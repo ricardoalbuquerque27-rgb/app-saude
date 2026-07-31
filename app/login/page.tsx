@@ -8,7 +8,6 @@ import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
   const router = useRouter();
-  const supabase = createClient();
 
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [fullName, setFullName] = useState("");
@@ -23,6 +22,8 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
     setMessage(null);
+
+    const supabase = createClient();
 
     try {
       if (mode === "signup") {
