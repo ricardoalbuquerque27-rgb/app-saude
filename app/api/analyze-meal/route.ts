@@ -6,8 +6,8 @@ export const dynamic = "force-dynamic";
 
 // Modelo do Google Gemini usado para analisar a foto. Pode ser trocado sem
 // editar o código, definindo a variável GEMINI_MODEL no Vercel.
-// Opções do nível gratuito: "gemini-2.5-flash" ou "gemini-2.0-flash".
-const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+// Opções do nível gratuito: "gemini-2.0-flash" ou "gemini-flash-latest".
+const MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
 
 const SYSTEM =
   "Você é um nutricionista que estima o conteúdo nutricional de refeições a partir de uma foto do prato. " +
