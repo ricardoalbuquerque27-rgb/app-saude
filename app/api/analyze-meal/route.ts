@@ -1,68 +1,32 @@
 import { NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Modelo usado para analisar a foto. Pode ser trocado sem editar o código,
-// definindo a variável de ambiente ANTHROPIC_MODEL no Vercel.
-// Alternativas mais baratas: "claude-sonnet-5" ou "claude-haiku-4-5".
-const MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-5";
-
-const SCHEMA = {
-  type: "object",
-  properties: {
-    is_food: {
-      type: "boolean",
-      description: "true se a imagem mostra comida/bebida; false caso contrário",
-    },
-    description: {
-      type: "string",
-      description:
-        "Descrição curta do prato em português, listando os alimentos e porções estimadas. Ex.: '2 ovos, 50g de arroz, 1 filé de frango grelhado'",
-    },
-    calories: { type: "number", description: "Total estimado de calorias (kcal)" },
-    protein_g: { type: "number", description: "Total estimado de proteína (g)" },
-    carbs_g: { type: "number", description: "Total estimado de carboidratos (g)" },
-    fat_g: { type: "number", description: "Total estimado de gordura (g)" },
-    items: {
-      type: "array",
-      description: "Alimentos identificados no prato",
-      items: {
-        type: "object",
-        properties: {
-          name: { type: "string", description: "Nome do alimento em português" },
-          calories: { type: "number", description: "Calorias estimadas do item (kcal)" },
-        },
-        required: ["name", "calories"],
-        additionalProperties: false,
-      },
-    },
-    confidence: {
-      type: "string",
-      enum: ["alta", "media", "baixa"],
-      description: "Nível de confiança da estimativa",
-    },
-  },
-  required: [
-    "is_food",
-    "description",
-    "calories",
-    "protein_g",
-    "carbs_g",
-    "fat_g",
-    "items",
-    "confidence",
-  ],
-  additionalProperties: false,
-} as const;
+// Modelo do Google Gemini usado para analisar a foto. Pode ser trocado sem
+// editar o código, definindo a variável GEMINI_MODEL no Vercel.
+// Opções do nível gratuito: "gemini-2.5-flash" ou "gemini-2.0-flash".
+const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
 const SYSTEM =
   "Você é um nutricionista que estima o conteúdo nutricional de refeições a partir de uma foto do prato. " +
   "Identifique cada alimento e estime porções realistas com base no tamanho aparente e em referências visuais (talheres, prato). " +
   "Some as calorias e macros de todos os itens. Seja realista: prefira estimativas médias a extremos. " +
-  "Responda sempre em português do Brasil. Se a imagem não mostrar comida, defina is_food como false e zere os valores.";
+  "Responda SEMPRE em português do Brasil.\n\n" +
+  "Responda APENAS com um JSON válido, sem texto extra e sem markdown, exatamente neste formato:\n" +
+  "{\n" +
+  '  "is_food": true,\n' +
+  '  "description": "descrição curta listando os alimentos e porções, ex.: 2 ovos, 50g de arroz, 1 filé de frango",\n' +
+  '  "calories": 0,\n' +
+  '  "protein_g": 0,\n' +
+  '  "carbs_g": 0,\n' +
+  '  "fat_g": 0,\n' +
+  '  "items": [{ "name": "nome do alimento", "calories": 0 }],\n' +
+  '  "confidence": "alta"\n' +
+  "}\n" +
+  'Os números são estimativas (calorias em kcal, macros em gramas). "confidence" deve ser "alta", "media" ou "baixa". ' +
+  'Se a imagem NÃO mostrar comida, retorne is_food=false e todos os números em 0.';
 
 const MEDIA_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
@@ -76,7 +40,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
   }
 
-  if (!process.env.ANTHROPIC_API_KEY) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
     return NextResponse.json(
       { error: "A análise por foto não está configurada (falta a chave da IA no servidor)." },
       { status: 503 }
@@ -104,54 +69,75 @@ export async function POST(request: Request) {
     );
   }
 
-  const client = new Anthropic();
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${apiKey}`;
 
   try {
-    const response = await client.messages.create({
-      model: MODEL,
-      max_tokens: 2048,
-      system: SYSTEM,
-      output_config: {
-        effort: "low",
-        format: { type: "json_schema", schema: SCHEMA },
-      },
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "image",
-              source: {
-                type: "base64",
-                media_type: mediaType as "image/jpeg" | "image/png" | "image/webp" | "image/gif",
-                data: base64,
+    const geminiRes = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: SYSTEM }] },
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { inline_data: { mime_type: mediaType, data: base64 } },
+              {
+                text: "Analise a foto deste prato e estime as calorias e macros de tudo que está nele.",
               },
-            },
-            {
-              type: "text",
-              text: "Analise a foto deste prato e estime as calorias e macros de tudo que está nele.",
-            },
-          ],
+            ],
+          },
+        ],
+        generationConfig: {
+          responseMimeType: "application/json",
+          temperature: 0.2,
         },
-      ],
+      }),
     });
 
-    if (response.stop_reason === "refusal") {
+    if (!geminiRes.ok) {
+      const status = geminiRes.status;
+      if (status === 400 || status === 403) {
+        return NextResponse.json(
+          { error: "Chave da IA inválida ou sem permissão. Verifique GEMINI_API_KEY no servidor." },
+          { status: 503 }
+        );
+      }
+      if (status === 429) {
+        return NextResponse.json(
+          { error: "Limite gratuito da IA atingido no momento. Tente novamente mais tarde." },
+          { status: 429 }
+        );
+      }
+      const detail = await geminiRes.text().catch(() => "");
+      console.error("gemini error:", status, detail.slice(0, 500));
       return NextResponse.json(
-        { error: "Não foi possível analisar esta imagem." },
-        { status: 422 }
-      );
-    }
-
-    const textBlock = response.content.find((b) => b.type === "text");
-    if (!textBlock || textBlock.type !== "text") {
-      return NextResponse.json(
-        { error: "Resposta inesperada da IA." },
+        { error: "Falha ao analisar a foto. Tente novamente." },
         { status: 502 }
       );
     }
 
-    const result = JSON.parse(textBlock.text);
+    const payload = await geminiRes.json();
+    const text: string | undefined =
+      payload?.candidates?.[0]?.content?.parts
+        ?.map((p: any) => p?.text ?? "")
+        .join("") || undefined;
+
+    if (!text) {
+      return NextResponse.json(
+        { error: "Não foi possível analisar esta imagem. Tente outra foto." },
+        { status: 422 }
+      );
+    }
+
+    let result: any;
+    try {
+      result = JSON.parse(text);
+    } catch {
+      // Remove cercas de markdown caso o modelo as inclua.
+      const cleaned = text.replace(/```json/gi, "").replace(/```/g, "").trim();
+      result = JSON.parse(cleaned);
+    }
 
     if (result.is_food === false) {
       return NextResponse.json(
@@ -170,19 +156,6 @@ export async function POST(request: Request) {
       confidence: result.confidence ?? "media",
     });
   } catch (err: any) {
-    const status = err?.status;
-    if (status === 401) {
-      return NextResponse.json(
-        { error: "Chave da IA inválida. Verifique ANTHROPIC_API_KEY no servidor." },
-        { status: 503 }
-      );
-    }
-    if (status === 429) {
-      return NextResponse.json(
-        { error: "Muitas requisições no momento. Tente novamente em instantes." },
-        { status: 429 }
-      );
-    }
     console.error("analyze-meal error:", err?.message ?? err);
     return NextResponse.json(
       { error: "Falha ao analisar a foto. Tente novamente." },
