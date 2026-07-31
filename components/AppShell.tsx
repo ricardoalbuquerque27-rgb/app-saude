@@ -14,6 +14,7 @@ import {
   LogOut,
   Moon,
   Sun,
+  Bot,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -24,6 +25,7 @@ const nav = [
   { href: "/app/medidas", label: "Medidas", icon: LineChart },
   { href: "/app/habitos", label: "Hábitos", icon: Droplets },
   { href: "/app/exames", label: "Exames", icon: FileText },
+  { href: "/app/assistente", label: "Assistente", icon: Bot },
 ];
 
 export default function AppShell({
@@ -152,7 +154,7 @@ export default function AppShell({
 
       {/* Bottom nav — mobile */}
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur lg:hidden dark:border-slate-800 dark:bg-slate-900/95">
-        <div className="mx-auto grid max-w-lg grid-cols-6">
+        <div className="mx-auto grid max-w-lg grid-cols-7">
           {nav.map((item) => (
             <Link
               key={item.href}
