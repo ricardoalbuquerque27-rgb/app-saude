@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { Salad, Plus, Trash2, Loader2, Flame } from "lucide-react";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { Salad, Plus, Trash2, Loader2, Flame, Camera, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { Meal } from "@/lib/types";
 import { PageHeader, Modal, Field, EmptyState, StatCard } from "@/components/ui";
@@ -29,6 +29,11 @@ export default function DietaPage() {
   const [protein, setProtein] = useState("");
   const [carbs, setCarbs] = useState("");
   const [fat, setFat] = useState("");
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+  const [analyzeNote, setAnalyzeNote] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -62,6 +67,74 @@ export default function DietaPage() {
     setProtein("");
     setCarbs("");
     setFat("");
+    setAnalyzeError(null);
+    setAnalyzeNote(null);
+  }
+
+  // Redimensiona a foto no navegador antes de enviar (mais rápido e barato).
+  function resizeImage(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          const maxSide = 1024;
+          let { width, height } = img;
+          if (width > maxSide || height > maxSide) {
+            const scale = maxSide / Math.max(width, height);
+            width = Math.round(width * scale);
+            height = Math.round(height * scale);
+          }
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) return reject(new Error("canvas"));
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL("image/jpeg", 0.8));
+        };
+        img.onerror = () => reject(new Error("img"));
+        img.src = reader.result as string;
+      };
+      reader.onerror = () => reject(new Error("read"));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function analyzePhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // permite reenviar a mesma foto
+    if (!file) return;
+    setAnalyzing(true);
+    setAnalyzeError(null);
+    setAnalyzeNote(null);
+    try {
+      const image = await resizeImage(file);
+      const res = await fetch("/api/analyze-meal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setAnalyzeError(data?.error ?? "Falha ao analisar a foto.");
+        return;
+      }
+      if (data.description) setDescription(data.description);
+      if (data.calories != null) setCalories(String(data.calories));
+      if (data.protein_g != null) setProtein(String(data.protein_g));
+      if (data.carbs_g != null) setCarbs(String(data.carbs_g));
+      if (data.fat_g != null) setFat(String(data.fat_g));
+      const conf =
+        data.confidence === "baixa"
+          ? " (confiança baixa — confira os valores)"
+          : "";
+      setAnalyzeNote("Preenchido pela IA — revise antes de salvar." + conf);
+    } catch {
+      setAnalyzeError("Não foi possível processar a imagem. Tente outra foto.");
+    } finally {
+      setAnalyzing(false);
+    }
   }
 
   async function save(e: React.FormEvent) {
@@ -180,6 +253,44 @@ export default function DietaPage() {
         title="Nova refeição"
       >
         <form onSubmit={save} className="space-y-4">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={analyzePhoto}
+          />
+          <div className="rounded-xl border border-dashed border-brand-300 bg-brand-50/60 p-3 dark:border-brand-800 dark:bg-brand-950/30">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={analyzing}
+              className="btn-primary w-full py-2.5"
+            >
+              {analyzing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Camera className="h-4 w-4" />
+              )}
+              {analyzing ? "Analisando foto…" : "Analisar foto do prato"}
+            </button>
+            <p className="mt-2 flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+              <Sparkles className="h-3.5 w-3.5" />
+              Tire ou envie uma foto e a IA estima calorias e macros.
+            </p>
+            {analyzeNote && (
+              <p className="mt-2 rounded-lg bg-brand-100 px-3 py-2 text-xs text-brand-800 dark:bg-brand-900/40 dark:text-brand-200">
+                {analyzeNote}
+              </p>
+            )}
+            {analyzeError && (
+              <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-950/40 dark:text-red-300">
+                {analyzeError}
+              </p>
+            )}
+          </div>
+
           <Field label="Tipo de refeição">
             <select
               className="input"
