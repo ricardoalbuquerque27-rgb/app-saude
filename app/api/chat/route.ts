@@ -85,21 +85,26 @@ export async function POST(request: Request) {
 
   if (!geminiRes.ok || !geminiRes.body) {
     const status = geminiRes.status;
-    if (status === 400 || status === 403) {
-      return NextResponse.json(
-        { error: "Chave da IA inválida ou sem permissão. Verifique GEMINI_API_KEY no servidor." },
-        { status: 503 }
-      );
+    const detail = await geminiRes.text().catch(() => "");
+    // Extrai a mensagem de erro do Gemini, se houver.
+    let reason = detail.slice(0, 200);
+    try {
+      const j = JSON.parse(detail);
+      reason = j?.error?.message || j?.error?.status || reason;
+    } catch {
+      // mantém o texto bruto
     }
+    console.error("chat gemini error:", status, detail.slice(0, 500));
     if (status === 429) {
       return NextResponse.json(
         { error: "Limite gratuito da IA atingido no momento. Tente novamente mais tarde." },
         { status: 429 }
       );
     }
-    const detail = await geminiRes.text().catch(() => "");
-    console.error("chat gemini error:", status, detail.slice(0, 300));
-    return NextResponse.json({ error: "Falha ao gerar a resposta. Tente novamente." }, { status: 502 });
+    return NextResponse.json(
+      { error: `Erro da IA (${status}): ${reason}` },
+      { status: 502 }
+    );
   }
 
   // Converte o SSE do Gemini num fluxo de texto puro para o navegador.
