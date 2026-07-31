@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { Salad, Plus, Trash2, Loader2, Flame, Camera, Sparkles } from "lucide-react";
+import { Salad, Plus, Trash2, Loader2, Flame, Camera, Sparkles, Upload } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { Meal } from "@/lib/types";
 import { PageHeader, Modal, Field, EmptyState, StatCard } from "@/components/ui";
@@ -31,6 +31,7 @@ export default function DietaPage() {
   const [fat, setFat] = useState("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
   const [analyzeNote, setAnalyzeNote] = useState<string | null>(null);
@@ -254,30 +255,53 @@ export default function DietaPage() {
       >
         <form onSubmit={save} className="space-y-4">
           <input
-            ref={fileInputRef}
+            ref={cameraInputRef}
             type="file"
             accept="image/*"
             capture="environment"
             className="hidden"
             onChange={analyzePhoto}
           />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={analyzePhoto}
+          />
           <div className="rounded-xl border border-dashed border-brand-300 bg-brand-50/60 p-3 dark:border-brand-800 dark:bg-brand-950/30">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={analyzing}
-              className="btn-primary w-full py-2.5"
-            >
-              {analyzing ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Camera className="h-4 w-4" />
-              )}
-              {analyzing ? "Analisando foto…" : "Analisar foto do prato"}
-            </button>
-            <p className="mt-2 flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+            <p className="mb-2 flex items-center gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">
               <Sparkles className="h-3.5 w-3.5" />
-              Tire ou envie uma foto e a IA estima calorias e macros.
+              Analisar foto do prato com IA
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => cameraInputRef.current?.click()}
+                disabled={analyzing}
+                className="btn-primary py-2.5"
+              >
+                {analyzing ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Camera className="h-4 w-4" />
+                )}
+                Tirar foto
+              </button>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={analyzing}
+                className="btn-ghost py-2.5"
+              >
+                <Upload className="h-4 w-4" />
+                Enviar arquivo
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+              {analyzing
+                ? "Analisando foto…"
+                : "Tire uma foto ou escolha uma imagem da galeria — a IA estima calorias e macros."}
             </p>
             {analyzeNote && (
               <p className="mt-2 rounded-lg bg-brand-100 px-3 py-2 text-xs text-brand-800 dark:bg-brand-900/40 dark:text-brand-200">
