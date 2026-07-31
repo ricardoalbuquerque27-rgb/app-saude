@@ -1,0 +1,17 @@
+{
+  "name": "Pace Fit",
+  "short_name": "Pace Fit",
+  "description": "Acompanhe seus treinos, dieta, peso, hábitos e exames.",
+  "start_url": "/app",
+  "display": "standalone",
+  "background_color": "#0c964b",
+  "theme_color": "#0c964b",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
