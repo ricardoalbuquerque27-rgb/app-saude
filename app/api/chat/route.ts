@@ -95,15 +95,9 @@ export async function POST(request: Request) {
       // mantém o texto bruto
     }
     console.error("chat gemini error:", status, detail.slice(0, 500));
-    if (status === 429) {
-      return NextResponse.json(
-        { error: "Limite gratuito da IA atingido no momento. Tente novamente mais tarde." },
-        { status: 429 }
-      );
-    }
     return NextResponse.json(
       { error: `Erro da IA (${status}): ${reason}` },
-      { status: 502 }
+      { status: status === 429 ? 429 : 502 }
     );
   }
 
