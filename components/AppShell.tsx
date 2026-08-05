@@ -15,6 +15,7 @@ import {
   Moon,
   Sun,
   Bot,
+  Watch,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -96,6 +97,17 @@ export default function AppShell({
 
         <div className="mt-4 space-y-1 border-t border-slate-200 pt-4 dark:border-slate-800">
           <Link
+            href="/app/integracoes"
+            className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition ${
+              pathname === "/app/integracoes"
+                ? "bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-300"
+                : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+            }`}
+          >
+            <Watch className="h-5 w-5" />
+            Integrações
+          </Link>
+          <Link
             href="/app/perfil"
             className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition ${
               pathname === "/app/perfil"
@@ -137,6 +149,13 @@ export default function AppShell({
           >
             {dark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
           </button>
+          <Link
+            href="/app/integracoes"
+            className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+            aria-label="Integrações"
+          >
+            <Watch className="h-5 w-5" />
+          </Link>
           <Link
             href="/app/perfil"
             className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
