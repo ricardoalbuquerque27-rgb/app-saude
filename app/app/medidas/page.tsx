@@ -21,6 +21,8 @@ const FIELDS: { key: keyof BodyMeasurement; label: string; unit: string }[] = [
   { key: "chest_cm", label: "Peito", unit: "cm" },
   { key: "arm_cm", label: "Braço", unit: "cm" },
   { key: "thigh_cm", label: "Coxa", unit: "cm" },
+  { key: "calf_cm", label: "Panturrilha", unit: "cm" },
+  { key: "neck_cm", label: "Pescoço", unit: "cm" },
 ];
 
 export default function MedidasPage() {

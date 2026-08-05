@@ -18,6 +18,8 @@ export type Database = {
       body_measurements: {
         Row: {
           arm_cm: number | null;
+          calf_cm: number | null;
+          neck_cm: number | null;
           body_fat_pct: number | null;
           chest_cm: number | null;
           created_at: string;
@@ -32,6 +34,8 @@ export type Database = {
         };
         Insert: {
           arm_cm?: number | null;
+          calf_cm?: number | null;
+          neck_cm?: number | null;
           body_fat_pct?: number | null;
           chest_cm?: number | null;
           created_at?: string;
@@ -46,6 +50,8 @@ export type Database = {
         };
         Update: {
           arm_cm?: number | null;
+          calf_cm?: number | null;
+          neck_cm?: number | null;
           body_fat_pct?: number | null;
           chest_cm?: number | null;
           created_at?: string;
@@ -65,10 +71,13 @@ export type Database = {
           created_at: string;
           date: string;
           id: string;
+          energy: number | null;
           mood: string | null;
           notes: string | null;
+          pain: number | null;
           sleep_hours: number | null;
           steps: number | null;
+          stress: number | null;
           user_id: string;
           water_ml: number | null;
         };
@@ -76,10 +85,13 @@ export type Database = {
           created_at?: string;
           date?: string;
           id?: string;
+          energy?: number | null;
           mood?: string | null;
           notes?: string | null;
+          pain?: number | null;
           sleep_hours?: number | null;
           steps?: number | null;
+          stress?: number | null;
           user_id: string;
           water_ml?: number | null;
         };
@@ -87,10 +99,13 @@ export type Database = {
           created_at?: string;
           date?: string;
           id?: string;
+          energy?: number | null;
           mood?: string | null;
           notes?: string | null;
+          pain?: number | null;
           sleep_hours?: number | null;
           steps?: number | null;
+          stress?: number | null;
           user_id?: string;
           water_ml?: number | null;
         };
@@ -147,6 +162,7 @@ export type Database = {
           reps: number | null;
           rpe: number | null;
           sets: number | null;
+          sets_json: Json | null;
           user_id: string;
           weight_kg: number | null;
           workout_id: string;
@@ -159,6 +175,7 @@ export type Database = {
           reps?: number | null;
           rpe?: number | null;
           sets?: number | null;
+          sets_json?: Json | null;
           user_id: string;
           weight_kg?: number | null;
           workout_id: string;
@@ -171,6 +188,7 @@ export type Database = {
           reps?: number | null;
           rpe?: number | null;
           sets?: number | null;
+          sets_json?: Json | null;
           user_id?: string;
           weight_kg?: number | null;
           workout_id?: string;
@@ -326,6 +344,33 @@ export type Database = {
         };
         Relationships: [];
       };
+      plan_completions: {
+        Row: {
+          created_at: string;
+          date: string;
+          id: string;
+          plan_id: string;
+          user_id: string;
+          workout_id: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          date?: string;
+          id?: string;
+          plan_id: string;
+          user_id: string;
+          workout_id?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          date?: string;
+          id?: string;
+          plan_id?: string;
+          user_id?: string;
+          workout_id?: string | null;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -353,3 +398,4 @@ export type BodyMeasurement = PublicSchema["Tables"]["body_measurements"]["Row"]
 export type DailyLog = PublicSchema["Tables"]["daily_logs"]["Row"];
 export type Exam = PublicSchema["Tables"]["exams"]["Row"];
 export type WorkoutPlan = PublicSchema["Tables"]["workout_plan"]["Row"];
+export type PlanCompletion = PublicSchema["Tables"]["plan_completions"]["Row"];

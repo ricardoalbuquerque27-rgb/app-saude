@@ -1,7 +1,16 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Droplets, Moon, Footprints, Smile, Loader2, Plus, Minus } from "lucide-react";
+import {
+  Droplets,
+  Moon,
+  Footprints,
+  Smile,
+  Loader2,
+  Plus,
+  Minus,
+  Gauge,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { DailyLog, Profile } from "@/lib/types";
 import { PageHeader, Field, formatDate } from "@/components/ui";
@@ -64,6 +73,9 @@ export default function HabitosPage() {
         sleep_hours: next.sleep_hours ?? null,
         steps: next.steps ?? null,
         mood: next.mood ?? null,
+        energy: next.energy ?? null,
+        stress: next.stress ?? null,
+        pain: next.pain ?? null,
         notes: next.notes ?? null,
       },
       { onConflict: "user_id,date" }
@@ -212,6 +224,69 @@ export default function HabitosPage() {
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Bem-estar */}
+      <div className="card mb-4">
+        <div className="mb-3 flex items-center gap-2">
+          <Gauge className="h-5 w-5 text-rose-500" />
+          <h2 className="font-semibold text-slate-900 dark:text-white">
+            Bem-estar
+          </h2>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Field label="Energia (1–5)">
+            <select
+              className="input"
+              value={log.energy ?? ""}
+              onChange={(e) =>
+                persist({ energy: e.target.value ? Number(e.target.value) : null })
+              }
+            >
+              <option value="">—</option>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Estresse (1–5)">
+            <select
+              className="input"
+              value={log.stress ?? ""}
+              onChange={(e) =>
+                persist({ stress: e.target.value ? Number(e.target.value) : null })
+              }
+            >
+              <option value="">—</option>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Dor (0–10)">
+            <select
+              className="input"
+              value={log.pain ?? ""}
+              onChange={(e) =>
+                persist({ pain: e.target.value !== "" ? Number(e.target.value) : null })
+              }
+            >
+              <option value="">—</option>
+              {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+        <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">
+          Energia e estresse: 1 = baixo, 5 = alto. Dor: 0 = nenhuma, 10 = máxima.
+        </p>
       </div>
 
       {saving && (
