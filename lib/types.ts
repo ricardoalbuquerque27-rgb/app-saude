@@ -290,6 +290,39 @@ export type Database = {
         };
         Relationships: [];
       };
+      workout_plan: {
+        Row: {
+          created_at: string;
+          day_of_week: number;
+          id: string;
+          notes: string | null;
+          position: number;
+          sport: string;
+          title: string | null;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          day_of_week: number;
+          id?: string;
+          notes?: string | null;
+          position?: number;
+          sport: string;
+          title?: string | null;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          day_of_week?: number;
+          id?: string;
+          notes?: string | null;
+          position?: number;
+          sport?: string;
+          title?: string | null;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -316,3 +349,4 @@ export type Meal = PublicSchema["Tables"]["meals"]["Row"];
 export type BodyMeasurement = PublicSchema["Tables"]["body_measurements"]["Row"];
 export type DailyLog = PublicSchema["Tables"]["daily_logs"]["Row"];
 export type Exam = PublicSchema["Tables"]["exams"]["Row"];
+export type WorkoutPlan = PublicSchema["Tables"]["workout_plan"]["Row"];

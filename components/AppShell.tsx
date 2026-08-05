@@ -70,12 +70,16 @@ export default function AppShell({
     item.exact ? pathname === item.href : pathname.startsWith(item.href);
 
   return (
-    <div className="min-h-dvh bg-slate-50 dark:bg-slate-950">
+    <div className="min-h-dvh">
       {/* Sidebar — desktop */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-slate-200 bg-white px-4 py-6 lg:flex dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex items-center gap-2 px-2 text-lg font-bold text-brand-700 dark:text-brand-400">
-          <Dumbbell className="h-6 w-6" />
-          Pace Fit
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-slate-200 bg-white/70 px-4 py-6 backdrop-blur-xl lg:flex dark:border-white/[0.06] dark:bg-slate-950/40">
+        <div className="flex items-center gap-2.5 px-1">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 text-white shadow-[0_8px_20px_-8px_rgba(24,184,94,0.8)]">
+            <Dumbbell className="h-5 w-5" />
+          </div>
+          <span className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">
+            Pace Fit
+          </span>
         </div>
 
         <nav className="mt-8 flex-1 space-y-1">

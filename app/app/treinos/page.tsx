@@ -8,6 +8,8 @@ import {
   ChevronDown,
   ChevronUp,
   Loader2,
+  CalendarDays,
+  History,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { Workout, Exercise } from "@/lib/types";
@@ -18,6 +20,55 @@ import {
   EmptyState,
   formatDate,
 } from "@/components/ui";
+
+// Segunda = 0 ... Domingo = 6
+const DAYS = [
+  "Segunda",
+  "Terça",
+  "Quarta",
+  "Quinta",
+  "Sexta",
+  "Sábado",
+  "Domingo",
+];
+
+const SPORTS = [
+  "Musculação",
+  "Corrida",
+  "Ciclismo",
+  "Natação",
+  "Crossfit",
+  "Funcional",
+  "HIIT",
+  "Yoga",
+  "Pilates",
+  "Futebol",
+  "Caminhada",
+  "Alongamento",
+  "Descanso",
+];
+
+function sportChip(sport: string) {
+  const s = sport.toLowerCase();
+  if (s.includes("descanso"))
+    return "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300";
+  if (s.includes("corrida") || s.includes("caminh") || s.includes("hiit"))
+    return "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300";
+  if (s.includes("ciclismo") || s.includes("natação") || s.includes("nata"))
+    return "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300";
+  if (s.includes("yoga") || s.includes("pilates") || s.includes("along"))
+    return "bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300";
+  return "bg-brand-100 text-brand-700 dark:bg-brand-950/40 dark:text-brand-300";
+}
+
+type PlanEntry = {
+  id: string;
+  day_of_week: number;
+  sport: string;
+  title: string | null;
+  notes: string | null;
+  position: number;
+};
 
 type ExerciseDraft = {
   name: string;
@@ -33,17 +84,32 @@ const emptyExercise = (): ExerciseDraft => ({
   weight_kg: "",
 });
 
+function todayIndex() {
+  // JS: 0=Domingo..6=Sábado -> nosso: 0=Segunda..6=Domingo
+  return (new Date().getDay() + 6) % 7;
+}
+
 export default function TreinosPage() {
   const supabase = createClient();
+  const [tab, setTab] = useState<"plano" | "historico">("plano");
+
+  // Plano semanal
+  const [plan, setPlan] = useState<PlanEntry[]>([]);
+  const [planOpen, setPlanOpen] = useState(false);
+  const [planSaving, setPlanSaving] = useState(false);
+  const [pDay, setPDay] = useState(0);
+  const [pSport, setPSport] = useState("Musculação");
+  const [pTitle, setPTitle] = useState("");
+  const [pNotes, setPNotes] = useState("");
+
+  // Histórico de treinos
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [exercisesByWorkout, setExercisesByWorkout] = useState<
     Record<string, Exercise[]>
   >({});
-  const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
@@ -51,15 +117,23 @@ export default function TreinosPage() {
   const [notes, setNotes] = useState("");
   const [exercises, setExercises] = useState<ExerciseDraft[]>([emptyExercise()]);
 
+  const [loading, setLoading] = useState(true);
+
   const load = useCallback(async () => {
     setLoading(true);
-    const { data: ws } = await supabase
-      .from("workouts")
-      .select("*")
-      .order("date", { ascending: false });
-    const list = (ws ?? []) as Workout[];
-    setWorkouts(list);
+    const [planRes, wsRes] = await Promise.all([
+      supabase
+        .from("workout_plan")
+        .select("*")
+        .order("day_of_week", { ascending: true })
+        .order("position", { ascending: true }),
+      supabase.from("workouts").select("*").order("date", { ascending: false }),
+    ]);
 
+    setPlan((planRes.data ?? []) as PlanEntry[]);
+
+    const list = (wsRes.data ?? []) as Workout[];
+    setWorkouts(list);
     if (list.length > 0) {
       const { data: exs } = await supabase
         .from("exercises")
@@ -83,6 +157,41 @@ export default function TreinosPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  function openPlanModal(day: number) {
+    setPDay(day);
+    setPSport("Musculação");
+    setPTitle("");
+    setPNotes("");
+    setPlanOpen(true);
+  }
+
+  async function savePlanEntry(e: React.FormEvent) {
+    e.preventDefault();
+    if (!pSport.trim()) return;
+    setPlanSaving(true);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+    const position = plan.filter((p) => p.day_of_week === pDay).length;
+    await supabase.from("workout_plan").insert({
+      user_id: user.id,
+      day_of_week: pDay,
+      sport: pSport.trim(),
+      title: pTitle.trim() || null,
+      notes: pNotes.trim() || null,
+      position,
+    });
+    setPlanSaving(false);
+    setPlanOpen(false);
+    await load();
+  }
+
+  async function removePlanEntry(id: string) {
+    await supabase.from("workout_plan").delete().eq("id", id);
+    setPlan((prev) => prev.filter((p) => p.id !== id));
+  }
 
   function resetForm() {
     setDate(new Date().toISOString().slice(0, 10));
@@ -150,21 +259,126 @@ export default function TreinosPage() {
     );
   }
 
+  const today = todayIndex();
+
   return (
     <div>
       <PageHeader
         title="Treinos"
-        subtitle="Registre seus treinos e exercícios."
+        subtitle="Monte seu plano da semana e registre seus treinos."
         action={
-          <button onClick={() => setOpen(true)} className="btn-primary">
-            <Plus className="h-4 w-4" /> Novo treino
-          </button>
+          tab === "historico" ? (
+            <button onClick={() => setOpen(true)} className="btn-primary">
+              <Plus className="h-4 w-4" /> Novo treino
+            </button>
+          ) : undefined
         }
       />
+
+      {/* Abas */}
+      <div className="mb-5 inline-flex rounded-xl border border-slate-200 bg-white p-1 dark:border-white/[0.06] dark:bg-slate-900/50">
+        <button
+          onClick={() => setTab("plano")}
+          className={`flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-sm font-medium transition ${
+            tab === "plano"
+              ? "bg-brand-600 text-white shadow-sm"
+              : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+          }`}
+        >
+          <CalendarDays className="h-4 w-4" /> Plano semanal
+        </button>
+        <button
+          onClick={() => setTab("historico")}
+          className={`flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-sm font-medium transition ${
+            tab === "historico"
+              ? "bg-brand-600 text-white shadow-sm"
+              : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+          }`}
+        >
+          <History className="h-4 w-4" /> Histórico
+        </button>
+      </div>
 
       {loading ? (
         <div className="flex justify-center py-16 text-slate-400">
           <Loader2 className="h-6 w-6 animate-spin" />
+        </div>
+      ) : tab === "plano" ? (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {DAYS.map((dayName, day) => {
+            const sessions = plan.filter((p) => p.day_of_week === day);
+            const isToday = day === today;
+            return (
+              <div
+                key={day}
+                className={`card ${
+                  isToday ? "ring-2 ring-brand-500/40" : ""
+                }`}
+              >
+                <div className="mb-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold text-slate-900 dark:text-white">
+                      {dayName}
+                    </h3>
+                    {isToday && (
+                      <span className="rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-semibold text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
+                        hoje
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {sessions.length === 0 ? (
+                  <p className="mb-3 text-sm text-slate-400 dark:text-slate-500">
+                    Nada planejado.
+                  </p>
+                ) : (
+                  <ul className="mb-3 space-y-2">
+                    {sessions.map((s) => (
+                      <li
+                        key={s.id}
+                        className="rounded-xl border border-slate-100 bg-slate-50/70 p-2.5 dark:border-white/[0.05] dark:bg-slate-800/40"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${sportChip(
+                              s.sport
+                            )}`}
+                          >
+                            {s.sport}
+                          </span>
+                          <button
+                            onClick={() => removePlanEntry(s.id)}
+                            className="rounded-lg p-1 text-slate-400 hover:text-rose-600"
+                            aria-label="Remover"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                        {s.title && (
+                          <p className="mt-1 text-sm font-medium text-slate-800 dark:text-slate-200">
+                            {s.title}
+                          </p>
+                        )}
+                        {s.notes && (
+                          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                            {s.notes}
+                          </p>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                <button
+                  onClick={() => openPlanModal(day)}
+                  className="btn-ghost w-full py-1.5 text-sm"
+                >
+                  <Plus className="h-4 w-4" /> Adicionar
+                </button>
+              </div>
+            );
+          })}
         </div>
       ) : workouts.length === 0 ? (
         <EmptyState
@@ -178,7 +392,7 @@ export default function TreinosPage() {
             const exs = exercisesByWorkout[w.id] ?? [];
             const isOpen = expanded === w.id;
             return (
-              <div key={w.id} className="card p-0 overflow-hidden">
+              <div key={w.id} className="card overflow-hidden p-0">
                 <div className="flex items-center gap-3 p-4">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
                     <Dumbbell className="h-5 w-5" />
@@ -262,6 +476,69 @@ export default function TreinosPage() {
         </div>
       )}
 
+      {/* Modal — adicionar treino ao plano semanal */}
+      <Modal
+        open={planOpen}
+        onClose={() => setPlanOpen(false)}
+        title="Adicionar ao plano"
+      >
+        <form onSubmit={savePlanEntry} className="space-y-4">
+          <Field label="Dia da semana">
+            <select
+              className="input"
+              value={pDay}
+              onChange={(e) => setPDay(Number(e.target.value))}
+            >
+              {DAYS.map((d, i) => (
+                <option key={d} value={i}>
+                  {d}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Esporte / modalidade">
+            <input
+              className="input"
+              list="sports-list"
+              value={pSport}
+              onChange={(e) => setPSport(e.target.value)}
+              placeholder="Ex.: Musculação, Corrida..."
+              required
+            />
+            <datalist id="sports-list">
+              {SPORTS.map((s) => (
+                <option key={s} value={s} />
+              ))}
+            </datalist>
+          </Field>
+          <Field label="Treino / foco (opcional)">
+            <input
+              className="input"
+              value={pTitle}
+              onChange={(e) => setPTitle(e.target.value)}
+              placeholder="Ex.: Treino A — Peito e tríceps / Corrida 5km"
+            />
+          </Field>
+          <Field label="Observações (opcional)">
+            <textarea
+              className="input min-h-[60px]"
+              value={pNotes}
+              onChange={(e) => setPNotes(e.target.value)}
+              placeholder="Ex.: manhã, intensidade leve..."
+            />
+          </Field>
+          <button
+            type="submit"
+            disabled={planSaving}
+            className="btn-primary w-full py-2.5"
+          >
+            {planSaving && <Loader2 className="h-4 w-4 animate-spin" />}
+            Adicionar
+          </button>
+        </form>
+      </Modal>
+
+      {/* Modal — registrar treino (histórico) */}
       <Modal
         open={open}
         onClose={() => {
@@ -391,7 +668,11 @@ export default function TreinosPage() {
             />
           </Field>
 
-          <button type="submit" disabled={saving} className="btn-primary w-full py-2.5">
+          <button
+            type="submit"
+            disabled={saving}
+            className="btn-primary w-full py-2.5"
+          >
             {saving && <Loader2 className="h-4 w-4 animate-spin" />}
             Salvar treino
           </button>

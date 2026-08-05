@@ -15,7 +15,7 @@ export function PageHeader({
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
           {title}
         </h1>
         {subtitle && (
@@ -52,10 +52,10 @@ export function StatCard({
     rose: "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300",
   };
   return (
-    <div className="card flex items-center gap-4">
+    <div className="card flex items-center gap-4 transition duration-200 hover:-translate-y-0.5">
       {icon && (
         <div
-          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${accents[accent]}`}
+          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ring-1 ring-inset ring-black/[0.03] dark:ring-white/[0.06] ${accents[accent]}`}
         >
           {icon}
         </div>
@@ -64,7 +64,7 @@ export function StatCard({
         <p className="truncate text-xs font-medium text-slate-500 dark:text-slate-400">
           {label}
         </p>
-        <p className="text-xl font-bold text-slate-900 dark:text-white">
+        <p className="mt-0.5 text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
           {value}
           {unit && (
             <span className="ml-1 text-sm font-medium text-slate-400">
