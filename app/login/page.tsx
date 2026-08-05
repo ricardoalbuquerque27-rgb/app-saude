@@ -17,6 +17,7 @@ export default function LoginPage() {
 
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [fullName, setFullName] = useState("");
+  const [cpf, setCpf] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -34,10 +35,25 @@ export default function LoginPage() {
 
     try {
       if (mode === "signup") {
+        const cpfDigits = onlyDigits(cpf);
+        if (!validateCPF(cpfDigits)) {
+          setError("CPF inválido. Confira os números digitados.");
+          setLoading(false);
+          return;
+        }
+        const { data: disponivel, error: rpcErr } = await supabase.rpc(
+          "cpf_disponivel",
+          { p_cpf: cpfDigits }
+        );
+        if (!rpcErr && disponivel === false) {
+          setError("Este CPF já está cadastrado.");
+          setLoading(false);
+          return;
+        }
         const { error } = await supabase.auth.signUp({
           email,
           password,
-          options: { data: { full_name: fullName } },
+          options: { data: { full_name: fullName, cpf: cpfDigits } },
         });
         if (error) throw error;
         const { data } = await supabase.auth.getSession();
@@ -146,16 +162,31 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="mt-7 space-y-4">
             {mode === "signup" && (
-              <div>
-                <label className="label">Nome</label>
-                <input
-                  className="input"
-                  type="text"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Seu nome"
-                />
-              </div>
+              <>
+                <div>
+                  <label className="label">Nome</label>
+                  <input
+                    className="input"
+                    type="text"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="Seu nome"
+                  />
+                </div>
+                <div>
+                  <label className="label">CPF</label>
+                  <input
+                    className="input"
+                    type="text"
+                    inputMode="numeric"
+                    value={cpf}
+                    onChange={(e) => setCpf(formatCPF(e.target.value))}
+                    placeholder="000.000.000-00"
+                    maxLength={14}
+                    required
+                  />
+                </div>
+              </>
             )}
             <div>
               <label className="label">E-mail</label>
@@ -260,6 +291,34 @@ export default function LoginPage() {
   );
 }
 
+function onlyDigits(s: string) {
+  return s.replace(/\D/g, "");
+}
+
+function formatCPF(v: string) {
+  const d = onlyDigits(v).slice(0, 11);
+  return d
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+}
+
+function validateCPF(value: string) {
+  const cpf = onlyDigits(value);
+  if (cpf.length !== 11) return false;
+  if (/^(\d)\1{10}$/.test(cpf)) return false; // todos iguais
+  let sum = 0;
+  for (let i = 0; i < 9; i++) sum += parseInt(cpf[i]) * (10 - i);
+  let d1 = (sum * 10) % 11;
+  if (d1 === 10) d1 = 0;
+  if (d1 !== parseInt(cpf[9])) return false;
+  sum = 0;
+  for (let i = 0; i < 10; i++) sum += parseInt(cpf[i]) * (11 - i);
+  let d2 = (sum * 10) % 11;
+  if (d2 === 10) d2 = 0;
+  return d2 === parseInt(cpf[10]);
+}
+
 function traduzErro(msg: string): string {
   const m = msg.toLowerCase();
   if (m.includes("invalid login credentials"))
@@ -270,5 +329,7 @@ function traduzErro(msg: string): string {
     return "A senha deve ter pelo menos 6 caracteres.";
   if (m.includes("email not confirmed"))
     return "Confirme seu e-mail antes de entrar.";
+  if (m.includes("database error"))
+    return "Não foi possível criar a conta. Verifique se o CPF ou e-mail já está cadastrado.";
   return msg;
 }

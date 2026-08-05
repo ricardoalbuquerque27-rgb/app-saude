@@ -245,6 +245,7 @@ export type Database = {
       profiles: {
         Row: {
           birth_date: string | null;
+          cpf: string | null;
           created_at: string;
           daily_calorie_goal: number | null;
           daily_water_goal_ml: number | null;
@@ -256,6 +257,7 @@ export type Database = {
         };
         Insert: {
           birth_date?: string | null;
+          cpf?: string | null;
           created_at?: string;
           daily_calorie_goal?: number | null;
           daily_water_goal_ml?: number | null;
@@ -267,6 +269,7 @@ export type Database = {
         };
         Update: {
           birth_date?: string | null;
+          cpf?: string | null;
           created_at?: string;
           daily_calorie_goal?: number | null;
           daily_water_goal_ml?: number | null;
@@ -376,7 +379,10 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      cpf_disponivel: {
+        Args: { p_cpf: string };
+        Returns: boolean;
+      };
     };
     Enums: {
       [_ in never]: never;
