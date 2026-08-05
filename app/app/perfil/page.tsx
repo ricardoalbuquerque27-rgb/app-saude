@@ -2,10 +2,41 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { User, LogOut, Loader2, Check } from "lucide-react";
+import { LogOut, Loader2, Check } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { Profile } from "@/lib/types";
 import { PageHeader, Field } from "@/components/ui";
+
+function onlyDigits(s: string) {
+  return s.replace(/\D/g, "");
+}
+function formatCPF(v: string) {
+  const d = onlyDigits(v).slice(0, 11);
+  return d
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+}
+function validateCPF(value: string) {
+  const cpf = onlyDigits(value);
+  if (cpf.length !== 11) return false;
+  if (/^(\d)\1{10}$/.test(cpf)) return false;
+  let sum = 0;
+  for (let i = 0; i < 9; i++) sum += parseInt(cpf[i]) * (10 - i);
+  let d1 = (sum * 10) % 11;
+  if (d1 === 10) d1 = 0;
+  if (d1 !== parseInt(cpf[9])) return false;
+  sum = 0;
+  for (let i = 0; i < 10; i++) sum += parseInt(cpf[i]) * (11 - i);
+  let d2 = (sum * 10) % 11;
+  if (d2 === 10) d2 = 0;
+  return d2 === parseInt(cpf[10]);
+}
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "PF";
+  return (parts[0][0] + (parts[1]?.[0] ?? "")).toUpperCase();
+}
 
 export default function PerfilPage() {
   const supabase = createClient();
@@ -13,9 +44,12 @@ export default function PerfilPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState("");
 
   const [fullName, setFullName] = useState("");
+  const [cpf, setCpf] = useState("");
+  const [originalCpf, setOriginalCpf] = useState("");
   const [height, setHeight] = useState("");
   const [birthDate, setBirthDate] = useState("");
   const [weightGoal, setWeightGoal] = useState("");
@@ -28,13 +62,12 @@ export default function PerfilPage() {
       data: { user },
     } = await supabase.auth.getUser();
     setEmail(user?.email ?? "");
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .maybeSingle();
+    const { data } = await supabase.from("profiles").select("*").maybeSingle();
     const p = data as Profile | null;
     if (p) {
       setFullName(p.full_name ?? "");
+      setCpf(p.cpf ? formatCPF(p.cpf) : "");
+      setOriginalCpf(p.cpf ?? "");
       setHeight(p.height_cm?.toString() ?? "");
       setBirthDate(p.birth_date ?? "");
       setWeightGoal(p.weight_goal_kg?.toString() ?? "");
@@ -50,15 +83,39 @@ export default function PerfilPage() {
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
-    setSaving(true);
+    setError(null);
     setSaved(false);
+
+    const cpfDigits = onlyDigits(cpf);
+    if (cpfDigits && !validateCPF(cpfDigits)) {
+      setError("CPF inválido. Confira os números digitados.");
+      return;
+    }
+    setSaving(true);
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) return;
-    await supabase.from("profiles").upsert({
+    if (!user) {
+      setSaving(false);
+      return;
+    }
+
+    // Só checa disponibilidade se o CPF mudou
+    if (cpfDigits && cpfDigits !== originalCpf) {
+      const { data: disponivel } = await supabase.rpc("cpf_disponivel", {
+        p_cpf: cpfDigits,
+      });
+      if (disponivel === false) {
+        setSaving(false);
+        setError("Este CPF já está cadastrado em outra conta.");
+        return;
+      }
+    }
+
+    const { error: upErr } = await supabase.from("profiles").upsert({
       id: user.id,
       full_name: fullName.trim() || null,
+      cpf: cpfDigits || null,
       height_cm: height ? Number(height) : null,
       birth_date: birthDate || null,
       weight_goal_kg: weightGoal ? Number(weightGoal) : null,
@@ -66,7 +123,17 @@ export default function PerfilPage() {
       daily_calorie_goal: calorieGoal ? Number(calorieGoal) : null,
       updated_at: new Date().toISOString(),
     });
+
     setSaving(false);
+    if (upErr) {
+      setError(
+        upErr.message?.toLowerCase().includes("cpf")
+          ? "Este CPF já está cadastrado em outra conta."
+          : "Não foi possível salvar. Tente novamente."
+      );
+      return;
+    }
+    setOriginalCpf(cpfDigits);
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
   }
@@ -89,17 +156,21 @@ export default function PerfilPage() {
     <div className="max-w-xl">
       <PageHeader title="Perfil" subtitle="Seus dados e metas." />
 
-      <div className="card mb-6 flex items-center gap-4">
-        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
-          <User className="h-7 w-7" />
-        </div>
-        <div className="min-w-0">
-          <p className="truncate font-semibold text-slate-900 dark:text-white">
-            {fullName || "Sem nome"}
-          </p>
-          <p className="truncate text-sm text-slate-500 dark:text-slate-400">
-            {email}
-          </p>
+      {/* Cabeçalho premium */}
+      <div className="card mb-6 overflow-hidden p-0">
+        <div className="h-20 bg-gradient-to-r from-brand-500 to-brand-700" />
+        <div className="-mt-9 flex items-end gap-4 p-5">
+          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600 text-xl font-bold text-white ring-4 ring-white shadow-lg dark:ring-slate-900">
+            {initials(fullName)}
+          </div>
+          <div className="min-w-0 pb-1">
+            <p className="truncate text-lg font-bold tracking-tight text-slate-900 dark:text-white">
+              {fullName || "Sem nome"}
+            </p>
+            <p className="truncate text-sm text-slate-500 dark:text-slate-400">
+              {email}
+            </p>
+          </div>
         </div>
       </div>
 
@@ -110,6 +181,17 @@ export default function PerfilPage() {
             className="input"
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
+          />
+        </Field>
+        <Field label="CPF">
+          <input
+            className="input"
+            type="text"
+            inputMode="numeric"
+            value={cpf}
+            onChange={(e) => setCpf(formatCPF(e.target.value))}
+            placeholder="000.000.000-00"
+            maxLength={14}
           />
         </Field>
         <div className="grid grid-cols-2 gap-3">
@@ -132,9 +214,7 @@ export default function PerfilPage() {
           </Field>
         </div>
 
-        <h2 className="pt-2 font-semibold text-slate-900 dark:text-white">
-          Metas
-        </h2>
+        <h2 className="pt-2 font-semibold text-slate-900 dark:text-white">Metas</h2>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Field label="Peso alvo (kg)">
             <input
@@ -165,6 +245,12 @@ export default function PerfilPage() {
             />
           </Field>
         </div>
+
+        {error && (
+          <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
+            {error}
+          </p>
+        )}
 
         <button type="submit" disabled={saving} className="btn-primary w-full py-2.5">
           {saving ? (
