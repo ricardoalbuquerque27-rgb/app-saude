@@ -27,6 +27,109 @@ const SYSTEM =
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
+// Monta um resumo dos dados do usuário para personalizar as respostas.
+async function buildUserContext(supabase: any, uid: string): Promise<string> {
+  const today = new Date().toISOString().slice(0, 10);
+  const weekAgo = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 7);
+    return d.toISOString().slice(0, 10);
+  })();
+  const dow = (new Date().getDay() + 6) % 7;
+
+  const [prof, weight, meals, wkCount, plan, log, exams] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select(
+        "full_name, height_cm, birth_date, weight_goal_kg, daily_water_goal_ml, daily_calorie_goal"
+      )
+      .eq("id", uid)
+      .maybeSingle(),
+    supabase
+      .from("body_measurements")
+      .select("weight_kg, body_fat_pct, date")
+      .eq("user_id", uid)
+      .not("weight_kg", "is", null)
+      .order("date", { ascending: false })
+      .limit(1),
+    supabase.from("meals").select("calories").eq("user_id", uid).eq("date", today),
+    supabase
+      .from("workouts")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", uid)
+      .gte("date", weekAgo),
+    supabase
+      .from("workout_plan")
+      .select("sport, title")
+      .eq("user_id", uid)
+      .eq("day_of_week", dow),
+    supabase
+      .from("daily_logs")
+      .select("water_ml, sleep_hours")
+      .eq("user_id", uid)
+      .eq("date", today)
+      .maybeSingle(),
+    supabase
+      .from("exams")
+      .select("title, result_value, unit, status")
+      .eq("user_id", uid)
+      .neq("status", "normal")
+      .order("date", { ascending: false })
+      .limit(5),
+  ]);
+
+  const p = prof.data;
+  const age = p?.birth_date
+    ? Math.floor(
+        (Date.now() - new Date(p.birth_date).getTime()) /
+          (365.25 * 24 * 3600 * 1000)
+      )
+    : null;
+  const w = (weight.data ?? [])[0];
+  const calToday = (meals.data ?? []).reduce(
+    (s: number, m: any) => s + (Number(m.calories) || 0),
+    0
+  );
+
+  const parts: string[] = [];
+  if (p?.full_name) parts.push(`Nome: ${p.full_name.split(" ")[0]}`);
+  if (age) parts.push(`Idade: ${age}`);
+  if (p?.height_cm) parts.push(`Altura: ${p.height_cm} cm`);
+  if (w?.weight_kg != null) parts.push(`Peso atual: ${w.weight_kg} kg`);
+  if (p?.weight_goal_kg != null) parts.push(`Meta de peso: ${p.weight_goal_kg} kg`);
+  if (w?.body_fat_pct != null) parts.push(`Gordura corporal: ${w.body_fat_pct}%`);
+  parts.push(
+    `Calorias hoje: ${Math.round(calToday)}${
+      p?.daily_calorie_goal ? ` (meta ${p.daily_calorie_goal})` : ""
+    }`
+  );
+  if (log.data?.water_ml != null)
+    parts.push(
+      `Água hoje: ${log.data.water_ml} ml${
+        p?.daily_water_goal_ml ? ` (meta ${p.daily_water_goal_ml})` : ""
+      }`
+    );
+  if (log.data?.sleep_hours != null) parts.push(`Sono: ${log.data.sleep_hours} h`);
+  parts.push(`Treinos nos últimos 7 dias: ${wkCount.count ?? 0}`);
+  if ((plan.data ?? []).length)
+    parts.push(
+      `Plano de hoje: ${(plan.data ?? [])
+        .map((x: any) => x.sport + (x.title ? ` (${x.title})` : ""))
+        .join(", ")}`
+    );
+  if ((exams.data ?? []).length)
+    parts.push(
+      `Exames alterados recentes: ${(exams.data ?? [])
+        .map(
+          (e: any) =>
+            `${e.title} ${e.result_value ?? ""}${e.unit ?? ""} (${e.status})`
+        )
+        .join("; ")}`
+    );
+
+  return parts.join("\n");
+}
+
 export async function POST(request: Request) {
   const supabase = await createClient();
   const {
@@ -61,6 +164,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Nenhuma mensagem enviada." }, { status: 400 });
   }
 
+  let contexto = "";
+  try {
+    contexto = await buildUserContext(supabase, user.id);
+  } catch {
+    // se falhar, segue sem contexto personalizado
+  }
+  const systemContent =
+    SYSTEM +
+    (contexto
+      ? "\n\nDADOS ATUAIS DO USUÁRIO (use para personalizar quando fizer sentido; não repita tudo sem necessidade e não invente números além destes):\n" +
+        contexto
+      : "");
+
   let groqRes: Response;
   try {
     groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -71,7 +187,7 @@ export async function POST(request: Request) {
       },
       body: JSON.stringify({
         model: MODEL,
-        messages: [{ role: "system", content: SYSTEM }, ...recent],
+        messages: [{ role: "system", content: systemContent }, ...recent],
         temperature: 0.7,
         stream: true,
       }),

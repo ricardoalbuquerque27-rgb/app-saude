@@ -7,10 +7,10 @@ import { PageHeader } from "@/components/ui";
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
 const SUGGESTIONS = [
-  "Monte um cardápio simples de 1800 kcal para o dia",
-  "Como organizar meus treinos na semana?",
-  "O que comer antes e depois do treino?",
-  "Como registrar uma refeição pela foto no app?",
+  "Como está minha dieta hoje?",
+  "Sugira um treino para hoje",
+  "Estou perto da minha meta de peso?",
+  "O que posso melhorar nos meus hábitos?",
 ];
 
 export default function AssistentePage() {
@@ -107,8 +107,8 @@ export default function AssistentePage() {
                   Olá! Sou seu assistente do Pace Fit 🥗💪
                 </p>
                 <p className="mt-1">
-                  Posso ajudar com dieta, treinos, organização da rotina e a usar o app.
-                  Como posso ajudar hoje?
+                  Conheço seus dados (peso, dieta, treinos, hábitos e exames) e uso
+                  isso para dar respostas sob medida. Como posso ajudar hoje?
                 </p>
               </div>
             </div>

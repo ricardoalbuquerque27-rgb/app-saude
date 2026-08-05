@@ -15,7 +15,7 @@ const HIGHLIGHTS = [
 export default function LoginPage() {
   const router = useRouter();
 
-  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [mode, setMode] = useState<"login" | "signup" | "recover">("login");
   const [fullName, setFullName] = useState("");
   const [cpf, setCpf] = useState("");
   const [email, setEmail] = useState("");
@@ -34,6 +34,17 @@ export default function LoginPage() {
     const supabase = createClient();
 
     try {
+      if (mode === "recover") {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/redefinir-senha`,
+        });
+        if (error) throw error;
+        setMessage(
+          "Se este e-mail tiver conta, enviamos um link para redefinir a senha. Verifique sua caixa de entrada (e o spam)."
+        );
+        setLoading(false);
+        return;
+      }
       if (mode === "signup") {
         const cpfDigits = onlyDigits(cpf);
         if (!validateCPF(cpfDigits)) {
@@ -152,12 +163,18 @@ export default function LoginPage() {
           </Link>
 
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-            {mode === "login" ? "Bem-vindo de volta" : "Crie sua conta"}
+            {mode === "login"
+              ? "Bem-vindo de volta"
+              : mode === "signup"
+                ? "Crie sua conta"
+                : "Recuperar senha"}
           </h1>
           <p className="mt-1.5 text-sm text-slate-500 dark:text-slate-400">
             {mode === "login"
               ? "Entre para continuar sua evolução."
-              : "Comece a acompanhar sua evolução hoje."}
+              : mode === "signup"
+                ? "Comece a acompanhar sua evolução hoje."
+                : "Enviaremos um link para você redefinir a senha."}
           </p>
 
           <form onSubmit={handleSubmit} className="mt-7 space-y-4">
@@ -199,33 +216,50 @@ export default function LoginPage() {
                 placeholder="voce@email.com"
               />
             </div>
-            <div>
-              <label className="label">Senha</label>
-              <div className="relative">
-                <input
-                  className="input pr-11"
-                  type={showPw ? "text" : "password"}
-                  required
-                  minLength={6}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPw((v) => !v)}
-                  className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-                  aria-label={showPw ? "Ocultar senha" : "Mostrar senha"}
-                  tabIndex={-1}
-                >
-                  {showPw ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
+            {mode !== "recover" && (
+              <div>
+                <div className="flex items-center justify-between">
+                  <label className="label">Senha</label>
+                  {mode === "login" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMode("recover");
+                        setError(null);
+                        setMessage(null);
+                      }}
+                      className="mb-1.5 text-xs font-medium text-brand-700 hover:underline dark:text-brand-400"
+                    >
+                      Esqueci a senha
+                    </button>
                   )}
-                </button>
+                </div>
+                <div className="relative">
+                  <input
+                    className="input pr-11"
+                    type={showPw ? "text" : "password"}
+                    required
+                    minLength={6}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPw((v) => !v)}
+                    className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                    aria-label={showPw ? "Ocultar senha" : "Mostrar senha"}
+                    tabIndex={-1}
+                  >
+                    {showPw ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
             {error && (
               <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
@@ -247,7 +281,11 @@ export default function LoginPage() {
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <>
-                  {mode === "login" ? "Entrar" : "Criar conta"}
+                  {mode === "login"
+                    ? "Entrar"
+                    : mode === "signup"
+                      ? "Criar conta"
+                      : "Enviar link de redefinição"}
                   <ArrowRight className="h-4 w-4" />
                 </>
               )}
@@ -269,7 +307,7 @@ export default function LoginPage() {
                   Criar agora
                 </button>
               </>
-            ) : (
+            ) : mode === "signup" ? (
               <>
                 Já tem conta?{" "}
                 <button
@@ -283,6 +321,17 @@ export default function LoginPage() {
                   Entrar
                 </button>
               </>
+            ) : (
+              <button
+                onClick={() => {
+                  setMode("login");
+                  setError(null);
+                  setMessage(null);
+                }}
+                className="font-semibold text-brand-700 hover:underline dark:text-brand-400"
+              >
+                ← Voltar para o login
+              </button>
             )}
           </div>
         </div>
