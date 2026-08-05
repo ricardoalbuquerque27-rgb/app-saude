@@ -4,7 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+// Groq (gratuito, rápido). Modelo trocável via GROQ_MODEL.
+const MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
 
 const SYSTEM =
   "Você é um coach de saúde, nutrição e treino analisando os dados dos últimos ~30 dias de um usuário do app Pace Fit. " +
@@ -42,10 +43,10 @@ export async function POST() {
     return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
-      { error: "Os relatórios não estão configurados (falta a chave da IA no servidor)." },
+      { error: "Os relatórios não estão configurados (falta a chave GROQ_API_KEY no servidor)." },
       { status: 503 }
     );
   }
@@ -195,56 +196,48 @@ export async function POST() {
   const hasAnyData =
     meals.length || workouts.length || logs.length || meas.length || exams.length;
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${apiKey}`;
+  const userPrompt =
+    (hasAnyData
+      ? "Analise estes dados do usuário e gere o relatório."
+      : "O usuário quase não tem dados registrados. Gere um relatório inicial incentivando o registro e explicando o que acompanhar.") +
+    "\n\nDADOS (JSON):\n" +
+    JSON.stringify(summary);
 
   try {
-    const geminiRes = await fetch(url, {
+    const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
       body: JSON.stringify({
-        system_instruction: { parts: [{ text: SYSTEM }] },
-        contents: [
-          {
-            role: "user",
-            parts: [
-              {
-                text:
-                  (hasAnyData
-                    ? "Analise estes dados do usuário e gere o relatório."
-                    : "O usuário quase não tem dados registrados. Gere um relatório inicial incentivando o registro e explicando o que acompanhar.") +
-                  "\n\nDADOS (JSON):\n" +
-                  JSON.stringify(summary),
-              },
-            ],
-          },
+        model: MODEL,
+        messages: [
+          { role: "system", content: SYSTEM },
+          { role: "user", content: userPrompt },
         ],
-        generationConfig: {
-          responseMimeType: "application/json",
-          temperature: 0.5,
-          maxOutputTokens: 2048,
-        },
+        response_format: { type: "json_object" },
+        temperature: 0.5,
+        max_tokens: 2048,
       }),
     });
 
-    if (!geminiRes.ok) {
-      const status = geminiRes.status;
-      const detail = await geminiRes.text().catch(() => "");
+    if (!groqRes.ok) {
+      const status = groqRes.status;
+      const detail = await groqRes.text().catch(() => "");
       let reason = detail.slice(0, 200);
       try {
         reason = JSON.parse(detail)?.error?.message || reason;
       } catch {}
-      console.error("report gemini error:", status, detail.slice(0, 400));
+      console.error("report groq error:", status, detail.slice(0, 400));
       return NextResponse.json(
         { error: `Erro da IA (${status}): ${reason}` },
         { status: status === 429 ? 429 : 502 }
       );
     }
 
-    const payload = await geminiRes.json();
-    const text: string =
-      payload?.candidates?.[0]?.content?.parts
-        ?.map((p: any) => p?.text ?? "")
-        .join("") ?? "";
+    const payload = await groqRes.json();
+    const text: string = payload?.choices?.[0]?.message?.content ?? "";
 
     if (!text) {
       return NextResponse.json(

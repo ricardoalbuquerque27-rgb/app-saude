@@ -4,25 +4,26 @@ import { createClient } from "@/lib/supabase/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+// Groq (gratuito, rápido). Modelo trocável via GROQ_MODEL.
+const MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
 
 const SYSTEM =
   "Você é o assistente do Pace Fit, um app de saúde e fitness. Você atua como um nutricionista e personal trainer virtual, " +
   "ajudando o usuário com dúvidas sobre alimentação/dieta, treinos, organização da rotina, hábitos (água, sono, humor) e " +
   "como usar o próprio app.\n\n" +
   "Sobre o app Pace Fit, para orientar o usuário:\n" +
-  "- Treinos: registrar exercícios, séries, cargas e acompanhar a evolução.\n" +
-  "- Dieta: registrar refeições e macros; há um botão para analisar a FOTO do prato e estimar calorias e macros automaticamente.\n" +
+  "- Treinos: plano semanal (esporte e treinos por dia) e histórico de treinos com exercícios.\n" +
+  "- Dieta: registrar refeições e macros; há um botão para analisar a FOTO do prato e estimar calorias e macros.\n" +
   "- Medidas: registrar peso e medidas corporais e ver gráficos.\n" +
-  "- Hábitos: acompanhar água, sono e humor no dia a dia.\n" +
-  "- Exames: guardar resultados de exames.\n\n" +
+  "- Hábitos: acompanhar água, sono e humor.\n" +
+  "- Exames: guardar resultados de exames.\n" +
+  "- Relatórios: a IA analisa os últimos 30 dias e traz o que melhorar.\n\n" +
   "Como responder:\n" +
   "- Sempre em português do Brasil, com tom amigável, prático e motivador.\n" +
-  "- Seja objetivo. Use parágrafos curtos e, quando fizer listas, use hífens simples (-). Evite markdown pesado (nada de **, ##).\n" +
-  "- Dê exemplos concretos (porções, substituições, séries) quando ajudar.\n" +
-  "- Faça perguntas de acompanhamento quando faltar informação (objetivo, peso, restrições).\n\n" +
-  "Importante (segurança): você não substitui um profissional de saúde. Para condições médicas, uso de medicamentos, " +
-  "gravidez, ou dietas muito restritivas, oriente a pessoa a procurar um nutricionista ou médico. Não faça diagnósticos.";
+  "- Seja objetivo. Parágrafos curtos e listas com hífens (-). Evite markdown pesado (nada de **, ##).\n" +
+  "- Dê exemplos concretos (porções, substituições, séries) quando ajudar.\n\n" +
+  "Importante (segurança): você não substitui um profissional de saúde. Para condições médicas, medicamentos, " +
+  "gravidez ou dietas muito restritivas, oriente a procurar um nutricionista ou médico. Não faça diagnósticos.";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
@@ -35,10 +36,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
-      { error: "O assistente não está configurado (falta a chave da IA no servidor)." },
+      { error: "O assistente não está configurado (falta a chave GROQ_API_KEY no servidor)." },
       { status: 503 }
     );
   }
@@ -51,31 +52,28 @@ export async function POST(request: Request) {
     // tratado abaixo
   }
 
-  // Mantém só as últimas mensagens para limitar o tamanho do contexto.
   const recent = messages
     .filter((m) => (m.role === "user" || m.role === "assistant") && m.content?.trim())
-    .slice(-20);
+    .slice(-20)
+    .map((m) => ({ role: m.role, content: m.content }));
 
   if (recent.length === 0) {
     return NextResponse.json({ error: "Nenhuma mensagem enviada." }, { status: 400 });
   }
 
-  const contents = recent.map((m) => ({
-    role: m.role === "assistant" ? "model" : "user",
-    parts: [{ text: m.content }],
-  }));
-
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:streamGenerateContent?alt=sse&key=${apiKey}`;
-
-  let geminiRes: Response;
+  let groqRes: Response;
   try {
-    geminiRes = await fetch(url, {
+    groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
       body: JSON.stringify({
-        system_instruction: { parts: [{ text: SYSTEM }] },
-        contents,
-        generationConfig: { temperature: 0.7 },
+        model: MODEL,
+        messages: [{ role: "system", content: SYSTEM }, ...recent],
+        temperature: 0.7,
+        stream: true,
       }),
     });
   } catch (err: any) {
@@ -83,28 +81,30 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Falha ao contatar a IA. Tente novamente." }, { status: 502 });
   }
 
-  if (!geminiRes.ok || !geminiRes.body) {
-    const status = geminiRes.status;
-    const detail = await geminiRes.text().catch(() => "");
-    // Extrai a mensagem de erro do Gemini, se houver.
+  if (!groqRes.ok || !groqRes.body) {
+    const status = groqRes.status;
+    const detail = await groqRes.text().catch(() => "");
     let reason = detail.slice(0, 200);
     try {
-      const j = JSON.parse(detail);
-      reason = j?.error?.message || j?.error?.status || reason;
-    } catch {
-      // mantém o texto bruto
+      reason = JSON.parse(detail)?.error?.message || reason;
+    } catch {}
+    console.error("chat groq error:", status, detail.slice(0, 400));
+    if (status === 401) {
+      return NextResponse.json(
+        { error: "Chave da IA inválida. Verifique GROQ_API_KEY no servidor." },
+        { status: 503 }
+      );
     }
-    console.error("chat gemini error:", status, detail.slice(0, 500));
     return NextResponse.json(
       { error: `Erro da IA (${status}): ${reason}` },
       { status: status === 429 ? 429 : 502 }
     );
   }
 
-  // Converte o SSE do Gemini num fluxo de texto puro para o navegador.
+  // Converte o SSE (formato OpenAI) do Groq em texto puro.
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
-      const reader = geminiRes.body!.getReader();
+      const reader = groqRes.body!.getReader();
       const decoder = new TextDecoder();
       const encoder = new TextEncoder();
       let buffer = "";
@@ -118,17 +118,14 @@ export async function POST(request: Request) {
             const line = buffer.slice(0, nl).trim();
             buffer = buffer.slice(nl + 1);
             if (!line.startsWith("data:")) continue;
-            const jsonStr = line.slice(5).trim();
-            if (!jsonStr || jsonStr === "[DONE]") continue;
+            const data = line.slice(5).trim();
+            if (!data || data === "[DONE]") continue;
             try {
-              const obj = JSON.parse(jsonStr);
-              const text: string =
-                obj?.candidates?.[0]?.content?.parts
-                  ?.map((p: any) => p?.text ?? "")
-                  .join("") ?? "";
+              const obj = JSON.parse(data);
+              const text: string = obj?.choices?.[0]?.delta?.content ?? "";
               if (text) controller.enqueue(encoder.encode(text));
             } catch {
-              // ignora linhas parciais/não-JSON
+              // ignora linhas parciais
             }
           }
         }
