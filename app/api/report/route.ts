@@ -253,7 +253,7 @@ export async function POST() {
       result = JSON.parse(text.replace(/```json/gi, "").replace(/```/g, "").trim());
     }
 
-    return NextResponse.json({
+    const report = {
       resumo: String(result.resumo ?? ""),
       pontos_fortes: Array.isArray(result.pontos_fortes) ? result.pontos_fortes : [],
       a_melhorar: Array.isArray(result.a_melhorar) ? result.a_melhorar : [],
@@ -263,6 +263,19 @@ export async function POST() {
       proximos_passos: Array.isArray(result.proximos_passos)
         ? result.proximos_passos
         : [],
+    };
+
+    // Salva no histórico
+    const { data: saved } = await supabase
+      .from("reports")
+      .insert({ user_id: user.id, content: report })
+      .select("id, created_at")
+      .single();
+
+    return NextResponse.json({
+      ...report,
+      id: saved?.id ?? null,
+      created_at: saved?.created_at ?? new Date().toISOString(),
     });
   } catch (err: any) {
     console.error("report error:", err?.message ?? err);
