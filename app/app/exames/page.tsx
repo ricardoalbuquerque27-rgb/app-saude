@@ -1,7 +1,15 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { FileText, Plus, Trash2, Loader2 } from "lucide-react";
+import { useEffect, useState, useCallback, useRef } from "react";
+import {
+  FileText,
+  Plus,
+  Trash2,
+  Loader2,
+  Sparkles,
+  Upload,
+  Save,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { Exam } from "@/lib/types";
 import {
@@ -18,6 +26,55 @@ const STATUS = [
   { value: "alterado", label: "Alterado", cls: "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300" },
 ];
 
+type ExamItem = {
+  nome: string;
+  valor?: string;
+  unidade?: string;
+  referencia?: string;
+  status?: string;
+};
+type ExamAnalysis = {
+  resumo: string;
+  itens: ExamItem[];
+  interpretacao: string[];
+  recomendacoes: string[];
+};
+
+function fileToData(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    if (file.type.startsWith("image/")) {
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          const maxSide = 1600;
+          let { width, height } = img;
+          if (width > maxSide || height > maxSide) {
+            const scale = maxSide / Math.max(width, height);
+            width = Math.round(width * scale);
+            height = Math.round(height * scale);
+          }
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) return reject(new Error("canvas"));
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL("image/jpeg", 0.85));
+        };
+        img.onerror = () => reject(new Error("img"));
+        img.src = reader.result as string;
+      };
+      reader.onerror = () => reject(new Error("read"));
+      reader.readAsDataURL(file);
+    } else {
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error("read"));
+      reader.readAsDataURL(file);
+    }
+  });
+}
+
 export default function ExamesPage() {
   const supabase = createClient();
   const [exams, setExams] = useState<Exam[]>([]);
@@ -33,6 +90,14 @@ export default function ExamesPage() {
   const [reference, setReference] = useState("");
   const [status, setStatus] = useState("normal");
   const [notes, setNotes] = useState("");
+
+  // Análise de exame por IA
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysis, setAnalysis] = useState<ExamAnalysis | null>(null);
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+  const [savingItems, setSavingItems] = useState(false);
+  const [savedMsg, setSavedMsg] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -90,6 +155,66 @@ export default function ExamesPage() {
     await load();
   }
 
+  async function analyzeExam(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setAnalyzing(true);
+    setAnalyzeError(null);
+    setAnalysis(null);
+    setSavedMsg(null);
+    try {
+      const data = await fileToData(file);
+      const res = await fetch("/api/analyze-exam", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file: data }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setAnalyzeError(json?.error ?? "Falha ao ler o exame.");
+        return;
+      }
+      setAnalysis(json as ExamAnalysis);
+    } catch {
+      setAnalyzeError("Não foi possível processar o arquivo. Tente outro.");
+    } finally {
+      setAnalyzing(false);
+    }
+  }
+
+  async function saveAnalysisItems() {
+    if (!analysis?.itens?.length) return;
+    setSavingItems(true);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      setSavingItems(false);
+      return;
+    }
+    const today = new Date().toISOString().slice(0, 10);
+    const rows = analysis.itens
+      .filter((it) => it.nome)
+      .map((it) => ({
+        user_id: user.id,
+        date: today,
+        title: it.nome,
+        exam_type: "Exame (IA)",
+        result_value: it.valor ?? null,
+        unit: it.unidade ?? null,
+        reference_range: it.referencia ?? null,
+        status: ["normal", "atencao", "alterado"].includes(it.status ?? "")
+          ? (it.status as string)
+          : "normal",
+        notes: null,
+      }));
+    if (rows.length) await supabase.from("exams").insert(rows);
+    setSavingItems(false);
+    setSavedMsg(`${rows.length} item(ns) salvo(s) no histórico.`);
+    await load();
+  }
+
   return (
     <div>
       <PageHeader
@@ -101,6 +226,156 @@ export default function ExamesPage() {
           </button>
         }
       />
+
+      <input
+        ref={fileRef}
+        type="file"
+        accept="application/pdf,image/*"
+        className="hidden"
+        onChange={analyzeExam}
+      />
+
+      <div className="card mb-6 border-brand-200 bg-brand-50/50 dark:border-brand-900/40 dark:bg-brand-950/20">
+        <div className="flex items-start gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
+            <Sparkles className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-slate-900 dark:text-white">
+              Ler exame com IA
+            </p>
+            <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+              Envie o PDF ou uma foto do exame. A IA lê, explica em linguagem
+              simples e destaca o que está fora da referência.
+            </p>
+            <button
+              onClick={() => fileRef.current?.click()}
+              disabled={analyzing}
+              className="btn-primary mt-3"
+            >
+              {analyzing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Upload className="h-4 w-4" />
+              )}
+              {analyzing ? "Lendo exame…" : "Enviar PDF ou foto"}
+            </button>
+          </div>
+        </div>
+
+        {analyzeError && (
+          <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
+            {analyzeError}
+          </p>
+        )}
+
+        {analysis && (
+          <div className="mt-4 space-y-4 border-t border-brand-200/60 pt-4 dark:border-brand-900/30">
+            {analysis.resumo && (
+              <p className="text-sm leading-relaxed text-slate-800 dark:text-slate-200">
+                {analysis.resumo}
+              </p>
+            )}
+
+            {analysis.itens.length > 0 && (
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Resultados
+                </p>
+                <div className="space-y-1.5">
+                  {analysis.itens.map((it, i) => {
+                    const st =
+                      STATUS.find((s) => s.value === it.status) ?? STATUS[0];
+                    return (
+                      <div
+                        key={i}
+                        className="flex items-center justify-between gap-2 rounded-lg bg-white px-3 py-2 text-sm dark:bg-slate-900/60"
+                      >
+                        <div className="min-w-0">
+                          <span className="font-medium text-slate-800 dark:text-slate-200">
+                            {it.nome}
+                          </span>
+                          {(it.valor || it.unidade) && (
+                            <span className="text-slate-600 dark:text-slate-400">
+                              {" "}
+                              — {it.valor}
+                              {it.unidade ? ` ${it.unidade}` : ""}
+                            </span>
+                          )}
+                          {it.referencia && (
+                            <span className="text-slate-400">
+                              {" "}
+                              (ref.: {it.referencia})
+                            </span>
+                          )}
+                        </div>
+                        <span
+                          className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${st.cls}`}
+                        >
+                          {st.label}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {analysis.interpretacao.length > 0 && (
+              <div>
+                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  O que significa
+                </p>
+                <ul className="list-disc space-y-1 pl-5 text-sm text-slate-700 dark:text-slate-300">
+                  {analysis.interpretacao.map((t, i) => (
+                    <li key={i}>{t}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {analysis.recomendacoes.length > 0 && (
+              <div>
+                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Recomendações
+                </p>
+                <ul className="list-disc space-y-1 pl-5 text-sm text-slate-700 dark:text-slate-300">
+                  {analysis.recomendacoes.map((t, i) => (
+                    <li key={i}>{t}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div className="flex flex-wrap items-center gap-3">
+              {analysis.itens.length > 0 && (
+                <button
+                  onClick={saveAnalysisItems}
+                  disabled={savingItems}
+                  className="btn-ghost"
+                >
+                  {savingItems ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4" />
+                  )}
+                  Salvar no histórico
+                </button>
+              )}
+              {savedMsg && (
+                <span className="text-xs font-medium text-brand-600 dark:text-brand-400">
+                  {savedMsg}
+                </span>
+              )}
+            </div>
+
+            <p className="text-[11px] text-slate-400 dark:text-slate-500">
+              Leitura automática por IA — pode conter erros e não substitui a
+              avaliação de um médico.
+            </p>
+          </div>
+        )}
+      </div>
 
       {loading ? (
         <div className="flex justify-center py-16 text-slate-400">
