@@ -10,6 +10,8 @@ import {
   Loader2,
   CalendarDays,
   History,
+  TrendingUp,
+  Trophy,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { Workout, Exercise } from "@/lib/types";
@@ -18,8 +20,10 @@ import {
   Modal,
   Field,
   EmptyState,
+  StatCard,
   formatDate,
 } from "@/components/ui";
+import { TrendChart } from "@/components/charts";
 
 // Segunda = 0 ... Domingo = 6
 const DAYS = [
@@ -75,6 +79,7 @@ type ExerciseDraft = {
   sets: string;
   reps: string;
   weight_kg: string;
+  rpe: string;
 };
 
 const emptyExercise = (): ExerciseDraft => ({
@@ -82,6 +87,7 @@ const emptyExercise = (): ExerciseDraft => ({
   sets: "",
   reps: "",
   weight_kg: "",
+  rpe: "",
 });
 
 function todayIndex() {
@@ -91,7 +97,8 @@ function todayIndex() {
 
 export default function TreinosPage() {
   const supabase = createClient();
-  const [tab, setTab] = useState<"plano" | "historico">("plano");
+  const [tab, setTab] = useState<"plano" | "historico" | "progressao">("plano");
+  const [selectedExercise, setSelectedExercise] = useState<string>("");
 
   // Plano semanal
   const [plan, setPlan] = useState<PlanEntry[]>([]);
@@ -234,6 +241,7 @@ export default function TreinosPage() {
           sets: ex.sets ? Number(ex.sets) : null,
           reps: ex.reps ? Number(ex.reps) : null,
           weight_kg: ex.weight_kg ? Number(ex.weight_kg) : null,
+          rpe: ex.rpe ? Number(ex.rpe) : null,
           position: i,
         }));
       if (validExercises.length > 0) {
@@ -260,6 +268,47 @@ export default function TreinosPage() {
   }
 
   const today = todayIndex();
+
+  // Progressão de carga
+  const exerciseNames = Array.from(
+    new Set(
+      Object.values(exercisesByWorkout)
+        .flat()
+        .filter((e) => e.weight_kg != null)
+        .map((e) => e.name)
+    )
+  ).sort();
+  const currentExercise =
+    selectedExercise && exerciseNames.includes(selectedExercise)
+      ? selectedExercise
+      : exerciseNames[0] ?? "";
+  const progressData: { label: string; value: number }[] = [];
+  if (currentExercise) {
+    const sorted = [...workouts].sort((a, b) => (a.date < b.date ? -1 : 1));
+    for (const w of sorted) {
+      const exs = (exercisesByWorkout[w.id] ?? []).filter(
+        (e) => e.name === currentExercise && e.weight_kg != null
+      );
+      if (exs.length) {
+        const maxW = Math.max(...exs.map((e) => Number(e.weight_kg)));
+        progressData.push({ label: formatDate(w.date).slice(0, 5), value: maxW });
+      }
+    }
+  }
+  const progStats =
+    progressData.length > 0
+      ? {
+          current: progressData[progressData.length - 1].value,
+          record: Math.max(...progressData.map((r) => r.value)),
+          delta:
+            Math.round(
+              (progressData[progressData.length - 1].value -
+                progressData[0].value) *
+                10
+            ) / 10,
+          count: progressData.length,
+        }
+      : null;
 
   return (
     <div>
@@ -296,6 +345,16 @@ export default function TreinosPage() {
           }`}
         >
           <History className="h-4 w-4" /> Histórico
+        </button>
+        <button
+          onClick={() => setTab("progressao")}
+          className={`flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-sm font-medium transition ${
+            tab === "progressao"
+              ? "bg-brand-600 text-white shadow-sm"
+              : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+          }`}
+        >
+          <TrendingUp className="h-4 w-4" /> Progressão
         </button>
       </div>
 
@@ -380,6 +439,75 @@ export default function TreinosPage() {
             );
           })}
         </div>
+      ) : tab === "progressao" ? (
+        exerciseNames.length === 0 ? (
+          <EmptyState
+            icon={<TrendingUp className="h-10 w-10" />}
+            title="Sem dados de progressão ainda"
+            description="Registre treinos com carga (peso) nos exercícios para acompanhar a evolução."
+          />
+        ) : (
+          <div className="space-y-5">
+            <div className="card">
+              <label className="label">Exercício</label>
+              <select
+                className="input"
+                value={currentExercise}
+                onChange={(e) => setSelectedExercise(e.target.value)}
+              >
+                {exerciseNames.map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {progStats && (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <StatCard
+                  label="Carga atual"
+                  value={progStats.current}
+                  unit="kg"
+                  icon={<Dumbbell className="h-5 w-5" />}
+                  accent="brand"
+                />
+                <StatCard
+                  label="Recorde"
+                  value={progStats.record}
+                  unit="kg"
+                  icon={<Trophy className="h-5 w-5" />}
+                  accent="amber"
+                />
+                <StatCard
+                  label="Variação"
+                  value={`${progStats.delta > 0 ? "+" : ""}${progStats.delta}`}
+                  unit="kg"
+                  icon={<TrendingUp className="h-5 w-5" />}
+                  accent={progStats.delta >= 0 ? "brand" : "rose"}
+                />
+              </div>
+            )}
+
+            <div className="card">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="font-semibold text-slate-900 dark:text-white">
+                  Evolução da carga
+                </h3>
+                <span className="text-xs text-slate-400">
+                  {progStats?.count ?? 0} registro(s)
+                </span>
+              </div>
+              {progressData.length > 1 ? (
+                <TrendChart data={progressData} unit=" kg" color="#18b85e" />
+              ) : (
+                <p className="py-8 text-center text-sm text-slate-500 dark:text-slate-400">
+                  Registre este exercício em mais de um treino para ver a curva.
+                </p>
+              )}
+            </div>
+          </div>
+        )
       ) : workouts.length === 0 ? (
         <EmptyState
           icon={<Dumbbell className="h-10 w-10" />}
@@ -439,6 +567,7 @@ export default function TreinosPage() {
                           <th className="pb-1 font-medium">Séries</th>
                           <th className="pb-1 font-medium">Reps</th>
                           <th className="pb-1 font-medium">Carga</th>
+                          <th className="pb-1 font-medium">RPE</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -458,6 +587,9 @@ export default function TreinosPage() {
                             </td>
                             <td className="py-1.5 text-slate-600 dark:text-slate-400">
                               {ex.weight_kg ? `${ex.weight_kg} kg` : "—"}
+                            </td>
+                            <td className="py-1.5 text-slate-600 dark:text-slate-400">
+                              {ex.rpe ?? "—"}
                             </td>
                           </tr>
                         ))}
@@ -624,7 +756,7 @@ export default function TreinosPage() {
                       </button>
                     )}
                   </div>
-                  <div className="mt-2 grid grid-cols-3 gap-2">
+                  <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
                     <input
                       className="input"
                       type="number"
@@ -652,6 +784,18 @@ export default function TreinosPage() {
                         updateExercise(i, { weight_kg: e.target.value })
                       }
                       placeholder="Carga kg"
+                    />
+                    <input
+                      className="input"
+                      type="number"
+                      step="0.5"
+                      min="1"
+                      max="10"
+                      value={ex.rpe}
+                      onChange={(e) =>
+                        updateExercise(i, { rpe: e.target.value })
+                      }
+                      placeholder="RPE 1-10"
                     />
                   </div>
                 </div>

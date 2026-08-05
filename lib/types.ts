@@ -145,6 +145,7 @@ export type Database = {
           name: string;
           position: number | null;
           reps: number | null;
+          rpe: number | null;
           sets: number | null;
           user_id: string;
           weight_kg: number | null;
@@ -156,6 +157,7 @@ export type Database = {
           name: string;
           position?: number | null;
           reps?: number | null;
+          rpe?: number | null;
           sets?: number | null;
           user_id: string;
           weight_kg?: number | null;
@@ -167,6 +169,7 @@ export type Database = {
           name?: string;
           position?: number | null;
           reps?: number | null;
+          rpe?: number | null;
           sets?: number | null;
           user_id?: string;
           weight_kg?: number | null;
