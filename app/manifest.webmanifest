@@ -1,17 +1,39 @@
 {
-  "name": "Pace Fit",
+  "name": "Pace Fit — Treinos, Dieta e Saúde",
   "short_name": "Pace Fit",
   "description": "Acompanhe seus treinos, dieta, peso, hábitos e exames.",
   "start_url": "/app",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#0c964b",
   "theme_color": "#0c964b",
+  "categories": ["health", "fitness", "lifestyle"],
+  "lang": "pt-BR",
   "icons": [
     {
       "src": "/icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

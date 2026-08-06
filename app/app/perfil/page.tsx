@@ -6,6 +6,7 @@ import { LogOut, Loader2, Check } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { Profile } from "@/lib/types";
 import { PageHeader, Field } from "@/components/ui";
+import PwaSettings from "@/components/PwaSettings";
 
 function onlyDigits(s: string) {
   return s.replace(/\D/g, "");
@@ -261,6 +262,8 @@ export default function PerfilPage() {
           {saved ? "Salvo!" : "Salvar alterações"}
         </button>
       </form>
+
+      <PwaSettings />
 
       <button
         onClick={signOut}
