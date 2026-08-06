@@ -10,10 +10,12 @@ import {
   BarChart3,
   Camera,
   CalendarDays,
+  Trophy,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { StatCard, formatDate } from "@/components/ui";
 import { TrendChart } from "@/components/charts";
+import { getGamification } from "@/lib/gamification";
 
 function isoDaysAgo(days: number) {
   const d = new Date();
@@ -97,6 +99,8 @@ export default async function DashboardPage() {
   const recentWorkouts = recentWorkoutsRes.data ?? [];
   const todayPlan = todayPlanRes.data ?? [];
 
+  const game = await getGamification(supabase, uid);
+
   const chartData = measurements.map((m) => ({
     label: formatDate(m.date).slice(0, 5),
     value: m.weight_kg,
@@ -174,6 +178,37 @@ export default async function DashboardPage() {
           accent="blue"
         />
       </div>
+
+      {/* Gamificação */}
+      <Link
+        href="/app/conquistas"
+        className="card group flex items-center gap-4 transition duration-200 hover:-translate-y-0.5"
+      >
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600 text-lg font-extrabold text-white shadow-[0_8px_20px_-8px_rgba(24,184,94,0.8)]">
+          {game.level}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-semibold text-slate-900 dark:text-white">
+              Nível {game.level}
+            </p>
+            <span className="flex items-center gap-1 text-xs font-medium text-amber-600 dark:text-amber-400">
+              <Flame className="h-3.5 w-3.5" />
+              {game.current} {game.current === 1 ? "dia" : "dias"}
+            </span>
+          </div>
+          <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-brand-400 to-brand-600 transition-all"
+              style={{ width: `${Math.round(game.progress * 100)}%` }}
+            />
+          </div>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            {game.xpPerLevel - game.xpIntoLevel} XP para o próximo nível
+          </p>
+        </div>
+        <Trophy className="h-5 w-5 shrink-0 text-slate-300 transition group-hover:text-brand-500" />
+      </Link>
 
       {/* Gráfico + Plano de hoje */}
       <div className="grid gap-6 lg:grid-cols-3">
