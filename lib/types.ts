@@ -395,6 +395,30 @@ export type Database = {
         };
         Relationships: [];
       };
+      friendships: {
+        Row: {
+          id: string;
+          requester: string;
+          addressee: string;
+          status: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          requester: string;
+          addressee: string;
+          status?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          requester?: string;
+          addressee?: string;
+          status?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -403,6 +427,41 @@ export type Database = {
       cpf_disponivel: {
         Args: { p_cpf: string };
         Returns: boolean;
+      };
+      ensure_friend_code: {
+        Args: Record<string, never>;
+        Returns: string;
+      };
+      add_friend_by_code: {
+        Args: { p_code: string };
+        Returns: Json;
+      };
+      respond_friend_request: {
+        Args: { p_id: string; p_accept: boolean };
+        Returns: boolean;
+      };
+      remove_friend: {
+        Args: { p_friend: string };
+        Returns: boolean;
+      };
+      friend_requests_incoming: {
+        Args: Record<string, never>;
+        Returns: {
+          id: string;
+          requester: string;
+          name: string;
+          created_at: string;
+        }[];
+      };
+      friends_leaderboard: {
+        Args: Record<string, never>;
+        Returns: {
+          user_id: string;
+          name: string;
+          xp: number;
+          level: number;
+          is_me: boolean;
+        }[];
       };
     };
     Enums: {

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import {
   Trophy,
   Flame,
@@ -13,6 +14,8 @@ import {
   CalendarDays,
   Lock,
   Sparkles,
+  Users,
+  ArrowRight,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui";
@@ -132,6 +135,25 @@ export default async function ConquistasPage() {
           sequência. Registre algo hoje para não perder!
         </p>
       )}
+
+      {/* Ranking de amigos */}
+      <Link
+        href="/app/amigos"
+        className="card group flex items-center gap-4 transition duration-200 hover:-translate-y-0.5"
+      >
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-300">
+          <Users className="h-6 w-6" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-slate-900 dark:text-white">
+            Ranking de amigos
+          </p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Adicione amigos e veja quem acumula mais XP.
+          </p>
+        </div>
+        <ArrowRight className="h-5 w-5 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-brand-500" />
+      </Link>
 
       {/* Medalhas */}
       <div>
