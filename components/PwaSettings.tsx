@@ -9,14 +9,15 @@ import {
   Share,
   PlusSquare,
   Download,
+  Loader2,
 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { VAPID_PUBLIC_KEY } from "@/lib/vapidPublicKey";
 
 type InstallEvent = Event & {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 };
-
-const REMINDER_KEY = "pf-reminder";
 
 function isStandalone() {
   if (typeof window === "undefined") return false;
@@ -29,40 +30,57 @@ function isIOS() {
   if (typeof navigator === "undefined") return false;
   return /iphone|ipad|ipod/i.test(navigator.userAgent);
 }
+function pushSupported() {
+  return (
+    typeof window !== "undefined" &&
+    "serviceWorker" in navigator &&
+    "PushManager" in window &&
+    "Notification" in window
+  );
+}
+function urlB64ToUint8Array(base64: string) {
+  const padding = "=".repeat((4 - (base64.length % 4)) % 4);
+  const b64 = (base64 + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(b64);
+  const arr = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+  return arr;
+}
 
 export default function PwaSettings() {
   const [installed, setInstalled] = useState(false);
   const [canPrompt, setCanPrompt] = useState(false);
   const [showIosHelp, setShowIosHelp] = useState(false);
 
-  // Lembretes
-  const [notifSupported, setNotifSupported] = useState(true);
+  const [supported, setSupported] = useState(true);
   const [reminderOn, setReminderOn] = useState(false);
   const [time, setTime] = useState("19:00");
   const [permDenied, setPermDenied] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [tested, setTested] = useState(false);
+  const [testMsg, setTestMsg] = useState<string | null>(null);
+
+  const loadPrefs = useCallback(async () => {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("profiles")
+      .select("reminder_enabled, reminder_time")
+      .maybeSingle();
+    if (data) {
+      setReminderOn(!!data.reminder_enabled);
+      if (data.reminder_time) setTime(data.reminder_time.slice(0, 5));
+    }
+  }, []);
 
   useEffect(() => {
     setInstalled(isStandalone());
-    setNotifSupported(
-      typeof window !== "undefined" && "Notification" in window
-    );
+    setSupported(pushSupported());
     setCanPrompt(
       !!(window as unknown as { __pfInstallPrompt?: Event }).__pfInstallPrompt
     );
-
-    try {
-      const raw = localStorage.getItem(REMINDER_KEY);
-      if (raw) {
-        const r = JSON.parse(raw);
-        setReminderOn(!!r.enabled);
-        if (r.time) setTime(r.time);
-      }
-    } catch {
-      /* ignore */
-    }
     if (typeof Notification !== "undefined" && Notification.permission === "denied")
       setPermDenied(true);
+    loadPrefs();
 
     const onInstallable = () => setCanPrompt(true);
     const onInstalled = () => {
@@ -75,49 +93,7 @@ export default function PwaSettings() {
       window.removeEventListener("pf-installable", onInstallable);
       window.removeEventListener("pf-installed", onInstalled);
     };
-  }, []);
-
-  // (Re)agenda o lembrete local enquanto o app estiver aberto.
-  const scheduleReminder = useCallback((hhmm: string) => {
-    const w = window as unknown as { __pfReminderTimer?: number };
-    if (w.__pfReminderTimer) window.clearTimeout(w.__pfReminderTimer);
-    if (typeof Notification === "undefined" || Notification.permission !== "granted")
-      return;
-    const [h, m] = hhmm.split(":").map(Number);
-    const now = new Date();
-    const next = new Date();
-    next.setHours(h, m, 0, 0);
-    if (next.getTime() <= now.getTime()) next.setDate(next.getDate() + 1);
-    const delay = next.getTime() - now.getTime();
-    w.__pfReminderTimer = window.setTimeout(() => {
-      fireNotification(
-        "Hora do Pace Fit 💪",
-        "Registre um treino, refeição ou hábito para manter sua sequência!"
-      );
-      scheduleReminder(hhmm); // reagenda para o próximo dia
-    }, Math.min(delay, 2147483647));
-  }, []);
-
-  useEffect(() => {
-    if (reminderOn) scheduleReminder(time);
-  }, [reminderOn, time, scheduleReminder]);
-
-  async function fireNotification(title: string, body: string) {
-    try {
-      const reg = await navigator.serviceWorker?.getRegistration();
-      if (reg) {
-        await reg.showNotification(title, {
-          body,
-          icon: "/icon-192.png",
-          badge: "/icon-192.png",
-        });
-      } else if (typeof Notification !== "undefined") {
-        new Notification(title, { body, icon: "/icon-192.png" });
-      }
-    } catch {
-      /* ignore */
-    }
-  }
+  }, [loadPrefs]);
 
   async function install() {
     const evt = (window as unknown as { __pfInstallPrompt?: InstallEvent })
@@ -136,51 +112,122 @@ export default function PwaSettings() {
       null;
   }
 
+  // Cria a assinatura de push e salva no banco.
+  async function subscribeAndSave(): Promise<boolean> {
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlB64ToUint8Array(VAPID_PUBLIC_KEY),
+      });
+    }
+    const json = sub.toJSON() as {
+      endpoint?: string;
+      keys?: { p256dh?: string; auth?: string };
+    };
+    if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) return false;
+
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return false;
+
+    const { error } = await supabase.from("push_subscriptions").upsert(
+      {
+        user_id: user.id,
+        endpoint: json.endpoint,
+        p256dh: json.keys.p256dh,
+        auth: json.keys.auth,
+      },
+      { onConflict: "endpoint" }
+    );
+    return !error;
+  }
+
+  async function savePrefs(enabled: boolean, t: string) {
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase
+      .from("profiles")
+      .update({
+        reminder_enabled: enabled,
+        reminder_time: t,
+        reminder_tz_offset: new Date().getTimezoneOffset(),
+      })
+      .eq("id", user.id);
+  }
+
   async function toggleReminder() {
+    if (busy) return;
     if (reminderOn) {
+      setBusy(true);
       setReminderOn(false);
-      persist(false, time);
-      const w = window as unknown as { __pfReminderTimer?: number };
-      if (w.__pfReminderTimer) window.clearTimeout(w.__pfReminderTimer);
+      try {
+        const reg = await navigator.serviceWorker?.ready;
+        const sub = await reg?.pushManager.getSubscription();
+        if (sub) {
+          const endpoint = sub.endpoint;
+          await sub.unsubscribe().catch(() => {});
+          const supabase = createClient();
+          await supabase.from("push_subscriptions").delete().eq("endpoint", endpoint);
+        }
+        await savePrefs(false, time);
+      } finally {
+        setBusy(false);
+      }
       return;
     }
-    let perm = Notification.permission;
-    if (perm === "default") perm = await Notification.requestPermission();
-    if (perm !== "granted") {
-      setPermDenied(perm === "denied");
+
+    // Ligar
+    if (!supported) {
+      setPermDenied(false);
       return;
     }
-    setPermDenied(false);
-    setReminderOn(true);
-    persist(true, time);
-  }
-
-  function changeTime(v: string) {
-    setTime(v);
-    if (reminderOn) persist(true, v);
-  }
-
-  function persist(enabled: boolean, t: string) {
+    setBusy(true);
     try {
-      localStorage.setItem(REMINDER_KEY, JSON.stringify({ enabled, time: t }));
-    } catch {
-      /* ignore */
+      let perm = Notification.permission;
+      if (perm === "default") perm = await Notification.requestPermission();
+      if (perm !== "granted") {
+        setPermDenied(perm === "denied");
+        return;
+      }
+      setPermDenied(false);
+      const ok = await subscribeAndSave();
+      if (!ok) return;
+      await savePrefs(true, time);
+      setReminderOn(true);
+    } finally {
+      setBusy(false);
     }
+  }
+
+  async function changeTime(v: string) {
+    setTime(v);
+    if (reminderOn) await savePrefs(true, v);
   }
 
   async function testNotification() {
-    let perm = Notification.permission;
-    if (perm === "default") perm = await Notification.requestPermission();
-    if (perm !== "granted") {
-      setPermDenied(perm === "denied");
-      return;
+    setTestMsg(null);
+    try {
+      const res = await fetch("/api/push/test", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.sent > 0) {
+        setTested(true);
+        setTimeout(() => setTested(false), 2500);
+      } else {
+        setTestMsg(
+          data?.error ??
+            "Não foi possível enviar agora. O envio pode não estar configurado no servidor ainda."
+        );
+      }
+    } catch {
+      setTestMsg("Falha de conexão ao testar.");
     }
-    await fireNotification(
-      "Notificação de teste ✅",
-      "É assim que seus lembretes vão aparecer."
-    );
-    setTested(true);
-    setTimeout(() => setTested(false), 2500);
   }
 
   return (
@@ -232,7 +279,7 @@ export default function PwaSettings() {
                       </li>
                       <li className="flex items-center gap-2">
                         <Check className="h-4 w-4 shrink-0 text-brand-600" /> 3.
-                        Confirme em <b>Adicionar</b>.
+                        Abra o app pela tela inicial para ativar os lembretes.
                       </li>
                     </ol>
                   </div>
@@ -260,27 +307,34 @@ export default function PwaSettings() {
               </h2>
               <button
                 onClick={toggleReminder}
-                disabled={!notifSupported}
+                disabled={!supported || busy}
                 role="switch"
                 aria-checked={reminderOn}
                 className={`relative h-6 w-11 shrink-0 rounded-full transition ${
                   reminderOn ? "bg-brand-500" : "bg-slate-300 dark:bg-slate-700"
                 } disabled:opacity-50`}
               >
-                <span
-                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition ${
-                    reminderOn ? "left-[22px]" : "left-0.5"
-                  }`}
-                />
+                {busy ? (
+                  <Loader2 className="absolute left-1/2 top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 animate-spin text-white" />
+                ) : (
+                  <span
+                    className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition ${
+                      reminderOn ? "left-[22px]" : "left-0.5"
+                    }`}
+                  />
+                )}
               </button>
             </div>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Receba um empurrãozinho para não perder sua sequência.
+              Uma notificação no seu celular para não perder a sequência — mesmo
+              com o app fechado.
             </p>
 
-            {!notifSupported && (
-              <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                Seu navegador não suporta notificações.
+            {!supported && (
+              <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+                {isIOS()
+                  ? "No iPhone, instale o app na tela inicial (passo acima) e abra por lá para ativar os lembretes."
+                  : "Seu navegador não suporta notificações push."}
               </p>
             )}
             {permDenied && (
@@ -301,22 +355,23 @@ export default function PwaSettings() {
                   onChange={(e) => changeTime(e.target.value)}
                   className="input w-auto"
                 />
-                <button onClick={testNotification} className="btn-ghost text-sm">
+                <button
+                  onClick={testNotification}
+                  className="btn-ghost text-sm"
+                >
                   {tested ? (
                     <>
                       <Check className="h-4 w-4 text-brand-600" /> Enviada
                     </>
                   ) : (
-                    "Testar"
+                    "Testar agora"
                   )}
                 </button>
               </div>
             )}
-
-            {reminderOn && (
-              <p className="mt-3 text-xs text-slate-400 dark:text-slate-500">
-                Dica: instale o app no celular para os lembretes funcionarem
-                melhor.
+            {testMsg && (
+              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                {testMsg}
               </p>
             )}
           </div>

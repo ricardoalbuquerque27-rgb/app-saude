@@ -254,6 +254,10 @@ export type Database = {
           id: string;
           updated_at: string;
           weight_goal_kg: number | null;
+          reminder_enabled: boolean;
+          reminder_time: string | null;
+          reminder_tz_offset: number;
+          last_reminded_on: string | null;
         };
         Insert: {
           birth_date?: string | null;
@@ -266,6 +270,10 @@ export type Database = {
           id: string;
           updated_at?: string;
           weight_goal_kg?: number | null;
+          reminder_enabled?: boolean;
+          reminder_time?: string | null;
+          reminder_tz_offset?: number;
+          last_reminded_on?: string | null;
         };
         Update: {
           birth_date?: string | null;
@@ -278,6 +286,37 @@ export type Database = {
           id?: string;
           updated_at?: string;
           weight_goal_kg?: number | null;
+          reminder_enabled?: boolean;
+          reminder_time?: string | null;
+          reminder_tz_offset?: number;
+          last_reminded_on?: string | null;
+        };
+        Relationships: [];
+      };
+      push_subscriptions: {
+        Row: {
+          id: string;
+          user_id: string;
+          endpoint: string;
+          p256dh: string;
+          auth: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          endpoint: string;
+          p256dh: string;
+          auth: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          endpoint?: string;
+          p256dh?: string;
+          auth?: string;
+          created_at?: string;
         };
         Relationships: [];
       };
@@ -462,6 +501,20 @@ export type Database = {
           level: number;
           is_me: boolean;
         }[];
+      };
+      due_reminders: {
+        Args: { p_secret: string };
+        Returns: {
+          user_id: string;
+          first_name: string;
+          endpoint: string;
+          p256dh: string;
+          auth: string;
+        }[];
+      };
+      prune_push_endpoint: {
+        Args: { p_secret: string; p_endpoint: string };
+        Returns: undefined;
       };
     };
     Enums: {
