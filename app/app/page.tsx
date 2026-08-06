@@ -11,6 +11,7 @@ import {
   Camera,
   CalendarDays,
   Trophy,
+  Syringe,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { StatCard, formatDate } from "@/components/ui";
@@ -48,6 +49,7 @@ export default async function DashboardPage() {
     dailyTodayRes,
     recentWorkoutsRes,
     todayPlanRes,
+    treatmentRes,
   ] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", uid).maybeSingle(),
     supabase
@@ -81,6 +83,14 @@ export default async function DashboardPage() {
       .eq("user_id", uid)
       .eq("day_of_week", dow)
       .order("position", { ascending: true }),
+    supabase
+      .from("treatments")
+      .select("medication, dose, next_dose_date")
+      .eq("user_id", uid)
+      .eq("active", true)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   const profile = profileRes.data;
@@ -100,6 +110,28 @@ export default async function DashboardPage() {
   const todayPlan = todayPlanRes.data ?? [];
 
   const game = await getGamification(supabase, uid);
+
+  const treatment = treatmentRes.data;
+  let doseLabel: string | null = null;
+  let doseUrgent = false;
+  if (treatment?.next_dose_date) {
+    const diff = Math.round(
+      (new Date(treatment.next_dose_date + "T00:00:00").getTime() -
+        new Date(today + "T00:00:00").getTime()) /
+        86400000
+    );
+    if (diff < 0) {
+      doseLabel = "Aplicação atrasada";
+      doseUrgent = true;
+    } else if (diff === 0) {
+      doseLabel = "Hoje é dia da aplicação";
+      doseUrgent = true;
+    } else if (diff === 1) {
+      doseLabel = "Aplicação amanhã";
+    } else {
+      doseLabel = `Aplicação em ${diff} dias`;
+    }
+  }
 
   const chartData = measurements.map((m) => ({
     label: formatDate(m.date).slice(0, 5),
@@ -178,6 +210,32 @@ export default async function DashboardPage() {
           accent="blue"
         />
       </div>
+
+      {/* Tratamento (Modo Caneta) */}
+      {treatment && doseLabel && (
+        <Link
+          href="/app/tratamento"
+          className={`card group flex items-center gap-4 transition duration-200 hover:-translate-y-0.5 ${
+            doseUrgent
+              ? "border-brand-300 bg-brand-50/60 dark:border-brand-800/60 dark:bg-brand-950/20"
+              : ""
+          }`}
+        >
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
+            <Syringe className="h-6 w-6" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-slate-900 dark:text-white">
+              {doseLabel}
+            </p>
+            <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+              {treatment.medication}
+              {treatment.dose ? ` · ${treatment.dose}` : ""}
+            </p>
+          </div>
+          <ArrowRight className="h-5 w-5 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-brand-500" />
+        </Link>
+      )}
 
       {/* Gamificação */}
       <Link

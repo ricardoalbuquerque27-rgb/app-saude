@@ -19,6 +19,7 @@ import {
   BarChart3,
   Trophy,
   Users,
+  Syringe,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -103,6 +104,17 @@ export default function AppShell({
         </nav>
 
         <div className="mt-4 space-y-1 border-t border-slate-200 pt-4 dark:border-slate-800">
+          <Link
+            href="/app/tratamento"
+            className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition ${
+              pathname === "/app/tratamento"
+                ? "bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-300"
+                : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+            }`}
+          >
+            <Syringe className="h-5 w-5" />
+            Tratamento
+          </Link>
           <Link
             href="/app/conquistas"
             className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition ${
@@ -189,6 +201,13 @@ export default function AppShell({
           >
             {dark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
           </button>
+          <Link
+            href="/app/tratamento"
+            className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+            aria-label="Tratamento"
+          >
+            <Syringe className="h-5 w-5" />
+          </Link>
           <Link
             href="/app/conquistas"
             className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"

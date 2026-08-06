@@ -37,7 +37,8 @@ async function buildUserContext(supabase: any, uid: string): Promise<string> {
   })();
   const dow = (new Date().getDay() + 6) % 7;
 
-  const [prof, weight, meals, wkCount, plan, log, exams] = await Promise.all([
+  const [prof, weight, meals, wkCount, plan, log, exams, treat] =
+    await Promise.all([
     supabase
       .from("profiles")
       .select(
@@ -76,6 +77,14 @@ async function buildUserContext(supabase: any, uid: string): Promise<string> {
       .neq("status", "normal")
       .order("date", { ascending: false })
       .limit(5),
+    supabase
+      .from("treatments")
+      .select("medication, dose, frequency_days")
+      .eq("user_id", uid)
+      .eq("active", true)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   const p = prof.data;
@@ -126,6 +135,19 @@ async function buildUserContext(supabase: any, uid: string): Promise<string> {
         )
         .join("; ")}`
     );
+  if (treat.data) {
+    const freq =
+      treat.data.frequency_days === 7
+        ? "semanal"
+        : treat.data.frequency_days === 1
+          ? "diária"
+          : `a cada ${treat.data.frequency_days} dias`;
+    parts.push(
+      `Tratamento com caneta (GLP-1): usa ${treat.data.medication}${
+        treat.data.dose ? ` (${treat.data.dose})` : ""
+      }, aplicação ${freq}. ORIENTE de acordo: priorize proteína (preservar músculo), boa hidratação, comer devagar e em menor quantidade, fibras contra constipação, e reforce procurar o médico para ajuste de dose ou efeitos fortes. NUNCA sugira ou altere doses de medicamento.`
+    );
+  }
 
   return parts.join("\n");
 }

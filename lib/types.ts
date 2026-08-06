@@ -258,6 +258,7 @@ export type Database = {
           reminder_time: string | null;
           reminder_tz_offset: number;
           last_reminded_on: string | null;
+          protein_goal_g: number | null;
         };
         Insert: {
           birth_date?: string | null;
@@ -274,6 +275,7 @@ export type Database = {
           reminder_time?: string | null;
           reminder_tz_offset?: number;
           last_reminded_on?: string | null;
+          protein_goal_g?: number | null;
         };
         Update: {
           birth_date?: string | null;
@@ -290,6 +292,7 @@ export type Database = {
           reminder_time?: string | null;
           reminder_tz_offset?: number;
           last_reminded_on?: string | null;
+          protein_goal_g?: number | null;
         };
         Relationships: [];
       };
@@ -434,6 +437,114 @@ export type Database = {
         };
         Relationships: [];
       };
+      treatments: {
+        Row: {
+          id: string;
+          user_id: string;
+          medication: string;
+          dose: string | null;
+          frequency_days: number;
+          start_date: string;
+          next_dose_date: string | null;
+          remind_dose: boolean;
+          dose_reminded_on: string | null;
+          active: boolean;
+          notes: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          medication: string;
+          dose?: string | null;
+          frequency_days?: number;
+          start_date?: string;
+          next_dose_date?: string | null;
+          remind_dose?: boolean;
+          dose_reminded_on?: string | null;
+          active?: boolean;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          medication?: string;
+          dose?: string | null;
+          frequency_days?: number;
+          start_date?: string;
+          next_dose_date?: string | null;
+          remind_dose?: boolean;
+          dose_reminded_on?: string | null;
+          active?: boolean;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      dose_logs: {
+        Row: {
+          id: string;
+          user_id: string;
+          treatment_id: string | null;
+          date: string;
+          dose: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          treatment_id?: string | null;
+          date?: string;
+          dose?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          treatment_id?: string | null;
+          date?: string;
+          dose?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      side_effects: {
+        Row: {
+          id: string;
+          user_id: string;
+          date: string;
+          nausea: number;
+          appetite: number;
+          fatigue: number;
+          other: string | null;
+          notes: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          date?: string;
+          nausea?: number;
+          appetite?: number;
+          fatigue?: number;
+          other?: string | null;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          date?: string;
+          nausea?: number;
+          appetite?: number;
+          fatigue?: number;
+          other?: string | null;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       friendships: {
         Row: {
           id: string;
@@ -516,6 +627,16 @@ export type Database = {
         Args: { p_secret: string; p_endpoint: string };
         Returns: undefined;
       };
+      due_dose_reminders: {
+        Args: { p_secret: string };
+        Returns: {
+          user_id: string;
+          medication: string;
+          endpoint: string;
+          p256dh: string;
+          auth: string;
+        }[];
+      };
     };
     Enums: {
       [_ in never]: never;
@@ -538,3 +659,6 @@ export type DailyLog = PublicSchema["Tables"]["daily_logs"]["Row"];
 export type Exam = PublicSchema["Tables"]["exams"]["Row"];
 export type WorkoutPlan = PublicSchema["Tables"]["workout_plan"]["Row"];
 export type PlanCompletion = PublicSchema["Tables"]["plan_completions"]["Row"];
+export type Treatment = PublicSchema["Tables"]["treatments"]["Row"];
+export type DoseLog = PublicSchema["Tables"]["dose_logs"]["Row"];
+export type SideEffect = PublicSchema["Tables"]["side_effects"]["Row"];

@@ -44,27 +44,62 @@ export async function GET(request: Request) {
 
   let sent = 0;
   let pruned = 0;
-  for (const r of rows) {
-    const payload = {
-      title: `Bora, ${r.first_name}! 💪`,
-      body: "Registre um treino, refeição ou hábito hoje para manter sua sequência.",
-      url: "/app",
-      tag: "pacefit-reminder",
-    };
-    const status = await sendPush(
-      { endpoint: r.endpoint, p256dh: r.p256dh, auth: r.auth },
-      payload
-    );
+
+  async function deliver(
+    sub: { endpoint: string; p256dh: string; auth: string },
+    payload: Record<string, unknown>
+  ) {
+    const status = await sendPush(sub, payload);
     if (status === 201 || status === 200) {
       sent++;
     } else if (status === 404 || status === 410) {
       await supabase.rpc("prune_push_endpoint", {
-        p_secret: secret,
-        p_endpoint: r.endpoint,
+        p_secret: secret!,
+        p_endpoint: sub.endpoint,
       });
       pruned++;
     }
   }
 
-  return NextResponse.json({ due: rows.length, sent, pruned });
+  for (const r of rows) {
+    await deliver(
+      { endpoint: r.endpoint, p256dh: r.p256dh, auth: r.auth },
+      {
+        title: `Bora, ${r.first_name}! 💪`,
+        body: "Registre um treino, refeição ou hábito hoje para manter sua sequência.",
+        url: "/app",
+        tag: "pacefit-reminder",
+      }
+    );
+  }
+
+  // Lembretes de aplicação da caneta (GLP-1)
+  const { data: doseDue } = await supabase.rpc("due_dose_reminders", {
+    p_secret: secret,
+  });
+  const doseRows = (doseDue ?? []) as {
+    user_id: string;
+    medication: string;
+    endpoint: string;
+    p256dh: string;
+    auth: string;
+  }[];
+  for (const d of doseRows) {
+    await deliver(
+      { endpoint: d.endpoint, p256dh: d.p256dh, auth: d.auth },
+      {
+        title: "Dia da aplicação 💉",
+        body: `Hoje é dia da sua dose de ${d.medication}. Não esqueça de registrar!`,
+        url: "/app/tratamento",
+        tag: "pacefit-dose",
+      }
+    );
+  }
+
+  return NextResponse.json({
+    due: rows.length,
+    dose: doseRows.length,
+    sent,
+    pruned,
+  });
 }
