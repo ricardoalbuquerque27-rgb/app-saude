@@ -23,6 +23,7 @@ import {
   X,
   ChevronRight,
   Target,
+  HeartPulse,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import ChatWidget from "@/components/ChatWidget";
@@ -54,6 +55,7 @@ const menuGroups = [
       { href: "/app/medidas", label: "Medidas", icon: LineChart },
       { href: "/app/exames", label: "Exames", icon: FileText },
       { href: "/app/tratamento", label: "Tratamento", icon: Syringe },
+      { href: "/app/saude", label: "Saúde (IA)", icon: HeartPulse },
     ],
   },
   {

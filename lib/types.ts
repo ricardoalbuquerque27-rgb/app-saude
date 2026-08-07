@@ -548,6 +548,27 @@ export type Database = {
         };
         Relationships: [];
       };
+      health_insights: {
+        Row: {
+          id: string;
+          user_id: string;
+          content: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          content: Json;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          content?: Json;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       challenge_completions: {
         Row: {
           id: string;
