@@ -6,7 +6,6 @@ import {
   Droplets,
   ArrowRight,
   LineChart as LineIcon,
-  Bot,
   BarChart3,
   Camera,
   CalendarDays,
@@ -17,6 +16,7 @@ import { createClient } from "@/lib/supabase/server";
 import { StatCard, formatDate } from "@/components/ui";
 import { TrendChart } from "@/components/charts";
 import { getGamification } from "@/lib/gamification";
+import OpenChatButton from "@/components/OpenChatButton";
 
 function isoDaysAgo(days: number) {
   const d = new Date();
@@ -147,7 +147,6 @@ export default async function DashboardPage() {
   const actions = [
     { href: "/app/treinos", icon: Dumbbell, label: "Registrar treino" },
     { href: "/app/dieta", icon: Camera, label: "Analisar foto do prato" },
-    { href: "/app/assistente", icon: Bot, label: "Falar com o assistente" },
     { href: "/app/relatorios", icon: BarChart3, label: "Gerar relatório" },
   ];
 
@@ -383,6 +382,7 @@ export default async function DashboardPage() {
                 <ArrowRight className="h-4 w-4 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-brand-500" />
               </Link>
             ))}
+            <OpenChatButton />
           </div>
         </div>
       </div>

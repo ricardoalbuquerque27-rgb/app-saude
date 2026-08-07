@@ -14,7 +14,6 @@ import {
   LogOut,
   Moon,
   Sun,
-  Bot,
   Watch,
   BarChart3,
   Trophy,
@@ -22,6 +21,7 @@ import {
   Syringe,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import ChatWidget from "@/components/ChatWidget";
 
 const nav = [
   { href: "/app", label: "Início", icon: LayoutDashboard, exact: true },
@@ -30,7 +30,6 @@ const nav = [
   { href: "/app/medidas", label: "Medidas", icon: LineChart },
   { href: "/app/habitos", label: "Hábitos", icon: Droplets },
   { href: "/app/exames", label: "Exames", icon: FileText },
-  { href: "/app/assistente", label: "Assistente", icon: Bot },
 ];
 
 export default function AppShell({
@@ -253,7 +252,7 @@ export default function AppShell({
 
       {/* Bottom nav — mobile */}
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur lg:hidden dark:border-slate-800 dark:bg-slate-900/95">
-        <div className="mx-auto grid max-w-lg grid-cols-7">
+        <div className="mx-auto grid max-w-lg grid-cols-6">
           {nav.map((item) => (
             <Link
               key={item.href}
@@ -270,6 +269,9 @@ export default function AppShell({
           ))}
         </div>
       </nav>
+
+      {/* Assistente flutuante */}
+      <ChatWidget />
     </div>
   );
 }
