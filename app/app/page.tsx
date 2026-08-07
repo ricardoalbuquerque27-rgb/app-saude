@@ -3,7 +3,6 @@ import {
   Dumbbell,
   Flame,
   Scale,
-  Droplets,
   ArrowRight,
   LineChart as LineIcon,
   BarChart3,
@@ -17,6 +16,7 @@ import { StatCard, formatDate } from "@/components/ui";
 import { TrendChart } from "@/components/charts";
 import { getGamification } from "@/lib/gamification";
 import OpenChatButton from "@/components/OpenChatButton";
+import { ProgressRing } from "@/components/ProgressRing";
 
 function isoDaysAgo(days: number) {
   const d = new Date();
@@ -57,7 +57,11 @@ export default async function DashboardPage() {
       .select("id", { count: "exact", head: true })
       .eq("user_id", uid)
       .gte("date", weekAgo),
-    supabase.from("meals").select("calories").eq("user_id", uid).eq("date", today),
+    supabase
+      .from("meals")
+      .select("calories, protein_g")
+      .eq("user_id", uid)
+      .eq("date", today),
     supabase
       .from("body_measurements")
       .select("date, weight_kg")
@@ -101,13 +105,44 @@ export default async function DashboardPage() {
     (s, m) => s + (Number(m.calories) || 0),
     0
   );
+  const proteinToday = (mealsTodayRes.data ?? []).reduce(
+    (s, m) => s + (Number(m.protein_g) || 0),
+    0
+  );
   const measurements = measurementsRes.data ?? [];
   const currentWeight =
     measurements.length > 0 ? measurements[measurements.length - 1].weight_kg : null;
   const waterToday = dailyTodayRes.data?.water_ml ?? 0;
   const waterGoal = profile?.daily_water_goal_ml ?? 2500;
+  const calorieGoal = profile?.daily_calorie_goal ?? null;
+  const proteinGoal = profile?.protein_goal_g ?? null;
   const recentWorkouts = recentWorkoutsRes.data ?? [];
   const todayPlan = todayPlanRes.data ?? [];
+
+  // Anéis do dia
+  const rings = [
+    {
+      label: "Calorias",
+      colorClass: "text-amber-500",
+      pct: calorieGoal ? caloriesToday / calorieGoal : 0,
+      centerMain: `${Math.round(caloriesToday)}`,
+      centerSub: calorieGoal ? `/ ${calorieGoal}` : "kcal",
+    },
+    {
+      label: "Água",
+      colorClass: "text-blue-500",
+      pct: waterGoal ? waterToday / waterGoal : 0,
+      centerMain: `${(waterToday / 1000).toFixed(1)}`,
+      centerSub: `/ ${(waterGoal / 1000).toFixed(1)} L`,
+    },
+    {
+      label: "Proteína",
+      colorClass: "text-rose-500",
+      pct: proteinGoal ? proteinToday / proteinGoal : 0,
+      centerMain: `${Math.round(proteinToday)}`,
+      centerSub: proteinGoal ? `/ ${proteinGoal} g` : "g",
+    },
+  ];
 
   const game = await getGamification(supabase, uid);
 
@@ -179,8 +214,37 @@ export default async function DashboardPage() {
         )}
       </section>
 
-      {/* Resumo */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      {/* Resumo do dia — anéis */}
+      <div className="card">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="font-semibold text-slate-900 dark:text-white">
+            Resumo de hoje
+          </h2>
+          {(!calorieGoal || !proteinGoal) && (
+            <Link
+              href="/app/perfil"
+              className="text-xs font-medium text-brand-700 hover:underline dark:text-brand-400"
+            >
+              Definir metas
+            </Link>
+          )}
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {rings.map((r) => (
+            <ProgressRing
+              key={r.label}
+              pct={r.pct}
+              centerMain={r.centerMain}
+              centerSub={r.centerSub}
+              label={r.label}
+              colorClass={r.colorClass}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Mini-stats */}
+      <div className="grid grid-cols-2 gap-3">
         <StatCard
           label="Treinos (7 dias)"
           value={workoutsWeek}
@@ -188,25 +252,11 @@ export default async function DashboardPage() {
           accent="brand"
         />
         <StatCard
-          label="Calorias hoje"
-          value={Math.round(caloriesToday)}
-          unit="kcal"
-          icon={<Flame className="h-5 w-5" />}
-          accent="amber"
-        />
-        <StatCard
           label="Peso atual"
           value={currentWeight ?? "—"}
           unit={currentWeight ? "kg" : ""}
           icon={<Scale className="h-5 w-5" />}
           accent="violet"
-        />
-        <StatCard
-          label="Água hoje"
-          value={`${(waterToday / 1000).toFixed(1)}/${(waterGoal / 1000).toFixed(1)}`}
-          unit="L"
-          icon={<Droplets className="h-5 w-5" />}
-          accent="blue"
         />
       </div>
 
