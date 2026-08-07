@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import ChatWidget from "@/components/ChatWidget";
+import Onboarding from "@/components/Onboarding";
 
 // Navegação completa (usada na sidebar do desktop)
 const nav = [
@@ -77,10 +78,12 @@ export default function AppShell({
   children,
   userName,
   userEmail,
+  needsOnboarding,
 }: {
   children: React.ReactNode;
   userName: string;
   userEmail: string;
+  needsOnboarding?: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -360,6 +363,11 @@ export default function AppShell({
 
       {/* Assistente flutuante */}
       <ChatWidget />
+
+      {/* Onboarding (novos usuários) */}
+      {needsOnboarding && (
+        <Onboarding initialName={userName === "Atleta" ? "" : userName} />
+      )}
     </div>
   );
 }

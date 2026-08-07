@@ -259,6 +259,7 @@ export type Database = {
           reminder_tz_offset: number;
           last_reminded_on: string | null;
           protein_goal_g: number | null;
+          onboarded: boolean;
         };
         Insert: {
           birth_date?: string | null;
@@ -276,6 +277,7 @@ export type Database = {
           reminder_tz_offset?: number;
           last_reminded_on?: string | null;
           protein_goal_g?: number | null;
+          onboarded?: boolean;
         };
         Update: {
           birth_date?: string | null;
@@ -293,6 +295,7 @@ export type Database = {
           reminder_tz_offset?: number;
           last_reminded_on?: string | null;
           protein_goal_g?: number | null;
+          onboarded?: boolean;
         };
         Relationships: [];
       };

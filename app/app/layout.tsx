@@ -18,7 +18,7 @@ export default async function AppLayout({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name")
+    .select("full_name, onboarded")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -26,7 +26,11 @@ export default async function AppLayout({
     profile?.full_name || user.user_metadata?.full_name || "Atleta";
 
   return (
-    <AppShell userName={userName} userEmail={user.email ?? ""}>
+    <AppShell
+      userName={userName}
+      userEmail={user.email ?? ""}
+      needsOnboarding={profile ? !profile.onboarded : false}
+    >
       {children}
     </AppShell>
   );
