@@ -107,6 +107,13 @@ export default async function DashboardPage() {
 
   const profile = profileRes.data;
   const firstName = (profile?.full_name || "Atleta").split(" ")[0];
+  const initials = (profile?.full_name || "Atleta")
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((s) => s[0])
+    .join("")
+    .toUpperCase();
 
   const workoutsWeek = workoutsWeekRes.count ?? 0;
   const caloriesToday = (mealsTodayRes.data ?? []).reduce(
@@ -202,27 +209,58 @@ export default async function DashboardPage() {
       <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-600 to-brand-800 p-6 text-white shadow-xl sm:p-8">
         <div className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-white/10 blur-2xl" />
         <div className="pointer-events-none absolute -bottom-24 -left-10 h-56 w-56 rounded-full bg-black/10 blur-2xl" />
-        <p className="relative text-sm capitalize text-brand-50/80">{dataLonga}</p>
-        <h1 className="relative mt-1 text-2xl font-bold tracking-tight sm:text-3xl">
-          Olá, {firstName} 👋
-        </h1>
-        <p className="relative mt-1 text-sm text-brand-50/90">
-          Cada registro é um passo na sua evolução.
-        </p>
-        {todayPlan.length > 0 && (
-          <div className="relative mt-4 flex flex-wrap items-center gap-2">
-            <span className="text-xs font-medium text-brand-50/80">Hoje:</span>
-            {todayPlan.map((p, i) => (
-              <span
-                key={i}
-                className="rounded-full bg-white/15 px-2.5 py-1 text-xs font-medium backdrop-blur"
-              >
-                {p.sport}
-                {p.title ? ` · ${p.title}` : ""}
-              </span>
-            ))}
+        <div className="pointer-events-none absolute inset-0 opacity-[0.06] [background-image:linear-gradient(white_1px,transparent_1px),linear-gradient(90deg,white_1px,transparent_1px)] [background-size:36px_36px]" />
+
+        <div className="relative flex items-start gap-4">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15 text-lg font-bold backdrop-blur ring-1 ring-white/20">
+            {initials}
           </div>
-        )}
+          <div className="min-w-0 flex-1">
+            <p className="text-sm capitalize text-brand-50/80">{dataLonga}</p>
+            <h1 className="mt-0.5 text-2xl font-bold tracking-tight sm:text-3xl">
+              Olá, {firstName} 👋
+            </h1>
+          </div>
+        </div>
+
+        {/* Nível, sequência e plano */}
+        <div className="relative mt-5 flex flex-wrap items-center gap-2">
+          <Link
+            href="/app/conquistas"
+            className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold ring-1 ring-white/15 backdrop-blur transition hover:bg-white/25"
+          >
+            <Trophy className="h-3.5 w-3.5" /> Nível {game.level}
+          </Link>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold ring-1 ring-white/15 backdrop-blur">
+            <Flame className="h-3.5 w-3.5" /> {game.current}{" "}
+            {game.current === 1 ? "dia" : "dias"}
+          </span>
+          {todayPlan.map((p, i) => (
+            <span
+              key={i}
+              className="inline-flex items-center rounded-full bg-white/15 px-3 py-1 text-xs font-medium ring-1 ring-white/15 backdrop-blur"
+            >
+              {p.sport}
+              {p.title ? ` · ${p.title}` : ""}
+            </span>
+          ))}
+        </div>
+
+        {/* Barra de nível */}
+        <div className="relative mt-4">
+          <div className="mb-1 flex justify-between text-[11px] text-brand-50/80">
+            <span>Progresso de nível</span>
+            <span>
+              {game.xpPerLevel - game.xpIntoLevel} XP p/ nível {game.level + 1}
+            </span>
+          </div>
+          <div className="h-2 w-full overflow-hidden rounded-full bg-black/20">
+            <div
+              className="h-full rounded-full bg-white/90 transition-all"
+              style={{ width: `${Math.round(game.progress * 100)}%` }}
+            />
+          </div>
+        </div>
       </section>
 
       {/* Resumo do dia — anéis */}
@@ -271,83 +309,53 @@ export default async function DashboardPage() {
         />
       </div>
 
-      {/* Tratamento (Modo Caneta) */}
-      {treatment && doseLabel && (
+      {/* Tratamento + Desafios */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        {treatment && doseLabel && (
+          <Link
+            href="/app/tratamento"
+            className={`card group flex items-center gap-4 transition duration-200 hover:-translate-y-0.5 ${
+              doseUrgent
+                ? "border-brand-300 bg-brand-50/60 dark:border-brand-800/60 dark:bg-brand-950/20"
+                : ""
+            }`}
+          >
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
+              <Syringe className="h-6 w-6" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                {doseLabel}
+              </p>
+              <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                {treatment.medication}
+                {treatment.dose ? ` · ${treatment.dose}` : ""}
+              </p>
+            </div>
+            <ArrowRight className="h-5 w-5 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-brand-500" />
+          </Link>
+        )}
+
         <Link
-          href="/app/tratamento"
-          className={`card group flex items-center gap-4 transition duration-200 hover:-translate-y-0.5 ${
-            doseUrgent
-              ? "border-brand-300 bg-brand-50/60 dark:border-brand-800/60 dark:bg-brand-950/20"
-              : ""
-          }`}
+          href="/app/desafios"
+          className="card group flex items-center gap-4 transition duration-200 hover:-translate-y-0.5"
         >
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
-            <Syringe className="h-6 w-6" />
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-300">
+            <Target className="h-6 w-6" />
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-slate-900 dark:text-white">
-              {doseLabel}
+              Desafios da semana
             </p>
-            <p className="truncate text-xs text-slate-500 dark:text-slate-400">
-              {treatment.medication}
-              {treatment.dose ? ` · ${treatment.dose}` : ""}
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {challengesDone > 0
+                ? `${challengesDone}/${challengesTotal} concluídos — resgate mais XP!`
+                : "Complete metas e ganhe XP extra."}
             </p>
           </div>
           <ArrowRight className="h-5 w-5 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-brand-500" />
         </Link>
-      )}
-
-      {/* Gamificação */}
-      <Link
-        href="/app/conquistas"
-        className="card group flex items-center gap-4 transition duration-200 hover:-translate-y-0.5"
-      >
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600 text-lg font-extrabold text-white shadow-[0_8px_20px_-8px_rgba(24,184,94,0.8)]">
-          {game.level}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-sm font-semibold text-slate-900 dark:text-white">
-              Nível {game.level}
-            </p>
-            <span className="flex items-center gap-1 text-xs font-medium text-amber-600 dark:text-amber-400">
-              <Flame className="h-3.5 w-3.5" />
-              {game.current} {game.current === 1 ? "dia" : "dias"}
-            </span>
-          </div>
-          <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-brand-400 to-brand-600 transition-all"
-              style={{ width: `${Math.round(game.progress * 100)}%` }}
-            />
-          </div>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            {game.xpPerLevel - game.xpIntoLevel} XP para o próximo nível
-          </p>
-        </div>
-        <Trophy className="h-5 w-5 shrink-0 text-slate-300 transition group-hover:text-brand-500" />
-      </Link>
-
-      {/* Desafios da semana */}
-      <Link
-        href="/app/desafios"
-        className="card group flex items-center gap-4 transition duration-200 hover:-translate-y-0.5"
-      >
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-300">
-          <Target className="h-6 w-6" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-slate-900 dark:text-white">
-            Desafios da semana
-          </p>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            {challengesDone > 0
-              ? `${challengesDone} de ${challengesTotal} concluídos — resgate mais XP!`
-              : "Complete metas e ganhe XP extra esta semana."}
-          </p>
-        </div>
-        <ArrowRight className="h-5 w-5 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-brand-500" />
-      </Link>
+      </div>
 
       {/* Gráfico + Plano de hoje */}
       <div className="grid gap-6 lg:grid-cols-3">
