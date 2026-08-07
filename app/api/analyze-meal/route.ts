@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { withTimeout, isAbortError, parseModelJson } from "@/lib/aiHttp";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -71,9 +72,11 @@ export async function POST(request: Request) {
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${apiKey}`;
 
+  const to = withTimeout(30_000);
   try {
     const geminiRes = await fetch(url, {
       method: "POST",
+      signal: to.signal,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         system_instruction: { parts: [{ text: SYSTEM }] },
@@ -130,13 +133,12 @@ export async function POST(request: Request) {
       );
     }
 
-    let result: any;
-    try {
-      result = JSON.parse(text);
-    } catch {
-      // Remove cercas de markdown caso o modelo as inclua.
-      const cleaned = text.replace(/```json/gi, "").replace(/```/g, "").trim();
-      result = JSON.parse(cleaned);
+    const result = parseModelJson(text);
+    if (!result) {
+      return NextResponse.json(
+        { error: "A IA retornou uma resposta inválida. Tente outra foto." },
+        { status: 502 }
+      );
     }
 
     if (result.is_food === false) {
@@ -156,10 +158,18 @@ export async function POST(request: Request) {
       confidence: result.confidence ?? "media",
     });
   } catch (err: any) {
+    if (isAbortError(err)) {
+      return NextResponse.json(
+        { error: "A IA demorou demais para responder. Tente novamente." },
+        { status: 504 }
+      );
+    }
     console.error("analyze-meal error:", err?.message ?? err);
     return NextResponse.json(
       { error: "Falha ao analisar a foto. Tente novamente." },
       { status: 500 }
     );
+  } finally {
+    to.clear();
   }
 }

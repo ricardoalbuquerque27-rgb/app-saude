@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { withTimeout, isAbortError, parseModelJson } from "@/lib/aiHttp";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -185,9 +186,11 @@ export async function POST() {
     "\n\nDADOS (JSON):\n" +
     JSON.stringify(summary);
 
+  const to = withTimeout(45_000);
   try {
     const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
+      signal: to.signal,
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
@@ -227,11 +230,12 @@ export async function POST() {
       );
     }
 
-    let result: any;
-    try {
-      result = JSON.parse(text);
-    } catch {
-      result = JSON.parse(text.replace(/```json/gi, "").replace(/```/g, "").trim());
+    const result = parseModelJson(text);
+    if (!result) {
+      return NextResponse.json(
+        { error: "A IA retornou uma resposta inválida. Tente novamente." },
+        { status: 502 }
+      );
     }
 
     const insight = {
@@ -253,10 +257,18 @@ export async function POST() {
       created_at: saved?.created_at ?? new Date().toISOString(),
     });
   } catch (err: any) {
+    if (isAbortError(err)) {
+      return NextResponse.json(
+        { error: "A IA demorou demais para responder. Tente novamente." },
+        { status: 504 }
+      );
+    }
     console.error("insights error:", err?.message ?? err);
     return NextResponse.json(
       { error: "Falha ao gerar a análise. Tente novamente." },
       { status: 500 }
     );
+  }  finally {
+    to.clear();
   }
 }

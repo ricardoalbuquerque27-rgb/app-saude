@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { todayISO, addDaysISO } from "@/lib/date";
+import { withTimeout, isAbortError } from "@/lib/aiHttp";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -196,10 +197,12 @@ export async function POST(request: Request) {
         contexto
       : "");
 
+  const to = withTimeout(30_000);
   let groqRes: Response;
   try {
     groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
+      signal: to.signal,
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
@@ -212,9 +215,18 @@ export async function POST(request: Request) {
       }),
     });
   } catch (err: any) {
+    to.clear();
+    if (isAbortError(err)) {
+      return NextResponse.json(
+        { error: "A IA demorou demais para responder. Tente novamente." },
+        { status: 504 }
+      );
+    }
     console.error("chat fetch error:", err?.message ?? err);
     return NextResponse.json({ error: "Falha ao contatar a IA. Tente novamente." }, { status: 502 });
   }
+  // Conexão estabelecida: não deixamos o timeout abortar o streaming.
+  to.clear();
 
   if (!groqRes.ok || !groqRes.body) {
     const status = groqRes.status;
