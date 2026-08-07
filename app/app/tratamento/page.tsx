@@ -19,6 +19,7 @@ import { createClient } from "@/lib/supabase/client";
 import { PageHeader, Field } from "@/components/ui";
 import type { Treatment, SideEffect } from "@/lib/types";
 import { ensurePushSubscription } from "@/lib/pushClient";
+import { todayISO } from "@/lib/date";
 
 const MEDS = [
   "Ozempic (semaglutida)",
@@ -44,9 +45,6 @@ const SEV_COLOR = [
   "bg-rose-500",
 ];
 
-function todayISO() {
-  return new Date().toISOString().slice(0, 10);
-}
 function addDays(iso: string, days: number) {
   const d = new Date(iso + "T00:00:00");
   d.setDate(d.getDate() + days);

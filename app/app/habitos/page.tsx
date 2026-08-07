@@ -15,6 +15,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { DailyLog, Profile } from "@/lib/types";
 import { PageHeader, Field, formatDate } from "@/components/ui";
 import { ProgressRing } from "@/components/ProgressRing";
+import { todayISO } from "@/lib/date";
 
 const MOODS = [
   { value: "otimo", label: "😄 Ótimo" },
@@ -59,7 +60,7 @@ function ScalePicker({
 
 export default function HabitosPage() {
   const supabase = createClient();
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(todayISO());
   const [log, setLog] = useState<Partial<DailyLog>>({});
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);

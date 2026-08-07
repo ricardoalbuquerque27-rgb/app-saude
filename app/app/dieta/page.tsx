@@ -17,6 +17,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { Meal } from "@/lib/types";
 import { PageHeader, Modal, Field, EmptyState } from "@/components/ui";
 import { ProgressRing } from "@/components/ProgressRing";
+import { todayISO } from "@/lib/date";
 
 const MEAL_TYPES = [
   "Café da manhã",
@@ -29,7 +30,7 @@ const MEAL_TYPES = [
 
 export default function DietaPage() {
   const supabase = createClient();
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(todayISO());
   const [meals, setMeals] = useState<Meal[]>([]);
   const [loading, setLoading] = useState(true);
   const [calorieGoal, setCalorieGoal] = useState<number | null>(null);
@@ -86,7 +87,7 @@ export default function DietaPage() {
     { calories: 0, protein: 0, carbs: 0, fat: 0 }
   );
 
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = todayISO();
   const isToday = date === todayStr;
   function shiftDate(days: number) {
     const d = new Date(date + "T00:00:00");

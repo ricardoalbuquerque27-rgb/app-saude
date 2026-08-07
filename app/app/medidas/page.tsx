@@ -21,6 +21,7 @@ import {
   formatDate,
 } from "@/components/ui";
 import { TrendChart } from "@/components/charts";
+import { todayISO } from "@/lib/date";
 
 const FIELDS: { key: keyof BodyMeasurement; label: string; unit: string }[] = [
   { key: "weight_kg", label: "Peso", unit: "kg" },
@@ -42,7 +43,7 @@ export default function MedidasPage() {
   const [saving, setSaving] = useState(false);
   const [metric, setMetric] = useState<keyof BodyMeasurement>("weight_kg");
 
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(todayISO());
   const [form, setForm] = useState<Record<string, string>>({});
   const [weightGoal, setWeightGoal] = useState<number | null>(null);
 
@@ -129,7 +130,7 @@ export default function MedidasPage() {
     setSaving(false);
     setOpen(false);
     setForm({});
-    setDate(new Date().toISOString().slice(0, 10));
+    setDate(todayISO());
     await load();
   }
 

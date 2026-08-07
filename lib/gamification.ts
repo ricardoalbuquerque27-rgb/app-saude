@@ -1,4 +1,5 @@
 // Sistema de gamificação — tudo calculado a partir dos registros existentes.
+import { todayISO, addDaysISO } from "./date";
 
 export type Achievement = {
   id: string;
@@ -28,10 +29,6 @@ export type Gamification = {
   };
   achievements: Achievement[];
 };
-
-function iso(d: Date) {
-  return d.toISOString().slice(0, 10);
-}
 
 const XP_PER_LEVEL = 250;
 
@@ -108,12 +105,12 @@ export async function getGamification(
   addDates(measDates.data);
 
   // Sequência atual (permite terminar em ontem, para não zerar durante o dia)
-  let day = new Date();
-  if (!dateSet.has(iso(day))) day.setDate(day.getDate() - 1);
+  let cursor = todayISO();
+  if (!dateSet.has(cursor)) cursor = addDaysISO(cursor, -1);
   let current = 0;
-  while (dateSet.has(iso(day))) {
+  while (dateSet.has(cursor)) {
     current++;
-    day.setDate(day.getDate() - 1);
+    cursor = addDaysISO(cursor, -1);
   }
 
   // Melhor sequência

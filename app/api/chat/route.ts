@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { todayISO, addDaysISO } from "@/lib/date";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,13 +30,9 @@ type ChatMessage = { role: "user" | "assistant"; content: string };
 
 // Monta um resumo dos dados do usuário para personalizar as respostas.
 async function buildUserContext(supabase: any, uid: string): Promise<string> {
-  const today = new Date().toISOString().slice(0, 10);
-  const weekAgo = (() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 7);
-    return d.toISOString().slice(0, 10);
-  })();
-  const dow = (new Date().getDay() + 6) % 7;
+  const today = todayISO();
+  const weekAgo = addDaysISO(today, -7);
+  const dow = (new Date(today + "T12:00:00").getDay() + 6) % 7;
 
   const [prof, weight, meals, wkCount, plan, log, exams, treat] =
     await Promise.all([

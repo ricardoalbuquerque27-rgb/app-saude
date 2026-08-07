@@ -19,18 +19,7 @@ import { getGamification } from "@/lib/gamification";
 import OpenChatButton from "@/components/OpenChatButton";
 import { ProgressRing } from "@/components/ProgressRing";
 import { CHALLENGES, weekStartISO } from "@/lib/challenges";
-
-function isoDaysAgo(days: number) {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  return d.toISOString().slice(0, 10);
-}
-function todayISO() {
-  return new Date().toISOString().slice(0, 10);
-}
-function todayDow() {
-  return (new Date().getDay() + 6) % 7; // 0 = Segunda
-}
+import { todayISO, addDaysISO } from "@/lib/date";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -40,8 +29,8 @@ export default async function DashboardPage() {
   const uid = user!.id;
 
   const today = todayISO();
-  const weekAgo = isoDaysAgo(7);
-  const dow = todayDow();
+  const weekAgo = addDaysISO(today, -7);
+  const dow = (new Date(today + "T12:00:00").getDay() + 6) % 7; // 0 = Segunda
 
   const [
     profileRes,

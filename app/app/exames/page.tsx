@@ -19,6 +19,7 @@ import {
   EmptyState,
   formatDate,
 } from "@/components/ui";
+import { todayISO } from "@/lib/date";
 
 const STATUS = [
   { value: "normal", label: "Normal", cls: "bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300" },
@@ -82,7 +83,7 @@ export default function ExamesPage() {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(todayISO());
   const [title, setTitle] = useState("");
   const [examType, setExamType] = useState("");
   const [resultValue, setResultValue] = useState("");
@@ -114,7 +115,7 @@ export default function ExamesPage() {
   }, [load]);
 
   function resetForm() {
-    setDate(new Date().toISOString().slice(0, 10));
+    setDate(todayISO());
     setTitle("");
     setExamType("");
     setResultValue("");
@@ -199,7 +200,7 @@ export default function ExamesPage() {
       setSavingItems(false);
       return;
     }
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayISO();
     const rows = analysis.itens
       .filter((it) => it.nome)
       .map((it) => ({

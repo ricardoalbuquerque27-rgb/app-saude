@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { ensurePushSubscription } from "@/lib/pushClient";
+import { todayISO } from "@/lib/date";
 
 const MEDS = [
   "Ozempic (semaglutida)",
@@ -24,10 +25,6 @@ const MEDS = [
   "Rybelsus (semaglutida oral)",
   "Outro",
 ];
-
-function todayISO() {
-  return new Date().toISOString().slice(0, 10);
-}
 
 export default function Onboarding({ initialName }: { initialName?: string }) {
   const router = useRouter();

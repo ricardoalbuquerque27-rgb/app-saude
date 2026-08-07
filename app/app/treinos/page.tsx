@@ -26,6 +26,7 @@ import {
   formatDate,
 } from "@/components/ui";
 import { TrendChart, BarsChart } from "@/components/charts";
+import { todayISO, weekStartISO } from "@/lib/date";
 
 // Segunda = 0 ... Domingo = 6
 const DAYS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
@@ -78,16 +79,7 @@ const emptyExercise = (): ExerciseDraft => ({
 });
 
 function todayIndex() {
-  return (new Date().getDay() + 6) % 7; // 0=Segunda
-}
-function todayISO() {
-  return new Date().toISOString().slice(0, 10);
-}
-function weekStartISO(dateStr: string) {
-  const d = new Date(dateStr + "T00:00:00");
-  const day = (d.getDay() + 6) % 7; // Segunda=0
-  d.setDate(d.getDate() - day);
-  return d.toISOString().slice(0, 10);
+  return (new Date(todayISO() + "T12:00:00").getDay() + 6) % 7; // 0=Segunda
 }
 // Séries de um exercício (usa o detalhe salvo; senão, resume pelas colunas)
 function setsOf(ex: Exercise): { reps: number | null; weight: number | null }[] {

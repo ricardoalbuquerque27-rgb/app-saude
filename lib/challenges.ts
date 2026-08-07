@@ -1,4 +1,5 @@
 // Definições dos desafios semanais (compartilhado pela página e pelo dashboard).
+export { weekStartISO } from "./date";
 
 export type ChallengeMetric =
   | "workouts"
@@ -65,13 +66,3 @@ export const CHALLENGES: Challenge[] = [
   },
 ];
 
-// Segunda-feira da semana atual (data local, formato YYYY-MM-DD)
-export function weekStartISO(): string {
-  const d = new Date();
-  const day = (d.getDay() + 6) % 7; // 0 = segunda
-  d.setDate(d.getDate() - day);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const da = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${da}`;
-}
