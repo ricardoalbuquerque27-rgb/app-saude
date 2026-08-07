@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut, Loader2, Check } from "lucide-react";
+import { LogOut, Loader2, Check, User, Target, CalendarClock } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { Profile } from "@/lib/types";
 import { PageHeader, Field } from "@/components/ui";
@@ -56,6 +56,8 @@ export default function PerfilPage() {
   const [weightGoal, setWeightGoal] = useState("");
   const [waterGoal, setWaterGoal] = useState("");
   const [calorieGoal, setCalorieGoal] = useState("");
+  const [proteinGoal, setProteinGoal] = useState("");
+  const [memberSince, setMemberSince] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -74,6 +76,8 @@ export default function PerfilPage() {
       setWeightGoal(p.weight_goal_kg?.toString() ?? "");
       setWaterGoal(p.daily_water_goal_ml?.toString() ?? "");
       setCalorieGoal(p.daily_calorie_goal?.toString() ?? "");
+      setProteinGoal(p.protein_goal_g?.toString() ?? "");
+      setMemberSince(p.created_at ?? null);
     }
     setLoading(false);
   }, [supabase]);
@@ -122,6 +126,7 @@ export default function PerfilPage() {
       weight_goal_kg: weightGoal ? Number(weightGoal) : null,
       daily_water_goal_ml: waterGoal ? Number(waterGoal) : 2500,
       daily_calorie_goal: calorieGoal ? Number(calorieGoal) : null,
+      protein_goal_g: proteinGoal ? Number(proteinGoal) : null,
       updated_at: new Date().toISOString(),
     });
 
@@ -171,12 +176,24 @@ export default function PerfilPage() {
             <p className="truncate text-sm text-slate-500 dark:text-slate-400">
               {email}
             </p>
+            {memberSince && (
+              <p className="mt-1.5 inline-flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500">
+                <CalendarClock className="h-3.5 w-3.5" />
+                Membro desde{" "}
+                {new Date(memberSince).toLocaleDateString("pt-BR", {
+                  month: "short",
+                  year: "numeric",
+                })}
+              </p>
+            )}
           </div>
         </div>
       </div>
 
       <form onSubmit={save} className="card space-y-4">
-        <h2 className="font-semibold text-slate-900 dark:text-white">Dados</h2>
+        <h2 className="flex items-center gap-2 font-semibold text-slate-900 dark:text-white">
+          <User className="h-4 w-4 text-brand-600 dark:text-brand-400" /> Dados
+        </h2>
         <Field label="Nome completo">
           <input
             className="input"
@@ -215,8 +232,10 @@ export default function PerfilPage() {
           </Field>
         </div>
 
-        <h2 className="pt-2 font-semibold text-slate-900 dark:text-white">Metas</h2>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <h2 className="flex items-center gap-2 pt-2 font-semibold text-slate-900 dark:text-white">
+          <Target className="h-4 w-4 text-brand-600 dark:text-brand-400" /> Metas
+        </h2>
+        <div className="grid grid-cols-2 gap-3">
           <Field label="Peso alvo (kg)">
             <input
               type="number"
@@ -227,15 +246,6 @@ export default function PerfilPage() {
               placeholder="75"
             />
           </Field>
-          <Field label="Água/dia (ml)">
-            <input
-              type="number"
-              className="input"
-              value={waterGoal}
-              onChange={(e) => setWaterGoal(e.target.value)}
-              placeholder="2500"
-            />
-          </Field>
           <Field label="Calorias/dia">
             <input
               type="number"
@@ -243,6 +253,24 @@ export default function PerfilPage() {
               value={calorieGoal}
               onChange={(e) => setCalorieGoal(e.target.value)}
               placeholder="2000"
+            />
+          </Field>
+          <Field label="Proteína/dia (g)">
+            <input
+              type="number"
+              className="input"
+              value={proteinGoal}
+              onChange={(e) => setProteinGoal(e.target.value)}
+              placeholder="110"
+            />
+          </Field>
+          <Field label="Água/dia (ml)">
+            <input
+              type="number"
+              className="input"
+              value={waterGoal}
+              onChange={(e) => setWaterGoal(e.target.value)}
+              placeholder="2500"
             />
           </Field>
         </div>
