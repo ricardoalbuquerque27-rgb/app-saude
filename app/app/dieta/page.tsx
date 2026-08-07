@@ -1,10 +1,22 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { Salad, Plus, Trash2, Loader2, Flame, Camera, Sparkles, Upload } from "lucide-react";
+import Link from "next/link";
+import {
+  Salad,
+  Plus,
+  Trash2,
+  Loader2,
+  Camera,
+  Sparkles,
+  Upload,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { Meal } from "@/lib/types";
-import { PageHeader, Modal, Field, EmptyState, StatCard } from "@/components/ui";
+import { PageHeader, Modal, Field, EmptyState } from "@/components/ui";
+import { ProgressRing } from "@/components/ProgressRing";
 
 const MEAL_TYPES = [
   "Café da manhã",
@@ -20,6 +32,8 @@ export default function DietaPage() {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [meals, setMeals] = useState<Meal[]>([]);
   const [loading, setLoading] = useState(true);
+  const [calorieGoal, setCalorieGoal] = useState<number | null>(null);
+  const [proteinGoal, setProteinGoal] = useState<number | null>(null);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -51,6 +65,17 @@ export default function DietaPage() {
     load();
   }, [load]);
 
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("daily_calorie_goal, protein_goal_g")
+        .maybeSingle();
+      setCalorieGoal(data?.daily_calorie_goal ?? null);
+      setProteinGoal(data?.protein_goal_g ?? null);
+    })();
+  }, [supabase]);
+
   const totals = meals.reduce(
     (acc, m) => ({
       calories: acc.calories + (Number(m.calories) || 0),
@@ -60,6 +85,25 @@ export default function DietaPage() {
     }),
     { calories: 0, protein: 0, carbs: 0, fat: 0 }
   );
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const isToday = date === todayStr;
+  function shiftDate(days: number) {
+    const d = new Date(date + "T00:00:00");
+    d.setDate(d.getDate() + days);
+    setDate(d.toISOString().slice(0, 10));
+  }
+  const dateLabel = new Date(date + "T00:00:00").toLocaleDateString("pt-BR", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+
+  // Distribuição de macros (por calorias: P/C 4, G 9)
+  const pCal = totals.protein * 4;
+  const cCal = totals.carbs * 4;
+  const fCal = totals.fat * 9;
+  const macroCal = pCal + cCal + fCal || 1;
 
   function resetForm() {
     setMealType(MEAL_TYPES[0]);
@@ -179,26 +223,103 @@ export default function DietaPage() {
         }
       />
 
-      <div className="mb-4 flex items-center gap-3">
-        <input
-          type="date"
-          className="input max-w-[180px]"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-        />
+      {/* Navegador de data */}
+      <div className="mb-4 flex items-center gap-2">
+        <button
+          onClick={() => shiftDate(-1)}
+          className="btn-ghost h-10 w-10 justify-center px-0"
+          aria-label="Dia anterior"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <div className="relative flex-1 sm:max-w-[220px]">
+          <input
+            type="date"
+            className="input pr-3 text-center"
+            value={date}
+            max={todayStr}
+            onChange={(e) => setDate(e.target.value)}
+          />
+        </div>
+        <button
+          onClick={() => shiftDate(1)}
+          disabled={isToday}
+          className="btn-ghost h-10 w-10 justify-center px-0 disabled:opacity-40"
+          aria-label="Próximo dia"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+        {!isToday && (
+          <button onClick={() => setDate(todayStr)} className="chip">
+            Hoje
+          </button>
+        )}
       </div>
 
-      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard
-          label="Calorias"
-          value={Math.round(totals.calories)}
-          unit="kcal"
-          icon={<Flame className="h-5 w-5" />}
-          accent="amber"
-        />
-        <StatCard label="Proteína" value={Math.round(totals.protein)} unit="g" accent="brand" />
-        <StatCard label="Carboidrato" value={Math.round(totals.carbs)} unit="g" accent="blue" />
-        <StatCard label="Gordura" value={Math.round(totals.fat)} unit="g" accent="rose" />
+      {/* Resumo do dia */}
+      <div className="card mb-6">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="font-semibold text-slate-900 dark:text-white">
+              Resumo do dia
+            </h2>
+            <p className="text-xs capitalize text-slate-400">{dateLabel}</p>
+          </div>
+          {(!calorieGoal || !proteinGoal) && (
+            <Link
+              href="/app/perfil"
+              className="text-xs font-medium text-brand-700 hover:underline dark:text-brand-400"
+            >
+              Definir metas
+            </Link>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <ProgressRing
+            pct={calorieGoal ? totals.calories / calorieGoal : 0}
+            centerMain={`${Math.round(totals.calories)}`}
+            centerSub={calorieGoal ? `/ ${calorieGoal}` : "kcal"}
+            label="Calorias"
+            colorClass="text-amber-500"
+          />
+          <ProgressRing
+            pct={proteinGoal ? totals.protein / proteinGoal : 0}
+            centerMain={`${Math.round(totals.protein)}`}
+            centerSub={proteinGoal ? `/ ${proteinGoal} g` : "g"}
+            label="Proteína"
+            colorClass="text-rose-500"
+          />
+        </div>
+
+        {/* Distribuição de macros */}
+        <div className="mt-5">
+          <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+            <div className="bg-rose-500" style={{ width: `${(pCal / macroCal) * 100}%` }} />
+            <div className="bg-blue-500" style={{ width: `${(cCal / macroCal) * 100}%` }} />
+            <div className="bg-amber-500" style={{ width: `${(fCal / macroCal) * 100}%` }} />
+          </div>
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-rose-500" /> Proteína{" "}
+              <span className="tabular font-medium text-slate-700 dark:text-slate-300">
+                {Math.round(totals.protein)}g
+              </span>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-blue-500" /> Carbo{" "}
+              <span className="tabular font-medium text-slate-700 dark:text-slate-300">
+                {Math.round(totals.carbs)}g
+              </span>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-amber-500" /> Gordura{" "}
+              <span className="tabular font-medium text-slate-700 dark:text-slate-300">
+                {Math.round(totals.fat)}g
+              </span>
+            </span>
+          </div>
+        </div>
       </div>
 
       {loading ? (
