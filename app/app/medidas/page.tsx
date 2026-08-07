@@ -1,7 +1,16 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Scale, Plus, Trash2, Loader2, TrendingDown, TrendingUp } from "lucide-react";
+import Link from "next/link";
+import {
+  Scale,
+  Plus,
+  Trash2,
+  Loader2,
+  TrendingDown,
+  TrendingUp,
+  Target,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { BodyMeasurement } from "@/lib/types";
 import {
@@ -35,6 +44,7 @@ export default function MedidasPage() {
 
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [form, setForm] = useState<Record<string, string>>({});
+  const [weightGoal, setWeightGoal] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -49,6 +59,16 @@ export default function MedidasPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("weight_goal_kg")
+        .maybeSingle();
+      setWeightGoal(data?.weight_goal_kg ?? null);
+    })();
+  }, [supabase]);
 
   const asc = [...rows].sort((a, b) => a.date.localeCompare(b.date));
   const chartData = asc
@@ -65,6 +85,33 @@ export default function MedidasPage() {
     latest?.weight_kg != null && previous?.weight_kg != null
       ? Number(latest.weight_kg) - Number(previous.weight_kg)
       : null;
+
+  // Progresso rumo à meta de peso
+  const startWeight = asc.find((r) => r.weight_kg != null)?.weight_kg ?? null;
+  const toGoal =
+    weightGoal != null && currentWeight != null
+      ? Math.round((Number(currentWeight) - weightGoal) * 10) / 10
+      : null;
+  let goalPct: number | null = null;
+  if (
+    weightGoal != null &&
+    startWeight != null &&
+    currentWeight != null &&
+    Number(startWeight) !== weightGoal
+  ) {
+    goalPct = Math.max(
+      0,
+      Math.min(
+        1,
+        (Number(startWeight) - Number(currentWeight)) /
+          (Number(startWeight) - weightGoal)
+      )
+    );
+  }
+  const goalReached = toGoal != null && Math.abs(toGoal) < 0.1;
+
+  // Métricas que já têm ao menos um registro
+  const metricsWithData = FIELDS.filter((f) => rows.some((r) => r[f.key] != null));
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
@@ -107,79 +154,131 @@ export default function MedidasPage() {
         }
       />
 
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <div className="mb-6 space-y-3">
+        {/* Peso + meta */}
         <div className="card">
-          <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-            Peso atual
-          </p>
-          <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">
-            {currentWeight ?? "—"}
-            <span className="ml-1 text-sm font-medium text-slate-400">
-              {currentWeight ? "kg" : ""}
-            </span>
-          </p>
-          {weightDiff != null && (
-            <p
-              className={`mt-1 flex items-center gap-1 text-xs font-medium ${
-                weightDiff <= 0 ? "text-brand-600" : "text-rose-500"
-              }`}
-            >
-              {weightDiff <= 0 ? (
-                <TrendingDown className="h-3.5 w-3.5" />
-              ) : (
-                <TrendingUp className="h-3.5 w-3.5" />
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                Peso atual
+              </p>
+              <p className="tabular mt-1 text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+                {currentWeight ?? "—"}
+                <span className="ml-1 text-base font-medium text-slate-400">
+                  {currentWeight ? "kg" : ""}
+                </span>
+              </p>
+              {weightDiff != null && (
+                <p
+                  className={`mt-1 flex items-center gap-1 text-xs font-medium ${
+                    weightDiff <= 0 ? "text-brand-600 dark:text-brand-400" : "text-rose-500"
+                  }`}
+                >
+                  {weightDiff <= 0 ? (
+                    <TrendingDown className="h-3.5 w-3.5" />
+                  ) : (
+                    <TrendingUp className="h-3.5 w-3.5" />
+                  )}
+                  {weightDiff > 0 ? "+" : ""}
+                  {weightDiff.toFixed(1)} kg desde o último
+                </p>
               )}
-              {weightDiff > 0 ? "+" : ""}
-              {weightDiff.toFixed(1)} kg desde o último
-            </p>
+            </div>
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-violet-100 text-violet-600 dark:bg-violet-900/40 dark:text-violet-300">
+              <Scale className="h-6 w-6" />
+            </div>
+          </div>
+
+          {weightGoal != null ? (
+            <div className="mt-4">
+              <div className="mb-1.5 flex items-center justify-between text-xs">
+                <span className="flex items-center gap-1 font-medium text-slate-600 dark:text-slate-300">
+                  <Target className="h-3.5 w-3.5 text-brand-600 dark:text-brand-400" />
+                  Meta: {weightGoal} kg
+                </span>
+                <span className="font-medium text-slate-500 dark:text-slate-400">
+                  {goalReached
+                    ? "Meta atingida! 🎉"
+                    : toGoal != null
+                      ? `faltam ${Math.abs(toGoal)} kg`
+                      : ""}
+                </span>
+              </div>
+              {goalPct != null && (
+                <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-brand-400 to-brand-600 transition-all"
+                    style={{ width: `${Math.round(goalPct * 100)}%` }}
+                  />
+                </div>
+              )}
+            </div>
+          ) : (
+            <Link
+              href="/app/perfil"
+              className="mt-3 inline-flex text-xs font-medium text-brand-700 hover:underline dark:text-brand-400"
+            >
+              Definir meta de peso
+            </Link>
           )}
         </div>
-        {latest?.body_fat_pct != null && (
-          <div className="card">
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-              % Gordura
-            </p>
-            <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">
-              {latest.body_fat_pct}
-              <span className="ml-1 text-sm font-medium text-slate-400">%</span>
-            </p>
-          </div>
-        )}
-        {latest?.waist_cm != null && (
-          <div className="card">
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-              Cintura
-            </p>
-            <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">
-              {latest.waist_cm}
-              <span className="ml-1 text-sm font-medium text-slate-400">cm</span>
-            </p>
+
+        {/* Outras medidas */}
+        {(latest?.body_fat_pct != null || latest?.waist_cm != null) && (
+          <div className="grid grid-cols-2 gap-3">
+            {latest?.body_fat_pct != null && (
+              <div className="card">
+                <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                  % Gordura
+                </p>
+                <p className="tabular mt-1 text-2xl font-bold text-slate-900 dark:text-white">
+                  {latest.body_fat_pct}
+                  <span className="ml-1 text-sm font-medium text-slate-400">%</span>
+                </p>
+              </div>
+            )}
+            {latest?.waist_cm != null && (
+              <div className="card">
+                <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                  Cintura
+                </p>
+                <p className="tabular mt-1 text-2xl font-bold text-slate-900 dark:text-white">
+                  {latest.waist_cm}
+                  <span className="ml-1 text-sm font-medium text-slate-400">cm</span>
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>
 
       <div className="card mb-6">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="font-semibold text-slate-900 dark:text-white">
-            Evolução — {metricLabel}
-          </h2>
-          <select
-            className="input max-w-[160px]"
-            value={metric as string}
-            onChange={(e) => setMetric(e.target.value as keyof BodyMeasurement)}
-          >
-            {FIELDS.map((f) => (
-              <option key={f.key as string} value={f.key as string}>
+        <h2 className="mb-3 font-semibold text-slate-900 dark:text-white">
+          Evolução — {metricLabel}
+        </h2>
+        {metricsWithData.length > 0 && (
+          <div className="mb-4 flex flex-wrap gap-1.5">
+            {metricsWithData.map((f) => (
+              <button
+                key={f.key as string}
+                onClick={() => setMetric(f.key)}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                  metric === f.key
+                    ? "bg-brand-600 text-white"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                }`}
+              >
                 {f.label}
-              </option>
+              </button>
             ))}
-          </select>
-        </div>
+          </div>
+        )}
         {chartData.length > 1 ? (
-          <TrendChart data={chartData} unit={metricUnit} color="#8b5cf6" />
+          <TrendChart data={chartData} unit={metricUnit} color="#18b85e" />
         ) : (
           <div className="flex h-[240px] items-center justify-center text-center text-sm text-slate-500 dark:text-slate-400">
-            Registre pelo menos 2 medições para ver o gráfico.
+            Registre pelo menos 2 medições de {metricLabel.toLowerCase()} para ver o
+            gráfico.
           </div>
         )}
       </div>
