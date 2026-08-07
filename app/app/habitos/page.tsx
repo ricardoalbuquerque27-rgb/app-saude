@@ -14,6 +14,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import type { DailyLog, Profile } from "@/lib/types";
 import { PageHeader, Field, formatDate } from "@/components/ui";
+import { ProgressRing } from "@/components/ProgressRing";
 
 const MOODS = [
   { value: "otimo", label: "😄 Ótimo" },
@@ -22,6 +23,39 @@ const MOODS = [
   { value: "cansado", label: "😴 Cansado" },
   { value: "mal", label: "😞 Mal" },
 ];
+
+function ScalePicker({
+  value,
+  min,
+  max,
+  onChange,
+}: {
+  value: number | null | undefined;
+  min: number;
+  max: number;
+  onChange: (v: number) => void;
+}) {
+  const opts = [];
+  for (let i = min; i <= max; i++) opts.push(i);
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {opts.map((n) => (
+        <button
+          key={n}
+          type="button"
+          onClick={() => onChange(n)}
+          className={`h-9 w-9 rounded-lg text-sm font-semibold transition ${
+            value === n
+              ? "bg-brand-600 text-white shadow-sm"
+              : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+          }`}
+        >
+          {n}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export default function HabitosPage() {
   const supabase = createClient();
@@ -119,38 +153,45 @@ export default function HabitosPage() {
 
       {/* Água */}
       <div className="card mb-4">
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Droplets className="h-5 w-5 text-blue-500" />
             <h2 className="font-semibold text-slate-900 dark:text-white">Água</h2>
           </div>
-          <span className="text-sm font-medium text-slate-500 dark:text-slate-400">
-            {(water / 1000).toFixed(2)} / {(waterGoal / 1000).toFixed(1)} L
-          </span>
+          {waterPct >= 100 && (
+            <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">
+              Meta batida 💧
+            </span>
+          )}
         </div>
-        <div className="mb-4 h-3 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-          <div
-            className="h-full rounded-full bg-blue-500 transition-all"
-            style={{ width: `${waterPct}%` }}
+        <div className="flex items-center gap-5">
+          <ProgressRing
+            pct={water / waterGoal}
+            centerMain={`${(water / 1000).toFixed(1)}`}
+            centerSub={`/ ${(waterGoal / 1000).toFixed(1)} L`}
+            label="Hoje"
+            colorClass="text-blue-500"
           />
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {[200, 300, 500].map((ml) => (
+          <div className="flex-1">
+            <div className="grid grid-cols-3 gap-2">
+              {[200, 300, 500].map((ml) => (
+                <button
+                  key={ml}
+                  onClick={() => addWater(ml)}
+                  className="btn-ghost flex-col gap-0.5 py-2 text-xs"
+                >
+                  <Plus className="h-4 w-4" /> {ml}ml
+                </button>
+              ))}
+            </div>
             <button
-              key={ml}
-              onClick={() => addWater(ml)}
-              className="btn-ghost"
+              onClick={() => addWater(-200)}
+              className="mt-2 flex w-full items-center justify-center gap-1 rounded-xl py-1.5 text-xs font-medium text-slate-500 transition hover:bg-slate-100 disabled:opacity-40 dark:text-slate-400 dark:hover:bg-slate-800"
+              disabled={water <= 0}
             >
-              <Plus className="h-4 w-4" /> {ml}ml
+              <Minus className="h-3.5 w-3.5" /> Remover 200ml
             </button>
-          ))}
-          <button
-            onClick={() => addWater(-200)}
-            className="btn-ghost"
-            disabled={water <= 0}
-          >
-            <Minus className="h-4 w-4" /> 200ml
-          </button>
+          </div>
         </div>
       </div>
 
@@ -234,59 +275,35 @@ export default function HabitosPage() {
             Bem-estar
           </h2>
         </div>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <Field label="Energia (1–5)">
-            <select
-              className="input"
-              value={log.energy ?? ""}
-              onChange={(e) =>
-                persist({ energy: e.target.value ? Number(e.target.value) : null })
-              }
-            >
-              <option value="">—</option>
-              {[1, 2, 3, 4, 5].map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Estresse (1–5)">
-            <select
-              className="input"
-              value={log.stress ?? ""}
-              onChange={(e) =>
-                persist({ stress: e.target.value ? Number(e.target.value) : null })
-              }
-            >
-              <option value="">—</option>
-              {[1, 2, 3, 4, 5].map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Dor (0–10)">
-            <select
-              className="input"
-              value={log.pain ?? ""}
-              onChange={(e) =>
-                persist({ pain: e.target.value !== "" ? Number(e.target.value) : null })
-              }
-            >
-              <option value="">—</option>
-              {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
-          </Field>
+        <div className="space-y-4">
+          <div>
+            <label className="label">Energia (1 = baixa · 5 = alta)</label>
+            <ScalePicker
+              value={log.energy}
+              min={1}
+              max={5}
+              onChange={(v) => persist({ energy: v })}
+            />
+          </div>
+          <div>
+            <label className="label">Estresse (1 = baixo · 5 = alto)</label>
+            <ScalePicker
+              value={log.stress}
+              min={1}
+              max={5}
+              onChange={(v) => persist({ stress: v })}
+            />
+          </div>
+          <div>
+            <label className="label">Dor (0 = nenhuma · 10 = máxima)</label>
+            <ScalePicker
+              value={log.pain}
+              min={0}
+              max={10}
+              onChange={(v) => persist({ pain: v })}
+            />
+          </div>
         </div>
-        <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">
-          Energia e estresse: 1 = baixo, 5 = alto. Dor: 0 = nenhuma, 10 = máxima.
-        </p>
       </div>
 
       {saving && (
