@@ -3,13 +3,22 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Dumbbell, Loader2, Check, Eye, EyeOff, ArrowRight } from "lucide-react";
+import {
+  Dumbbell,
+  Loader2,
+  Check,
+  Eye,
+  EyeOff,
+  ArrowRight,
+  ShieldCheck,
+  Lock,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 const HIGHLIGHTS = [
+  "Modo Caneta: acompanhe seu tratamento (GLP-1)",
+  "IA que conecta seus exames, dieta e treino",
   "Estime calorias pela foto do prato",
-  "Relatórios inteligentes do seu progresso",
-  "Leitura de exames em linguagem simples",
 ];
 
 export default function LoginPage() {
@@ -142,9 +151,20 @@ export default function LoginPage() {
           </ul>
         </div>
 
-        <p className="relative text-xs text-slate-500">
-          © {new Date().getFullYear()} Pace Fit
-        </p>
+        <div className="relative">
+          <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs text-slate-400">
+            <span className="flex items-center gap-1.5">
+              <ShieldCheck className="h-3.5 w-3.5 text-brand-400" /> Dados isolados
+              por conta
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Lock className="h-3.5 w-3.5 text-brand-400" /> Conexão criptografada
+            </span>
+          </div>
+          <p className="mt-3 text-xs text-slate-500">
+            © {new Date().getFullYear()} Pace Fit
+          </p>
+        </div>
       </div>
 
       {/* Painel direito — formulário limpo */}
@@ -333,6 +353,18 @@ export default function LoginPage() {
                 ← Voltar para o login
               </button>
             )}
+          </div>
+
+          {/* Confiança (mobile) */}
+          <div className="mt-8 flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs text-slate-400 lg:hidden dark:text-slate-500">
+            <span className="flex items-center gap-1.5">
+              <ShieldCheck className="h-3.5 w-3.5 text-brand-600 dark:text-brand-400" />
+              Dados isolados
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Lock className="h-3.5 w-3.5 text-brand-600 dark:text-brand-400" />
+              Criptografia
+            </span>
           </div>
         </div>
       </div>
