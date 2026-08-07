@@ -22,6 +22,7 @@ import {
   Menu,
   X,
   ChevronRight,
+  Target,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import ChatWidget from "@/components/ChatWidget";
@@ -59,6 +60,7 @@ const menuGroups = [
     title: "Progresso",
     items: [
       { href: "/app/conquistas", label: "Conquistas", icon: Trophy },
+      { href: "/app/desafios", label: "Desafios", icon: Target },
       { href: "/app/amigos", label: "Amigos", icon: Users },
       { href: "/app/relatorios", label: "Relatórios", icon: BarChart3 },
     ],

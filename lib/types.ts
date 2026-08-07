@@ -548,6 +548,33 @@ export type Database = {
         };
         Relationships: [];
       };
+      challenge_completions: {
+        Row: {
+          id: string;
+          user_id: string;
+          challenge_id: string;
+          week_start: string;
+          xp: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          challenge_id: string;
+          week_start: string;
+          xp?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          challenge_id?: string;
+          week_start?: string;
+          xp?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       friendships: {
         Row: {
           id: string;

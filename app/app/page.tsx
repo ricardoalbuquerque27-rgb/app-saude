@@ -10,6 +10,7 @@ import {
   CalendarDays,
   Trophy,
   Syringe,
+  Target,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { StatCard, formatDate } from "@/components/ui";
@@ -17,6 +18,7 @@ import { TrendChart } from "@/components/charts";
 import { getGamification } from "@/lib/gamification";
 import OpenChatButton from "@/components/OpenChatButton";
 import { ProgressRing } from "@/components/ProgressRing";
+import { CHALLENGES, weekStartISO } from "@/lib/challenges";
 
 function isoDaysAgo(days: number) {
   const d = new Date();
@@ -50,6 +52,7 @@ export default async function DashboardPage() {
     recentWorkoutsRes,
     todayPlanRes,
     treatmentRes,
+    challengesRes,
   ] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", uid).maybeSingle(),
     supabase
@@ -95,6 +98,11 @@ export default async function DashboardPage() {
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    supabase
+      .from("challenge_completions")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", uid)
+      .eq("week_start", weekStartISO()),
   ]);
 
   const profile = profileRes.data;
@@ -145,6 +153,9 @@ export default async function DashboardPage() {
   ];
 
   const game = await getGamification(supabase, uid);
+
+  const challengesDone = challengesRes.count ?? 0;
+  const challengesTotal = CHALLENGES.length;
 
   const treatment = treatmentRes.data;
   let doseLabel: string | null = null;
@@ -315,6 +326,27 @@ export default async function DashboardPage() {
           </p>
         </div>
         <Trophy className="h-5 w-5 shrink-0 text-slate-300 transition group-hover:text-brand-500" />
+      </Link>
+
+      {/* Desafios da semana */}
+      <Link
+        href="/app/desafios"
+        className="card group flex items-center gap-4 transition duration-200 hover:-translate-y-0.5"
+      >
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-300">
+          <Target className="h-6 w-6" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-slate-900 dark:text-white">
+            Desafios da semana
+          </p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            {challengesDone > 0
+              ? `${challengesDone} de ${challengesTotal} concluídos — resgate mais XP!`
+              : "Complete metas e ganhe XP extra esta semana."}
+          </p>
+        </div>
+        <ArrowRight className="h-5 w-5 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-brand-500" />
       </Link>
 
       {/* Gráfico + Plano de hoje */}

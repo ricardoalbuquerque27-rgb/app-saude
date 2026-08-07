@@ -58,6 +58,7 @@ export async function getGamification(
     logRows,
     measDates,
     profileRes,
+    challengeRows,
   ] = await Promise.all([
     headCount("workouts"),
     headCount("meals"),
@@ -79,7 +80,13 @@ export async function getGamification(
       .select("daily_water_goal_ml")
       .eq("id", uid)
       .maybeSingle(),
+    supabase.from("challenge_completions").select("xp").eq("user_id", uid).limit(500),
   ]);
+
+  const challengeXp = (challengeRows.data ?? []).reduce(
+    (s: number, c: any) => s + (Number(c.xp) || 0),
+    0
+  );
 
   const counts = {
     workouts: wCount.count ?? 0,
@@ -140,7 +147,8 @@ export async function getGamification(
     counts.measurements * 10 +
     counts.exams * 12 +
     counts.reports * 20 +
-    counts.plan * 4;
+    counts.plan * 4 +
+    challengeXp;
 
   const level = Math.floor(xp / XP_PER_LEVEL) + 1;
   const xpIntoLevel = xp % XP_PER_LEVEL;
