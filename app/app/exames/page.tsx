@@ -183,6 +183,12 @@ export default function ExamesPage() {
     }
   }
 
+  const statusCounts = {
+    alterado: exams.filter((e) => e.status === "alterado").length,
+    atencao: exams.filter((e) => e.status === "atencao").length,
+    normal: exams.filter((e) => !e.status || e.status === "normal").length,
+  };
+
   async function saveAnalysisItems() {
     if (!analysis?.itens?.length) return;
     setSavingItems(true);
@@ -377,6 +383,29 @@ export default function ExamesPage() {
         )}
       </div>
 
+      {!loading && exams.length > 0 && (
+        <div className="mb-4 grid grid-cols-3 gap-3">
+          <div className="card py-3 text-center">
+            <p className="tabular text-2xl font-bold text-rose-600 dark:text-rose-400">
+              {statusCounts.alterado}
+            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Alterados</p>
+          </div>
+          <div className="card py-3 text-center">
+            <p className="tabular text-2xl font-bold text-amber-600 dark:text-amber-400">
+              {statusCounts.atencao}
+            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Em atenção</p>
+          </div>
+          <div className="card py-3 text-center">
+            <p className="tabular text-2xl font-bold text-brand-600 dark:text-brand-400">
+              {statusCounts.normal}
+            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Normais</p>
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <div className="flex justify-center py-16 text-slate-400">
           <Loader2 className="h-6 w-6 animate-spin" />
@@ -391,9 +420,27 @@ export default function ExamesPage() {
         <div className="space-y-3">
           {exams.map((ex) => {
             const st = STATUS.find((s) => s.value === ex.status) ?? STATUS[0];
+            const key = st.value;
+            const accent =
+              key === "alterado"
+                ? "border-l-rose-400 dark:border-l-rose-500/70"
+                : key === "atencao"
+                  ? "border-l-amber-400 dark:border-l-amber-500/70"
+                  : "border-l-brand-400 dark:border-l-brand-500/70";
+            const iconTint =
+              key === "alterado"
+                ? "bg-rose-100 text-rose-600 dark:bg-rose-950/40 dark:text-rose-300"
+                : key === "atencao"
+                  ? "bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-300"
+                  : "bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300";
             return (
-              <div key={ex.id} className="card flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+              <div
+                key={ex.id}
+                className={`card flex items-start gap-3 border-l-4 ${accent}`}
+              >
+                <div
+                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${iconTint}`}
+                >
                   <FileText className="h-5 w-5" />
                 </div>
                 <div className="min-w-0 flex-1">
