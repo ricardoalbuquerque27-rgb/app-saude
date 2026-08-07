@@ -155,19 +155,29 @@ export default function RelatoriosPage() {
             {report && (
               <>
                 {current && (
-                  <p className="text-xs font-medium text-slate-400">
-                    Relatório de {formatDateTime(current.created_at)}
-                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-xs font-medium text-slate-400">
+                      Relatório de {formatDateTime(current.created_at)}
+                    </p>
+                    <span className="chip">Últimos 30 dias</span>
+                  </div>
                 )}
 
                 {report.resumo && (
-                  <div className="card border-brand-200 bg-brand-50/50 dark:border-brand-900/40 dark:bg-brand-950/20">
-                    <p className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-brand-700 dark:text-brand-400">
-                      <Sparkles className="h-3.5 w-3.5" /> Resumo
-                    </p>
-                    <p className="text-sm leading-relaxed text-slate-800 dark:text-slate-200">
-                      {report.resumo}
-                    </p>
+                  <div className="card bg-gradient-to-br from-brand-50 to-white dark:from-brand-950/20 dark:to-slate-900">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
+                        <Sparkles className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="mb-0.5 text-xs font-semibold uppercase tracking-wide text-brand-700 dark:text-brand-400">
+                          Resumo
+                        </p>
+                        <p className="text-sm leading-relaxed text-slate-800 dark:text-slate-200">
+                          {report.resumo}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 )}
 
