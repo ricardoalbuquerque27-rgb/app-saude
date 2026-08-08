@@ -14,6 +14,7 @@ import {
   Check,
   Trophy,
 } from "lucide-react";
+import Reveal from "@/components/Reveal";
 
 /* Landing no modelo Whoop: seções preto/branco alternadas, tipografia grande e
    "leve", botões em pílula, cards com mídia e título sobreposto. */
@@ -61,19 +62,35 @@ function Pill({
   );
 }
 
-// Círculo verde "assinatura" (tipo WHOOP AGE)
+// Círculo verde "assinatura" (tipo WHOOP AGE), com pulso e partículas
 function GlowRing({ value, label }: { value: string; label: string }) {
+  const dots = [
+    "left-6 top-8 h-1.5 w-1.5",
+    "right-8 top-16 h-1 w-1",
+    "bottom-10 left-14 h-1.5 w-1.5",
+    "bottom-16 right-10 h-1 w-1",
+    "left-10 top-1/2 h-1 w-1",
+  ];
+  const delays = ["0s", "1.2s", "2s", "0.6s", "1.6s"];
   return (
-    <div
-      className="relative flex h-56 w-56 items-center justify-center rounded-full sm:h-64 sm:w-64"
-      style={{
-        background:
-          "radial-gradient(circle at 50% 45%, rgba(24,184,94,0.55), rgba(24,184,94,0.08) 55%, transparent 72%)",
-      }}
-    >
-      <div className="absolute inset-5 rounded-full border border-brand-400/30" />
+    <div className="relative flex h-56 w-56 items-center justify-center sm:h-64 sm:w-64">
+      <div
+        className="animate-pulse-glow absolute inset-0 rounded-full"
+        style={{
+          background:
+            "radial-gradient(circle at 50% 45%, rgba(24,184,94,0.55), rgba(24,184,94,0.08) 55%, transparent 72%)",
+        }}
+      />
+      <div className="animate-spin-slow absolute inset-4 rounded-full border border-dashed border-brand-400/25" />
       <div className="absolute inset-10 rounded-full border border-brand-400/20" />
-      <div className="text-center">
+      {dots.map((d, i) => (
+        <span
+          key={i}
+          className={`animate-float absolute rounded-full bg-brand-300/80 ${d}`}
+          style={{ animationDelay: delays[i] }}
+        />
+      ))}
+      <div className="relative text-center">
         <p className="font-display text-5xl font-bold text-white">{value}</p>
         <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-brand-300">
           {label}
@@ -150,7 +167,7 @@ export default function Home() {
             }}
           />
           <div className="relative mx-auto grid max-w-7xl items-center gap-10 px-6 py-20 sm:px-10 lg:grid-cols-2 lg:py-28">
-            <div>
+            <Reveal>
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-brand-400">
                 Saúde · Treino · Dieta com IA
               </p>
@@ -165,30 +182,55 @@ export default function Home() {
                 <Pill href="/login" variant="green">Começar grátis</Pill>
                 <Pill href="#diferenciais" variant="white">Ver diferenciais</Pill>
               </div>
-            </div>
+            </Reveal>
             <div className="flex justify-center lg:justify-end">
-              <GlowRing value="92" label="Pace Score" />
+              <div className="animate-float">
+                <GlowRing value="92" label="Pace Score" />
+              </div>
             </div>
           </div>
         </div>
       </section>
 
+      {/* Faixa em movimento (marquee) */}
+      <div className="overflow-hidden border-y border-white/10 bg-black py-5" aria-hidden="true">
+        <div className="flex w-max animate-marquee">
+          {[0, 1].map((dup) => (
+            <div key={dup} className="flex items-center">
+              {["Treino", "Dieta", "Sono", "Água", "Exames", "IA", "Modo Caneta", "Conquistas"].map(
+                (w) => (
+                  <span
+                    key={w}
+                    className="flex items-center text-xl font-semibold uppercase tracking-[0.15em] text-white/70 sm:text-2xl"
+                  >
+                    <span className="px-6">{w}</span>
+                    <span className="text-brand-500">•</span>
+                  </span>
+                )
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* SEÇÃO BRANCA — título gigante + cards de mídia (carrossel) */}
       <section id="recursos" className="bg-white">
         <div className="mx-auto max-w-7xl px-6 py-24 sm:px-10">
-          <h2 className="max-w-3xl font-display text-4xl font-semibold leading-[1.02] tracking-tight text-slate-900 sm:text-6xl">
-            Tudo o que importa, num só app
-          </h2>
-          <p className="mt-6 max-w-xl text-lg text-slate-500">
-            Uma visão completa da sua saúde — para você tomar decisões melhores
-            todos os dias.
-          </p>
+          <Reveal>
+            <h2 className="max-w-3xl font-display text-4xl font-semibold leading-[1.02] tracking-tight text-slate-900 sm:text-6xl">
+              Tudo o que importa, num só app
+            </h2>
+            <p className="mt-6 max-w-xl text-lg text-slate-500">
+              Uma visão completa da sua saúde — para você tomar decisões melhores
+              todos os dias.
+            </p>
+          </Reveal>
 
           <div className="mt-12 flex snap-x gap-5 overflow-x-auto pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {mediaCards.map((c) => (
               <div
                 key={c.title}
-                className={`relative flex aspect-[3/4] w-[78%] shrink-0 snap-start flex-col justify-between overflow-hidden rounded-3xl bg-gradient-to-br ${c.from} ${c.to} p-6 sm:w-[340px]`}
+                className={`relative flex aspect-[3/4] w-[78%] shrink-0 snap-start flex-col justify-between overflow-hidden rounded-3xl bg-gradient-to-br ${c.from} ${c.to} p-6 transition duration-300 hover:-translate-y-1.5 sm:w-[340px]`}
               >
                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15 text-white backdrop-blur">
                   <c.icon className="h-5 w-5" />
@@ -205,12 +247,14 @@ export default function Home() {
       {/* SEÇÃO PRETA — diferenciais em cards de mídia grandes */}
       <section id="diferenciais" className="bg-black">
         <div className="mx-auto max-w-7xl px-6 py-24 sm:px-10">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-brand-400">
-            O que nos torna diferentes
-          </p>
-          <h2 className="mt-5 max-w-2xl font-display text-4xl font-semibold leading-[1.02] tracking-tight text-white sm:text-6xl">
-            Mais que um app de treino
-          </h2>
+          <Reveal>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-brand-400">
+              O que nos torna diferentes
+            </p>
+            <h2 className="mt-5 max-w-2xl font-display text-4xl font-semibold leading-[1.02] tracking-tight text-white sm:text-6xl">
+              Mais que um app de treino
+            </h2>
+          </Reveal>
 
           <div className="mt-12 grid gap-5 lg:grid-cols-2">
             {[
@@ -229,7 +273,7 @@ export default function Home() {
             ].map((d) => (
               <div
                 key={d.title}
-                className="relative flex min-h-[24rem] flex-col justify-between overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-slate-800 to-black p-8"
+                className="relative flex min-h-[24rem] flex-col justify-between overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-slate-800 to-black p-8 transition duration-300 hover:-translate-y-1.5 hover:border-brand-500/40"
               >
                 <div
                   className="pointer-events-none absolute -right-10 -top-12 h-52 w-52 rounded-full"
