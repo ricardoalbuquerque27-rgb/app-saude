@@ -101,11 +101,11 @@ function GlowRing({ value, label }: { value: string; label: string }) {
 }
 
 const mediaCards = [
-  { title: "Registre seus treinos", icon: Dumbbell, from: "from-brand-700", to: "to-slate-900" },
-  { title: "Calorias pela foto", icon: Camera, from: "from-amber-700", to: "to-slate-900" },
-  { title: "Acompanhe seu peso", icon: LineChart, from: "from-violet-700", to: "to-slate-900" },
-  { title: "Hábitos do dia a dia", icon: Droplets, from: "from-blue-700", to: "to-slate-900" },
-  { title: "Entenda seus exames", icon: FileText, from: "from-slate-600", to: "to-slate-900" },
+  { title: "Registre seus treinos", icon: Dumbbell, from: "from-brand-700", to: "to-slate-900", img: "/landing/treinos.jpg" },
+  { title: "Calorias pela foto", icon: Camera, from: "from-amber-700", to: "to-slate-900", img: "" },
+  { title: "Acompanhe seu peso", icon: LineChart, from: "from-violet-700", to: "to-slate-900", img: "/landing/peso.jpg" },
+  { title: "Hábitos do dia a dia", icon: Droplets, from: "from-blue-700", to: "to-slate-900", img: "/landing/habitos.jpg" },
+  { title: "Entenda seus exames", icon: FileText, from: "from-slate-600", to: "to-slate-900", img: "/landing/exames.jpg" },
 ];
 
 const pillars = [
@@ -159,6 +159,11 @@ export default function Home() {
       <section className="relative">
         <div className="relative mx-3 overflow-hidden rounded-3xl">
           <div className="absolute inset-0 bg-gradient-to-br from-slate-800 via-slate-900 to-black" />
+          <div
+            className="absolute inset-0 bg-cover bg-center"
+            style={{ backgroundImage: "url('/landing/hero.jpg')" }}
+          />
+          <div className="absolute inset-0 bg-slate-950/65" />
           <div
             className="pointer-events-none absolute inset-0"
             style={{
@@ -232,10 +237,19 @@ export default function Home() {
                 key={c.title}
                 className={`relative flex aspect-[3/4] w-[78%] shrink-0 snap-start flex-col justify-between overflow-hidden rounded-3xl bg-gradient-to-br ${c.from} ${c.to} p-6 transition duration-300 hover:-translate-y-1.5 sm:w-[340px]`}
               >
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15 text-white backdrop-blur">
+                {c.img && (
+                  <>
+                    <div
+                      className="absolute inset-0 bg-cover bg-center"
+                      style={{ backgroundImage: `url('${c.img}')` }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
+                  </>
+                )}
+                <div className="relative flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15 text-white backdrop-blur">
                   <c.icon className="h-5 w-5" />
                 </div>
-                <h3 className="font-display text-2xl font-semibold leading-tight text-white">
+                <h3 className="relative font-display text-2xl font-semibold leading-tight text-white">
                   {c.title}
                 </h3>
               </div>
@@ -263,18 +277,29 @@ export default function Home() {
                 title: "Modo Caneta",
                 sub: "GLP-1",
                 desc: "Para quem usa Ozempic, Mounjaro, Wegovy e similares: lembrete da aplicação, diário de efeitos e foco em proteína para preservar músculo.",
+                img: "/landing/caneta.jpg",
               },
               {
                 icon: HeartPulse,
                 title: "Inteligência de Saúde",
                 sub: "IA conectada",
                 desc: "Cruza seus exames, dieta, treino e hábitos e revela conexões que passariam despercebidas — com prioridades claras do que fazer agora.",
+                img: "",
               },
             ].map((d) => (
               <div
                 key={d.title}
                 className="relative flex min-h-[24rem] flex-col justify-between overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-slate-800 to-black p-8 transition duration-300 hover:-translate-y-1.5 hover:border-brand-500/40"
               >
+                {d.img && (
+                  <>
+                    <div
+                      className="absolute inset-0 bg-cover bg-center"
+                      style={{ backgroundImage: `url('${d.img}')` }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/60 to-black/40" />
+                  </>
+                )}
                 <div
                   className="pointer-events-none absolute -right-10 -top-12 h-52 w-52 rounded-full"
                   style={{

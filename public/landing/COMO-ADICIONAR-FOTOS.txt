@@ -1,0 +1,14 @@
+Coloque aqui as fotos da landing page, com EXATAMENTE estes nomes:
+
+  hero.jpg      -> foto de fundo do topo (academia/treino, horizontal, escura)
+  treinos.jpg   -> card "Registre seus treinos" (vertical)
+  habitos.jpg   -> card "Hábitos" (beber água) (vertical)
+  exames.jpg    -> card "Entenda seus exames" (vertical)
+  caneta.jpg    -> diferencial "Modo Caneta" (canetas de aplicação)
+
+Opcionais (ainda sem foto):
+  comida.jpg    -> card "Calorias pela foto"
+  peso.jpg      -> card "Acompanhe seu peso"
+  ia.jpg        -> diferencial "Inteligência de Saúde"
+
+Enquanto o arquivo não existir, o site mostra um gradiente no lugar (não quebra).
