@@ -78,6 +78,12 @@ const menuGroups = [
 
 const menuHrefs = menuGroups.flatMap((g) => g.items.map((i) => i.href));
 
+// Itens da barra lateral do desktop = tudo do menu "Mais" que não está na nav principal
+const mainHrefs = new Set(nav.map((n) => n.href));
+const secondaryItems = menuGroups
+  .flatMap((g) => g.items)
+  .filter((i) => !mainHrefs.has(i.href));
+
 export default function AppShell({
   children,
   userName,
@@ -157,72 +163,20 @@ export default function AppShell({
         </nav>
 
         <div className="mt-4 space-y-1 border-t border-slate-200 pt-4 dark:border-slate-800">
-          <Link
-            href="/app/tratamento"
-            className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition ${
-              pathname === "/app/tratamento"
-                ? "bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-300"
-                : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-            }`}
-          >
-            <Syringe className="h-5 w-5" />
-            Tratamento
-          </Link>
-          <Link
-            href="/app/conquistas"
-            className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition ${
-              pathname === "/app/conquistas"
-                ? "bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-300"
-                : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-            }`}
-          >
-            <Trophy className="h-5 w-5" />
-            Conquistas
-          </Link>
-          <Link
-            href="/app/amigos"
-            className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition ${
-              pathname === "/app/amigos"
-                ? "bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-300"
-                : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-            }`}
-          >
-            <Users className="h-5 w-5" />
-            Amigos
-          </Link>
-          <Link
-            href="/app/relatorios"
-            className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition ${
-              pathname === "/app/relatorios"
-                ? "bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-300"
-                : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-            }`}
-          >
-            <BarChart3 className="h-5 w-5" />
-            Relatórios
-          </Link>
-          <Link
-            href="/app/integracoes"
-            className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition ${
-              pathname === "/app/integracoes"
-                ? "bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-300"
-                : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-            }`}
-          >
-            <Watch className="h-5 w-5" />
-            Integrações
-          </Link>
-          <Link
-            href="/app/perfil"
-            className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition ${
-              pathname === "/app/perfil"
-                ? "bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-300"
-                : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-            }`}
-          >
-            <User className="h-5 w-5" />
-            Perfil
-          </Link>
+          {secondaryItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition ${
+                pathname === item.href
+                  ? "bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-300"
+                  : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+              }`}
+            >
+              <item.icon className="h-5 w-5" />
+              {item.label}
+            </Link>
+          ))}
           <button
             onClick={toggleTheme}
             className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
