@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { todayISO, addDaysISO } from "@/lib/date";
 import { withTimeout, isAbortError } from "@/lib/aiHttp";
+import { AI_TOOLS, executeAction } from "@/lib/aiActions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,12 +21,104 @@ const SYSTEM =
   "- Hábitos: acompanhar água, sono e humor.\n" +
   "- Exames: guardar resultados de exames.\n" +
   "- Relatórios: a IA analisa os últimos 30 dias e traz o que melhorar.\n\n" +
+  "AÇÕES NO APP (importante): você PODE registrar coisas no app do usuário usando as ferramentas disponíveis: " +
+  "adicionar treinos ao plano semanal, registrar um treino feito, registrar refeições, registrar água e registrar peso. " +
+  "Assim o usuário não precisa digitar manualmente.\n" +
+  "Regras para usar as ferramentas:\n" +
+  "- Só execute uma ação quando o usuário pedir claramente para adicionar/salvar/registrar/colocar no app. " +
+  "Se você acabou de sugerir um treino ou plano e o usuário ainda não confirmou, PERGUNTE se quer que você adicione (a não ser que ele já tenha pedido).\n" +
+  "- Ao montar um plano semanal, envie todas as sessões de uma vez, com o dia da semana certo e detalhes úteis (exercícios/séries nas observações).\n" +
+  "- Depois de executar, confirme em 1 frase curta o que foi feito e onde o usuário encontra (ex.: 'Pronto! Adicionei na aba Treinos › Plano semanal.').\n" +
+  "- Se uma ação falhar, avise com naturalidade e ofereça tentar de novo. Nunca invente que salvou se a ferramenta não confirmou.\n\n" +
   "Como responder:\n" +
   "- Sempre em português do Brasil, com tom amigável, prático e motivador.\n" +
   "- Seja objetivo. Parágrafos curtos e listas com hífens (-). Evite markdown pesado (nada de **, ##).\n" +
   "- Dê exemplos concretos (porções, substituições, séries) quando ajudar.\n\n" +
   "Importante (segurança): você não substitui um profissional de saúde. Para condições médicas, medicamentos, " +
   "gravidez ou dietas muito restritivas, oriente a procurar um nutricionista ou médico. Não faça diagnósticos.";
+
+const encoder = new TextEncoder();
+
+// Faz uma chamada streaming ao Groq. Reenvia o texto (content) para o cliente
+// conforme chega e acumula eventuais chamadas de ferramenta (tool_calls).
+async function streamGroqRound(
+  apiKey: string,
+  messages: any[],
+  controller: ReadableStreamDefaultController<Uint8Array>
+): Promise<{ toolCalls: { id: string; name: string; args: string }[] }> {
+  const to = withTimeout(30_000);
+  let res: Response;
+  try {
+    res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      signal: to.signal,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        messages,
+        tools: AI_TOOLS,
+        tool_choice: "auto",
+        temperature: 0.7,
+        stream: true,
+      }),
+    });
+  } finally {
+    to.clear();
+  }
+
+  if (!res.ok || !res.body) {
+    const detail = await res.text().catch(() => "");
+    console.error("chat groq round error:", res.status, detail.slice(0, 300));
+    throw new Error(`groq ${res.status}`);
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  const toolAcc: Record<number, { id: string; name: string; args: string }> = {};
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let nl: number;
+    while ((nl = buffer.indexOf("\n")) >= 0) {
+      const line = buffer.slice(0, nl).trim();
+      buffer = buffer.slice(nl + 1);
+      if (!line.startsWith("data:")) continue;
+      const data = line.slice(5).trim();
+      if (!data || data === "[DONE]") continue;
+      try {
+        const obj = JSON.parse(data);
+        const delta = obj?.choices?.[0]?.delta;
+        if (delta?.content) {
+          controller.enqueue(encoder.encode(delta.content));
+        }
+        if (Array.isArray(delta?.tool_calls)) {
+          for (const tc of delta.tool_calls) {
+            const idx = tc.index ?? 0;
+            const cur = (toolAcc[idx] ||= { id: "", name: "", args: "" });
+            if (tc.id) cur.id = tc.id;
+            if (tc.function?.name) cur.name = tc.function.name;
+            if (tc.function?.arguments) cur.args += tc.function.arguments;
+          }
+        }
+      } catch {
+        // ignora linhas parciais
+      }
+    }
+  }
+
+  const toolCalls = Object.keys(toolAcc)
+    .map((k) => Number(k))
+    .sort((a, b) => a - b)
+    .map((k) => toolAcc[k])
+    .filter((t) => t.name);
+  return { toolCalls };
+}
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
@@ -197,22 +290,17 @@ export async function POST(request: Request) {
         contexto
       : "");
 
-  const to = withTimeout(30_000);
-  let groqRes: Response;
+  // Mensagens da conversa (mutável ao longo das rodadas de ferramentas).
+  const convo: any[] = [{ role: "system", content: systemContent }, ...recent];
+
+  // Chamada de sondagem: valida a chave/serviço ANTES de abrir o stream,
+  // para conseguirmos devolver erros como JSON (o cliente sabe tratar).
+  const to = withTimeout(15_000);
+  let probe: Response;
   try {
-    groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
+    probe = await fetch("https://api.groq.com/openai/v1/models", {
+      headers: { Authorization: `Bearer ${apiKey}` },
       signal: to.signal,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        messages: [{ role: "system", content: systemContent }, ...recent],
-        temperature: 0.7,
-        stream: true,
-      }),
     });
   } catch (err: any) {
     to.clear();
@@ -222,62 +310,60 @@ export async function POST(request: Request) {
         { status: 504 }
       );
     }
-    console.error("chat fetch error:", err?.message ?? err);
-    return NextResponse.json({ error: "Falha ao contatar a IA. Tente novamente." }, { status: 502 });
-  }
-  // Conexão estabelecida: não deixamos o timeout abortar o streaming.
-  to.clear();
-
-  if (!groqRes.ok || !groqRes.body) {
-    const status = groqRes.status;
-    const detail = await groqRes.text().catch(() => "");
-    let reason = detail.slice(0, 200);
-    try {
-      reason = JSON.parse(detail)?.error?.message || reason;
-    } catch {}
-    console.error("chat groq error:", status, detail.slice(0, 400));
-    if (status === 401) {
-      return NextResponse.json(
-        { error: "Chave da IA inválida. Verifique GROQ_API_KEY no servidor." },
-        { status: 503 }
-      );
-    }
+    console.error("chat probe error:", err?.message ?? err);
     return NextResponse.json(
-      { error: `Erro da IA (${status}): ${reason}` },
-      { status: status === 429 ? 429 : 502 }
+      { error: "Falha ao contatar a IA. Tente novamente." },
+      { status: 502 }
+    );
+  }
+  to.clear();
+  if (probe.status === 401) {
+    return NextResponse.json(
+      { error: "Chave da IA inválida. Verifique GROQ_API_KEY no servidor." },
+      { status: 503 }
     );
   }
 
-  // Converte o SSE (formato OpenAI) do Groq em texto puro.
+  // Loop de ferramentas: o modelo pode pedir ações (registrar treino, etc.).
+  // Cada rodada faz streaming do texto para o cliente; se houver tool_calls,
+  // executamos e voltamos ao modelo para ele confirmar em linguagem natural.
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
-      const reader = groqRes.body!.getReader();
-      const decoder = new TextDecoder();
-      const encoder = new TextEncoder();
-      let buffer = "";
       try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          let nl: number;
-          while ((nl = buffer.indexOf("\n")) >= 0) {
-            const line = buffer.slice(0, nl).trim();
-            buffer = buffer.slice(nl + 1);
-            if (!line.startsWith("data:")) continue;
-            const data = line.slice(5).trim();
-            if (!data || data === "[DONE]") continue;
-            try {
-              const obj = JSON.parse(data);
-              const text: string = obj?.choices?.[0]?.delta?.content ?? "";
-              if (text) controller.enqueue(encoder.encode(text));
-            } catch {
-              // ignora linhas parciais
-            }
+        for (let round = 0; round < 5; round++) {
+          const { toolCalls } = await streamGroqRound(apiKey, convo, controller);
+          if (toolCalls.length === 0) break; // o modelo respondeu em texto
+
+          // Registra a mensagem do assistente com as chamadas de ferramenta.
+          convo.push({
+            role: "assistant",
+            content: null,
+            tool_calls: toolCalls.map((t) => ({
+              id: t.id,
+              type: "function",
+              function: { name: t.name, arguments: t.args },
+            })),
+          });
+
+          // Executa cada ferramenta e devolve o resultado ao modelo.
+          for (const t of toolCalls) {
+            const result = await executeAction(t.name, t.args, supabase, user.id);
+            convo.push({
+              role: "tool",
+              tool_call_id: t.id,
+              content: JSON.stringify(result),
+            });
           }
         }
       } catch (err) {
-        console.error("chat stream error:", err);
+        console.error("chat loop error:", err);
+        try {
+          controller.enqueue(
+            encoder.encode(
+              "\n\nDesculpe, tive um problema para concluir agora. Pode tentar de novo?"
+            )
+          );
+        } catch {}
       } finally {
         controller.close();
       }

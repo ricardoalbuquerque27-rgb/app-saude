@@ -14,10 +14,10 @@ import {
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
 const SUGGESTIONS = [
+  "Monte um treino de musculação e adicione ao meu plano",
+  "Registrei 500ml de água agora",
   "Como está minha dieta hoje?",
-  "Sugira um treino para hoje",
   "Estou perto da minha meta de peso?",
-  "Dicas para o meu tratamento",
 ];
 
 export default function ChatWidget() {
@@ -126,7 +126,7 @@ export default function ChatWidget() {
               </div>
               <div>
                 <p className="text-sm font-semibold leading-tight">Assistente</p>
-                <p className="text-[11px] text-brand-50/80">Conhece seus dados</p>
+                <p className="text-[11px] text-brand-50/80">Conhece e registra por você</p>
               </div>
             </div>
             <button
@@ -150,7 +150,8 @@ export default function ChatWidget() {
                     Olá! Sou seu assistente 🥗💪
                   </p>
                   <p className="mt-1">
-                    Pergunte sobre dieta, treino, hábitos ou seu tratamento.
+                    Pergunte sobre dieta, treino e hábitos — e peça para eu
+                    registrar direto no app (treino, refeição, água, peso).
                   </p>
                 </div>
                 <p className="mb-1.5 mt-3 flex items-center gap-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
