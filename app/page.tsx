@@ -102,7 +102,7 @@ function GlowRing({ value, label }: { value: string; label: string }) {
 
 const mediaCards = [
   { title: "Registre seus treinos", icon: Dumbbell, from: "from-brand-700", to: "to-slate-900", img: "/landing/treinos.jpg" },
-  { title: "Calorias pela foto", icon: Camera, from: "from-amber-700", to: "to-slate-900", img: "" },
+  { title: "Calorias pela foto", icon: Camera, from: "from-amber-700", to: "to-slate-900", img: "/landing/comida.jpg" },
   { title: "Acompanhe seu peso", icon: LineChart, from: "from-violet-700", to: "to-slate-900", img: "/landing/peso.jpg" },
   { title: "Hábitos do dia a dia", icon: Droplets, from: "from-blue-700", to: "to-slate-900", img: "/landing/habitos.jpg" },
   { title: "Entenda seus exames", icon: FileText, from: "from-slate-600", to: "to-slate-900", img: "/landing/exames.jpg" },
@@ -284,7 +284,7 @@ export default function Home() {
                 title: "Inteligência de Saúde",
                 sub: "IA conectada",
                 desc: "Cruza seus exames, dieta, treino e hábitos e revela conexões que passariam despercebidas — com prioridades claras do que fazer agora.",
-                img: "",
+                img: "/landing/ia.jpg",
               },
             ].map((d) => (
               <div
