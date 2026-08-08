@@ -101,11 +101,11 @@ function GlowRing({ value, label }: { value: string; label: string }) {
 }
 
 const mediaCards = [
-  { title: "Registre seus treinos", icon: Dumbbell, from: "from-brand-700", to: "to-slate-900", img: "/landing/treinos.jpg" },
-  { title: "Calorias pela foto", icon: Camera, from: "from-amber-700", to: "to-slate-900", img: "/landing/comida.jpg" },
-  { title: "Acompanhe seu peso", icon: LineChart, from: "from-violet-700", to: "to-slate-900", img: "/landing/peso.jpg" },
-  { title: "Hábitos do dia a dia", icon: Droplets, from: "from-blue-700", to: "to-slate-900", img: "/landing/habitos.jpg" },
-  { title: "Entenda seus exames", icon: FileText, from: "from-slate-600", to: "to-slate-900", img: "/landing/exames.jpg" },
+  { title: "Registre seus treinos", icon: Dumbbell, from: "from-brand-700", to: "to-slate-900", img: "https://images.unsplash.com/photo-1759674861540-afed9f86f94a?w=900&auto=format&fit=crop&q=60" },
+  { title: "Calorias pela foto", icon: Camera, from: "from-amber-700", to: "to-slate-900", img: "https://images.unsplash.com/photo-1606756790138-261d2b21cd75?w=900&auto=format&fit=crop&q=60" },
+  { title: "Acompanhe seu peso", icon: LineChart, from: "from-violet-700", to: "to-slate-900", img: "https://plus.unsplash.com/premium_photo-1722686591833-d96146b9ea8b?w=900&auto=format&fit=crop&q=60" },
+  { title: "Hábitos do dia a dia", icon: Droplets, from: "from-blue-700", to: "to-slate-900", img: "https://plus.unsplash.com/premium_photo-1689298475215-ee343186074d?w=900&auto=format&fit=crop&q=60" },
+  { title: "Entenda seus exames", icon: FileText, from: "from-slate-600", to: "to-slate-900", img: "https://plus.unsplash.com/premium_photo-1723132607567-32ef8b312c03?w=900&auto=format&fit=crop&q=60" },
 ];
 
 const pillars = [
@@ -161,7 +161,10 @@ export default function Home() {
           <div className="absolute inset-0 bg-gradient-to-br from-slate-800 via-slate-900 to-black" />
           <div
             className="absolute inset-0 bg-cover bg-center"
-            style={{ backgroundImage: "url('/landing/hero.jpg')" }}
+            style={{
+              backgroundImage:
+                "url('https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=1920&auto=format&fit=crop&q=60')",
+            }}
           />
           <div className="absolute inset-0 bg-slate-950/65" />
           <div
@@ -277,14 +280,14 @@ export default function Home() {
                 title: "Modo Caneta",
                 sub: "GLP-1",
                 desc: "Para quem usa Ozempic, Mounjaro, Wegovy e similares: lembrete da aplicação, diário de efeitos e foco em proteína para preservar músculo.",
-                img: "/landing/caneta.jpg",
+                img: "https://images.unsplash.com/photo-1682330709591-aa4b18ac1030?w=900&auto=format&fit=crop&q=60",
               },
               {
                 icon: HeartPulse,
                 title: "Inteligência de Saúde",
                 sub: "IA conectada",
                 desc: "Cruza seus exames, dieta, treino e hábitos e revela conexões que passariam despercebidas — com prioridades claras do que fazer agora.",
-                img: "/landing/ia.jpg",
+                img: "https://images.unsplash.com/photo-1697577418970-95d99b5a55cf?w=900&auto=format&fit=crop&q=60",
               },
             ].map((d) => (
               <div
