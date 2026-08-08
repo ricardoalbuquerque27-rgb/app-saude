@@ -27,6 +27,7 @@ import {
 } from "@/components/ui";
 import { TrendChart, BarsChart } from "@/components/charts";
 import { todayISO, weekStartISO } from "@/lib/date";
+import { useLiveRefresh } from "@/lib/useLiveRefresh";
 
 // Segunda = 0 ... Domingo = 6
 const DAYS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
@@ -195,6 +196,9 @@ export default function TreinosPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Recarrega quando a IA adiciona/registra um treino.
+  useLiveRefresh("treinos", load);
 
   function openPlanModal(day: number) {
     setPDay(day);

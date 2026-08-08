@@ -22,6 +22,7 @@ import {
 } from "@/components/ui";
 import { TrendChart } from "@/components/charts";
 import { todayISO } from "@/lib/date";
+import { useLiveRefresh } from "@/lib/useLiveRefresh";
 
 const FIELDS: { key: keyof BodyMeasurement; label: string; unit: string }[] = [
   { key: "weight_kg", label: "Peso", unit: "kg" },
@@ -60,6 +61,9 @@ export default function MedidasPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Recarrega quando a IA registra peso/medidas.
+  useLiveRefresh("medidas", load);
 
   useEffect(() => {
     (async () => {

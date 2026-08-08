@@ -186,6 +186,15 @@ export const AI_TOOLS = [
 
 type ActionResult = { ok: boolean; resumo: string };
 
+// Área do app afetada por cada ferramenta (usado para recarregar a tela certa).
+export const TOOL_AREAS: Record<string, string> = {
+  adicionar_ao_plano_semanal: "treinos",
+  registrar_treino: "treinos",
+  registrar_refeicao: "dieta",
+  registrar_agua: "habitos",
+  registrar_peso: "medidas",
+};
+
 const DIAS = ["segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo"];
 
 function toNum(v: any): number | null {

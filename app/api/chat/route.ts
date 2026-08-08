@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { todayISO, addDaysISO } from "@/lib/date";
 import { withTimeout, isAbortError } from "@/lib/aiHttp";
-import { AI_TOOLS, executeAction } from "@/lib/aiActions";
+import { AI_TOOLS, executeAction, TOOL_AREAS } from "@/lib/aiActions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -327,6 +327,9 @@ export async function POST(request: Request) {
   // Loop de ferramentas: o modelo pode pedir ações (registrar treino, etc.).
   // Cada rodada faz streaming do texto para o cliente; se houver tool_calls,
   // executamos e voltamos ao modelo para ele confirmar em linguagem natural.
+  // Áreas do app alteradas por ações bem-sucedidas (para o cliente recarregar).
+  const affected = new Set<string>();
+
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
@@ -348,6 +351,7 @@ export async function POST(request: Request) {
           // Executa cada ferramenta e devolve o resultado ao modelo.
           for (const t of toolCalls) {
             const result = await executeAction(t.name, t.args, supabase, user.id);
+            if (result.ok && TOOL_AREAS[t.name]) affected.add(TOOL_AREAS[t.name]);
             convo.push({
               role: "tool",
               tool_call_id: t.id,
@@ -365,6 +369,15 @@ export async function POST(request: Request) {
           );
         } catch {}
       } finally {
+        // Marcador fora de banda: informa ao cliente quais áreas mudaram, para
+        // ele recarregar as telas abertas. O ChatWidget remove isto do texto.
+        if (affected.size > 0) {
+          try {
+            controller.enqueue(
+              encoder.encode(` PF_REFRESH:${Array.from(affected).join(",")}`)
+            );
+          } catch {}
+        }
         controller.close();
       }
     },

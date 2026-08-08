@@ -16,6 +16,7 @@ import type { DailyLog, Profile } from "@/lib/types";
 import { PageHeader, Field, formatDate } from "@/components/ui";
 import { ProgressRing } from "@/components/ProgressRing";
 import { todayISO } from "@/lib/date";
+import { useLiveRefresh } from "@/lib/useLiveRefresh";
 
 const MOODS = [
   { value: "otimo", label: "😄 Ótimo" },
@@ -87,6 +88,9 @@ export default function HabitosPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Recarrega quando a IA registra água/hábitos.
+  useLiveRefresh("habitos", load);
 
   const waterGoal = profile?.daily_water_goal_ml ?? 2500;
   const water = log.water_ml ?? 0;

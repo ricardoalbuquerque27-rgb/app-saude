@@ -18,6 +18,7 @@ import type { Meal } from "@/lib/types";
 import { PageHeader, Modal, Field, EmptyState } from "@/components/ui";
 import { ProgressRing } from "@/components/ProgressRing";
 import { todayISO } from "@/lib/date";
+import { useLiveRefresh } from "@/lib/useLiveRefresh";
 
 const MEAL_TYPES = [
   "Café da manhã",
@@ -65,6 +66,9 @@ export default function DietaPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Recarrega quando a IA registra uma refeição.
+  useLiveRefresh("dieta", load);
 
   useEffect(() => {
     (async () => {

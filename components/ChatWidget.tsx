@@ -68,18 +68,36 @@ export default function ChatWidget() {
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
+      // Marcador fora de banda enviado pelo servidor no fim do stream:
+      // " PF_REFRESH:treinos,habitos". Removemos do texto e usamos para
+      // recarregar as telas abertas.
+      const MARKER = /\s*PF_REFRESH:[a-z,]*\s*$/i;
       let acc = "";
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
         acc += decoder.decode(value, { stream: true });
+        const display = acc.replace(MARKER, "");
         setMessages((prev) => {
           const copy = [...prev];
-          copy[copy.length - 1] = { role: "assistant", content: acc };
+          copy[copy.length - 1] = { role: "assistant", content: display };
           return copy;
         });
       }
-      if (!acc.trim()) {
+
+      // Dispara a atualização das telas afetadas.
+      const m = acc.match(/PF_REFRESH:([a-z,]+)/i);
+      if (m) {
+        const areas = m[1].split(",").filter(Boolean);
+        if (areas.length) {
+          window.dispatchEvent(
+            new CustomEvent("pf-data-changed", { detail: { areas } })
+          );
+        }
+      }
+
+      const clean = acc.replace(MARKER, "");
+      if (!clean.trim()) {
         setMessages((prev) => prev.slice(0, -1));
         setError("O assistente não respondeu. Tente novamente.");
       }

@@ -106,6 +106,14 @@ export default function AppShell({
     setMenuOpen(false);
   }, [pathname]);
 
+  // Quando a IA altera dados, recarrega também os componentes de servidor
+  // (ex.: o dashboard). As telas client cuidam do próprio recarregamento.
+  useEffect(() => {
+    const handler = () => router.refresh();
+    window.addEventListener("pf-data-changed", handler);
+    return () => window.removeEventListener("pf-data-changed", handler);
+  }, [router]);
+
   useEffect(() => {
     const saved = localStorage.getItem("pf-theme");
     const prefersDark = window.matchMedia(
