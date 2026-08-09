@@ -24,6 +24,7 @@ import {
   ChevronRight,
   Target,
   HeartPulse,
+  Stethoscope,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import ChatWidget from "@/components/ChatWidget";
@@ -72,6 +73,7 @@ const menuGroups = [
     items: [
       { href: "/app/integracoes", label: "Integrações", icon: Watch },
       { href: "/app/perfil", label: "Perfil", icon: User },
+      { href: "/app/diagnostico", label: "Diagnóstico", icon: Stethoscope },
     ],
   },
 ];
