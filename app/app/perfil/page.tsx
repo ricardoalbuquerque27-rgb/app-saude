@@ -53,6 +53,7 @@ export default function PerfilPage() {
   const [originalCpf, setOriginalCpf] = useState("");
   const [height, setHeight] = useState("");
   const [birthDate, setBirthDate] = useState("");
+  const [sex, setSex] = useState("");
   const [weightGoal, setWeightGoal] = useState("");
   const [waterGoal, setWaterGoal] = useState("");
   const [calorieGoal, setCalorieGoal] = useState("");
@@ -73,6 +74,7 @@ export default function PerfilPage() {
       setOriginalCpf(p.cpf ?? "");
       setHeight(p.height_cm?.toString() ?? "");
       setBirthDate(p.birth_date ?? "");
+      setSex(p.sex ?? "");
       setWeightGoal(p.weight_goal_kg?.toString() ?? "");
       setWaterGoal(p.daily_water_goal_ml?.toString() ?? "");
       setCalorieGoal(p.daily_calorie_goal?.toString() ?? "");
@@ -123,6 +125,7 @@ export default function PerfilPage() {
       cpf: cpfDigits || null,
       height_cm: height ? Number(height) : null,
       birth_date: birthDate || null,
+      sex: sex || null,
       weight_goal_kg: weightGoal ? Number(weightGoal) : null,
       daily_water_goal_ml: waterGoal ? Number(waterGoal) : 2500,
       daily_calorie_goal: calorieGoal ? Number(calorieGoal) : null,
@@ -231,6 +234,21 @@ export default function PerfilPage() {
             />
           </Field>
         </div>
+        <Field label="Sexo biológico">
+          <select
+            className="input"
+            value={sex}
+            onChange={(e) => setSex(e.target.value)}
+          >
+            <option value="">Prefiro não informar</option>
+            <option value="F">Feminino</option>
+            <option value="M">Masculino</option>
+          </select>
+          <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+            Usado para ajustar as faixas de referência dos seus exames (junto
+            com a idade). Não é exibido para ninguém.
+          </p>
+        </Field>
 
         <h2 className="flex items-center gap-2 pt-2 font-semibold text-slate-900 dark:text-white">
           <Target className="h-4 w-4 text-brand-600 dark:text-brand-400" /> Metas

@@ -35,6 +35,8 @@ export default function Onboarding({ initialName }: { initialName?: string }) {
   const [name, setName] = useState(initialName ?? "");
   const [weight, setWeight] = useState("");
   const [weightGoal, setWeightGoal] = useState("");
+  const [sex, setSex] = useState("");
+  const [birthDate, setBirthDate] = useState("");
   const [waterGoal, setWaterGoal] = useState("2500");
   const [proteinGoal, setProteinGoal] = useState("");
   const [usesPen, setUsesPen] = useState<boolean | null>(null);
@@ -71,6 +73,8 @@ export default function Onboarding({ initialName }: { initialName?: string }) {
         weight_goal_kg: weightGoal ? Number(weightGoal) : null,
         daily_water_goal_ml: waterGoal ? Number(waterGoal) : 2500,
         protein_goal_g: proteinGoal ? Number(proteinGoal) : null,
+        sex: sex || null,
+        birth_date: birthDate || null,
         onboarded: true,
         updated_at: new Date().toISOString(),
       })
@@ -193,6 +197,33 @@ export default function Onboarding({ initialName }: { initialName?: string }) {
                   />
                 </div>
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <FieldLabel>Sexo biológico</FieldLabel>
+                  <select
+                    className="input"
+                    value={sex}
+                    onChange={(e) => setSex(e.target.value)}
+                  >
+                    <option value="">Prefiro não dizer</option>
+                    <option value="F">Feminino</option>
+                    <option value="M">Masculino</option>
+                  </select>
+                </div>
+                <div>
+                  <FieldLabel>Data de nascimento</FieldLabel>
+                  <input
+                    type="date"
+                    className="input"
+                    value={birthDate}
+                    onChange={(e) => setBirthDate(e.target.value)}
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-slate-400 dark:text-slate-500">
+                Usamos sexo e idade só para ajustar as faixas de referência dos
+                seus exames. Você pode deixar em branco.
+              </p>
             </div>
           )}
 

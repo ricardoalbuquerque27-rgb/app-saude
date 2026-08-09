@@ -260,6 +260,7 @@ export type Database = {
           last_reminded_on: string | null;
           protein_goal_g: number | null;
           onboarded: boolean;
+          sex: string | null;
         };
         Insert: {
           birth_date?: string | null;
@@ -278,6 +279,7 @@ export type Database = {
           last_reminded_on?: string | null;
           protein_goal_g?: number | null;
           onboarded?: boolean;
+          sex?: string | null;
         };
         Update: {
           birth_date?: string | null;
@@ -296,6 +298,7 @@ export type Database = {
           last_reminded_on?: string | null;
           protein_goal_g?: number | null;
           onboarded?: boolean;
+          sex?: string | null;
         };
         Relationships: [];
       };

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import {
   FileText,
   Plus,
@@ -21,6 +21,15 @@ import {
 } from "@/components/ui";
 import { todayISO } from "@/lib/date";
 import { useLiveRefresh } from "@/lib/useLiveRefresh";
+import { classifyExam, type Sex } from "@/lib/examRanges";
+
+function ageFromBirth(birth?: string | null): number | null {
+  if (!birth) return null;
+  const d = new Date(birth + "T12:00:00");
+  if (isNaN(d.getTime())) return null;
+  const age = Math.floor((Date.now() - d.getTime()) / (365.25 * 24 * 3600 * 1000));
+  return age >= 0 && age < 130 ? age : null;
+}
 
 const STATUS = [
   { value: "normal", label: "Normal", cls: "bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300" },
@@ -34,6 +43,7 @@ type ExamItem = {
   unidade?: string;
   referencia?: string;
   status?: string;
+  explicacao?: string;
 };
 type ExamAnalysis = {
   resumo: string;
@@ -92,6 +102,10 @@ export default function ExamesPage() {
   const [reference, setReference] = useState("");
   const [status, setStatus] = useState("normal");
   const [notes, setNotes] = useState("");
+  const [profileCtx, setProfileCtx] = useState<{ sex: Sex; age: number | null }>({
+    sex: null,
+    age: null,
+  });
 
   // Análise de exame por IA
   const fileRef = useRef<HTMLInputElement>(null);
@@ -117,6 +131,42 @@ export default function ExamesPage() {
 
   // Recarrega quando a IA registra um exame.
   useLiveRefresh("exames", load);
+
+  // Perfil (sexo/idade) para personalizar a classificação automática.
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("sex, birth_date")
+        .maybeSingle();
+      setProfileCtx({
+        sex: (data?.sex as Sex) ?? null,
+        age: ageFromBirth(data?.birth_date),
+      });
+    })();
+  }, [supabase]);
+
+  // Classificação automática enquanto o usuário digita.
+  const auto = useMemo(
+    () =>
+      classifyExam({
+        name: title,
+        value: resultValue,
+        unit,
+        reference,
+        ctx: profileCtx,
+      }),
+    [title, resultValue, unit, reference, profileCtx]
+  );
+
+  // Preenche situação e faixa automaticamente a partir da classificação.
+  useEffect(() => {
+    if (auto.matched) {
+      setStatus(auto.status);
+      if (auto.faixa && !reference.trim()) setReference(auto.faixa);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auto.matched, auto.status, auto.faixa]);
 
   function resetForm() {
     setDate(todayISO());
@@ -144,9 +194,9 @@ export default function ExamesPage() {
       exam_type: examType.trim() || null,
       result_value: resultValue.trim() || null,
       unit: unit.trim() || null,
-      reference_range: reference.trim() || null,
+      reference_range: reference.trim() || auto.faixa || null,
       status,
-      notes: notes.trim() || null,
+      notes: notes.trim() || (auto.matched ? auto.explicacao : null),
     });
     setSaving(false);
     setOpen(false);
@@ -218,7 +268,7 @@ export default function ExamesPage() {
         status: ["normal", "atencao", "alterado"].includes(it.status ?? "")
           ? (it.status as string)
           : "normal",
-        notes: null,
+        notes: (it as any).explicacao ?? null,
       }));
     if (rows.length) await supabase.from("exams").insert(rows);
     setSavingItems(false);
@@ -559,6 +609,21 @@ export default function ExamesPage() {
             </Field>
           </div>
           <Field label="Situação">
+            {auto.matched && (
+              <div
+                className={`mb-2 rounded-xl border px-3 py-2 text-sm ${
+                  (STATUS.find((s) => s.value === auto.status) ?? STATUS[0]).cls
+                } border-transparent`}
+              >
+                <span className="font-semibold">
+                  Classificação automática:{" "}
+                  {(STATUS.find((s) => s.value === auto.status) ?? STATUS[0]).label}
+                </span>
+                {auto.explicacao && (
+                  <p className="mt-0.5 text-xs opacity-90">{auto.explicacao}</p>
+                )}
+              </div>
+            )}
             <div className="flex gap-2">
               {STATUS.map((s) => (
                 <button
@@ -575,6 +640,11 @@ export default function ExamesPage() {
                 </button>
               ))}
             </div>
+            <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+              {auto.matched
+                ? "Preenchida automaticamente pela faixa de referência — você pode ajustar se quiser."
+                : "Exame fora da tabela automática. Selecione a situação ou informe a faixa de referência acima."}
+            </p>
           </Field>
           <Field label="Observações">
             <textarea

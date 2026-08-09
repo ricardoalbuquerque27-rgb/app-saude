@@ -1,6 +1,15 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { withTimeout, isAbortError, parseModelJson } from "@/lib/aiHttp";
+import { classifyExam, type Sex } from "@/lib/examRanges";
+
+function ageFromBirth(birth?: string | null): number | null {
+  if (!birth) return null;
+  const d = new Date(birth + "T12:00:00");
+  if (isNaN(d.getTime())) return null;
+  const age = Math.floor((Date.now() - d.getTime()) / (365.25 * 24 * 3600 * 1000));
+  return age >= 0 && age < 130 ? age : null;
+}
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -138,9 +147,38 @@ export async function POST(request: Request) {
       );
     }
 
+    // Reclassifica cada item com nossas faixas de referência (personalizadas
+    // por sexo e idade), em vez de confiar no palpite da IA.
+    const { data: prof } = await supabase
+      .from("profiles")
+      .select("sex, birth_date")
+      .eq("id", user.id)
+      .maybeSingle();
+    const ctx = {
+      sex: (prof?.sex as Sex) ?? null,
+      age: ageFromBirth(prof?.birth_date),
+    };
+    const rawItens = Array.isArray(result.itens) ? result.itens : [];
+    const itens = rawItens.map((it: any) => {
+      const cls = classifyExam({
+        name: String(it?.nome ?? ""),
+        value: it?.valor,
+        unit: it?.unidade,
+        reference: it?.referencia,
+        ctx,
+      });
+      if (!cls.matched) return it; // mantém o que a IA leu
+      return {
+        ...it,
+        status: cls.status,
+        referencia: cls.faixa || it?.referencia,
+        explicacao: cls.explicacao,
+      };
+    });
+
     return NextResponse.json({
       resumo: String(result.resumo ?? ""),
-      itens: Array.isArray(result.itens) ? result.itens : [],
+      itens,
       interpretacao: Array.isArray(result.interpretacao) ? result.interpretacao : [],
       recomendacoes: Array.isArray(result.recomendacoes) ? result.recomendacoes : [],
     });

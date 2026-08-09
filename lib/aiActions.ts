@@ -6,6 +6,17 @@
 // próprios dados). O user_id é sempre definido pelo servidor, nunca pelo modelo.
 
 import { todayISO, addDaysISO } from "@/lib/date";
+import { classifyExam, EXAM_STATUS_LABEL, type Sex } from "@/lib/examRanges";
+
+// Idade em anos a partir da data de nascimento (AAAA-MM-DD).
+function ageFromBirth(birth?: string | null): number | null {
+  if (!birth) return null;
+  const d = new Date(birth + "T12:00:00");
+  if (isNaN(d.getTime())) return null;
+  const ms = Date.now() - d.getTime();
+  const age = Math.floor(ms / (365.25 * 24 * 3600 * 1000));
+  return age >= 0 && age < 130 ? age : null;
+}
 
 // Formato das ferramentas para a API de chat (compatível com OpenAI/Groq).
 export const AI_TOOLS = [
@@ -187,7 +198,7 @@ export const AI_TOOLS = [
     function: {
       name: "registrar_exame",
       description:
-        "Registra o resultado de um exame na aba Exames. Use quando o usuário informar um resultado de exame (ex.: colesterol, glicose, vitamina D) e quiser guardar.",
+        "Registra o resultado de um exame na aba Exames. Use quando o usuário informar um resultado de exame (ex.: colesterol, glicose, vitamina D) e quiser guardar. NÃO tente classificar se está normal/alterado: o app calcula isso automaticamente com base em faixas de referência ajustadas por sexo e idade. Apenas extraia nome, valor e unidade.",
       parameters: {
         type: "object",
         properties: {
@@ -197,7 +208,7 @@ export const AI_TOOLS = [
           },
           valor: {
             type: "string",
-            description: "Valor do resultado. Ex.: '190', '5.4'.",
+            description: "Valor numérico do resultado. Ex.: '190', '5.4'.",
           },
           unidade: {
             type: "string",
@@ -205,13 +216,8 @@ export const AI_TOOLS = [
           },
           referencia: {
             type: "string",
-            description: "Faixa de referência (opcional). Ex.: '< 200', '70-99'.",
-          },
-          status: {
-            type: "string",
             description:
-              "Situação do resultado: 'normal' (dentro do esperado), 'atencao' (limítrofe) ou 'alterado' (fora da faixa).",
-            enum: ["normal", "atencao", "alterado"],
+              "Faixa de referência informada pelo laudo, se o usuário disser (opcional). Ex.: '< 200', '70-99'.",
           },
           tipo: {
             type: "string",
@@ -223,7 +229,7 @@ export const AI_TOOLS = [
             description: "Data do exame no formato AAAA-MM-DD. Se omitido, usa hoje.",
           },
         },
-        required: ["titulo"],
+        required: ["titulo", "valor"],
       },
     },
   },
@@ -473,37 +479,61 @@ export async function executeAction(
       case "registrar_exame": {
         const titulo = typeof args.titulo === "string" ? args.titulo.trim() : "";
         if (!titulo) return { ok: false, resumo: "Faltou o nome do exame." };
-        const status = ["normal", "atencao", "alterado"].includes(args.status)
-          ? args.status
-          : "normal";
+        const valor =
+          typeof args.valor === "string" && args.valor.trim()
+            ? args.valor.trim()
+            : args.valor != null
+              ? String(args.valor)
+              : null;
+        const unidade =
+          typeof args.unidade === "string" && args.unidade.trim()
+            ? args.unidade.trim()
+            : null;
+        const refInformada =
+          typeof args.referencia === "string" && args.referencia.trim()
+            ? args.referencia.trim()
+            : null;
+        const obs =
+          typeof args.observacoes === "string" && args.observacoes.trim()
+            ? args.observacoes.trim()
+            : null;
+
+        // Personaliza a classificação com sexo e idade do perfil.
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("sex, birth_date")
+          .eq("id", uid)
+          .maybeSingle();
+        const cls = classifyExam({
+          name: titulo,
+          value: valor,
+          unit: unidade,
+          reference: refInformada,
+          ctx: { sex: (prof?.sex as Sex) ?? null, age: ageFromBirth(prof?.birth_date) },
+        });
+
+        const status = cls.matched ? cls.status : "normal";
+        const reference_range = cls.faixa || refInformada;
+        const notes = [obs, cls.explicacao].filter(Boolean).join(" — ") || null;
+
         const { error } = await supabase.from("exams").insert({
           user_id: uid,
           date: isValidDate(args.data) ? args.data : todayISO(),
           title: titulo,
           exam_type:
             typeof args.tipo === "string" && args.tipo.trim() ? args.tipo.trim() : null,
-          result_value:
-            typeof args.valor === "string" && args.valor.trim()
-              ? args.valor.trim()
-              : args.valor != null
-                ? String(args.valor)
-                : null,
-          unit:
-            typeof args.unidade === "string" && args.unidade.trim()
-              ? args.unidade.trim()
-              : null,
-          reference_range:
-            typeof args.referencia === "string" && args.referencia.trim()
-              ? args.referencia.trim()
-              : null,
+          result_value: valor,
+          unit: unidade,
+          reference_range: reference_range,
           status,
-          notes:
-            typeof args.observacoes === "string" && args.observacoes.trim()
-              ? args.observacoes.trim()
-              : null,
+          notes,
         });
         if (error) throw error;
-        return { ok: true, resumo: `Exame "${titulo}" registrado na aba Exames.` };
+
+        const resumo = cls.matched
+          ? `Exame "${titulo}" registrado como ${EXAM_STATUS_LABEL[status]} (${cls.explicacao}) na aba Exames.`
+          : `Exame "${titulo}" registrado na aba Exames. Não consegui classificar automaticamente (exame fora da minha tabela de referência); confirme com um profissional.`;
+        return { ok: true, resumo };
       }
 
       case "registrar_dose": {
