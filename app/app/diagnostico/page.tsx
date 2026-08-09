@@ -192,8 +192,8 @@ export default function DiagnosticoPage() {
               <div className="card">
                 <Row
                   icon={Bot}
-                  title="Assistente de IA (chat e ações)"
-                  desc={`Groq · modelo ${data.groq.model}. Necessário para o chat e para registrar treinos, refeições etc.`}
+                  title="Gaia — assistente de IA (chat e ações)"
+                  desc={`Groq · modelo ${data.groq.model}. Necessário para a Gaia conversar e registrar treinos, refeições etc.`}
                   level={r.groq.level}
                   status={r.groq.status}
                   hint={r.groq.hint}

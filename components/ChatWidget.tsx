@@ -2,13 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  Bot,
   Send,
   Loader2,
   User as UserIcon,
   Sparkles,
   X,
-  MessageCircle,
+  Leaf,
 } from "lucide-react";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
@@ -61,7 +60,7 @@ export default function ChatWidget() {
 
       if (!res.ok || !res.body) {
         const data = await res.json().catch(() => ({}));
-        setError(data?.error ?? "Falha ao falar com o assistente.");
+        setError(data?.error ?? "Falha ao falar com a Gaia.");
         setMessages((prev) => prev.slice(0, -1));
         return;
       }
@@ -99,7 +98,7 @@ export default function ChatWidget() {
       const clean = acc.replace(MARKER, "");
       if (!clean.trim()) {
         setMessages((prev) => prev.slice(0, -1));
-        setError("O assistente não respondeu. Tente novamente.");
+        setError("A Gaia não respondeu. Tente novamente.");
       }
     } catch {
       setMessages((prev) => prev.slice(0, -1));
@@ -122,10 +121,10 @@ export default function ChatWidget() {
       {!open && (
         <button
           onClick={() => setOpen(true)}
-          aria-label="Abrir assistente"
+          aria-label="Abrir a Gaia"
           className="fixed bottom-20 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-lg shadow-brand-600/30 transition hover:scale-105 active:scale-95 lg:bottom-6 lg:right-6"
         >
-          <MessageCircle className="h-6 w-6" />
+          <Leaf className="h-6 w-6" />
           <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-400 opacity-60" />
             <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-brand-300" />
@@ -140,11 +139,11 @@ export default function ChatWidget() {
           <div className="flex items-center justify-between gap-2 border-b border-slate-200 bg-gradient-to-r from-brand-600 to-brand-700 px-4 py-3 text-white dark:border-slate-800">
             <div className="flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/15">
-                <Bot className="h-5 w-5" />
+                <Leaf className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-sm font-semibold leading-tight">Assistente</p>
-                <p className="text-[11px] text-brand-50/80">Conhece e registra por você</p>
+                <p className="text-sm font-semibold leading-tight">Gaia</p>
+                <p className="text-[11px] text-brand-50/80">Sua companheira de saúde</p>
               </div>
             </div>
             <button
@@ -165,12 +164,12 @@ export default function ChatWidget() {
               <div>
                 <div className="rounded-xl bg-white p-3 text-sm text-slate-700 shadow-sm dark:bg-slate-900 dark:text-slate-300">
                   <p className="font-medium text-slate-900 dark:text-white">
-                    Olá! Sou seu assistente 🥗💪
+                    Oi, eu sou a Gaia 🌱
                   </p>
                   <p className="mt-1">
-                    Pergunte sobre dieta, treino e hábitos — e peça para eu
-                    registrar direto no app (treino, refeição, água, peso,
-                    exames e a dose da caneta).
+                    Sua companheira de saúde. Pergunte sobre dieta, treino,
+                    hábitos e exames — e peça para eu registrar direto no app
+                    (treino, refeição, água, peso, exames e a dose da caneta).
                   </p>
                 </div>
                 <p className="mb-1.5 mt-3 flex items-center gap-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
@@ -205,7 +204,7 @@ export default function ChatWidget() {
                   {m.role === "user" ? (
                     <UserIcon className="h-3.5 w-3.5" />
                   ) : (
-                    <Bot className="h-3.5 w-3.5" />
+                    <Leaf className="h-3.5 w-3.5" />
                   )}
                 </div>
                 <div

@@ -7,6 +7,7 @@ import {
   FileText,
   ArrowRight,
   Bot,
+  Leaf,
   Camera,
   Syringe,
   HeartPulse,
@@ -115,7 +116,7 @@ const pillars = [
   },
   {
     name: "Nutrição",
-    points: ["Calorias e macros", "Análise por foto (IA)", "Meta de proteína", "Assistente 24h"],
+    points: ["Calorias e macros", "Análise por foto (IA)", "Meta de proteína", "Gaia (IA) 24h"],
   },
   {
     name: "Saúde",
@@ -375,7 +376,7 @@ export default function Home() {
           <div className="mt-12 grid gap-px overflow-hidden rounded-3xl border border-white/10 bg-white/10 sm:grid-cols-2 lg:grid-cols-4">
             {[
               { icon: Camera, t: "Foto do prato", d: "Calorias e macros pela imagem." },
-              { icon: Bot, t: "Assistente 24h", d: "Coach por IA em qualquer tela." },
+              { icon: Leaf, t: "Gaia, sua IA 24h", d: "Companheira de saúde em qualquer tela." },
               { icon: FileText, t: "Leitura de exames", d: "Entenda o PDF sem juridiquês." },
               { icon: Trophy, t: "Gamificação", d: "Sequência, níveis e desafios." },
             ].map((f) => (
