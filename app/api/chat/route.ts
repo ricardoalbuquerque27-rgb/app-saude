@@ -31,13 +31,15 @@ const SYSTEM =
   "- Hábitos: acompanhar água, sono e humor.\n" +
   "- Exames: guardar resultados de exames.\n" +
   "- Relatórios: a IA analisa os últimos 30 dias e traz o que melhorar.\n\n" +
-  "AÇÕES NO APP (importante): você PODE registrar coisas no app do usuário usando as ferramentas disponíveis: " +
-  "adicionar treinos ao plano semanal, registrar um treino feito, registrar refeições, registrar água, registrar peso, " +
-  "registrar resultados de exames e registrar a aplicação da dose do tratamento com caneta (GLP-1). " +
-  "Assim o usuário não precisa digitar manualmente.\n" +
+  "AÇÕES NO APP (importante): você PODE mexer no app do usuário usando as ferramentas disponíveis:\n" +
+  "- Adicionar: treinos ao plano semanal, treino feito, refeições, água, peso, hábitos (sono/humor/energia/estresse/passos), exames e a dose da caneta (GLP-1).\n" +
+  "- Concluir o treino planejado de hoje; definir/ajustar metas (peso alvo, calorias, proteína, água).\n" +
+  "- Editar e desfazer: corrigir o peso, tirar/corrigir a água, apagar o último registro (refeição, treino, peso, exame) e remover uma sessão do plano semanal.\n" +
+  "Assim o usuário não precisa digitar nem mexer nas telas manualmente.\n" +
   "Regras para usar as ferramentas:\n" +
-  "- Só execute uma ação quando o usuário pedir claramente para adicionar/salvar/registrar/colocar no app. " +
-  "Se você acabou de sugerir um treino ou plano e o usuário ainda não confirmou, PERGUNTE se quer que você adicione (a não ser que ele já tenha pedido).\n" +
+  "- Só execute uma ação quando o usuário pedir claramente (adicionar/salvar/registrar, ou apagar/desfazer/remover/corrigir/mudar). " +
+  "Se você acabou de sugerir algo e o usuário ainda não confirmou, PERGUNTE antes (a não ser que ele já tenha pedido).\n" +
+  "- Para APAGAR/REMOVER, tenha certeza do que ele quer; confirme em 1 frase o que foi apagado. Nunca apague sem pedido explícito.\n" +
   "- Ao montar um plano semanal, envie todas as sessões de uma vez, com o dia da semana certo e detalhes úteis (exercícios/séries nas observações).\n" +
   "- EXAMES: quando o usuário só mencionar um resultado ou perguntar se está normal (curiosidade), use 'avaliar_exame' (NÃO salva) para responder com a classificação correta e DEPOIS pergunte se ele quer que você adicione na aba Exames. Só use 'registrar_exame' (que salva) quando ele pedir para registrar/salvar ou confirmar que quer adicionar. Nunca classifique exame por conta própria — use sempre as ferramentas.\n" +
   "- Depois de executar, confirme em 1 frase curta o que foi feito e onde o usuário encontra (ex.: 'Pronto! Adicionei na aba Treinos › Plano semanal.').\n" +
@@ -363,7 +365,14 @@ export async function POST(request: Request) {
           // Executa cada ferramenta e devolve o resultado ao modelo.
           for (const t of toolCalls) {
             const result = await executeAction(t.name, t.args, supabase, user.id);
-            if (result.ok && TOOL_AREAS[t.name]) affected.add(TOOL_AREAS[t.name]);
+            if (result.ok) {
+              if (TOOL_AREAS[t.name]) affected.add(TOOL_AREAS[t.name]);
+              if (result.area) {
+                (Array.isArray(result.area) ? result.area : [result.area]).forEach(
+                  (a) => affected.add(a)
+                );
+              }
+            }
             convo.push({
               role: "tool",
               tool_call_id: t.id,

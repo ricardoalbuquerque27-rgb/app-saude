@@ -160,13 +160,14 @@ export const AI_TOOLS = [
     function: {
       name: "registrar_agua",
       description:
-        "Adiciona uma quantidade de água (em ml) ao total de hoje, na aba Hábitos. Use quando o usuário disser que bebeu água.",
+        "Ajusta a água de hoje na aba Hábitos. Use ml positivo quando o usuário bebeu água (ex.: 500) e ml NEGATIVO para corrigir/tirar (ex.: -500 se registrou errado).",
       parameters: {
         type: "object",
         properties: {
           ml: {
             type: "number",
-            description: "Quantidade de água a adicionar, em mililitros. Ex.: 500.",
+            description:
+              "Quantidade em mililitros a somar (positivo) ou subtrair (negativo) do total de hoje.",
           },
         },
         required: ["ml"],
@@ -275,9 +276,126 @@ export const AI_TOOLS = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "registrar_habito",
+      description:
+        "Registra hábitos do dia na aba Hábitos: sono, humor, energia, estresse e passos. Use quando o usuário contar como dormiu/se sente/passos. (Para água, use registrar_agua.)",
+      parameters: {
+        type: "object",
+        properties: {
+          sono_horas: { type: "number", description: "Horas de sono. Ex.: 7.5." },
+          humor: {
+            type: "string",
+            description: "Humor do dia.",
+            enum: ["otimo", "bem", "neutro", "cansado", "mal"],
+          },
+          energia: { type: "number", description: "Energia de 1 (baixa) a 5 (alta)." },
+          estresse: { type: "number", description: "Estresse de 1 (baixo) a 5 (alto)." },
+          passos: { type: "number", description: "Número de passos no dia." },
+          data: { type: "string", description: "Data AAAA-MM-DD. Se omitido, hoje." },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "definir_metas",
+      description:
+        "Define ou ajusta as metas do usuário no perfil: peso alvo, calorias/dia, proteína/dia e água/dia. Use quando o usuário pedir para mudar uma meta.",
+      parameters: {
+        type: "object",
+        properties: {
+          peso_alvo_kg: { type: "number", description: "Meta de peso, em kg." },
+          calorias_dia: { type: "number", description: "Meta de calorias por dia (kcal)." },
+          proteina_dia_g: { type: "number", description: "Meta de proteína por dia (g)." },
+          agua_dia_ml: { type: "number", description: "Meta de água por dia (ml)." },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "concluir_treino_do_plano",
+      description:
+        "Marca o treino do PLANO DE HOJE como concluído (registra no histórico também). Use quando o usuário disser que fez o treino planejado de hoje.",
+      parameters: {
+        type: "object",
+        properties: {
+          esporte: {
+            type: "string",
+            description:
+              "Modalidade a concluir, caso haja mais de um treino planejado hoje (opcional). Ex.: 'Musculação'.",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "atualizar_peso",
+      description:
+        "Corrige/atualiza o peso atual do usuário na aba Medidas (atualiza o registro de hoje ou cria um). Use quando ele disser 'muda meu peso para X' ou corrigir um peso.",
+      parameters: {
+        type: "object",
+        properties: {
+          peso_kg: { type: "number", description: "Peso correto, em kg." },
+        },
+        required: ["peso_kg"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "remover_ultimo",
+      description:
+        "Apaga o ÚLTIMO registro de um tipo. Use quando o usuário pedir para apagar/desfazer o que acabou de registrar (ex.: 'apaga a última refeição', 'desfaz o último treino').",
+      parameters: {
+        type: "object",
+        properties: {
+          tipo: {
+            type: "string",
+            description: "O que apagar.",
+            enum: ["refeicao", "treino", "peso", "exame"],
+          },
+        },
+        required: ["tipo"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "remover_do_plano",
+      description:
+        "Remove uma sessão do plano semanal de treinos. Use quando o usuário pedir para tirar um treino de um dia (ex.: 'tira a corrida de terça').",
+      parameters: {
+        type: "object",
+        properties: {
+          dia_semana: {
+            type: "integer",
+            description: "0=Segunda ... 6=Domingo.",
+            minimum: 0,
+            maximum: 6,
+          },
+          esporte: {
+            type: "string",
+            description: "Modalidade a remover naquele dia (opcional; se omitido, remove todas do dia).",
+          },
+        },
+        required: ["dia_semana"],
+      },
+    },
+  },
 ] as const;
 
-type ActionResult = { ok: boolean; resumo: string };
+// area: telas a recarregar (além do mapa estático), útil para ações dinâmicas.
+type ActionResult = { ok: boolean; resumo: string; area?: string | string[] };
 
 // Área do app afetada por cada ferramenta (usado para recarregar a tela certa).
 export const TOOL_AREAS: Record<string, string> = {
@@ -288,6 +406,10 @@ export const TOOL_AREAS: Record<string, string> = {
   registrar_peso: "medidas",
   registrar_exame: "exames",
   registrar_dose: "tratamento",
+  registrar_habito: "habitos",
+  concluir_treino_do_plano: "treinos",
+  atualizar_peso: "medidas",
+  remover_do_plano: "treinos",
 };
 
 const DIAS = ["segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo"];
@@ -461,7 +583,7 @@ export async function executeAction(
 
       case "registrar_agua": {
         const ml = toNum(args.ml);
-        if (ml == null || ml <= 0) {
+        if (ml == null || ml === 0) {
           return { ok: false, resumo: "Quantidade de água inválida." };
         }
         const hoje = todayISO();
@@ -471,7 +593,7 @@ export async function executeAction(
           .eq("user_id", uid)
           .eq("date", hoje)
           .maybeSingle();
-        const total = (toNum(atual?.water_ml) ?? 0) + ml;
+        const total = Math.max(0, (toNum(atual?.water_ml) ?? 0) + ml);
         const { error } = await supabase
           .from("daily_logs")
           .upsert(
@@ -479,9 +601,10 @@ export async function executeAction(
             { onConflict: "user_id,date" }
           );
         if (error) throw error;
+        const sinal = ml > 0 ? `+${ml}` : `${ml}`;
         return {
           ok: true,
-          resumo: `+${ml} ml de água. Total de hoje: ${total} ml (${(total / 1000).toFixed(1)} L).`,
+          resumo: `${sinal} ml de água. Total de hoje: ${total} ml (${(total / 1000).toFixed(1)} L).`,
         };
       }
 
@@ -645,6 +768,230 @@ export async function executeAction(
           ok: true,
           resumo: `Dose${dose ? ` de ${dose}` : ""} registrada. Próxima aplicação prevista para ${proxima}.`,
         };
+      }
+
+      case "registrar_habito": {
+        const hoje = isValidDate(args.data) ? args.data : todayISO();
+        const patch: any = { user_id: uid, date: hoje };
+        const partes: string[] = [];
+        const sono = toNum(args.sono_horas);
+        if (sono != null) {
+          patch.sleep_hours = sono;
+          partes.push(`sono ${sono}h`);
+        }
+        if (typeof args.humor === "string" && args.humor.trim()) {
+          const map: Record<string, string> = {
+            otimo: "otimo", "ótimo": "otimo", feliz: "otimo", excelente: "otimo",
+            bem: "bem", bom: "bem", tranquilo: "bem",
+            neutro: "neutro", normal: "neutro", ok: "neutro",
+            cansado: "cansado", cansada: "cansado", exausto: "cansado",
+            mal: "mal", triste: "mal", ruim: "mal", pessimo: "mal", "péssimo": "mal",
+          };
+          const h = map[args.humor.trim().toLowerCase()];
+          if (h) {
+            patch.mood = h;
+            partes.push(`humor ${h}`);
+          }
+        }
+        const energia = toNum(args.energia);
+        if (energia != null) {
+          patch.energy = Math.max(1, Math.min(5, Math.round(energia)));
+          partes.push(`energia ${patch.energy}/5`);
+        }
+        const estresse = toNum(args.estresse);
+        if (estresse != null) {
+          patch.stress = Math.max(1, Math.min(5, Math.round(estresse)));
+          partes.push(`estresse ${patch.stress}/5`);
+        }
+        const passos = toNum(args.passos);
+        if (passos != null) {
+          patch.steps = Math.max(0, Math.round(passos));
+          partes.push(`${patch.steps} passos`);
+        }
+        if (partes.length === 0) {
+          return { ok: false, resumo: "Nada de hábito para registrar." };
+        }
+        const { error } = await supabase
+          .from("daily_logs")
+          .upsert(patch, { onConflict: "user_id,date" });
+        if (error) throw error;
+        return { ok: true, resumo: `Registrei ${partes.join(", ")} na aba Hábitos.` };
+      }
+
+      case "definir_metas": {
+        const patch: any = { id: uid, updated_at: new Date().toISOString() };
+        const partes: string[] = [];
+        const peso = toNum(args.peso_alvo_kg);
+        if (peso != null) {
+          patch.weight_goal_kg = peso;
+          partes.push(`peso alvo ${peso} kg`);
+        }
+        const cal = toNum(args.calorias_dia);
+        if (cal != null) {
+          patch.daily_calorie_goal = Math.round(cal);
+          partes.push(`${Math.round(cal)} kcal/dia`);
+        }
+        const prot = toNum(args.proteina_dia_g);
+        if (prot != null) {
+          patch.protein_goal_g = Math.round(prot);
+          partes.push(`${Math.round(prot)} g de proteína/dia`);
+        }
+        const agua = toNum(args.agua_dia_ml);
+        if (agua != null) {
+          patch.daily_water_goal_ml = Math.round(agua);
+          partes.push(`${Math.round(agua)} ml de água/dia`);
+        }
+        if (partes.length === 0) {
+          return { ok: false, resumo: "Nenhuma meta para ajustar." };
+        }
+        const { error } = await supabase.from("profiles").upsert(patch);
+        if (error) throw error;
+        return {
+          ok: true,
+          resumo: `Metas atualizadas: ${partes.join(", ")}.`,
+          area: ["dieta", "medidas", "habitos"],
+        };
+      }
+
+      case "concluir_treino_do_plano": {
+        const hoje = todayISO();
+        const dow = (new Date(hoje + "T12:00:00").getDay() + 6) % 7; // 0=Segunda
+        const { data: sessoes } = await supabase
+          .from("workout_plan")
+          .select("id, sport, title")
+          .eq("user_id", uid)
+          .eq("day_of_week", dow);
+        let lista = (sessoes ?? []) as any[];
+        lista = lista.filter((s) => !String(s.sport).toLowerCase().includes("descanso"));
+        if (lista.length === 0) {
+          return { ok: true, resumo: "Não há treino planejado para hoje." };
+        }
+        if (typeof args.esporte === "string" && args.esporte.trim()) {
+          const e = args.esporte.trim().toLowerCase();
+          lista = lista.filter((s) => String(s.sport).toLowerCase().includes(e));
+          if (lista.length === 0) {
+            return { ok: true, resumo: `Não achei "${args.esporte}" no plano de hoje.` };
+          }
+        }
+        if (lista.length > 1) {
+          const nomes = lista.map((s) => s.sport).join(", ");
+          return {
+            ok: true,
+            resumo: `Há mais de um treino hoje (${nomes}). Pergunte qual concluir.`,
+          };
+        }
+        const s = lista[0];
+        const { data: jaFeito } = await supabase
+          .from("plan_completions")
+          .select("id")
+          .eq("user_id", uid)
+          .eq("plan_id", s.id)
+          .eq("date", hoje)
+          .limit(1);
+        if ((jaFeito ?? []).length > 0) {
+          return { ok: true, resumo: `O treino de ${s.sport} já estava marcado como concluído hoje.` };
+        }
+        const { data: w } = await supabase
+          .from("workouts")
+          .insert({
+            user_id: uid,
+            date: hoje,
+            name: s.title || s.sport,
+            category: s.sport,
+            notes: "Concluído pelo plano semanal",
+          })
+          .select()
+          .single();
+        const { error } = await supabase.from("plan_completions").insert({
+          user_id: uid,
+          plan_id: s.id,
+          date: hoje,
+          workout_id: w?.id ?? null,
+        });
+        if (error) throw error;
+        return { ok: true, resumo: `Treino de ${s.sport} marcado como concluído hoje. 🌱` };
+      }
+
+      case "atualizar_peso": {
+        const peso = toNum(args.peso_kg);
+        if (peso == null || peso <= 0) return { ok: false, resumo: "Peso inválido." };
+        const hoje = todayISO();
+        const { data: hojeReg } = await supabase
+          .from("body_measurements")
+          .select("id")
+          .eq("user_id", uid)
+          .eq("date", hoje)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (hojeReg?.id) {
+          const { error } = await supabase
+            .from("body_measurements")
+            .update({ weight_kg: peso })
+            .eq("id", hojeReg.id);
+          if (error) throw error;
+          return { ok: true, resumo: `Peso de hoje atualizado para ${peso} kg.` };
+        }
+        const { error } = await supabase.from("body_measurements").insert({
+          user_id: uid,
+          date: hoje,
+          weight_kg: peso,
+        });
+        if (error) throw error;
+        return { ok: true, resumo: `Peso de ${peso} kg registrado (hoje).` };
+      }
+
+      case "remover_ultimo": {
+        const tipo = String(args.tipo || "");
+        const conf: Record<string, { table: string; area: string; label: string; order: string }> = {
+          refeicao: { table: "meals", area: "dieta", label: "refeição", order: "created_at" },
+          treino: { table: "workouts", area: "treinos", label: "treino", order: "created_at" },
+          peso: { table: "body_measurements", area: "medidas", label: "registro de peso", order: "created_at" },
+          exame: { table: "exams", area: "exames", label: "exame", order: "created_at" },
+        };
+        const c = conf[tipo];
+        if (!c) return { ok: false, resumo: "Tipo inválido para remover." };
+        const { data: last } = await supabase
+          .from(c.table)
+          .select("id")
+          .eq("user_id", uid)
+          .order(c.order, { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (!last?.id) {
+          return { ok: true, resumo: `Não há ${c.label} para apagar.` };
+        }
+        if (c.table === "workouts") {
+          // Remove exercícios antes (evita órfãos) e a conclusão do plano ligada.
+          await supabase.from("exercises").delete().eq("workout_id", last.id);
+          await supabase.from("plan_completions").delete().eq("workout_id", last.id);
+        }
+        const { error } = await supabase.from(c.table).delete().eq("id", last.id);
+        if (error) throw error;
+        return { ok: true, resumo: `Última ${c.label} apagada.`, area: c.area };
+      }
+
+      case "remover_do_plano": {
+        const dia = toNum(args.dia_semana);
+        if (dia == null || dia < 0 || dia > 6) {
+          return { ok: false, resumo: "Diga o dia da semana para remover do plano." };
+        }
+        let q = supabase
+          .from("workout_plan")
+          .delete()
+          .eq("user_id", uid)
+          .eq("day_of_week", dia);
+        let alvo = DIAS[dia];
+        if (typeof args.esporte === "string" && args.esporte.trim()) {
+          q = q.ilike("sport", `%${args.esporte.trim()}%`);
+          alvo = `${args.esporte.trim()} de ${DIAS[dia]}`;
+        }
+        const { error, count } = await q.select("id", { count: "exact" });
+        if (error) throw error;
+        if (!count) {
+          return { ok: true, resumo: `Não achei nada no plano de ${DIAS[dia]} para remover.` };
+        }
+        return { ok: true, resumo: `Removi do plano: ${alvo}.` };
       }
 
       default:
