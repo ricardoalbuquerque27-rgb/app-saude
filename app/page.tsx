@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import Reveal from "@/components/Reveal";
 import { Logo, Pill } from "@/components/landing";
+import MobileMenu from "@/components/MobileMenu";
 
 /* Landing no modelo Whoop: seções preto/branco alternadas, tipografia grande e
    "leve", botões em pílula, cards com mídia e título sobreposto. */
@@ -109,7 +110,16 @@ export default function Home() {
             >
               Entrar
             </Link>
-            <Pill href="/login" variant="green">Criar conta</Pill>
+            <Pill href="/login" variant="green" className="hidden sm:inline-flex">
+              Criar conta
+            </Pill>
+            <MobileMenu
+              links={[
+                { label: "Recursos", href: "/recursos" },
+                { label: "Diferenciais", href: "#diferenciais" },
+                { label: "Segurança", href: "#seguranca" },
+              ]}
+            />
           </div>
         </div>
       </header>

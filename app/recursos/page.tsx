@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import Reveal from "@/components/Reveal";
 import { Logo, Pill, APP_NAME } from "@/components/landing";
+import MobileMenu from "@/components/MobileMenu";
 
 export const metadata: Metadata = {
   title: `Recursos e tecnologia — ${APP_NAME}`,
@@ -186,7 +187,17 @@ export default function RecursosPage() {
             >
               Entrar
             </Link>
-            <Pill href="/login" variant="green">Criar conta</Pill>
+            <Pill href="/login" variant="green" className="hidden sm:inline-flex">
+              Criar conta
+            </Pill>
+            <MobileMenu
+              links={[
+                { label: "Início", href: "/" },
+                { label: "Recursos", href: "#acompanha" },
+                { label: "Diferenciais", href: "#diferenciais" },
+                { label: "Tecnologia", href: "#tecnologia" },
+              ]}
+            />
           </div>
         </div>
       </header>
