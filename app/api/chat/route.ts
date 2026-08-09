@@ -22,7 +22,8 @@ const SYSTEM =
   "- Exames: guardar resultados de exames.\n" +
   "- Relatórios: a IA analisa os últimos 30 dias e traz o que melhorar.\n\n" +
   "AÇÕES NO APP (importante): você PODE registrar coisas no app do usuário usando as ferramentas disponíveis: " +
-  "adicionar treinos ao plano semanal, registrar um treino feito, registrar refeições, registrar água e registrar peso. " +
+  "adicionar treinos ao plano semanal, registrar um treino feito, registrar refeições, registrar água, registrar peso, " +
+  "registrar resultados de exames e registrar a aplicação da dose do tratamento com caneta (GLP-1). " +
   "Assim o usuário não precisa digitar manualmente.\n" +
   "Regras para usar as ferramentas:\n" +
   "- Só execute uma ação quando o usuário pedir claramente para adicionar/salvar/registrar/colocar no app. " +

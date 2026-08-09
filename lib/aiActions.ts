@@ -5,7 +5,7 @@
 // autenticado do próprio usuário (a RLS garante que ele só escreve nos seus
 // próprios dados). O user_id é sempre definido pelo servidor, nunca pelo modelo.
 
-import { todayISO } from "@/lib/date";
+import { todayISO, addDaysISO } from "@/lib/date";
 
 // Formato das ferramentas para a API de chat (compatível com OpenAI/Groq).
 export const AI_TOOLS = [
@@ -182,6 +182,69 @@ export const AI_TOOLS = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "registrar_exame",
+      description:
+        "Registra o resultado de um exame na aba Exames. Use quando o usuário informar um resultado de exame (ex.: colesterol, glicose, vitamina D) e quiser guardar.",
+      parameters: {
+        type: "object",
+        properties: {
+          titulo: {
+            type: "string",
+            description: "Nome do exame. Ex.: 'Colesterol total', 'Glicose', 'Vitamina D'.",
+          },
+          valor: {
+            type: "string",
+            description: "Valor do resultado. Ex.: '190', '5.4'.",
+          },
+          unidade: {
+            type: "string",
+            description: "Unidade do resultado. Ex.: 'mg/dL', 'ng/mL'.",
+          },
+          referencia: {
+            type: "string",
+            description: "Faixa de referência (opcional). Ex.: '< 200', '70-99'.",
+          },
+          status: {
+            type: "string",
+            description:
+              "Situação do resultado: 'normal' (dentro do esperado), 'atencao' (limítrofe) ou 'alterado' (fora da faixa).",
+            enum: ["normal", "atencao", "alterado"],
+          },
+          tipo: {
+            type: "string",
+            description: "Categoria do exame (opcional). Ex.: 'Sangue', 'Hormonal'.",
+          },
+          observacoes: { type: "string", description: "Observações (opcional)." },
+          data: {
+            type: "string",
+            description: "Data do exame no formato AAAA-MM-DD. Se omitido, usa hoje.",
+          },
+        },
+        required: ["titulo"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "registrar_dose",
+      description:
+        "Registra a aplicação da dose do tratamento com caneta (GLP-1, ex.: Ozempic, Mounjaro, Wegovy) na aba Tratamento, e atualiza a data da próxima dose. Use quando o usuário disser que aplicou/tomou a caneta. Só funciona se o usuário já tiver um tratamento ativo cadastrado.",
+      parameters: {
+        type: "object",
+        properties: {
+          dose: {
+            type: "string",
+            description:
+              "Dose aplicada (opcional). Ex.: '0.5 mg'. Se omitido, usa a dose cadastrada no tratamento.",
+          },
+        },
+      },
+    },
+  },
 ] as const;
 
 type ActionResult = { ok: boolean; resumo: string };
@@ -193,6 +256,8 @@ export const TOOL_AREAS: Record<string, string> = {
   registrar_refeicao: "dieta",
   registrar_agua: "habitos",
   registrar_peso: "medidas",
+  registrar_exame: "exames",
+  registrar_dose: "tratamento",
 };
 
 const DIAS = ["segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo"];
@@ -403,6 +468,94 @@ export async function executeAction(
         });
         if (error) throw error;
         return { ok: true, resumo: `Peso de ${peso} kg registrado na aba Medidas.` };
+      }
+
+      case "registrar_exame": {
+        const titulo = typeof args.titulo === "string" ? args.titulo.trim() : "";
+        if (!titulo) return { ok: false, resumo: "Faltou o nome do exame." };
+        const status = ["normal", "atencao", "alterado"].includes(args.status)
+          ? args.status
+          : "normal";
+        const { error } = await supabase.from("exams").insert({
+          user_id: uid,
+          date: isValidDate(args.data) ? args.data : todayISO(),
+          title: titulo,
+          exam_type:
+            typeof args.tipo === "string" && args.tipo.trim() ? args.tipo.trim() : null,
+          result_value:
+            typeof args.valor === "string" && args.valor.trim()
+              ? args.valor.trim()
+              : args.valor != null
+                ? String(args.valor)
+                : null,
+          unit:
+            typeof args.unidade === "string" && args.unidade.trim()
+              ? args.unidade.trim()
+              : null,
+          reference_range:
+            typeof args.referencia === "string" && args.referencia.trim()
+              ? args.referencia.trim()
+              : null,
+          status,
+          notes:
+            typeof args.observacoes === "string" && args.observacoes.trim()
+              ? args.observacoes.trim()
+              : null,
+        });
+        if (error) throw error;
+        return { ok: true, resumo: `Exame "${titulo}" registrado na aba Exames.` };
+      }
+
+      case "registrar_dose": {
+        // Encontra o tratamento ativo (Modo Caneta) do usuário.
+        const { data: treat } = await supabase
+          .from("treatments")
+          .select("id, dose, frequency_days")
+          .eq("user_id", uid)
+          .eq("active", true)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (!treat) {
+          return {
+            ok: false,
+            resumo:
+              "O usuário ainda não tem um tratamento ativo cadastrado. Oriente-o a configurar o Modo Caneta na aba Tratamento primeiro.",
+          };
+        }
+        const hoje = todayISO();
+        // Evita registrar duas doses no mesmo dia.
+        const { data: jaHoje } = await supabase
+          .from("dose_logs")
+          .select("id")
+          .eq("user_id", uid)
+          .eq("treatment_id", treat.id)
+          .eq("date", hoje)
+          .limit(1);
+        if ((jaHoje ?? []).length > 0) {
+          return { ok: true, resumo: "A dose de hoje já estava registrada." };
+        }
+        const dose =
+          typeof args.dose === "string" && args.dose.trim()
+            ? args.dose.trim()
+            : treat.dose;
+        const { error } = await supabase.from("dose_logs").insert({
+          user_id: uid,
+          treatment_id: treat.id,
+          date: hoje,
+          dose: dose ?? null,
+        });
+        if (error) throw error;
+        const freq = Number(treat.frequency_days) || 7;
+        const proxima = addDaysISO(hoje, freq);
+        await supabase
+          .from("treatments")
+          .update({ next_dose_date: proxima })
+          .eq("id", treat.id);
+        return {
+          ok: true,
+          resumo: `Dose${dose ? ` de ${dose}` : ""} registrada. Próxima aplicação prevista para ${proxima}.`,
+        };
       }
 
       default:

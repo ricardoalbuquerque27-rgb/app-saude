@@ -169,7 +169,8 @@ export default function ChatWidget() {
                   </p>
                   <p className="mt-1">
                     Pergunte sobre dieta, treino e hábitos — e peça para eu
-                    registrar direto no app (treino, refeição, água, peso).
+                    registrar direto no app (treino, refeição, água, peso,
+                    exames e a dose da caneta).
                   </p>
                 </div>
                 <p className="mb-1.5 mt-3 flex items-center gap-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">

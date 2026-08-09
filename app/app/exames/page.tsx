@@ -20,6 +20,7 @@ import {
   formatDate,
 } from "@/components/ui";
 import { todayISO } from "@/lib/date";
+import { useLiveRefresh } from "@/lib/useLiveRefresh";
 
 const STATUS = [
   { value: "normal", label: "Normal", cls: "bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300" },
@@ -113,6 +114,9 @@ export default function ExamesPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Recarrega quando a IA registra um exame.
+  useLiveRefresh("exames", load);
 
   function resetForm() {
     setDate(todayISO());

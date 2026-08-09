@@ -20,6 +20,7 @@ import { PageHeader, Field } from "@/components/ui";
 import type { Treatment, SideEffect } from "@/lib/types";
 import { ensurePushSubscription } from "@/lib/pushClient";
 import { todayISO } from "@/lib/date";
+import { useLiveRefresh } from "@/lib/useLiveRefresh";
 
 const MEDS = [
   "Ozempic (semaglutida)",
@@ -148,6 +149,9 @@ export default function TratamentoPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Recarrega quando a IA registra a dose da caneta.
+  useLiveRefresh("tratamento", load);
 
   if (loading) {
     return (
