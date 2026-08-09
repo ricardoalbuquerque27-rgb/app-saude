@@ -236,6 +236,30 @@ export const AI_TOOLS = [
   {
     type: "function",
     function: {
+      name: "avaliar_exame",
+      description:
+        "Classifica um resultado de exame (normal/atenção/alterado) SEM salvar nada. Use quando o usuário só quiser saber se um valor está bom (pergunta de curiosidade, ex.: 'colesterol 190 tá normal?'). Depois de avaliar, PERGUNTE se ele quer que você adicione na aba Exames — só aí use 'registrar_exame'.",
+      parameters: {
+        type: "object",
+        properties: {
+          titulo: {
+            type: "string",
+            description: "Nome do exame. Ex.: 'Colesterol total', 'Glicose'.",
+          },
+          valor: { type: "string", description: "Valor numérico do resultado." },
+          unidade: { type: "string", description: "Unidade. Ex.: 'mg/dL'." },
+          referencia: {
+            type: "string",
+            description: "Faixa de referência do laudo, se informada (opcional).",
+          },
+        },
+        required: ["titulo", "valor"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "registrar_dose",
       description:
         "Registra a aplicação da dose do tratamento com caneta (GLP-1, ex.: Ozempic, Mounjaro, Wegovy) na aba Tratamento, e atualiza a data da próxima dose. Use quando o usuário disser que aplicou/tomou a caneta. Só funciona se o usuário já tiver um tratamento ativo cadastrado.",
@@ -534,6 +558,41 @@ export async function executeAction(
           ? `Exame "${titulo}" registrado como ${EXAM_STATUS_LABEL[status]} (${cls.explicacao}) na aba Exames.`
           : `Exame "${titulo}" registrado na aba Exames. Não consegui classificar automaticamente (exame fora da minha tabela de referência); confirme com um profissional.`;
         return { ok: true, resumo };
+      }
+
+      case "avaliar_exame": {
+        const titulo = typeof args.titulo === "string" ? args.titulo.trim() : "";
+        const valor =
+          typeof args.valor === "string" && args.valor.trim()
+            ? args.valor.trim()
+            : args.valor != null
+              ? String(args.valor)
+              : null;
+        if (!titulo || valor == null) {
+          return { ok: false, resumo: "Preciso do nome e do valor do exame." };
+        }
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("sex, birth_date")
+          .eq("id", uid)
+          .maybeSingle();
+        const cls = classifyExam({
+          name: titulo,
+          value: valor,
+          unit: typeof args.unidade === "string" ? args.unidade : null,
+          reference: typeof args.referencia === "string" ? args.referencia : null,
+          ctx: { sex: (prof?.sex as Sex) ?? null, age: ageFromBirth(prof?.birth_date) },
+        });
+        if (!cls.matched) {
+          return {
+            ok: true,
+            resumo: `Não tenho faixa de referência confiável para "${titulo}". NÃO foi salvo. Oriente a confirmar o valor de referência no laudo ou com um profissional. Pergunte se mesmo assim quer registrar na aba Exames.`,
+          };
+        }
+        return {
+          ok: true,
+          resumo: `Avaliação (NÃO salva): ${titulo} = ${valor} → ${EXAM_STATUS_LABEL[cls.status]}. ${cls.explicacao} Agora PERGUNTE ao usuário se ele quer que você adicione este exame na aba Exames.`,
+        };
       }
 
       case "registrar_dose": {

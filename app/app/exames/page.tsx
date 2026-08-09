@@ -9,6 +9,8 @@ import {
   Sparkles,
   Upload,
   Save,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { Exam } from "@/lib/types";
@@ -476,6 +478,15 @@ export default function ExamesPage() {
           {exams.map((ex) => {
             const st = STATUS.find((s) => s.value === ex.status) ?? STATUS[0];
             const key = st.value;
+            // Direção (acima/abaixo) recalculada a partir do valor e faixa.
+            const dir = classifyExam({
+              name: ex.title,
+              value: ex.result_value,
+              unit: ex.unit,
+              reference: ex.reference_range,
+              ctx: profileCtx,
+            });
+            const showDir = dir.matched && dir.direction !== "normal";
             const accent =
               key === "alterado"
                 ? "border-l-rose-400 dark:border-l-rose-500/70"
@@ -504,9 +515,20 @@ export default function ExamesPage() {
                       {ex.title}
                     </p>
                     <span
-                      className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${st.cls}`}
+                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${st.cls}`}
                     >
+                      {showDir &&
+                        (dir.direction === "alto" ? (
+                          <ArrowUp className="h-3 w-3" />
+                        ) : (
+                          <ArrowDown className="h-3 w-3" />
+                        ))}
                       {st.label}
+                      {showDir && (
+                        <span className="font-normal opacity-80">
+                          · {dir.direction === "alto" ? "acima" : "abaixo"}
+                        </span>
+                      )}
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
