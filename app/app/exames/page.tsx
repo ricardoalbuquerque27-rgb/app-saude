@@ -665,7 +665,9 @@ export default function ExamesPage() {
             <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
               {auto.matched
                 ? "Preenchida automaticamente pela faixa de referência — você pode ajustar se quiser."
-                : "Exame fora da tabela automática. Selecione a situação ou informe a faixa de referência acima."}
+                : auto.needs?.includes("sexo")
+                  ? "Informe seu sexo no Perfil para eu classificar este exame automaticamente (a faixa muda entre homens e mulheres)."
+                  : "Exame fora da tabela automática. Selecione a situação ou informe a faixa de referência acima."}
             </p>
           </Field>
           <Field label="Observações">

@@ -25,6 +25,7 @@ export type ExamClassification = {
   faixa: string; // texto da faixa de referência usada
   explicacao: string; // explicação amigável em pt-BR
   source: "tabela" | "referencia" | "nenhuma";
+  needs?: ("sexo" | "idade")[]; // dados que faltam para classificar bem
 };
 
 // Extrai o primeiro número de um texto (aceita vírgula decimal).
@@ -83,6 +84,7 @@ function norm(s: string): string {
 type RangeDef = {
   keys: string[]; // termos que identificam o exame (sem acento)
   unit: string;
+  sexDependent?: boolean; // faixa muda muito entre homens e mulheres
   // devolve status/direção/faixa a partir do valor e do contexto
   classify: (v: number, ctx: ExamContext) => {
     status: ExamLevel;
@@ -166,6 +168,7 @@ const TABLE: RangeDef[] = [
   {
     keys: ["hdl", "colesterol hdl", "hdl colesterol"],
     unit: "mg/dL",
+    sexDependent: true,
     classify: (v, ctx) =>
       isFemale(ctx)
         ? lowConcern(50, 45, "≥ 50 mg/dL (mulheres)")(v)
@@ -197,6 +200,7 @@ const TABLE: RangeDef[] = [
   {
     keys: ["creatinina"],
     unit: "mg/dL",
+    sexDependent: true,
     classify: (v, ctx) =>
       isFemale(ctx)
         ? windowConcern(0.6, 1.1, "0,6–1,1 mg/dL (mulheres)")(v)
@@ -210,6 +214,7 @@ const TABLE: RangeDef[] = [
   {
     keys: ["acido urico", "urico"],
     unit: "mg/dL",
+    sexDependent: true,
     classify: (v, ctx) =>
       isFemale(ctx)
         ? windowConcern(2.4, 6.0, "2,4–6,0 mg/dL (mulheres)")(v)
@@ -218,6 +223,7 @@ const TABLE: RangeDef[] = [
   {
     keys: ["hemoglobina", "hb"],
     unit: "g/dL",
+    sexDependent: true,
     classify: (v, ctx) =>
       isFemale(ctx)
         ? lowConcern(12, 11, "12–16 g/dL (mulheres)")(v)
@@ -226,6 +232,7 @@ const TABLE: RangeDef[] = [
   {
     keys: ["hematocrito", "ht"],
     unit: "%",
+    sexDependent: true,
     classify: (v, ctx) =>
       isFemale(ctx)
         ? windowConcern(36, 46, "36–46% (mulheres)")(v)
@@ -234,10 +241,34 @@ const TABLE: RangeDef[] = [
   {
     keys: ["ferritina"],
     unit: "ng/mL",
+    sexDependent: true,
     classify: (v, ctx) =>
       isFemale(ctx)
         ? windowConcern(15, 150, "15–150 ng/mL (mulheres)")(v)
         : windowConcern(30, 400, "30–400 ng/mL (homens)")(v),
+  },
+  {
+    keys: ["testosterona total", "testosterona"],
+    unit: "ng/dL",
+    sexDependent: true,
+    classify: (v, ctx) => {
+      if (isFemale(ctx)) return windowConcern(15, 70, "15–70 ng/dL (mulheres)")(v);
+      const faixa = "264–916 ng/dL (homens)";
+      if (v < 264) return { status: "alterado", direction: "baixo", faixa };
+      if (v > 916) return { status: "alterado", direction: "alto", faixa };
+      if (v < 350) return { status: "atencao", direction: "baixo", faixa };
+      return { status: "normal", direction: "normal", faixa };
+    },
+  },
+  {
+    keys: ["vitamina b12", "b12", "cobalamina"],
+    unit: "pg/mL",
+    classify: (v) => {
+      if (v < 200) return { status: "alterado", direction: "baixo", faixa: "200–900 pg/mL" };
+      if (v < 300) return { status: "atencao", direction: "baixo", faixa: "200–900 pg/mL" };
+      if (v > 900) return { status: "atencao", direction: "alto", faixa: "200–900 pg/mL" };
+      return { status: "normal", direction: "normal", faixa: "200–900 pg/mL" };
+    },
   },
   {
     keys: ["ferro", "ferro serico"],
@@ -247,6 +278,7 @@ const TABLE: RangeDef[] = [
   {
     keys: ["tgo", "ast", "aspartato aminotransferase"],
     unit: "U/L",
+    sexDependent: true,
     classify: (v, ctx) =>
       isFemale(ctx)
         ? highConcern(32, 48, "até 32 U/L (mulheres)")(v)
@@ -255,6 +287,7 @@ const TABLE: RangeDef[] = [
   {
     keys: ["tgp", "alt", "alanina aminotransferase"],
     unit: "U/L",
+    sexDependent: true,
     classify: (v, ctx) =>
       isFemale(ctx)
         ? highConcern(33, 50, "até 33 U/L (mulheres)")(v)
@@ -362,19 +395,17 @@ export function classifyExam(params: {
 
   // 1) Tabela curada (personalizada por sexo/idade)
   const def = findDef(name);
-  if (def) {
-    const sexUsed = def.keys.some((k) =>
-      ["hdl", "creatinina", "urico", "hemoglobina", "hematocrito", "ferritina", "tgo", "tgp", "ast", "alt"].includes(
-        norm(k)
-      )
-    );
+  // Exame que depende de sexo, mas não sabemos o sexo: não chutamos.
+  // Tentamos a faixa do laudo; se não houver, pedimos o sexo.
+  const faltaSexo = !!def?.sexDependent && !ctx.sex;
+  if (def && !faltaSexo) {
     const r = def.classify(v, ctx);
     return {
       matched: true,
       status: r.status,
       direction: r.direction,
       faixa: r.faixa,
-      explicacao: explain(r.status, r.direction, r.faixa, ctx, sexUsed),
+      explicacao: explain(r.status, r.direction, r.faixa, ctx, !!def.sexDependent),
       source: "tabela",
     };
   }
@@ -401,6 +432,17 @@ export function classifyExam(params: {
   }
 
   // 3) Não foi possível classificar
+  if (faltaSexo) {
+    return {
+      matched: false,
+      status: "normal",
+      direction: "normal",
+      faixa: "",
+      explicacao: `Para avaliar ${name.trim()} eu preciso saber o sexo — as faixas de referência mudam bastante entre homens e mulheres.`,
+      source: "nenhuma",
+      needs: ["sexo"],
+    };
+  }
   return {
     matched: false,
     status: "normal",

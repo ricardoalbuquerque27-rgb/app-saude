@@ -229,6 +229,15 @@ export const AI_TOOLS = [
             type: "string",
             description: "Data do exame no formato AAAA-MM-DD. Se omitido, usa hoje.",
           },
+          sexo: {
+            type: "string",
+            description: "Sexo biológico, se informado no chat (para classificar).",
+            enum: ["M", "F"],
+          },
+          idade: {
+            type: "number",
+            description: "Idade, se informada no chat (opcional).",
+          },
         },
         required: ["titulo", "valor"],
       },
@@ -239,7 +248,7 @@ export const AI_TOOLS = [
     function: {
       name: "avaliar_exame",
       description:
-        "Classifica um resultado de exame (normal/atenção/alterado) SEM salvar nada. Use quando o usuário só quiser saber se um valor está bom (pergunta de curiosidade, ex.: 'colesterol 190 tá normal?'). Depois de avaliar, PERGUNTE se ele quer que você adicione na aba Exames — só aí use 'registrar_exame'.",
+        "Classifica um resultado de exame (normal/atenção/alterado) SEM salvar nada. Use quando o usuário só quiser saber se um valor está bom (pergunta de curiosidade, ex.: 'colesterol 190 tá normal?'). Depois de avaliar, PERGUNTE se ele quer que você adicione na aba Exames — só aí use 'registrar_exame'. Se a resposta indicar que falta o sexo, peça o sexo (ou que ele preencha no perfil) e chame de novo passando 'sexo'.",
       parameters: {
         type: "object",
         properties: {
@@ -253,8 +262,37 @@ export const AI_TOOLS = [
             type: "string",
             description: "Faixa de referência do laudo, se informada (opcional).",
           },
+          sexo: {
+            type: "string",
+            description:
+              "Sexo biológico do usuário, se ele informar no chat (usado quando não está no perfil).",
+            enum: ["M", "F"],
+          },
+          idade: {
+            type: "number",
+            description: "Idade do usuário, se ele informar no chat (opcional).",
+          },
         },
         required: ["titulo", "valor"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "atualizar_perfil",
+      description:
+        "Salva dados de cadastro do usuário no perfil: sexo e altura. Use quando o usuário informar esses dados no chat (por exemplo, quando você precisar do sexo para avaliar um exame e ele responder). Isso deixa salvo para as próximas vezes. (Para a idade exata, oriente preencher a data de nascimento no Perfil.)",
+      parameters: {
+        type: "object",
+        properties: {
+          sexo: {
+            type: "string",
+            description: "Sexo biológico.",
+            enum: ["M", "F"],
+          },
+          altura_cm: { type: "number", description: "Altura em centímetros." },
+        },
       },
     },
   },
@@ -645,23 +683,28 @@ export async function executeAction(
             ? args.observacoes.trim()
             : null;
 
-        // Personaliza a classificação com sexo e idade do perfil.
+        // Personaliza a classificação com sexo e idade (perfil + o que veio no chat).
         const { data: prof } = await supabase
           .from("profiles")
           .select("sex, birth_date")
           .eq("id", uid)
           .maybeSingle();
+        const sexoArg = args.sexo === "M" || args.sexo === "F" ? args.sexo : null;
+        const idadeArg = toNum(args.idade);
         const cls = classifyExam({
           name: titulo,
           value: valor,
           unit: unidade,
           reference: refInformada,
-          ctx: { sex: (prof?.sex as Sex) ?? null, age: ageFromBirth(prof?.birth_date) },
+          ctx: {
+            sex: (sexoArg ?? (prof?.sex as Sex) ?? null) as Sex,
+            age: idadeArg != null ? idadeArg : ageFromBirth(prof?.birth_date),
+          },
         });
 
         const status = cls.matched ? cls.status : "normal";
         const reference_range = cls.faixa || refInformada;
-        const notes = [obs, cls.explicacao].filter(Boolean).join(" — ") || null;
+        const notes = [obs, cls.matched ? cls.explicacao : null].filter(Boolean).join(" — ") || null;
 
         const { error } = await supabase.from("exams").insert({
           user_id: uid,
@@ -679,7 +722,9 @@ export async function executeAction(
 
         const resumo = cls.matched
           ? `Exame "${titulo}" registrado como ${EXAM_STATUS_LABEL[status]} (${cls.explicacao}) na aba Exames.`
-          : `Exame "${titulo}" registrado na aba Exames. Não consegui classificar automaticamente (exame fora da minha tabela de referência); confirme com um profissional.`;
+          : cls.needs?.includes("sexo")
+            ? `Exame "${titulo}" registrado, mas NÃO classifiquei porque falta o sexo. Sugira ao usuário informar o sexo (no Perfil ou aqui no chat) para eu classificar.`
+            : `Exame "${titulo}" registrado na aba Exames. Não consegui classificar automaticamente (fora da minha tabela); confirme com um profissional.`;
         return { ok: true, resumo };
       }
 
@@ -699,13 +744,24 @@ export async function executeAction(
           .select("sex, birth_date")
           .eq("id", uid)
           .maybeSingle();
+        const sexoArg = args.sexo === "M" || args.sexo === "F" ? args.sexo : null;
+        const idadeArg = toNum(args.idade);
         const cls = classifyExam({
           name: titulo,
           value: valor,
           unit: typeof args.unidade === "string" ? args.unidade : null,
           reference: typeof args.referencia === "string" ? args.referencia : null,
-          ctx: { sex: (prof?.sex as Sex) ?? null, age: ageFromBirth(prof?.birth_date) },
+          ctx: {
+            sex: (sexoArg ?? (prof?.sex as Sex) ?? null) as Sex,
+            age: idadeArg != null ? idadeArg : ageFromBirth(prof?.birth_date),
+          },
         });
+        if (cls.needs?.includes("sexo")) {
+          return {
+            ok: true,
+            resumo: `Para avaliar "${titulo}" eu preciso saber o SEXO do usuário (as faixas mudam muito entre homens e mulheres). PEÇA o sexo — ele pode preencher no Perfil ou te dizer agora aqui no chat. Quando ele disser, use atualizar_perfil para salvar e chame avaliar_exame de novo (ou passe o parâmetro 'sexo').`,
+          };
+        }
         if (!cls.matched) {
           return {
             ok: true,
@@ -768,6 +824,26 @@ export async function executeAction(
           ok: true,
           resumo: `Dose${dose ? ` de ${dose}` : ""} registrada. Próxima aplicação prevista para ${proxima}.`,
         };
+      }
+
+      case "atualizar_perfil": {
+        const patch: any = { id: uid, updated_at: new Date().toISOString() };
+        const partes: string[] = [];
+        if (args.sexo === "M" || args.sexo === "F") {
+          patch.sex = args.sexo;
+          partes.push(`sexo ${args.sexo === "F" ? "feminino" : "masculino"}`);
+        }
+        const alt = toNum(args.altura_cm);
+        if (alt != null && alt > 0) {
+          patch.height_cm = alt;
+          partes.push(`${alt} cm`);
+        }
+        if (partes.length === 0) {
+          return { ok: false, resumo: "Nada de perfil para atualizar." };
+        }
+        const { error } = await supabase.from("profiles").upsert(patch);
+        if (error) throw error;
+        return { ok: true, resumo: `Perfil atualizado: ${partes.join(", ")}.` };
       }
 
       case "registrar_habito": {
