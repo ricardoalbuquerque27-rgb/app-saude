@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   Dumbbell,
   Plus,
@@ -14,6 +14,8 @@ import {
   Trophy,
   Check,
   BarChart3,
+  Copy,
+  Zap,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { Workout, Exercise } from "@/lib/types";
@@ -28,6 +30,8 @@ import {
 import { TrendChart, BarsChart } from "@/components/charts";
 import { todayISO, weekStartISO } from "@/lib/date";
 import { useLiveRefresh } from "@/lib/useLiveRefresh";
+import RestTimer from "@/components/RestTimer";
+import PlateCalculator from "@/components/PlateCalculator";
 
 // Segunda = 0 ... Domingo = 6
 const DAYS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
@@ -199,6 +203,70 @@ export default function TreinosPage() {
 
   // Recarrega quando a IA adiciona/registra um treino.
   useLiveRefresh("treinos", load);
+
+  // Última performance e melhor 1RM (Epley) por exercício (para sugestões).
+  const perfByName = useMemo(() => {
+    const map: Record<
+      string,
+      { last?: { reps: number | null; weight: number | null; date: string }; best1rm: number }
+    > = {};
+    for (const w of workouts) {
+      for (const ex of exercisesByWorkout[w.id] ?? []) {
+        const key = ex.name.trim().toLowerCase();
+        if (!key) continue;
+        const sets = setsOf(ex);
+        const m = (map[key] ||= { best1rm: 0 });
+        if (!m.last) {
+          const withW = sets.filter((s) => s.weight != null);
+          const best = (withW.length
+            ? [...withW].sort((a, b) => (b.weight ?? 0) - (a.weight ?? 0))
+            : sets)[0];
+          m.last = { reps: best?.reps ?? null, weight: best?.weight ?? null, date: w.date };
+        }
+        for (const s of sets) {
+          if (s.weight != null && s.reps != null && s.reps > 0) {
+            const e = s.weight * (1 + s.reps / 30);
+            if (e > m.best1rm) m.best1rm = e;
+          }
+        }
+      }
+    }
+    return map;
+  }, [workouts, exercisesByWorkout]);
+
+  function progressionHint(name: string): string | null {
+    const p = perfByName[name.trim().toLowerCase()];
+    if (!p?.last || p.last.weight == null) return null;
+    const w = p.last.weight;
+    const r = p.last.reps;
+    const next = Math.round(w * 1.025 * 2) / 2; // +2,5% arredondado a 0,5 kg
+    const nextTxt = next > w ? `tente ${next}kg` : "tente +2,5kg";
+    return `Última vez: ${r ?? "?"}×${w}kg · ${nextTxt} ou +1 rep`;
+  }
+
+  function repeatLast() {
+    const w = workouts[0];
+    if (!w) return;
+    const exs = exercisesByWorkout[w.id] ?? [];
+    setDate(todayISO());
+    setName(w.name);
+    setCategory(w.category ?? "");
+    setDuration(w.duration_min ? String(w.duration_min) : "");
+    setNotes("");
+    setExercises(
+      exs.length
+        ? exs.map((ex) => ({
+            name: ex.name,
+            rpe: ex.rpe != null ? String(ex.rpe) : "",
+            sets: setsOf(ex).map((s) => ({
+              reps: s.reps != null ? String(s.reps) : "",
+              weight: s.weight != null ? String(s.weight) : "",
+            })),
+          }))
+        : [emptyExercise()]
+    );
+    setOpen(true);
+  }
 
   function openPlanModal(day: number) {
     setPDay(day);
@@ -458,9 +526,16 @@ export default function TreinosPage() {
         subtitle="Monte seu plano da semana e registre seus treinos."
         action={
           tab === "historico" ? (
-            <button onClick={() => setOpen(true)} className="btn-primary">
-              <Plus className="h-4 w-4" /> Novo treino
-            </button>
+            <div className="flex gap-2">
+              {workouts.length > 0 && (
+                <button onClick={repeatLast} className="btn-ghost">
+                  <Copy className="h-4 w-4" /> Repetir último
+                </button>
+              )}
+              <button onClick={() => setOpen(true)} className="btn-primary">
+                <Plus className="h-4 w-4" /> Novo treino
+              </button>
+            </div>
           ) : undefined
         }
       />
@@ -651,7 +726,7 @@ export default function TreinosPage() {
                   </div>
 
                   {progStats && (
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                       <StatCard
                         label="Carga atual"
                         value={progStats.current}
@@ -672,6 +747,13 @@ export default function TreinosPage() {
                         unit="kg"
                         icon={<TrendingUp className="h-5 w-5" />}
                         accent={progStats.delta >= 0 ? "brand" : "rose"}
+                      />
+                      <StatCard
+                        label="1RM estimado"
+                        value={Math.round(perfByName[currentExercise.toLowerCase()]?.best1rm ?? 0)}
+                        unit="kg"
+                        icon={<Zap className="h-5 w-5" />}
+                        accent="brand"
                       />
                     </div>
                   )}
@@ -717,14 +799,20 @@ export default function TreinosPage() {
             )}
           </div>
         )
-      ) : workouts.length === 0 ? (
-        <EmptyState
-          icon={<Dumbbell className="h-10 w-10" />}
-          title="Nenhum treino registrado"
-          description="Toque em “Novo treino” para adicionar o primeiro."
-        />
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-4">
+          <RestTimer />
+          <div className="flex justify-end">
+            <PlateCalculator />
+          </div>
+          {workouts.length === 0 ? (
+            <EmptyState
+              icon={<Dumbbell className="h-10 w-10" />}
+              title="Nenhum treino registrado"
+              description="Toque em “Novo treino” para adicionar o primeiro."
+            />
+          ) : (
+            <div className="space-y-3">
           {workouts.map((w) => {
             const exs = exercisesByWorkout[w.id] ?? [];
             const isOpen = expanded === w.id;
@@ -802,6 +890,8 @@ export default function TreinosPage() {
               </div>
             );
           })}
+            </div>
+          )}
         </div>
       )}
 
@@ -944,6 +1034,14 @@ export default function TreinosPage() {
                       </button>
                     )}
                   </div>
+
+                  {/* Sugestão de progressão (baseada no histórico) */}
+                  {progressionHint(ex.name) && (
+                    <p className="mt-1.5 flex items-center gap-1 text-xs font-medium text-brand-700 dark:text-brand-400">
+                      <TrendingUp className="h-3.5 w-3.5 shrink-0" />
+                      {progressionHint(ex.name)}
+                    </p>
+                  )}
 
                   {/* Séries */}
                   <div className="mt-2 space-y-1.5">
