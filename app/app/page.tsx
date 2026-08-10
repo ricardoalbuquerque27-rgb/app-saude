@@ -12,6 +12,8 @@ import {
   Syringe,
   Target,
   HeartPulse,
+  Bell,
+  ChevronRight,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { StatCard, formatDate } from "@/components/ui";
@@ -22,6 +24,7 @@ import { ProgressRing } from "@/components/ProgressRing";
 import { CHALLENGES, weekStartISO } from "@/lib/challenges";
 import { todayISO, addDaysISO } from "@/lib/date";
 import { computeHealthScore } from "@/lib/healthScore";
+import { getPending } from "@/lib/pending";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -179,6 +182,7 @@ export default async function DashboardPage() {
   ];
 
   const game = await getGamification(supabase, uid);
+  const pending = await getPending(supabase, uid);
 
   const challengesDone = challengesRes.count ?? 0;
   const challengesTotal = CHALLENGES.length;
@@ -281,6 +285,45 @@ export default async function DashboardPage() {
           </div>
         </div>
       </section>
+
+      {/* Pendências — o que falta preencher/fazer */}
+      {pending.items.length > 0 && (
+        <div className="card border-l-4 border-l-amber-400 dark:border-l-amber-500/70">
+          <div className="mb-3 flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+              <Bell className="h-4 w-4" />
+            </span>
+            <h2 className="font-semibold text-slate-900 dark:text-white">Para você</h2>
+            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+              {pending.items.length}
+            </span>
+          </div>
+          <div className="space-y-2">
+            {pending.items.map((it) => (
+              <Link
+                key={it.key}
+                href={it.href}
+                className="flex items-center gap-3 rounded-xl border border-slate-200 p-3 transition hover:border-brand-300 hover:bg-brand-50/40 dark:border-white/[0.06] dark:hover:border-brand-800 dark:hover:bg-brand-950/20"
+              >
+                <span
+                  className={`mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full ${
+                    it.urgent ? "bg-rose-500" : "bg-amber-500"
+                  }`}
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-slate-900 dark:text-white">
+                    {it.label}
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {it.description}
+                  </p>
+                </div>
+                <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Score de Saúde do dia */}
       <div className="card">

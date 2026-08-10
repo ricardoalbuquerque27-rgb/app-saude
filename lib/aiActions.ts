@@ -852,7 +852,8 @@ export async function executeAction(
         }
         const { error } = await supabase.from("profiles").upsert(patch);
         if (error) throw error;
-        return { ok: true, resumo: `Perfil atualizado: ${partes.join(", ")}.` };
+        // area "perfil" apenas dispara o router.refresh (atualiza avisos/dashboard).
+        return { ok: true, resumo: `Perfil atualizado: ${partes.join(", ")}.`, area: "perfil" };
       }
 
       case "registrar_habito": {

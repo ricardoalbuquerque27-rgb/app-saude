@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import AppShell from "@/components/AppShell";
+import { getPending } from "@/lib/pending";
 
 export default async function AppLayout({
   children,
@@ -25,11 +26,14 @@ export default async function AppLayout({
   const userName =
     profile?.full_name || user.user_metadata?.full_name || "Atleta";
 
+  const pending = await getPending(supabase, user.id);
+
   return (
     <AppShell
       userName={userName}
       userEmail={user.email ?? ""}
       needsOnboarding={profile ? !profile.onboarded : false}
+      pendingHrefs={pending.hrefs}
     >
       {children}
     </AppShell>

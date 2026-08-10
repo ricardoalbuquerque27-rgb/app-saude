@@ -91,11 +91,13 @@ export default function AppShell({
   userName,
   userEmail,
   needsOnboarding,
+  pendingHrefs = [],
 }: {
   children: React.ReactNode;
   userName: string;
   userEmail: string;
   needsOnboarding?: boolean;
+  pendingHrefs?: string[];
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -142,6 +144,11 @@ export default function AppShell({
   const isActive = (item: (typeof nav)[number]) =>
     item.exact ? pathname === item.href : pathname.startsWith(item.href);
 
+  const hasPending = (href: string) => pendingHrefs.includes(href);
+  // Pendências que ficam dentro do menu "Mais" (para sinalizar o botão Mais).
+  const mobileHrefs = new Set(mobileNav.map((n) => n.href));
+  const morePending = pendingHrefs.some((h) => !mobileHrefs.has(h));
+
   return (
     <div className="min-h-dvh">
       {/* Sidebar — desktop */}
@@ -167,7 +174,10 @@ export default function AppShell({
               }`}
             >
               <item.icon className="h-5 w-5" />
-              {item.label}
+              <span className="flex-1">{item.label}</span>
+              {hasPending(item.href) && (
+                <span className="h-2 w-2 shrink-0 rounded-full bg-brand-500" />
+              )}
             </Link>
           ))}
         </nav>
@@ -184,7 +194,10 @@ export default function AppShell({
               }`}
             >
               <item.icon className="h-5 w-5" />
-              {item.label}
+              <span className="flex-1">{item.label}</span>
+              {hasPending(item.href) && (
+                <span className="h-2 w-2 shrink-0 rounded-full bg-brand-500" />
+              )}
             </Link>
           ))}
           <button
@@ -215,10 +228,13 @@ export default function AppShell({
         </Link>
         <button
           onClick={() => setMenuOpen(true)}
-          className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+          className="relative rounded-lg p-2 text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
           aria-label="Abrir menu"
         >
           <Menu className="h-6 w-6" />
+          {morePending && (
+            <span className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-brand-500 ring-2 ring-white dark:ring-slate-900" />
+          )}
         </button>
       </header>
 
@@ -240,7 +256,12 @@ export default function AppShell({
                   : "text-slate-500 dark:text-slate-400"
               }`}
             >
-              <item.icon className="h-[22px] w-[22px]" />
+              <span className="relative">
+                <item.icon className="h-[22px] w-[22px]" />
+                {hasPending(item.href) && (
+                  <span className="absolute -right-1 -top-0.5 h-2 w-2 rounded-full bg-brand-500" />
+                )}
+              </span>
               {item.label}
             </Link>
           ))}
@@ -252,7 +273,12 @@ export default function AppShell({
                 : "text-slate-500 dark:text-slate-400"
             }`}
           >
-            <Menu className="h-[22px] w-[22px]" />
+            <span className="relative">
+              <Menu className="h-[22px] w-[22px]" />
+              {morePending && (
+                <span className="absolute -right-1 -top-0.5 h-2 w-2 rounded-full bg-brand-500" />
+              )}
+            </span>
             Mais
           </button>
         </div>
@@ -300,6 +326,9 @@ export default function AppShell({
                         >
                           <item.icon className="h-5 w-5 shrink-0" />
                           <span className="flex-1">{item.label}</span>
+                          {hasPending(item.href) && (
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-brand-500" />
+                          )}
                           <ChevronRight className="h-4 w-4 text-slate-300" />
                         </Link>
                       );
