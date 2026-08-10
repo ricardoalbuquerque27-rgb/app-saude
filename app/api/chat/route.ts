@@ -43,7 +43,7 @@ const SYSTEM =
   "- Para APAGAR/REMOVER, tenha certeza do que ele quer; confirme em 1 frase o que foi apagado. Nunca apague sem pedido explícito.\n" +
   "- Ao montar um plano semanal, envie todas as sessões de uma vez, com o dia da semana certo e detalhes úteis (exercícios/séries nas observações).\n" +
   "- EXAMES: quando o usuário só mencionar um resultado ou perguntar se está normal (curiosidade), use 'avaliar_exame' (NÃO salva) para responder com a classificação correta e DEPOIS pergunte se ele quer que você adicione na aba Exames. Só use 'registrar_exame' (que salva) quando ele pedir para registrar/salvar ou confirmar que quer adicionar. Nunca classifique exame por conta própria — use sempre as ferramentas.\n" +
-  "- DADOS FALTANDO: nunca desista por falta de dado do cadastro. Se uma ferramenta disser que precisa do SEXO (ou idade) para avaliar um exame, PEÇA de forma gentil, oferecendo os dois caminhos: preencher no Perfil OU dizer aqui no chat. Quando o usuário informar o sexo, chame 'atualizar_perfil' para salvar e avalie de novo (para idade exata, oriente preencher a data de nascimento no Perfil). O mesmo vale para outras funções que dependam de dados do perfil.\n" +
+  "- DADOS FALTANDO (regra geral, vale para TUDO): para qualquer pergunta sobre resultados, exames, metas, calorias, IMC, progresso, hidratação etc., se você precisar de um dado que não tem (sexo, idade, altura, peso atual, metas, nível de atividade), NUNCA chute nem dê resposta genérica. Peça o dado com gentileza, sempre oferecendo os DOIS caminhos: preencher no Perfil OU informar aqui no chat. Quando o usuário informar dados de cadastro (sexo, altura, data de nascimento), salve com 'atualizar_perfil'; metas, com 'definir_metas'; peso, com 'registrar_peso'. Os campos que faltam aparecem na lista 'Dados do cadastro AUSENTES' nos dados abaixo — consulte-a antes de responder. Nunca invente números.\n" +
   "- Depois de executar, confirme em 1 frase curta o que foi feito e onde o usuário encontra (ex.: 'Pronto! Adicionei na aba Treinos › Plano semanal.').\n" +
   "- Se uma ação falhar, avise com naturalidade e ofereça tentar de novo. Nunca invente que salvou se a ferramenta não confirmou.\n\n" +
   "Como responder:\n" +
@@ -150,7 +150,7 @@ async function buildUserContext(supabase: any, uid: string): Promise<string> {
     supabase
       .from("profiles")
       .select(
-        "full_name, height_cm, birth_date, weight_goal_kg, daily_water_goal_ml, daily_calorie_goal, protein_goal_g"
+        "full_name, sex, height_cm, birth_date, weight_goal_kg, daily_water_goal_ml, daily_calorie_goal, protein_goal_g"
       )
       .eq("id", uid)
       .maybeSingle(),
@@ -290,6 +290,20 @@ async function buildUserContext(supabase: any, uid: string): Promise<string> {
       }, aplicação ${freq}. ORIENTE de acordo: priorize proteína (preservar músculo), boa hidratação, comer devagar e em menor quantidade, fibras contra constipação, e reforce procurar o médico para ajuste de dose ou efeitos fortes. NUNCA sugira ou altere doses de medicamento.`
     );
   }
+
+  // Lista o que falta no cadastro, para a Gaia pedir em vez de chutar.
+  const faltando: string[] = [];
+  if (!p?.sex) faltando.push("sexo");
+  if (!p?.birth_date) faltando.push("data de nascimento (idade)");
+  if (!p?.height_cm) faltando.push("altura");
+  if (w?.weight_kg == null) faltando.push("peso atual");
+  if (p?.weight_goal_kg == null) faltando.push("meta de peso");
+  if (p?.daily_calorie_goal == null) faltando.push("meta de calorias");
+  if (p?.protein_goal_g == null) faltando.push("meta de proteína");
+  if (faltando.length)
+    parts.push(
+      `Dados do cadastro AUSENTES (peça ao usuário se precisar deles para responder; não invente): ${faltando.join(", ")}.`
+    );
 
   return parts.join("\n");
 }

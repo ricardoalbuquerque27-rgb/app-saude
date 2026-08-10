@@ -282,7 +282,7 @@ export const AI_TOOLS = [
     function: {
       name: "atualizar_perfil",
       description:
-        "Salva dados de cadastro do usuário no perfil: sexo e altura. Use quando o usuário informar esses dados no chat (por exemplo, quando você precisar do sexo para avaliar um exame e ele responder). Isso deixa salvo para as próximas vezes. (Para a idade exata, oriente preencher a data de nascimento no Perfil.)",
+        "Salva dados de cadastro do usuário no perfil: sexo, altura e data de nascimento. Use quando o usuário informar esses dados no chat (por exemplo, quando você precisar do sexo para avaliar um exame e ele responder). Isso deixa salvo para as próximas vezes.",
       parameters: {
         type: "object",
         properties: {
@@ -292,6 +292,11 @@ export const AI_TOOLS = [
             enum: ["M", "F"],
           },
           altura_cm: { type: "number", description: "Altura em centímetros." },
+          data_nascimento: {
+            type: "string",
+            description:
+              "Data de nascimento no formato AAAA-MM-DD (se o usuário informar; permite calcular a idade).",
+          },
         },
       },
     },
@@ -837,6 +842,10 @@ export async function executeAction(
         if (alt != null && alt > 0) {
           patch.height_cm = alt;
           partes.push(`${alt} cm`);
+        }
+        if (isValidDate(args.data_nascimento)) {
+          patch.birth_date = args.data_nascimento;
+          partes.push(`nascimento ${args.data_nascimento}`);
         }
         if (partes.length === 0) {
           return { ok: false, resumo: "Nada de perfil para atualizar." };
