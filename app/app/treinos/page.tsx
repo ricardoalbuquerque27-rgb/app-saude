@@ -34,6 +34,10 @@ import { todayISO, weekStartISO } from "@/lib/date";
 import { useLiveRefresh } from "@/lib/useLiveRefresh";
 import RestTimer from "@/components/RestTimer";
 import PlateCalculator from "@/components/PlateCalculator";
+import WorkoutSession, {
+  type SessionRoutine,
+  type FinishPayload,
+} from "@/components/WorkoutSession";
 
 // Segunda = 0 ... Domingo = 6
 const DAYS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
@@ -193,6 +197,10 @@ export default function TreinosPage() {
   const [rName, setRName] = useState("");
   const [rNotes, setRNotes] = useState("");
   const [rExercises, setRExercises] = useState<RoutineExDraft[]>([emptyRoutineEx()]);
+
+  // Sessão ao vivo (M1b)
+  const [sessionRoutine, setSessionRoutine] = useState<SessionRoutine | null>(null);
+  const [sessionSaving, setSessionSaving] = useState(false);
 
   const [loading, setLoading] = useState(true);
 
@@ -446,6 +454,70 @@ export default function TreinosPage() {
     );
     setTab("historico");
     setOpen(true);
+  }
+
+  // Mapas derivados para a sessão ao vivo (última performance e 1RM base).
+  const lastByName = useMemo(() => {
+    const m: Record<string, { reps: number | null; weight: number | null }> = {};
+    for (const [k, v] of Object.entries(perfByName)) {
+      if (v.last) m[k] = { reps: v.last.reps, weight: v.last.weight };
+    }
+    return m;
+  }, [perfByName]);
+  const best1rmByName = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const [k, v] of Object.entries(perfByName)) m[k] = v.best1rm;
+    return m;
+  }, [perfByName]);
+
+  async function finishSession(p: FinishPayload) {
+    setSessionSaving(true);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      setSessionSaving(false);
+      return;
+    }
+    const { data: workout } = await supabase
+      .from("workouts")
+      .insert({
+        user_id: user.id,
+        date: todayISO(),
+        name: p.name,
+        category: null,
+        duration_min: p.durationMin,
+        notes: "Sessão ao vivo",
+      })
+      .select()
+      .single();
+    if (workout) {
+      const rows = p.exercises
+        .map((ex, i) => {
+          const sets = ex.sets.filter((s) => s.reps != null || s.weight != null);
+          if (!sets.length) return null;
+          const weights = sets
+            .map((s) => s.weight)
+            .filter((w): w is number => w != null);
+          return {
+            workout_id: (workout as Workout).id,
+            user_id: user.id,
+            name: ex.name,
+            sets: sets.length,
+            reps: sets[0]?.reps ?? null,
+            weight_kg: weights.length ? Math.max(...weights) : null,
+            sets_json: sets,
+            rpe: null,
+            position: i,
+          };
+        })
+        .filter(Boolean) as any[];
+      if (rows.length) await supabase.from("exercises").insert(rows);
+    }
+    setSessionSaving(false);
+    setSessionRoutine(null);
+    setTab("historico");
+    await load();
   }
 
   function openPlanModal(day: number) {
@@ -916,12 +988,22 @@ export default function TreinosPage() {
                   </ul>
                 )}
 
-                <button
-                  onClick={() => registerFromRoutine(r)}
-                  className="btn-primary mt-auto w-full py-2"
-                >
-                  <Play className="h-4 w-4" /> Registrar treino
-                </button>
+                <div className="mt-auto flex flex-col gap-1.5">
+                  <button
+                    onClick={() =>
+                      setSessionRoutine({ id: r.id, name: r.name, exercises: r.exercises })
+                    }
+                    className="btn-primary w-full py-2"
+                  >
+                    <Play className="h-4 w-4" /> Iniciar treino
+                  </button>
+                  <button
+                    onClick={() => registerFromRoutine(r)}
+                    className="text-xs font-medium text-slate-500 hover:text-brand-700 dark:text-slate-400 dark:hover:text-brand-400"
+                  >
+                    Registro rápido (sem cronômetro)
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -1504,6 +1586,18 @@ export default function TreinosPage() {
           </button>
         </form>
       </Modal>
+
+      {/* Sessão de treino ao vivo (M1b) */}
+      {sessionRoutine && (
+        <WorkoutSession
+          routine={sessionRoutine}
+          lastByName={lastByName}
+          best1rmByName={best1rmByName}
+          saving={sessionSaving}
+          onClose={() => setSessionRoutine(null)}
+          onFinish={finishSession}
+        />
+      )}
     </div>
   );
 }

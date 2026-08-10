@@ -3,9 +3,16 @@
 Objetivo: transformar a aba de Treino de um **diário** (preenchido depois) em um
 **treinador na mão** (usado durante o treino), no modelo Hevy/Strong.
 
-Status: **desenhado** (não implementado). O "pacote rápido" já entregue cobre
-cronômetro de descanso, repetir último treino, sugestão de progressão, 1RM
-estimado e calculadora de anilhas.
+Status:
+- **Pacote rápido** — ✅ entregue (cronômetro de descanso, repetir último treino,
+  sugestão de progressão, 1RM estimado, calculadora de anilhas).
+- **M1a — Rotinas reutilizáveis** — ✅ entregue (tabelas `routines`/
+  `routine_exercises`, aba Rotinas com CRUD e "Registro rápido").
+- **M1b — Sessão ao vivo** — ✅ entregue (componente `WorkoutSession`: iniciar
+  treino a partir da rotina, marcar séries, cronômetro de descanso automático,
+  PR/1RM em tempo real, finalizar gravando no histórico).
+- **M1c — Vínculo Plano ⇆ Rotina** — pendente.
+- **M1d — Gaia cria rotinas** — pendente.
 
 ---
 
