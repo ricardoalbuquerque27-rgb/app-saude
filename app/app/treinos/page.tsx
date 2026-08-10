@@ -16,6 +16,8 @@ import {
   BarChart3,
   Copy,
   Zap,
+  ListChecks,
+  Play,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { Workout, Exercise } from "@/lib/types";
@@ -83,6 +85,34 @@ const emptyExercise = (): ExerciseDraft => ({
   sets: [{ reps: "", weight: "" }],
 });
 
+// Rascunho de exercício de uma rotina (com metas).
+type RoutineExDraft = {
+  name: string;
+  sets: string;
+  reps: string;
+  weight: string;
+  rest: string;
+};
+const emptyRoutineEx = (): RoutineExDraft => ({
+  name: "",
+  sets: "3",
+  reps: "10",
+  weight: "",
+  rest: "90",
+});
+type RoutineWithEx = {
+  id: string;
+  name: string;
+  notes: string | null;
+  exercises: {
+    name: string;
+    target_sets: number | null;
+    target_reps: number | null;
+    target_weight_kg: number | null;
+    rest_seconds: number | null;
+  }[];
+};
+
 function todayIndex() {
   return (new Date(todayISO() + "T12:00:00").getDay() + 6) % 7; // 0=Segunda
 }
@@ -121,7 +151,9 @@ function PlanStat({
 
 export default function TreinosPage() {
   const supabase = createClient();
-  const [tab, setTab] = useState<"plano" | "historico" | "progressao">("plano");
+  const [tab, setTab] = useState<
+    "plano" | "rotinas" | "historico" | "progressao"
+  >("plano");
   const [progView, setProgView] = useState<"carga" | "volume">("carga");
   const [selectedExercise, setSelectedExercise] = useState<string>("");
 
@@ -153,11 +185,20 @@ export default function TreinosPage() {
   const [notes, setNotes] = useState("");
   const [exercises, setExercises] = useState<ExerciseDraft[]>([emptyExercise()]);
 
+  // Rotinas (M1a)
+  const [routines, setRoutines] = useState<RoutineWithEx[]>([]);
+  const [routineOpen, setRoutineOpen] = useState(false);
+  const [routineSaving, setRoutineSaving] = useState(false);
+  const [editingRoutineId, setEditingRoutineId] = useState<string | null>(null);
+  const [rName, setRName] = useState("");
+  const [rNotes, setRNotes] = useState("");
+  const [rExercises, setRExercises] = useState<RoutineExDraft[]>([emptyRoutineEx()]);
+
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [planRes, wsRes, compRes] = await Promise.all([
+    const [planRes, wsRes, compRes, routRes, routExRes] = await Promise.all([
       supabase
         .from("workout_plan")
         .select("*")
@@ -165,9 +206,38 @@ export default function TreinosPage() {
         .order("position", { ascending: true }),
       supabase.from("workouts").select("*").order("date", { ascending: false }),
       supabase.from("plan_completions").select("*").eq("date", todayISO()),
+      supabase
+        .from("routines")
+        .select("*")
+        .order("position", { ascending: true })
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("routine_exercises")
+        .select("*")
+        .order("position", { ascending: true }),
     ]);
 
     setPlan((planRes.data ?? []) as PlanEntry[]);
+
+    // Agrupa exercícios por rotina.
+    const exByRoutine: Record<string, any[]> = {};
+    (routExRes.data ?? []).forEach((e: any) => {
+      (exByRoutine[e.routine_id] ||= []).push(e);
+    });
+    setRoutines(
+      (routRes.data ?? []).map((r: any) => ({
+        id: r.id,
+        name: r.name,
+        notes: r.notes,
+        exercises: (exByRoutine[r.id] ?? []).map((e: any) => ({
+          name: e.name,
+          target_sets: e.target_sets,
+          target_reps: e.target_reps,
+          target_weight_kg: e.target_weight_kg,
+          rest_seconds: e.rest_seconds,
+        })),
+      }))
+    );
 
     const comp: Record<string, { id: string; workout_id: string | null }> = {};
     (compRes.data ?? []).forEach((c: any) => {
@@ -265,6 +335,116 @@ export default function TreinosPage() {
           }))
         : [emptyExercise()]
     );
+    setOpen(true);
+  }
+
+  // ----- Rotinas (M1a) -----
+  function openNewRoutine() {
+    setEditingRoutineId(null);
+    setRName("");
+    setRNotes("");
+    setRExercises([emptyRoutineEx()]);
+    setRoutineOpen(true);
+  }
+  function openEditRoutine(r: RoutineWithEx) {
+    setEditingRoutineId(r.id);
+    setRName(r.name);
+    setRNotes(r.notes ?? "");
+    setRExercises(
+      r.exercises.length
+        ? r.exercises.map((e) => ({
+            name: e.name,
+            sets: e.target_sets != null ? String(e.target_sets) : "",
+            reps: e.target_reps != null ? String(e.target_reps) : "",
+            weight: e.target_weight_kg != null ? String(e.target_weight_kg) : "",
+            rest: e.rest_seconds != null ? String(e.rest_seconds) : "90",
+          }))
+        : [emptyRoutineEx()]
+    );
+    setRoutineOpen(true);
+  }
+  function updRoutineEx(i: number, patch: Partial<RoutineExDraft>) {
+    setRExercises((p) => p.map((ex, idx) => (idx === i ? { ...ex, ...patch } : ex)));
+  }
+  async function saveRoutine(e: React.FormEvent) {
+    e.preventDefault();
+    if (!rName.trim()) return;
+    setRoutineSaving(true);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      setRoutineSaving(false);
+      return;
+    }
+    let routineId = editingRoutineId;
+    if (routineId) {
+      await supabase
+        .from("routines")
+        .update({ name: rName.trim(), notes: rNotes.trim() || null })
+        .eq("id", routineId);
+      await supabase.from("routine_exercises").delete().eq("routine_id", routineId);
+    } else {
+      const { data: r } = await supabase
+        .from("routines")
+        .insert({
+          user_id: user.id,
+          name: rName.trim(),
+          notes: rNotes.trim() || null,
+          position: routines.length,
+        })
+        .select()
+        .single();
+      routineId = (r as any)?.id ?? null;
+    }
+    if (routineId) {
+      const rows = rExercises
+        .filter((ex) => ex.name.trim())
+        .map((ex, i) => ({
+          routine_id: routineId as string,
+          user_id: user.id,
+          name: ex.name.trim(),
+          target_sets: ex.sets ? Number(ex.sets) : null,
+          target_reps: ex.reps ? Number(ex.reps) : null,
+          target_weight_kg: ex.weight ? Number(ex.weight) : null,
+          rest_seconds: ex.rest ? Number(ex.rest) : 90,
+          position: i,
+        }));
+      if (rows.length) await supabase.from("routine_exercises").insert(rows);
+    }
+    setRoutineSaving(false);
+    setRoutineOpen(false);
+    await load();
+  }
+  async function removeRoutine(id: string) {
+    if (!confirm("Excluir esta rotina?")) return;
+    await supabase.from("routines").delete().eq("id", id);
+    setRoutines((prev) => prev.filter((r) => r.id !== id));
+  }
+  // Ponte até o M1b (sessão ao vivo): registra um treino já preenchido pela rotina.
+  function registerFromRoutine(r: RoutineWithEx) {
+    setDate(todayISO());
+    setName(r.name);
+    setCategory("");
+    setDuration("");
+    setNotes("");
+    setExercises(
+      r.exercises.length
+        ? r.exercises.map((e) => {
+            const n = Math.max(1, e.target_sets ?? 1);
+            const base = {
+              reps: e.target_reps != null ? String(e.target_reps) : "",
+              weight: e.target_weight_kg != null ? String(e.target_weight_kg) : "",
+            };
+            return {
+              name: e.name,
+              rpe: "",
+              sets: Array.from({ length: n }, () => ({ ...base })),
+            };
+          })
+        : [emptyExercise()]
+    );
+    setTab("historico");
     setOpen(true);
   }
 
@@ -536,6 +716,10 @@ export default function TreinosPage() {
                 <Plus className="h-4 w-4" /> Novo treino
               </button>
             </div>
+          ) : tab === "rotinas" ? (
+            <button onClick={openNewRoutine} className="btn-primary">
+              <Plus className="h-4 w-4" /> Nova rotina
+            </button>
           ) : undefined
         }
       />
@@ -544,6 +728,7 @@ export default function TreinosPage() {
       <div className="mb-5 inline-flex max-w-full gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 dark:border-white/[0.06] dark:bg-slate-900/50">
         {[
           { id: "plano", label: "Plano semanal", icon: CalendarDays },
+          { id: "rotinas", label: "Rotinas", icon: ListChecks },
           { id: "historico", label: "Histórico", icon: History },
           { id: "progressao", label: "Progressão", icon: TrendingUp },
         ].map((t) => (
@@ -670,6 +855,77 @@ export default function TreinosPage() {
             })}
           </div>
         </div>
+      ) : tab === "rotinas" ? (
+        routines.length === 0 ? (
+          <EmptyState
+            icon={<ListChecks className="h-10 w-10" />}
+            title="Nenhuma rotina ainda"
+            description="Crie rotinas reutilizáveis (com exercícios e metas) para treinar sempre igual — ou peça para a Gaia montar."
+          />
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {routines.map((r) => (
+              <div key={r.id} className="card flex flex-col">
+                <div className="mb-2 flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <h3 className="font-semibold text-slate-900 dark:text-white">
+                      {r.name}
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {r.exercises.length} exercício(s)
+                      {r.notes ? ` · ${r.notes}` : ""}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 gap-1">
+                    <button
+                      onClick={() => openEditRoutine(r)}
+                      className="rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
+                      aria-label="Editar rotina"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      onClick={() => removeRoutine(r.id)}
+                      className="rounded-lg p-1.5 text-slate-400 hover:text-rose-600"
+                      aria-label="Excluir rotina"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {r.exercises.length > 0 && (
+                  <ul className="mb-4 flex-1 space-y-1.5">
+                    {r.exercises.slice(0, 6).map((e, i) => (
+                      <li
+                        key={i}
+                        className="flex items-center justify-between gap-2 text-sm text-slate-700 dark:text-slate-300"
+                      >
+                        <span className="truncate">{e.name}</span>
+                        <span className="shrink-0 text-xs text-slate-400">
+                          {e.target_sets ?? "—"}×{e.target_reps ?? "—"}
+                          {e.target_weight_kg != null ? ` · ${e.target_weight_kg}kg` : ""}
+                        </span>
+                      </li>
+                    ))}
+                    {r.exercises.length > 6 && (
+                      <li className="text-xs text-slate-400">
+                        +{r.exercises.length - 6} exercício(s)
+                      </li>
+                    )}
+                  </ul>
+                )}
+
+                <button
+                  onClick={() => registerFromRoutine(r)}
+                  className="btn-primary mt-auto w-full py-2"
+                >
+                  <Play className="h-4 w-4" /> Registrar treino
+                </button>
+              </div>
+            ))}
+          </div>
+        )
       ) : tab === "progressao" ? (
         exerciseNames.length === 0 && volumeData.length === 0 ? (
           <EmptyState
@@ -802,9 +1058,6 @@ export default function TreinosPage() {
       ) : (
         <div className="space-y-4">
           <RestTimer />
-          <div className="flex justify-end">
-            <PlateCalculator />
-          </div>
           {workouts.length === 0 ? (
             <EmptyState
               icon={<Dumbbell className="h-10 w-10" />}
@@ -997,6 +1250,10 @@ export default function TreinosPage() {
             />
           </Field>
 
+          <div className="flex justify-end">
+            <PlateCalculator />
+          </div>
+
           <div>
             <div className="mb-2 flex items-center justify-between">
               <span className="label mb-0">Exercícios</span>
@@ -1115,6 +1372,135 @@ export default function TreinosPage() {
           <button type="submit" disabled={saving} className="btn-primary w-full py-2.5">
             {saving && <Loader2 className="h-4 w-4 animate-spin" />}
             Salvar treino
+          </button>
+        </form>
+      </Modal>
+
+      {/* Modal — criar/editar rotina */}
+      <Modal
+        open={routineOpen}
+        onClose={() => setRoutineOpen(false)}
+        title={editingRoutineId ? "Editar rotina" : "Nova rotina"}
+      >
+        <form onSubmit={saveRoutine} className="space-y-4">
+          <Field label="Nome da rotina">
+            <input
+              className="input"
+              value={rName}
+              onChange={(e) => setRName(e.target.value)}
+              placeholder="Ex.: Treino A — Peito e tríceps"
+              required
+            />
+          </Field>
+          <Field label="Observações (opcional)">
+            <input
+              className="input"
+              value={rNotes}
+              onChange={(e) => setRNotes(e.target.value)}
+              placeholder="Ex.: foco em hipertrofia"
+            />
+          </Field>
+
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <span className="label mb-0">Exercícios e metas</span>
+              <button
+                type="button"
+                onClick={() => setRExercises((p) => [...p, emptyRoutineEx()])}
+                className="text-xs font-semibold text-brand-700 hover:underline dark:text-brand-400"
+              >
+                + Exercício
+              </button>
+            </div>
+            <div className="space-y-3">
+              {rExercises.map((ex, i) => (
+                <div
+                  key={i}
+                  className="rounded-xl border border-slate-200 p-3 dark:border-slate-700"
+                >
+                  <div className="flex items-center gap-2">
+                    <input
+                      className="input"
+                      value={ex.name}
+                      onChange={(e) => updRoutineEx(i, { name: e.target.value })}
+                      placeholder="Ex.: Supino reto"
+                    />
+                    {rExercises.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setRExercises((p) => p.filter((_, idx) => idx !== i))
+                        }
+                        className="rounded-lg p-1.5 text-slate-400 hover:text-rose-600"
+                        aria-label="Remover exercício"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                  <div className="mt-2 grid grid-cols-4 gap-2">
+                    <div>
+                      <span className="mb-0.5 block text-[10px] font-medium text-slate-400">
+                        Séries
+                      </span>
+                      <input
+                        className="input"
+                        type="number"
+                        value={ex.sets}
+                        onChange={(e) => updRoutineEx(i, { sets: e.target.value })}
+                        placeholder="3"
+                      />
+                    </div>
+                    <div>
+                      <span className="mb-0.5 block text-[10px] font-medium text-slate-400">
+                        Reps
+                      </span>
+                      <input
+                        className="input"
+                        type="number"
+                        value={ex.reps}
+                        onChange={(e) => updRoutineEx(i, { reps: e.target.value })}
+                        placeholder="10"
+                      />
+                    </div>
+                    <div>
+                      <span className="mb-0.5 block text-[10px] font-medium text-slate-400">
+                        Carga kg
+                      </span>
+                      <input
+                        className="input"
+                        type="number"
+                        step="0.5"
+                        value={ex.weight}
+                        onChange={(e) => updRoutineEx(i, { weight: e.target.value })}
+                        placeholder="—"
+                      />
+                    </div>
+                    <div>
+                      <span className="mb-0.5 block text-[10px] font-medium text-slate-400">
+                        Descanso s
+                      </span>
+                      <input
+                        className="input"
+                        type="number"
+                        value={ex.rest}
+                        onChange={(e) => updRoutineEx(i, { rest: e.target.value })}
+                        placeholder="90"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={routineSaving}
+            className="btn-primary w-full py-2.5"
+          >
+            {routineSaving && <Loader2 className="h-4 w-4 animate-spin" />}
+            {editingRoutineId ? "Salvar alterações" : "Criar rotina"}
           </button>
         </form>
       </Modal>

@@ -623,6 +623,83 @@ export type Database = {
         };
         Relationships: [];
       };
+      routines: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          notes: string | null;
+          position: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          name: string;
+          notes?: string | null;
+          position?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          name?: string;
+          notes?: string | null;
+          position?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      routine_exercises: {
+        Row: {
+          id: string;
+          routine_id: string;
+          user_id: string;
+          name: string;
+          target_sets: number | null;
+          target_reps: number | null;
+          target_weight_kg: number | null;
+          rest_seconds: number | null;
+          position: number;
+          notes: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          routine_id: string;
+          user_id: string;
+          name: string;
+          target_sets?: number | null;
+          target_reps?: number | null;
+          target_weight_kg?: number | null;
+          rest_seconds?: number | null;
+          position?: number;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          routine_id?: string;
+          user_id?: string;
+          name?: string;
+          target_sets?: number | null;
+          target_reps?: number | null;
+          target_weight_kg?: number | null;
+          rest_seconds?: number | null;
+          position?: number;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "routine_exercises_routine_id_fkey";
+            columns: ["routine_id"];
+            isOneToOne: false;
+            referencedRelation: "routines";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -714,5 +791,7 @@ export type Exam = PublicSchema["Tables"]["exams"]["Row"];
 export type WorkoutPlan = PublicSchema["Tables"]["workout_plan"]["Row"];
 export type PlanCompletion = PublicSchema["Tables"]["plan_completions"]["Row"];
 export type Treatment = PublicSchema["Tables"]["treatments"]["Row"];
+export type Routine = PublicSchema["Tables"]["routines"]["Row"];
+export type RoutineExercise = PublicSchema["Tables"]["routine_exercises"]["Row"];
 export type DoseLog = PublicSchema["Tables"]["dose_logs"]["Row"];
 export type SideEffect = PublicSchema["Tables"]["side_effects"]["Row"];
