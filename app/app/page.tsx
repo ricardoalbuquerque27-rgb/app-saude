@@ -11,6 +11,7 @@ import {
   Trophy,
   Syringe,
   Target,
+  HeartPulse,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { StatCard, formatDate } from "@/components/ui";
@@ -20,6 +21,7 @@ import OpenChatButton from "@/components/OpenChatButton";
 import { ProgressRing } from "@/components/ProgressRing";
 import { CHALLENGES, weekStartISO } from "@/lib/challenges";
 import { todayISO, addDaysISO } from "@/lib/date";
+import { computeHealthScore } from "@/lib/healthScore";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -63,7 +65,7 @@ export default async function DashboardPage() {
       .limit(60),
     supabase
       .from("daily_logs")
-      .select("water_ml")
+      .select("water_ml, sleep_hours, mood, energy")
       .eq("user_id", uid)
       .eq("date", today)
       .maybeSingle(),
@@ -122,6 +124,34 @@ export default async function DashboardPage() {
   const proteinGoal = profile?.protein_goal_g ?? null;
   const recentWorkouts = recentWorkoutsRes.data ?? [];
   const todayPlan = todayPlanRes.data ?? [];
+
+  // Score de Saúde do dia (usa só dados que o app já coleta).
+  const health = computeHealthScore({
+    sleepHours: dailyTodayRes.data?.sleep_hours ?? null,
+    trainedToday: recentWorkouts.some((w) => w.date === today),
+    workoutsWeek,
+    mealsLoggedToday: (mealsTodayRes.data ?? []).length,
+    proteinToday,
+    proteinGoal,
+    caloriesToday,
+    calorieGoal,
+    waterToday,
+    waterGoal,
+    mood: (dailyTodayRes.data as any)?.mood ?? null,
+    energy: (dailyTodayRes.data as any)?.energy ?? null,
+  });
+  const healthColor =
+    health.color === "brand"
+      ? "text-brand-500"
+      : health.color === "amber"
+        ? "text-amber-500"
+        : "text-rose-500";
+  const healthBadge =
+    health.color === "brand"
+      ? "bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300"
+      : health.color === "amber"
+        ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+        : "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300";
 
   // Anéis do dia
   const rings = [
@@ -251,6 +281,77 @@ export default async function DashboardPage() {
           </div>
         </div>
       </section>
+
+      {/* Score de Saúde do dia */}
+      <div className="card">
+        {health.hasData ? (
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+            <div className="flex items-center gap-4 sm:block sm:shrink-0 sm:text-center">
+              <ProgressRing
+                pct={health.score / 100}
+                centerMain={`${health.score}`}
+                centerSub="/ 100"
+                label="Score de Saúde"
+                colorClass={healthColor}
+              />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="mb-2 flex items-center gap-2">
+                <h2 className="font-semibold text-slate-900 dark:text-white">
+                  Seu dia hoje
+                </h2>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${healthBadge}`}
+                >
+                  {health.label}
+                </span>
+              </div>
+              <p className="mb-3 text-sm text-slate-500 dark:text-slate-400">
+                {health.topTip}
+              </p>
+              <div className="space-y-2">
+                {health.pillars.map((p) => (
+                  <div key={p.key}>
+                    <div className="mb-0.5 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                      <span>{p.label}</span>
+                      <span className="tabular font-medium text-slate-600 dark:text-slate-300">
+                        {p.value}
+                      </span>
+                    </div>
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                      <div
+                        className={`h-full rounded-full ${
+                          p.value >= 70
+                            ? "bg-brand-500"
+                            : p.value >= 55
+                              ? "bg-amber-500"
+                              : "bg-rose-500"
+                        }`}
+                        style={{ width: `${p.value}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
+              <HeartPulse className="h-6 w-6" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h2 className="font-semibold text-slate-900 dark:text-white">
+                Seu Score de Saúde aparece aqui
+              </h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Comece registrando água, sono, uma refeição ou um treino — a Gaia
+                também pode fazer isso por você.
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Resumo do dia — anéis */}
       <div className="card">

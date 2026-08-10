@@ -162,7 +162,7 @@ export default function Home() {
             </Reveal>
             <div className="flex justify-center lg:justify-end">
               <div className="animate-float">
-                <GlowRing value="92" label="Pace Score" />
+                <GlowRing value="92" label="Score de Saúde" />
               </div>
             </div>
           </div>

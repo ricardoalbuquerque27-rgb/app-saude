@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { todayISO, addDaysISO } from "@/lib/date";
 import { withTimeout, isAbortError } from "@/lib/aiHttp";
 import { AI_TOOLS, executeAction, TOOL_AREAS } from "@/lib/aiActions";
+import { computeHealthScore } from "@/lib/healthScore";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,6 +46,7 @@ const SYSTEM =
   "- Depois de executar, confirme em 1 frase curta o que foi feito e onde o usuário encontra (ex.: 'Pronto! Adicionei na aba Treinos › Plano semanal.').\n" +
   "- Se uma ação falhar, avise com naturalidade e ofereça tentar de novo. Nunca invente que salvou se a ferramenta não confirmou.\n\n" +
   "Como responder:\n" +
+  "- Você recebe o Score de Saúde do dia (0–100) nos dados do usuário; use-o para orientar e motivar quando fizer sentido (ex.: apontar o ponto mais fraco do dia).\n" +
   "- Sempre em português do Brasil, com tom amigável, prático e motivador.\n" +
   "- Seja objetivo. Parágrafos curtos e listas com hífens (-). Evite markdown pesado (nada de **, ##).\n" +
   "- Dê exemplos concretos (porções, substituições, séries) quando ajudar.\n\n" +
@@ -142,12 +144,12 @@ async function buildUserContext(supabase: any, uid: string): Promise<string> {
   const weekAgo = addDaysISO(today, -7);
   const dow = (new Date(today + "T12:00:00").getDay() + 6) % 7;
 
-  const [prof, weight, meals, wkCount, plan, log, exams, treat] =
+  const [prof, weight, meals, wkCount, plan, log, exams, treat, wkToday] =
     await Promise.all([
     supabase
       .from("profiles")
       .select(
-        "full_name, height_cm, birth_date, weight_goal_kg, daily_water_goal_ml, daily_calorie_goal"
+        "full_name, height_cm, birth_date, weight_goal_kg, daily_water_goal_ml, daily_calorie_goal, protein_goal_g"
       )
       .eq("id", uid)
       .maybeSingle(),
@@ -158,7 +160,11 @@ async function buildUserContext(supabase: any, uid: string): Promise<string> {
       .not("weight_kg", "is", null)
       .order("date", { ascending: false })
       .limit(1),
-    supabase.from("meals").select("calories").eq("user_id", uid).eq("date", today),
+    supabase
+      .from("meals")
+      .select("calories, protein_g")
+      .eq("user_id", uid)
+      .eq("date", today),
     supabase
       .from("workouts")
       .select("id", { count: "exact", head: true })
@@ -171,7 +177,7 @@ async function buildUserContext(supabase: any, uid: string): Promise<string> {
       .eq("day_of_week", dow),
     supabase
       .from("daily_logs")
-      .select("water_ml, sleep_hours")
+      .select("water_ml, sleep_hours, mood, energy")
       .eq("user_id", uid)
       .eq("date", today)
       .maybeSingle(),
@@ -190,6 +196,11 @@ async function buildUserContext(supabase: any, uid: string): Promise<string> {
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    supabase
+      .from("workouts")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", uid)
+      .eq("date", today),
   ]);
 
   const p = prof.data;
@@ -200,12 +211,37 @@ async function buildUserContext(supabase: any, uid: string): Promise<string> {
       )
     : null;
   const w = (weight.data ?? [])[0];
-  const calToday = (meals.data ?? []).reduce(
+  const mealsToday = meals.data ?? [];
+  const calToday = mealsToday.reduce(
     (s: number, m: any) => s + (Number(m.calories) || 0),
     0
   );
+  const proteinToday = mealsToday.reduce(
+    (s: number, m: any) => s + (Number(m.protein_g) || 0),
+    0
+  );
+
+  // Score de Saúde do dia (mesmo cálculo do dashboard).
+  const health = computeHealthScore({
+    sleepHours: log.data?.sleep_hours ?? null,
+    trainedToday: (wkToday.count ?? 0) > 0,
+    workoutsWeek: wkCount.count ?? 0,
+    mealsLoggedToday: mealsToday.length,
+    proteinToday,
+    proteinGoal: p?.protein_goal_g ?? null,
+    caloriesToday: calToday,
+    calorieGoal: p?.daily_calorie_goal ?? null,
+    waterToday: log.data?.water_ml ?? 0,
+    waterGoal: p?.daily_water_goal_ml ?? 2500,
+    mood: log.data?.mood ?? null,
+    energy: log.data?.energy ?? null,
+  });
 
   const parts: string[] = [];
+  if (health.hasData)
+    parts.push(
+      `Score de Saúde hoje: ${health.score}/100 (${health.label}). Dica principal: ${health.topTip}`
+    );
   if (p?.full_name) parts.push(`Nome: ${p.full_name.split(" ")[0]}`);
   if (age) parts.push(`Idade: ${age}`);
   if (p?.height_cm) parts.push(`Altura: ${p.height_cm} cm`);
