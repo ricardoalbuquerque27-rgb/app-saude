@@ -78,6 +78,7 @@ type PlanEntry = {
   title: string | null;
   notes: string | null;
   position: number;
+  routine_id: string | null;
 };
 
 type SetDraft = { reps: string; weight: string };
@@ -173,6 +174,7 @@ export default function TreinosPage() {
   const [pSport, setPSport] = useState("Musculação");
   const [pTitle, setPTitle] = useState("");
   const [pNotes, setPNotes] = useState("");
+  const [pRoutineId, setPRoutineId] = useState("");
 
   // Histórico
   const [workouts, setWorkouts] = useState<Workout[]>([]);
@@ -514,6 +516,25 @@ export default function TreinosPage() {
         .filter(Boolean) as any[];
       if (rows.length) await supabase.from("exercises").insert(rows);
     }
+    // Se veio de um dia do plano, marca como concluído hoje.
+    const planId = sessionRoutine?.planId;
+    if (planId && workout) {
+      const { data: already } = await supabase
+        .from("plan_completions")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("plan_id", planId)
+        .eq("date", todayISO())
+        .limit(1);
+      if ((already ?? []).length === 0) {
+        await supabase.from("plan_completions").insert({
+          user_id: user.id,
+          plan_id: planId,
+          date: todayISO(),
+          workout_id: (workout as Workout).id,
+        });
+      }
+    }
     setSessionSaving(false);
     setSessionRoutine(null);
     setTab("historico");
@@ -525,6 +546,7 @@ export default function TreinosPage() {
     setPSport("Musculação");
     setPTitle("");
     setPNotes("");
+    setPRoutineId("");
     setPlanOpen(true);
   }
 
@@ -544,10 +566,23 @@ export default function TreinosPage() {
       title: pTitle.trim() || null,
       notes: pNotes.trim() || null,
       position,
+      routine_id: pRoutineId || null,
     });
     setPlanSaving(false);
     setPlanOpen(false);
     await load();
+  }
+
+  // Inicia a sessão ao vivo a partir de uma sessão do plano (se tiver rotina).
+  function startPlanSession(session: PlanEntry) {
+    const r = routines.find((x) => x.id === session.routine_id);
+    if (!r) return;
+    setSessionRoutine({
+      id: r.id,
+      name: r.name,
+      exercises: r.exercises,
+      planId: session.id,
+    });
   }
 
   async function removePlanEntry(id: string) {
@@ -892,6 +927,15 @@ export default function TreinosPage() {
                               {s.notes}
                             </p>
                           )}
+                          {s.routine_id &&
+                            routines.some((r) => r.id === s.routine_id) && (
+                              <button
+                                onClick={() => startPlanSession(s)}
+                                className="btn-primary mt-2 w-full py-1.5 text-xs"
+                              >
+                                <Play className="h-3.5 w-3.5" /> Iniciar treino
+                              </button>
+                            )}
                           {isToday && (
                             <button
                               onClick={() => toggleDone(s)}
@@ -1269,6 +1313,27 @@ export default function TreinosPage() {
               placeholder="Ex.: Treino A — Peito e tríceps / Corrida 5km"
             />
           </Field>
+          {routines.length > 0 && (
+            <Field label="Rotina (opcional) — permite 'Iniciar treino' neste dia">
+              <select
+                className="input"
+                value={pRoutineId}
+                onChange={(e) => {
+                  const id = e.target.value;
+                  setPRoutineId(id);
+                  const r = routines.find((x) => x.id === id);
+                  if (r && !pTitle.trim()) setPTitle(r.name);
+                }}
+              >
+                <option value="">Nenhuma</option>
+                {routines.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
           <Field label="Observações (opcional)">
             <textarea
               className="input min-h-[60px]"

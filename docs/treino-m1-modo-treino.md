@@ -11,8 +11,13 @@ Status:
 - **M1b — Sessão ao vivo** — ✅ entregue (componente `WorkoutSession`: iniciar
   treino a partir da rotina, marcar séries, cronômetro de descanso automático,
   PR/1RM em tempo real, finalizar gravando no histórico).
-- **M1c — Vínculo Plano ⇆ Rotina** — pendente.
-- **M1d — Gaia cria rotinas** — pendente.
+- **M1c — Vínculo Plano ⇆ Rotina** — ✅ entregue (coluna `workout_plan.routine_id`,
+  seletor de rotina no plano, botão "Iniciar treino" no dia do plano; ao
+  finalizar, marca a conclusão do plano).
+- **M1d — Gaia cria rotinas** — ✅ entregue (tool `criar_rotina`).
+
+**M1 concluído.** Possíveis evoluções futuras: superséries, biblioteca de
+exercícios em PT (M3), reordenar exercícios, editar séries durante a sessão.
 
 ---
 

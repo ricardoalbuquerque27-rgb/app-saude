@@ -372,6 +372,7 @@ export type Database = {
           sport: string;
           title: string | null;
           user_id: string;
+          routine_id: string | null;
         };
         Insert: {
           created_at?: string;
@@ -382,6 +383,7 @@ export type Database = {
           sport: string;
           title?: string | null;
           user_id: string;
+          routine_id?: string | null;
         };
         Update: {
           created_at?: string;
@@ -392,6 +394,7 @@ export type Database = {
           sport?: string;
           title?: string | null;
           user_id?: string;
+          routine_id?: string | null;
         };
         Relationships: [];
       };

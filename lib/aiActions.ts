@@ -69,6 +69,43 @@ export const AI_TOOLS = [
   {
     type: "function",
     function: {
+      name: "criar_rotina",
+      description:
+        "Cria uma ROTINA de treino reutilizável (modelo com exercícios e metas) na aba Treinos › Rotinas, para o usuário guardar e repetir com 'Iniciar treino'. Use quando ele pedir para montar/criar um treino ou uma rotina. Diferente de 'adicionar_ao_plano_semanal' (que só coloca um rótulo num dia): a rotina tem os exercícios de verdade.",
+      parameters: {
+        type: "object",
+        properties: {
+          nome: {
+            type: "string",
+            description: "Nome da rotina. Ex.: 'Treino A — Peito e tríceps'.",
+          },
+          observacoes: { type: "string", description: "Observação da rotina (opcional)." },
+          exercicios: {
+            type: "array",
+            description: "Exercícios da rotina, com metas.",
+            items: {
+              type: "object",
+              properties: {
+                nome: { type: "string", description: "Nome do exercício." },
+                series: { type: "number", description: "Número de séries. Ex.: 4." },
+                reps: { type: "number", description: "Repetições por série. Ex.: 10." },
+                carga_kg: { type: "number", description: "Carga sugerida em kg (opcional)." },
+                descanso_s: {
+                  type: "number",
+                  description: "Descanso entre séries em segundos (ex.: 90).",
+                },
+              },
+              required: ["nome"],
+            },
+          },
+        },
+        required: ["nome", "exercicios"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "registrar_treino",
       description:
         "Registra um treino JÁ FEITO no histórico de treinos (com exercícios, séries e carga). Use quando o usuário disser que fez/concluiu um treino e quiser registrá-lo.",
@@ -443,6 +480,7 @@ type ActionResult = { ok: boolean; resumo: string; area?: string | string[] };
 // Área do app afetada por cada ferramenta (usado para recarregar a tela certa).
 export const TOOL_AREAS: Record<string, string> = {
   adicionar_ao_plano_semanal: "treinos",
+  criar_rotina: "treinos",
   registrar_treino: "treinos",
   registrar_refeicao: "dieta",
   registrar_agua: "habitos",
@@ -531,6 +569,49 @@ export async function executeAction(
         return {
           ok: true,
           resumo: `${rows.length} sessão(ões) adicionada(s) ao plano semanal (${dias}). O usuário pode ver na aba Treinos › Plano semanal.`,
+        };
+      }
+
+      case "criar_rotina": {
+        const nome = typeof args.nome === "string" ? args.nome.trim() : "";
+        if (!nome) return { ok: false, resumo: "Faltou o nome da rotina." };
+        const exercicios = Array.isArray(args.exercicios) ? args.exercicios : [];
+        const limpos = exercicios.filter(
+          (e: any) => typeof e?.nome === "string" && e.nome.trim()
+        );
+        const { data: rot, error } = await supabase
+          .from("routines")
+          .insert({
+            user_id: uid,
+            name: nome,
+            notes:
+              typeof args.observacoes === "string" && args.observacoes.trim()
+                ? args.observacoes.trim()
+                : null,
+            position: 0,
+          })
+          .select()
+          .single();
+        if (error) throw error;
+        if (limpos.length) {
+          const rows = limpos.map((e: any, i: number) => ({
+            routine_id: rot.id,
+            user_id: uid,
+            name: e.nome.trim(),
+            target_sets: toNum(e.series),
+            target_reps: toNum(e.reps),
+            target_weight_kg: toNum(e.carga_kg),
+            rest_seconds: toNum(e.descanso_s) ?? 90,
+            position: i,
+          }));
+          const { error: exErr } = await supabase
+            .from("routine_exercises")
+            .insert(rows);
+          if (exErr) throw exErr;
+        }
+        return {
+          ok: true,
+          resumo: `Rotina "${nome}" criada com ${limpos.length} exercício(s) em Treinos › Rotinas. O usuário pode tocar em "Iniciar treino".`,
         };
       }
 

@@ -10,7 +10,12 @@ type RoutineEx = {
   target_weight_kg: number | null;
   rest_seconds: number | null;
 };
-export type SessionRoutine = { id: string; name: string; exercises: RoutineEx[] };
+export type SessionRoutine = {
+  id: string;
+  name: string;
+  exercises: RoutineEx[];
+  planId?: string; // se veio de um dia do plano, marca como concluído ao finalizar
+};
 
 type SetState = { reps: string; weight: string; done: boolean };
 type ExState = { name: string; rest: number; sets: SetState[] };
