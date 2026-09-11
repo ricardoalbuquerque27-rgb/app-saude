@@ -261,6 +261,7 @@ export type Database = {
           protein_goal_g: number | null;
           onboarded: boolean;
           sex: string | null;
+          role: string;
         };
         Insert: {
           birth_date?: string | null;
@@ -280,6 +281,7 @@ export type Database = {
           protein_goal_g?: number | null;
           onboarded?: boolean;
           sex?: string | null;
+          role?: string;
         };
         Update: {
           birth_date?: string | null;
@@ -299,6 +301,7 @@ export type Database = {
           protein_goal_g?: number | null;
           onboarded?: boolean;
           sex?: string | null;
+          role?: string;
         };
         Relationships: [];
       };
@@ -703,11 +706,56 @@ export type Database = {
           },
         ];
       };
+      patient_links: {
+        Row: {
+          id: string;
+          nutritionist_id: string;
+          patient_id: string | null;
+          patient_label: string | null;
+          invite_code: string | null;
+          status: string;
+          created_at: string;
+          accepted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          nutritionist_id: string;
+          patient_id?: string | null;
+          patient_label?: string | null;
+          invite_code?: string | null;
+          status?: string;
+          created_at?: string;
+          accepted_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          nutritionist_id?: string;
+          patient_id?: string | null;
+          patient_label?: string | null;
+          invite_code?: string | null;
+          status?: string;
+          created_at?: string;
+          accepted_at?: string | null;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
     };
     Functions: {
+      is_active_nutri_of: {
+        Args: { p_patient: string };
+        Returns: boolean;
+      };
+      create_patient_invite: {
+        Args: { p_label?: string };
+        Returns: string;
+      };
+      accept_patient_invite: {
+        Args: { p_code: string };
+        Returns: Json;
+      };
       cpf_disponivel: {
         Args: { p_cpf: string };
         Returns: boolean;
@@ -796,5 +844,6 @@ export type PlanCompletion = PublicSchema["Tables"]["plan_completions"]["Row"];
 export type Treatment = PublicSchema["Tables"]["treatments"]["Row"];
 export type Routine = PublicSchema["Tables"]["routines"]["Row"];
 export type RoutineExercise = PublicSchema["Tables"]["routine_exercises"]["Row"];
+export type PatientLink = PublicSchema["Tables"]["patient_links"]["Row"];
 export type DoseLog = PublicSchema["Tables"]["dose_logs"]["Row"];
 export type SideEffect = PublicSchema["Tables"]["side_effects"]["Row"];
