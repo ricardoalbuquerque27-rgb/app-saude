@@ -31,6 +31,8 @@ export default function PlanCheckIn({
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+  // Guarda qual sessão acabou de ser salva, para dar o "pop" de confirmação.
+  const [pop, setPop] = useState<string | null>(null);
   const idx = indexCompletions(completions);
 
   async function mark(session: PlanSession, status: CheckStatus) {
@@ -59,6 +61,10 @@ export default function PlanCheckIn({
     if (error) {
       setErro("Não foi possível salvar. Tente de novo.");
       return;
+    }
+    if (next !== null) {
+      setPop(session.id);
+      setTimeout(() => setPop(null), 400);
     }
     window.dispatchEvent(
       new CustomEvent("pf-data-changed", { detail: { areas: ["treinos"] } })
@@ -103,7 +109,9 @@ export default function PlanCheckIn({
                 onClick={() => mark(s, "done")}
                 disabled={loading}
                 aria-pressed={done}
-                className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold transition disabled:opacity-60 ${
+                className={`tappable flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold disabled:opacity-60 ${
+                  pop === s.id && done ? "pf-pop" : ""
+                } ${
                   done
                     ? "bg-brand-600 text-white"
                     : "border border-slate-300 text-slate-600 hover:bg-white dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
@@ -120,7 +128,9 @@ export default function PlanCheckIn({
                 onClick={() => mark(s, "skipped")}
                 disabled={loading}
                 aria-pressed={skipped}
-                className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold transition disabled:opacity-60 ${
+                className={`tappable flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold disabled:opacity-60 ${
+                  pop === s.id && skipped ? "pf-pop" : ""
+                } ${
                   skipped
                     ? "bg-rose-600 text-white"
                     : "border border-slate-300 text-slate-600 hover:bg-white dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"

@@ -285,7 +285,7 @@ export default async function DashboardPage() {
             {treatment && doseLabel && doseUrgent && (
               <Link
                 href="/app/tratamento"
-                className="group flex items-center gap-3 rounded-xl border border-brand-200 bg-white/70 p-3 transition hover:border-brand-300 dark:border-brand-900/50 dark:bg-slate-900/40"
+                className="tappable group flex items-center gap-3 rounded-xl border border-brand-200 bg-white/70 p-3 hover:border-brand-300 dark:border-brand-900/50 dark:bg-slate-900/40"
               >
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
                   <Syringe className="h-5 w-5" />
@@ -304,12 +304,12 @@ export default async function DashboardPage() {
             )}
 
             {pending.items.length > 0 && (
-              <ul className="space-y-1.5">
+              <ul className="pf-stagger space-y-1.5">
                 {pending.items.map((it) => (
                   <li key={it.key}>
                     <Link
                       href={it.href}
-                      className="group flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white/70 p-2.5 transition hover:border-brand-300 dark:border-slate-700 dark:bg-slate-900/40"
+                      className="tappable group flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white/70 p-2.5 hover:border-brand-300 dark:border-slate-700 dark:bg-slate-900/40"
                     >
                       <span
                         className={`h-1.5 w-1.5 shrink-0 rounded-full ${
@@ -339,7 +339,7 @@ export default async function DashboardPage() {
             <Link
               key={a.label}
               href={a.href}
-              className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-brand-300 hover:text-brand-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-brand-700"
+              className="tappable inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-brand-300 hover:text-brand-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-brand-700"
             >
               <Plus className="h-3.5 w-3.5" />
               {a.label}
@@ -494,7 +494,7 @@ export default async function DashboardPage() {
             </Link>
           </div>
           {recentWorkouts.length > 0 ? (
-            <ul className="space-y-3">
+            <ul className="pf-stagger space-y-3">
               {recentWorkouts.map((w) => (
                 <li key={w.id} className="flex items-center gap-3">
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
@@ -523,7 +523,7 @@ export default async function DashboardPage() {
           {treatment && doseLabel && !doseUrgent && (
             <Link
               href="/app/tratamento"
-              className="card group flex items-center gap-4 transition duration-200 hover:-translate-y-0.5"
+              className="card card-interactive group flex items-center gap-4"
             >
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
                 <Syringe className="h-5 w-5" />
@@ -543,7 +543,7 @@ export default async function DashboardPage() {
 
           <Link
             href="/app/relatorios"
-            className="card group flex items-center gap-4 transition duration-200 hover:-translate-y-0.5"
+            className="card card-interactive group flex items-center gap-4"
           >
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
               <BarChart3 className="h-5 w-5" />

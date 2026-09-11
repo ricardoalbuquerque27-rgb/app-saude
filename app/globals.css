@@ -160,3 +160,138 @@ input[type="number"] {
       dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.03),0_18px_44px_-26px_rgba(0,0,0,0.85)];
   }
 }
+
+/* ===================================================================
+   Camada de movimento do app
+   Tudo aqui é desligado por prefers-reduced-motion, no final do bloco.
+   =================================================================== */
+
+/* Entrada de conteúdo: sobe e aparece. Usada na troca de página e em
+   blocos que surgem depois de carregar. */
+@keyframes pf-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+.pf-in {
+  animation: pf-in 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Lista em cascata: cada filho entra um pouco depois do anterior.
+   Para em 8 para não deixar listas longas lentas. */
+.pf-stagger > * {
+  animation: pf-in 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.pf-stagger > *:nth-child(1) { animation-delay: 0.02s; }
+.pf-stagger > *:nth-child(2) { animation-delay: 0.06s; }
+.pf-stagger > *:nth-child(3) { animation-delay: 0.10s; }
+.pf-stagger > *:nth-child(4) { animation-delay: 0.14s; }
+.pf-stagger > *:nth-child(5) { animation-delay: 0.18s; }
+.pf-stagger > *:nth-child(6) { animation-delay: 0.22s; }
+.pf-stagger > *:nth-child(7) { animation-delay: 0.26s; }
+.pf-stagger > *:nth-child(n + 8) { animation-delay: 0.30s; }
+
+/* Confirmação: o elemento "estufa" de leve ao dar certo. */
+@keyframes pf-pop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+.pf-pop { animation: pf-pop 0.34s cubic-bezier(0.16, 1, 0.3, 1); }
+
+/* Modal e folha inferior */
+@keyframes pf-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pf-zoom {
+  from { opacity: 0; transform: translateY(10px) scale(0.97); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes pf-slide-up {
+  from { transform: translateY(100%); }
+  to   { transform: none; }
+}
+.pf-backdrop { animation: pf-fade 0.2s ease-out both; }
+.pf-panel    { animation: pf-zoom 0.26s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* O modal sobe como folha no celular e dá zoom no desktop. Precisa ser
+   media query no CSS: variantes do Tailwind (sm:) não alcançam classes
+   declaradas fora do build dele. */
+.pf-modal { animation: pf-slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) both; }
+@media (min-width: 640px) {
+  .pf-modal { animation: pf-zoom 0.26s cubic-bezier(0.16, 1, 0.3, 1) both; }
+}
+.pf-sheet    { animation: pf-slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+@keyframes pf-slide-left {
+  from { transform: translateX(100%); }
+  to   { transform: none; }
+}
+.pf-drawer { animation: pf-slide-left 0.28s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* Esqueleto de carregamento */
+@keyframes pf-shimmer {
+  100% { transform: translateX(100%); }
+}
+.pf-skel {
+  position: relative;
+  overflow: hidden;
+  background-color: rgb(226 232 240 / 0.7);
+  border-radius: 0.75rem;
+}
+.dark .pf-skel { background-color: rgb(30 41 59 / 0.7); }
+.pf-skel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background-image: linear-gradient(
+    90deg,
+    transparent,
+    rgb(255 255 255 / 0.45),
+    transparent
+  );
+  animation: pf-shimmer 1.4s infinite;
+}
+.dark .pf-skel::after {
+  background-image: linear-gradient(
+    90deg,
+    transparent,
+    rgb(255 255 255 / 0.06),
+    transparent
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pf-in,
+  .pf-stagger > *,
+  .pf-pop,
+  .pf-backdrop,
+  .pf-panel,
+  .pf-sheet,
+  .pf-modal,
+  .pf-drawer {
+    animation: none !important;
+  }
+  .pf-skel::after { animation: none; }
+}
+
+@layer components {
+  /* Qualquer coisa clicável: afunda ao toque e sobe no hover. O
+     active:scale funciona no dedo também, que é onde mais importa. */
+  .tappable {
+    @apply transition duration-200 ease-out
+      active:scale-[0.97] active:duration-75
+      focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-500/25;
+  }
+  /* Card clicável: o mesmo, com elevação no hover (só em ponteiro fino,
+     para não "pular" no celular). */
+  .card-interactive {
+    @apply tappable cursor-pointer
+      hover:border-brand-300/70
+      hover:shadow-[0_2px_4px_rgba(16,24,40,0.05),0_18px_36px_-20px_rgba(16,24,40,0.22)]
+      dark:hover:border-brand-800/70;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .card-interactive:hover {
+      transform: translateY(-2px);
+    }
+  }
+}

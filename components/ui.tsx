@@ -124,20 +124,22 @@ export function Modal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4">
+    <div className="pf-backdrop fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 backdrop-blur-[2px] sm:items-center sm:p-4">
       <div
         className="absolute inset-0"
         onClick={onClose}
         aria-hidden="true"
       />
-      <div className="relative z-10 max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-2xl dark:bg-slate-900">
+      <div className="pf-modal relative z-10 max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-white p-5 shadow-2xl sm:rounded-2xl dark:bg-slate-900">
+        {/* Alça da folha, só no celular */}
+        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-300 sm:hidden dark:bg-slate-700" />
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-bold text-slate-900 dark:text-white">
             {title}
           </h2>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+            className="tappable rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
             aria-label="Fechar"
           >
             <X className="h-5 w-5" />

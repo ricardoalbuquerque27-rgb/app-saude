@@ -843,7 +843,7 @@ export default function TreinosPage() {
           <button
             key={t.id}
             onClick={() => setTab(t.id as typeof tab)}
-            className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3.5 py-2 text-sm font-medium transition ${
+            className={`tappable flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3.5 py-2 text-sm font-medium ${
               tab === t.id
                 ? "bg-brand-600 text-white shadow-sm"
                 : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
@@ -880,7 +880,7 @@ export default function TreinosPage() {
               return (
                 <div
                   key={day}
-                  className={`card ${
+                  className={`card transition duration-200 ${
                     isToday
                       ? "bg-gradient-to-b from-brand-50/70 to-white ring-2 ring-brand-500/50 dark:from-brand-950/20 dark:to-slate-900/50"
                       : ""
@@ -955,7 +955,7 @@ export default function TreinosPage() {
                                 onClick={() => markPlan(s, dataDoDia, "done")}
                                 disabled={busyKey}
                                 aria-pressed={done}
-                                className={`flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold transition disabled:opacity-60 ${
+                                className={`tappable flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold disabled:opacity-60 ${
                                   done
                                     ? "bg-brand-600 text-white"
                                     : "border border-slate-300 text-slate-600 hover:bg-white dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
@@ -972,7 +972,7 @@ export default function TreinosPage() {
                                 onClick={() => markPlan(s, dataDoDia, "skipped")}
                                 disabled={busyKey}
                                 aria-pressed={skipped}
-                                className={`flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold transition disabled:opacity-60 ${
+                                className={`tappable flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold disabled:opacity-60 ${
                                   skipped
                                     ? "bg-rose-600 text-white"
                                     : "border border-slate-300 text-slate-600 hover:bg-white dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"

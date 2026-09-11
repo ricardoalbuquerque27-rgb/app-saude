@@ -148,7 +148,7 @@ export default function PacientesClient({
                   <button
                     key={f.key}
                     onClick={() => setFilter(f.key)}
-                    className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+                    className={`tappable rounded-lg px-3 py-1.5 text-sm font-medium ${
                       filter === f.key
                         ? "bg-brand-600 text-white"
                         : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
@@ -173,14 +173,14 @@ export default function PacientesClient({
                   Nenhum paciente neste filtro.
                 </p>
               ) : (
-                <div className="space-y-2">
+                <div className="pf-stagger space-y-2">
                   {shown.map((l) => {
                     const s = byId.get(l.patient_id!);
                     const name =
                       s?.name || l.patient_label || "Paciente";
                     const alert = s?.alerts[0];
                     return (
-                      <div key={l.id} className="card flex items-center gap-3 p-3">
+                      <div key={l.id} className="card card-interactive flex items-center gap-3 p-3">
                         <div
                           className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl font-semibold ${
                             alert
@@ -228,7 +228,7 @@ export default function PacientesClient({
                         </Link>
                         <button
                           onClick={() => removePatient(l.id)}
-                          className="rounded-lg p-1.5 text-slate-400 hover:text-rose-600"
+                          className="tappable rounded-lg p-1.5 text-slate-400 hover:text-rose-600"
                           aria-label="Remover paciente"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -252,9 +252,9 @@ export default function PacientesClient({
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 Convites pendentes ({pending.length})
               </p>
-              <div className="space-y-2">
+              <div className="pf-stagger space-y-2">
                 {pending.map((l) => (
-                  <div key={l.id} className="card flex items-center gap-3 p-3">
+                  <div key={l.id} className="card card-interactive flex items-center gap-3 p-3">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
                       <Clock className="h-5 w-5" />
                     </div>
@@ -272,14 +272,14 @@ export default function PacientesClient({
                     </div>
                     <button
                       onClick={() => l.invite_code && copyInvite(l.invite_code)}
-                      className="rounded-lg p-1.5 text-slate-400 hover:text-brand-600"
+                      className="tappable rounded-lg p-1.5 text-slate-400 hover:text-brand-600"
                       aria-label="Copiar convite"
                     >
                       <Copy className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => cancelInvite(l.id)}
-                      className="rounded-lg p-1.5 text-slate-400 hover:text-rose-600"
+                      className="tappable rounded-lg p-1.5 text-slate-400 hover:text-rose-600"
                       aria-label="Cancelar convite"
                     >
                       <Trash2 className="h-4 w-4" />

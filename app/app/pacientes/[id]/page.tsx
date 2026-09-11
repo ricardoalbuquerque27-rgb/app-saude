@@ -247,7 +247,7 @@ export default async function PacienteDetalhe({
             key={t.key}
             href={`/app/pacientes/${uid}?t=${t.key}`}
             scroll={false}
-            className={`shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+            className={`tappable shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium ${
               tab === t.key
                 ? "bg-brand-600 text-white"
                 : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
@@ -336,7 +336,7 @@ async function TabGeral({
 
   return (
     <>
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="pf-stagger mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat
           label="Peso atual"
           value={summary.weightLast != null ? `${summary.weightLast} kg` : "—"}
@@ -588,7 +588,7 @@ async function TabNutricao({ supabase, uid, profile }: any) {
 
   return (
     <>
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="pf-stagger mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat
           label="Média de calorias"
           value={avgCal ? `${avgCal}` : "—"}

@@ -59,7 +59,7 @@ function PatientRow({ s, today }: { s: PatientSummary; today: string }) {
   return (
     <Link
       href={`/app/pacientes/${s.id}`}
-      className="flex items-center gap-3 rounded-xl px-3 py-2.5 transition hover:bg-slate-50 dark:hover:bg-slate-800/60"
+      className="tappable flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/60"
     >
       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-100 text-sm font-semibold text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
         {s.name.slice(0, 1).toUpperCase()}
@@ -173,7 +173,7 @@ export default async function NutriHome({
         </Link>
       </div>
 
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="pf-stagger mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Kpi
           label="Pacientes ativos"
           value={activeIds.length}
@@ -207,7 +207,7 @@ export default async function NutriHome({
               Precisam de atenção
             </h2>
           </div>
-          <div className="divide-y divide-slate-100 dark:divide-slate-800">
+          <div className="pf-stagger divide-y divide-slate-100 dark:divide-slate-800">
             {needAttention.map((s) => (
               <PatientRow key={s.id} s={s} today={today} />
             ))}
@@ -223,12 +223,12 @@ export default async function NutriHome({
               Movimento de hoje
             </h2>
           </div>
-          <div className="divide-y divide-slate-100 dark:divide-slate-800">
+          <div className="pf-stagger divide-y divide-slate-100 dark:divide-slate-800">
             {loggedToday.map((s) => (
               <Link
                 key={s.id}
                 href={`/app/pacientes/${s.id}`}
-                className="flex items-center gap-3 rounded-xl px-3 py-2.5 transition hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                className="tappable flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/60"
               >
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-sm font-semibold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
                   {s.name.slice(0, 1).toUpperCase()}
@@ -267,7 +267,7 @@ export default async function NutriHome({
               Em dia ({onTrack.length})
             </h2>
           </div>
-          <div className="divide-y divide-slate-100 dark:divide-slate-800">
+          <div className="pf-stagger divide-y divide-slate-100 dark:divide-slate-800">
             {onTrack.map((s) => (
               <PatientRow key={s.id} s={s} today={today} />
             ))}
