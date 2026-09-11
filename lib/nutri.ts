@@ -20,6 +20,11 @@ export type PatientSummary = {
   alteredExams: number;
   nextDose: string | null;
   doseOverdue: boolean;
+  /** Adesão ao plano de treino nos últimos 7 dias (só dias já vencidos). */
+  planPrevistas7: number;
+  planConfirmadas7: number;
+  planFaltas7: number;
+  planSemResposta7: number;
   /** Motivos de atenção, já em texto pronto para exibir. */
   alerts: string[];
 };
@@ -52,7 +57,7 @@ export async function getPatientsSummary(
   const d30 = addDaysISO(today, -30);
   const d180 = addDaysISO(today, -180);
 
-  const [mealsRes, wkRes, logsRes, bodyRes, examsRes, treatRes] =
+  const [mealsRes, wkRes, logsRes, bodyRes, examsRes, treatRes, planRes, checksRes] =
     await Promise.all([
       supabase
         .from("meals")
@@ -87,6 +92,15 @@ export async function getPatientsSummary(
         .select("user_id, next_dose_date")
         .in("user_id", ids)
         .eq("active", true),
+      supabase
+        .from("workout_plan")
+        .select("id, user_id, day_of_week, sport")
+        .in("user_id", ids),
+      supabase
+        .from("plan_completions")
+        .select("user_id, plan_id, date, status")
+        .in("user_id", ids)
+        .gte("date", d7),
     ]);
 
   const meals = (mealsRes.data ?? []) as any[];
@@ -95,6 +109,13 @@ export async function getPatientsSummary(
   const body = (bodyRes.data ?? []) as any[];
   const exams = (examsRes.data ?? []) as any[];
   const treats = (treatRes.data ?? []) as any[];
+  const planRows = (planRes.data ?? []) as any[];
+  const checkRows = (checksRes.data ?? []) as any[];
+
+  // Datas dos últimos 7 dias já vencidos (inclui hoje), para cruzar o plano
+  // — que é um molde por dia da semana — com os check-ins reais.
+  const janela7: string[] = [];
+  for (let i = 6; i >= 0; i--) janela7.push(addDaysISO(today, -i));
 
   return ids.map((id) => {
     const myMeals = meals.filter((m) => m.user_id === id);
@@ -135,6 +156,29 @@ export async function getPatientsSummary(
         ? Number((weightLast - weightFirst).toFixed(1))
         : null;
 
+    // Adesão ao plano nos últimos 7 dias.
+    const myPlan = planRows.filter(
+      (x) =>
+        x.user_id === id &&
+        !String(x.sport ?? "").toLowerCase().includes("descanso")
+    );
+    const myChecks = new Map<string, string>();
+    for (const c of checkRows.filter((c) => c.user_id === id)) {
+      myChecks.set(`${c.plan_id}|${c.date}`, c.status);
+    }
+    let planPrevistas7 = 0;
+    let planConfirmadas7 = 0;
+    let planFaltas7 = 0;
+    for (const date of janela7) {
+      const dow = (new Date(date + "T12:00:00").getDay() + 6) % 7;
+      for (const pl of myPlan.filter((x) => x.day_of_week === dow)) {
+        planPrevistas7++;
+        const st = myChecks.get(`${pl.id}|${date}`);
+        if (st === "done") planConfirmadas7++;
+        else if (st === "skipped") planFaltas7++;
+      }
+    }
+
     const nextDose = treats.find((t) => t.user_id === id)?.next_dose_date ?? null;
     const doseOverdue = !!nextDose && nextDose < today;
 
@@ -152,6 +196,10 @@ export async function getPatientsSummary(
       alteredExams: exams.filter((e) => e.user_id === id).length,
       nextDose,
       doseOverdue,
+      planPrevistas7,
+      planConfirmadas7,
+      planFaltas7,
+      planSemResposta7: planPrevistas7 - planConfirmadas7 - planFaltas7,
       alerts: [],
     };
 
@@ -159,6 +207,14 @@ export async function getPatientsSummary(
     if (idle == null) summary.alerts.push("Nunca registrou nada");
     else if (idle >= 3) summary.alerts.push(`${idle} dias sem registrar`);
     if (doseOverdue) summary.alerts.push("Dose atrasada");
+    if (summary.planFaltas7 > 0)
+      summary.alerts.push(
+        `Faltou a ${summary.planFaltas7} treino${summary.planFaltas7 > 1 ? "s" : ""} (7d)`
+      );
+    if (summary.planSemResposta7 >= 2)
+      summary.alerts.push(
+        `${summary.planSemResposta7} treinos sem confirmação (7d)`
+      );
     if (summary.alteredExams > 0)
       summary.alerts.push(
         `${summary.alteredExams} exame${summary.alteredExams > 1 ? "s" : ""} fora da referência`
@@ -179,7 +235,8 @@ export type ActivityKind =
   | "diario"
   | "exame"
   | "dose"
-  | "efeito";
+  | "efeito"
+  | "checkin";
 
 export type ActivityItem = {
   kind: ActivityKind;
@@ -198,7 +255,7 @@ export async function getPatientActivity(
 ): Promise<ActivityItem[]> {
   const since = addDaysISO(todayISO(), -sinceDays);
 
-  const [meals, workouts, body, logs, exams, doses, effects] =
+  const [meals, workouts, body, logs, exams, doses, effects, checkins, planRows] =
     await Promise.all([
       supabase
         .from("meals")
@@ -235,6 +292,18 @@ export async function getPatientActivity(
         .select("date, created_at, nausea, appetite, fatigue, other")
         .eq("user_id", uid)
         .gte("date", since),
+      supabase
+        .from("plan_completions")
+        .select("date, created_at, status, plan_id")
+        .eq("user_id", uid)
+        .gte("date", since),
+      // Nomes das sessões do plano, para rotular os check-ins. Consulta à
+      // parte de propósito: um select aninhado dependeria do PostgREST
+      // resolver a FK, e o plano é pequeno o bastante para não valer o risco.
+      supabase
+        .from("workout_plan")
+        .select("id, sport, title")
+        .eq("user_id", uid),
     ]);
 
   const items: ActivityItem[] = [];
@@ -310,6 +379,21 @@ export async function getPatientActivity(
       s.other || null,
     ].filter(Boolean);
     push("efeito", s, "Efeitos colaterais", parts.join(" · "));
+  }
+
+  const planNames = new Map<string, string>();
+  for (const p of (planRows.data ?? []) as any[]) {
+    planNames.set(p.id, p.title || p.sport || "treino do plano");
+  }
+  for (const c of checkins.data ?? []) {
+    const nome = planNames.get((c as any).plan_id) || "treino do plano";
+    push(
+      "checkin",
+      c,
+      c.status === "done"
+        ? `Confirmou o ${nome}`
+        : `Avisou que não foi ao ${nome}`
+    );
   }
 
   items.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));

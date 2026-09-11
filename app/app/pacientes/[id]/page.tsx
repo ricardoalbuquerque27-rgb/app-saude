@@ -19,6 +19,7 @@ import { createClient } from "@/lib/supabase/server";
 import { todayISO, addDaysISO, formatDate } from "@/lib/date";
 import { computeHealthScore } from "@/lib/healthScore";
 import { TrendChart, BarsChart } from "@/components/charts";
+import { computeAdherence, type Completion } from "@/lib/planCheckIn";
 import {
   getPatientsSummary,
   getPatientActivity,
@@ -140,6 +141,10 @@ const ACTIVITY_STYLE: Record<
   efeito: {
     icon: <AlertTriangle className="h-3.5 w-3.5" />,
     cls: "bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300",
+  },
+  checkin: {
+    icon: <CalendarCheck className="h-3.5 w-3.5" />,
+    cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300",
   },
 };
 
@@ -349,8 +354,24 @@ async function TabGeral({
           icon={<CalendarCheck className="h-4 w-4" />}
         />
         <Stat
-          label="Treinos (7 dias)"
-          value={`${summary.workouts7}`}
+          label="Plano cumprido (7d)"
+          value={
+            summary.planPrevistas7
+              ? `${summary.planConfirmadas7}/${summary.planPrevistas7}`
+              : "—"
+          }
+          sub={
+            summary.planPrevistas7
+              ? [
+                  summary.planFaltas7 ? `${summary.planFaltas7} falta(s)` : null,
+                  summary.planSemResposta7
+                    ? `${summary.planSemResposta7} sem resposta`
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ") || "tudo confirmado"
+              : `${summary.workouts7} treinos livres`
+          }
           icon={<Dumbbell className="h-4 w-4" />}
         />
         <Stat
@@ -671,7 +692,8 @@ const DOW = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 
 async function TabTreino({ supabase, uid }: any) {
   const since = addDaysISO(todayISO(), -30);
-  const [wkRes, planRes, routinesRes] = await Promise.all([
+  const desde28 = addDaysISO(todayISO(), -27);
+  const [wkRes, planRes, routinesRes, checksRes] = await Promise.all([
     supabase
       .from("workouts")
       .select("id, date, name, category, duration_min")
@@ -690,11 +712,28 @@ async function TabTreino({ supabase, uid }: any) {
       .select("id, name, notes")
       .eq("user_id", uid)
       .order("position", { ascending: true }),
+    supabase
+      .from("plan_completions")
+      .select("id, plan_id, date, status, workout_id")
+      .eq("user_id", uid)
+      .gte("date", desde28),
   ]);
 
   const workouts = (wkRes.data ?? []) as any[];
   const plan = (planRes.data ?? []) as any[];
   const routines = (routinesRes.data ?? []) as any[];
+  const checks = (checksRes.data ?? []) as Completion[];
+
+  // Adesão ao plano nas últimas 4 semanas. O plano é um molde por dia da
+  // semana, então cruzamos com as datas reais; dias futuros não entram.
+  const hoje = todayISO();
+  const dias28: string[] = [];
+  for (let i = 27; i >= 0; i--) dias28.push(addDaysISO(hoje, -i));
+  const planoTreinavel = plan.filter(
+    (x: any) => !String(x.sport ?? "").toLowerCase().includes("descanso")
+  );
+  const adesao = computeAdherence(planoTreinavel as any, checks, dias28, hoje);
+  const checkIdx = new Map(checks.map((c) => [`${c.plan_id}|${c.date}`, c.status]));
 
   // Exercícios dos treinos listados, numa única consulta.
   let exByWorkout: Record<string, any[]> = {};
@@ -714,6 +753,92 @@ async function TabTreino({ supabase, uid }: any) {
 
   return (
     <>
+      {adesao.previstas > 0 && (
+        <Card
+          title="Adesão ao plano (4 semanas)"
+          icon={<CalendarCheck className="h-4 w-4 text-brand-600" />}
+        >
+          <div className="mb-3 flex items-baseline gap-3">
+            <p className="text-3xl font-bold text-brand-600 dark:text-brand-400">
+              {adesao.percentual}%
+            </p>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              {adesao.confirmadas} de {adesao.previstas} treinos previstos
+              confirmados
+            </p>
+          </div>
+          <div className="mb-3 grid grid-cols-3 gap-2 text-center">
+            <div className="rounded-lg bg-emerald-50 py-2 dark:bg-emerald-950/30">
+              <p className="text-lg font-bold text-emerald-700 dark:text-emerald-300">
+                {adesao.confirmadas}
+              </p>
+              <p className="text-[11px] text-emerald-700/80 dark:text-emerald-400/80">
+                confirmou
+              </p>
+            </div>
+            <div className="rounded-lg bg-rose-50 py-2 dark:bg-rose-950/30">
+              <p className="text-lg font-bold text-rose-700 dark:text-rose-300">
+                {adesao.faltas}
+              </p>
+              <p className="text-[11px] text-rose-700/80 dark:text-rose-400/80">
+                disse que faltou
+              </p>
+            </div>
+            <div className="rounded-lg bg-slate-100 py-2 dark:bg-slate-800">
+              <p className="text-lg font-bold text-slate-600 dark:text-slate-300">
+                {adesao.semResposta}
+              </p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                não respondeu
+              </p>
+            </div>
+          </div>
+
+          {/* Uma coluna por dia; só dias com treino previsto ganham cor. */}
+          <div className="flex items-end gap-[3px]">
+            {dias28.map((date) => {
+              const dow = (new Date(date + "T12:00:00").getDay() + 6) % 7;
+              const previstos = planoTreinavel.filter(
+                (x: any) => x.day_of_week === dow
+              );
+              let cls = "bg-slate-100 dark:bg-slate-800";
+              let titulo = `${date}: sem treino previsto`;
+              if (previstos.length > 0) {
+                const estados = previstos.map(
+                  (x: any) => checkIdx.get(`${x.id}|${date}`) ?? "sem"
+                );
+                if (estados.every((e) => e === "done")) {
+                  cls = "bg-emerald-500";
+                  titulo = `${date}: confirmou`;
+                } else if (estados.some((e) => e === "skipped")) {
+                  cls = "bg-rose-500";
+                  titulo = `${date}: disse que faltou`;
+                } else if (estados.some((e) => e === "done")) {
+                  cls = "bg-emerald-300";
+                  titulo = `${date}: confirmou em parte`;
+                } else {
+                  cls = "bg-amber-300 dark:bg-amber-600";
+                  titulo = `${date}: previsto, sem resposta`;
+                }
+              }
+              return (
+                <div
+                  key={date}
+                  title={titulo}
+                  className={`h-8 flex-1 rounded-sm ${cls}`}
+                />
+              );
+            })}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-400 dark:text-slate-500">
+            <span>🟩 confirmou</span>
+            <span>🟥 faltou</span>
+            <span>🟨 sem resposta</span>
+            <span>⬜ sem treino previsto</span>
+          </div>
+        </Card>
+      )}
+
       <Card title="Plano semanal" icon={<CalendarCheck className="h-4 w-4 text-brand-600" />}>
         {plan.length === 0 ? (
           <Empty>Sem plano semanal montado.</Empty>

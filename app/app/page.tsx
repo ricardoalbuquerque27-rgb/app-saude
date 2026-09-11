@@ -26,6 +26,7 @@ import { todayISO, addDaysISO, formatDate } from "@/lib/date";
 import { computeHealthScore } from "@/lib/healthScore";
 import { getPending } from "@/lib/pending";
 import NutriHome from "@/components/NutriHome";
+import PlanCheckIn from "@/components/PlanCheckIn";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -65,6 +66,7 @@ export default async function DashboardPage() {
     todayPlanRes,
     treatmentRes,
     challengesRes,
+    todayCompletionsRes,
   ] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", uid).maybeSingle(),
     supabase
@@ -98,7 +100,7 @@ export default async function DashboardPage() {
       .limit(5),
     supabase
       .from("workout_plan")
-      .select("sport, title")
+      .select("id, sport, title, day_of_week")
       .eq("user_id", uid)
       .eq("day_of_week", dow)
       .order("position", { ascending: true }),
@@ -115,6 +117,11 @@ export default async function DashboardPage() {
       .select("id", { count: "exact", head: true })
       .eq("user_id", uid)
       .eq("week_start", weekStartISO()),
+    supabase
+      .from("plan_completions")
+      .select("id, plan_id, date, status, workout_id")
+      .eq("user_id", uid)
+      .eq("date", today),
   ]);
 
   const profile = profileRes.data;
@@ -145,6 +152,7 @@ export default async function DashboardPage() {
   const proteinGoal = profile?.protein_goal_g ?? null;
   const recentWorkouts = recentWorkoutsRes.data ?? [];
   const todayPlan = todayPlanRes.data ?? [];
+  const todayCompletions = todayCompletionsRes.data ?? [];
 
   // Score de Saúde do dia (usa só dados que o app já coleta).
   const health = computeHealthScore({
@@ -540,23 +548,11 @@ export default async function DashboardPage() {
             </h2>
           </div>
           {todayPlan.length > 0 ? (
-            <ul className="space-y-2">
-              {todayPlan.map((p, i) => (
-                <li
-                  key={i}
-                  className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 dark:border-white/[0.05] dark:bg-slate-800/40"
-                >
-                  <span className="inline-block rounded-full bg-brand-100 px-2 py-0.5 text-[11px] font-semibold text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
-                    {p.sport}
-                  </span>
-                  {p.title && (
-                    <p className="mt-1 text-sm font-medium text-slate-800 dark:text-slate-200">
-                      {p.title}
-                    </p>
-                  )}
-                </li>
-              ))}
-            </ul>
+            <PlanCheckIn
+              sessions={todayPlan as any}
+              date={today}
+              completions={todayCompletions as any}
+            />
           ) : (
             <p className="text-sm text-slate-500 dark:text-slate-400">
               Nada planejado para hoje.

@@ -407,6 +407,7 @@ export type Database = {
           date: string;
           id: string;
           plan_id: string;
+          status: string;
           user_id: string;
           workout_id: string | null;
         };
@@ -415,6 +416,7 @@ export type Database = {
           date?: string;
           id?: string;
           plan_id: string;
+          status?: string;
           user_id: string;
           workout_id?: string | null;
         };
@@ -423,6 +425,7 @@ export type Database = {
           date?: string;
           id?: string;
           plan_id?: string;
+          status?: string;
           user_id?: string;
           workout_id?: string | null;
         };

@@ -13,6 +13,7 @@ import {
   TrendingUp,
   Trophy,
   Check,
+  X,
   BarChart3,
   Copy,
   Zap,
@@ -23,6 +24,13 @@ import { createClient } from "@/lib/supabase/client";
 import type { Workout, Exercise } from "@/lib/types";
 import { PageHeader, Modal, Field, EmptyState, StatCard } from "@/components/ui";
 import { TrendChart, BarsChart } from "@/components/charts";
+import {
+  weekDates,
+  indexCompletions,
+  completionKey,
+  setPlanCheck,
+  type Completion,
+} from "@/lib/planCheckIn";
 import { todayISO, weekStartISO, formatDate } from "@/lib/date";
 import { useLiveRefresh } from "@/lib/useLiveRefresh";
 import RestTimer from "@/components/RestTimer";
@@ -157,9 +165,8 @@ export default function TreinosPage() {
 
   // Plano semanal
   const [plan, setPlan] = useState<PlanEntry[]>([]);
-  const [completions, setCompletions] = useState<
-    Record<string, { id: string; workout_id: string | null }>
-  >({});
+  // Check-ins da SEMANA inteira (não só de hoje), indexados por plan_id|data.
+  const [completions, setCompletions] = useState<Completion[]>([]);
   const [planOpen, setPlanOpen] = useState(false);
   const [planSaving, setPlanSaving] = useState(false);
   const [busyDone, setBusyDone] = useState<string | null>(null);
@@ -208,7 +215,11 @@ export default function TreinosPage() {
         .order("day_of_week", { ascending: true })
         .order("position", { ascending: true }),
       supabase.from("workouts").select("*").order("date", { ascending: false }),
-      supabase.from("plan_completions").select("*").eq("date", todayISO()),
+      supabase
+        .from("plan_completions")
+        .select("id, plan_id, date, status, workout_id")
+        .gte("date", weekDates()[0])
+        .lte("date", weekDates()[6]),
       supabase
         .from("routines")
         .select("*")
@@ -242,11 +253,7 @@ export default function TreinosPage() {
       }))
     );
 
-    const comp: Record<string, { id: string; workout_id: string | null }> = {};
-    (compRes.data ?? []).forEach((c: any) => {
-      comp[c.plan_id] = { id: c.id, workout_id: c.workout_id };
-    });
-    setCompletions(comp);
+    setCompletions((compRes.data ?? []) as Completion[]);
 
     const list = (wsRes.data ?? []) as Workout[];
     setWorkouts(list);
@@ -584,8 +591,14 @@ export default function TreinosPage() {
   }
 
   // Marca/desmarca um treino do plano como concluído hoje (e registra no histórico)
-  async function toggleDone(session: PlanEntry) {
-    setBusyDone(session.id);
+  // Check-in do plano: "fui" / "não fui" numa data específica da semana.
+  // Tocar no estado já ativo desfaz e volta para "sem resposta".
+  async function markPlan(
+    session: PlanEntry,
+    date: string,
+    status: "done" | "skipped"
+  ) {
+    setBusyDone(session.id + date);
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -593,31 +606,9 @@ export default function TreinosPage() {
       setBusyDone(null);
       return;
     }
-    const existing = completions[session.id];
-    if (existing) {
-      if (existing.workout_id) {
-        await supabase.from("workouts").delete().eq("id", existing.workout_id);
-      }
-      await supabase.from("plan_completions").delete().eq("id", existing.id);
-    } else {
-      const { data: w } = await supabase
-        .from("workouts")
-        .insert({
-          user_id: user.id,
-          date: todayISO(),
-          name: session.title || session.sport,
-          category: session.sport,
-          notes: "Concluído pelo plano semanal",
-        })
-        .select()
-        .single();
-      await supabase.from("plan_completions").insert({
-        user_id: user.id,
-        plan_id: session.id,
-        date: todayISO(),
-        workout_id: (w as Workout)?.id ?? null,
-      });
-    }
+    const current = compIndex[completionKey(session.id, date)] ?? null;
+    const next = current?.status === status ? null : status;
+    await setPlanCheck(supabase, user.id, session, date, next, current);
     setBusyDone(null);
     await load();
   }
@@ -727,13 +718,30 @@ export default function TreinosPage() {
   }
 
   const today = todayIndex();
+  const semana = weekDates();
+  const hojeISO = todayISO();
+  const compIndex = indexCompletions(completions);
+
+  // Adesão da semana: só conta o que já venceu (dias futuros ficam de fora).
+  const adesao = semana.reduce(
+    (acc, date, dow) => {
+      if (date > hojeISO) return acc;
+      for (const p of plan.filter((x) => x.day_of_week === dow)) {
+        acc.previstas++;
+        const c = compIndex[completionKey(p.id, date)];
+        if (c?.status === "done") acc.confirmadas++;
+        else if (c?.status === "skipped") acc.faltas++;
+      }
+      return acc;
+    },
+    { previstas: 0, confirmadas: 0, faltas: 0 }
+  );
 
   // Resumo do plano da semana
   const sessionsPlanned = plan.filter(
     (p) => !p.sport.toLowerCase().includes("descanso")
   );
   const daysPlanned = new Set(sessionsPlanned.map((p) => p.day_of_week)).size;
-  const doneToday = Object.keys(completions).length;
 
   // ----- Progressão de carga -----
   const exerciseNames = Array.from(
@@ -856,13 +864,19 @@ export default function TreinosPage() {
           <div className="card grid grid-cols-3 divide-x divide-slate-100 dark:divide-white/[0.06]">
             <PlanStat value={`${daysPlanned}`} sub="/ 7" label="Dias com treino" />
             <PlanStat value={`${sessionsPlanned.length}`} label="Sessões/semana" />
-            <PlanStat value={`${doneToday}`} label="Concluídos hoje" />
+            <PlanStat
+              value={`${adesao.confirmadas}`}
+              sub={`/ ${adesao.previstas}`}
+              label="Confirmados na semana"
+            />
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {DAYS.map((dayName, day) => {
               const sessions = plan.filter((p) => p.day_of_week === day);
               const isToday = day === today;
+              const dataDoDia = semana[day];
+              const jaPassou = dataDoDia <= hojeISO;
               return (
                 <div
                   key={day}
@@ -874,6 +888,9 @@ export default function TreinosPage() {
                 >
                 <div className="mb-3 flex items-center gap-2">
                   <h3 className="font-semibold text-slate-900 dark:text-white">{dayName}</h3>
+                  <span className="text-xs text-slate-400 dark:text-slate-500">
+                    {dataDoDia.slice(8, 10)}/{dataDoDia.slice(5, 7)}
+                  </span>
                   {isToday && (
                     <span className="rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-semibold text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
                       hoje
@@ -888,7 +905,10 @@ export default function TreinosPage() {
                 ) : (
                   <ul className="mb-3 space-y-2">
                     {sessions.map((s) => {
-                      const done = !!completions[s.id];
+                      const check = compIndex[completionKey(s.id, dataDoDia)];
+                      const done = check?.status === "done";
+                      const skipped = check?.status === "skipped";
+                      const busyKey = busyDone === s.id + dataDoDia;
                       return (
                         <li
                           key={s.id}
@@ -929,23 +949,39 @@ export default function TreinosPage() {
                                 <Play className="h-3.5 w-3.5" /> Iniciar treino
                               </button>
                             )}
-                          {isToday && (
-                            <button
-                              onClick={() => toggleDone(s)}
-                              disabled={busyDone === s.id}
-                              className={`mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold transition ${
-                                done
-                                  ? "bg-brand-600 text-white"
-                                  : "border border-slate-300 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-                              }`}
-                            >
-                              {busyDone === s.id ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              ) : (
-                                <Check className="h-3.5 w-3.5" />
-                              )}
-                              {done ? "Concluído" : "Concluir"}
-                            </button>
+                          {jaPassou && (
+                            <div className="mt-2 flex gap-1.5">
+                              <button
+                                onClick={() => markPlan(s, dataDoDia, "done")}
+                                disabled={busyKey}
+                                aria-pressed={done}
+                                className={`flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold transition disabled:opacity-60 ${
+                                  done
+                                    ? "bg-brand-600 text-white"
+                                    : "border border-slate-300 text-slate-600 hover:bg-white dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                                }`}
+                              >
+                                {busyKey ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <Check className="h-3.5 w-3.5" />
+                                )}
+                                Fui
+                              </button>
+                              <button
+                                onClick={() => markPlan(s, dataDoDia, "skipped")}
+                                disabled={busyKey}
+                                aria-pressed={skipped}
+                                className={`flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold transition disabled:opacity-60 ${
+                                  skipped
+                                    ? "bg-rose-600 text-white"
+                                    : "border border-slate-300 text-slate-600 hover:bg-white dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                                }`}
+                              >
+                                <X className="h-3.5 w-3.5" />
+                                Não fui
+                              </button>
+                            </div>
                           )}
                         </li>
                       );
