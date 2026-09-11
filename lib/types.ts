@@ -376,6 +376,7 @@ export type Database = {
           title: string | null;
           user_id: string;
           routine_id: string | null;
+          prescribed_by: string | null;
         };
         Insert: {
           created_at?: string;
@@ -387,6 +388,7 @@ export type Database = {
           title?: string | null;
           user_id: string;
           routine_id?: string | null;
+          prescribed_by?: string | null;
         };
         Update: {
           created_at?: string;
@@ -398,6 +400,7 @@ export type Database = {
           title?: string | null;
           user_id?: string;
           routine_id?: string | null;
+          prescribed_by?: string | null;
         };
         Relationships: [];
       };
@@ -428,6 +431,69 @@ export type Database = {
           status?: string;
           user_id?: string;
           workout_id?: string | null;
+        };
+        Relationships: [];
+      };
+      prescriptions: {
+        Row: {
+          created_at: string;
+          daily_calorie_goal: number | null;
+          daily_water_goal_ml: number | null;
+          id: string;
+          notes: string | null;
+          nutritionist_id: string;
+          patient_id: string;
+          protein_goal_g: number | null;
+          weight_goal_kg: number | null;
+        };
+        Insert: {
+          created_at?: string;
+          daily_calorie_goal?: number | null;
+          daily_water_goal_ml?: number | null;
+          id?: string;
+          notes?: string | null;
+          nutritionist_id: string;
+          patient_id: string;
+          protein_goal_g?: number | null;
+          weight_goal_kg?: number | null;
+        };
+        Update: {
+          created_at?: string;
+          daily_calorie_goal?: number | null;
+          daily_water_goal_ml?: number | null;
+          id?: string;
+          notes?: string | null;
+          nutritionist_id?: string;
+          patient_id?: string;
+          protein_goal_g?: number | null;
+          weight_goal_kg?: number | null;
+        };
+        Relationships: [];
+      };
+      patient_notes: {
+        Row: {
+          body: string;
+          created_at: string;
+          id: string;
+          nutritionist_id: string;
+          patient_id: string;
+          read_at: string | null;
+        };
+        Insert: {
+          body: string;
+          created_at?: string;
+          id?: string;
+          nutritionist_id: string;
+          patient_id: string;
+          read_at?: string | null;
+        };
+        Update: {
+          body?: string;
+          created_at?: string;
+          id?: string;
+          nutritionist_id?: string;
+          patient_id?: string;
+          read_at?: string | null;
         };
         Relationships: [];
       };
@@ -763,6 +829,17 @@ export type Database = {
         Args: { p_cpf: string };
         Returns: boolean;
       };
+      set_patient_goals: {
+        Args: {
+          p_patient: string;
+          p_calories?: number | null;
+          p_protein?: number | null;
+          p_water?: number | null;
+          p_weight?: number | null;
+          p_notes?: string | null;
+        };
+        Returns: Json;
+      };
       ensure_friend_code: {
         Args: Record<string, never>;
         Returns: string;
@@ -847,6 +924,8 @@ export type PlanCompletion = PublicSchema["Tables"]["plan_completions"]["Row"];
 export type Treatment = PublicSchema["Tables"]["treatments"]["Row"];
 export type Routine = PublicSchema["Tables"]["routines"]["Row"];
 export type RoutineExercise = PublicSchema["Tables"]["routine_exercises"]["Row"];
+export type Prescription = PublicSchema["Tables"]["prescriptions"]["Row"];
+export type PatientNote = PublicSchema["Tables"]["patient_notes"]["Row"];
 export type PatientLink = PublicSchema["Tables"]["patient_links"]["Row"];
 export type DoseLog = PublicSchema["Tables"]["dose_logs"]["Row"];
 export type SideEffect = PublicSchema["Tables"]["side_effects"]["Row"];

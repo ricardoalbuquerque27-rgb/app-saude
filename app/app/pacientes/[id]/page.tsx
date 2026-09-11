@@ -20,6 +20,7 @@ import { todayISO, addDaysISO, formatDate } from "@/lib/date";
 import { computeHealthScore } from "@/lib/healthScore";
 import { TrendChart, BarsChart } from "@/components/charts";
 import { computeAdherence, type Completion } from "@/lib/planCheckIn";
+import PrescricaoClient from "@/components/PrescricaoClient";
 import {
   getPatientsSummary,
   getPatientActivity,
@@ -37,6 +38,7 @@ const TABS = [
   { key: "treino", label: "Treino" },
   { key: "corpo", label: "Corpo" },
   { key: "clinico", label: "Clínico" },
+  { key: "prescricao", label: "Prescrição" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -277,10 +279,13 @@ export default async function PacienteDetalhe({
         <TabCorpo supabase={supabase} uid={uid} profile={profile} />
       )}
       {tab === "clinico" && <TabClinico supabase={supabase} uid={uid} />}
+      {tab === "prescricao" && (
+        <TabPrescricao supabase={supabase} uid={uid} profile={profile} />
+      )}
 
       <p className="mt-6 text-center text-xs text-slate-400 dark:text-slate-500">
-        Painel somente leitura. Prescrição de plano/metas e comentários chegam na
-        próxima fase.
+        As demais abas são somente leitura. Para alterar metas, plano ou enviar
+        um recado, use a aba Prescrição.
       </p>
     </div>
   );
@@ -1181,5 +1186,45 @@ async function TabClinico({ supabase, uid }: any) {
         )}
       </Card>
     </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Prescrição (a única aba que ESCREVE)
+// ---------------------------------------------------------------------------
+
+async function TabPrescricao({ supabase, uid, profile }: any) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const [planoRes, notasRes] = await Promise.all([
+    supabase
+      .from("workout_plan")
+      .select("id, day_of_week, sport, title, prescribed_by")
+      .eq("user_id", uid)
+      .order("day_of_week", { ascending: true })
+      .order("position", { ascending: true }),
+    supabase
+      .from("patient_notes")
+      .select("id, body, created_at, read_at")
+      .eq("patient_id", uid)
+      .order("created_at", { ascending: false })
+      .limit(20),
+  ]);
+
+  return (
+    <PrescricaoClient
+      patientId={uid}
+      nutriId={user?.id ?? ""}
+      metas={{
+        daily_calorie_goal: profile.daily_calorie_goal ?? null,
+        protein_goal_g: profile.protein_goal_g ?? null,
+        daily_water_goal_ml: profile.daily_water_goal_ml ?? null,
+        weight_goal_kg: profile.weight_goal_kg ?? null,
+      }}
+      plano={(planoRes.data ?? []) as any}
+      comentarios={(notasRes.data ?? []) as any}
+    />
   );
 }

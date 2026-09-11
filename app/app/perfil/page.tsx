@@ -60,6 +60,7 @@ export default function PerfilPage() {
   const [calorieGoal, setCalorieGoal] = useState("");
   const [proteinGoal, setProteinGoal] = useState("");
   const [memberSince, setMemberSince] = useState<string | null>(null);
+  const [metasDoNutri, setMetasDoNutri] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -67,6 +68,13 @@ export default function PerfilPage() {
       data: { user },
     } = await supabase.auth.getUser();
     setEmail(user?.email ?? "");
+    const { data: pres } = await supabase
+      .from("prescriptions")
+      .select("id")
+      .limit(1)
+      .maybeSingle();
+    setMetasDoNutri(!!pres);
+
     const { data } = await supabase.from("profiles").select("*").maybeSingle();
     const p = data as Profile | null;
     if (p) {
@@ -281,6 +289,12 @@ export default function PerfilPage() {
         <h2 className="flex items-center gap-2 pt-2 font-semibold text-slate-900 dark:text-white">
           <Target className="h-4 w-4 text-brand-600 dark:text-brand-400" /> Metas
         </h2>
+        {metasDoNutri && (
+          <p className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-xs text-brand-800 dark:border-brand-800/50 dark:bg-brand-500/10 dark:text-brand-200">
+            Estas metas foram definidas pelo seu nutricionista. Você pode
+            alterá-las, mas vale combinar antes — ele acompanha esses números.
+          </p>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <Field label="Peso alvo (kg)">
             <input

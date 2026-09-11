@@ -1,9 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Stethoscope, Loader2, Check, ShieldCheck } from "lucide-react";
+import {
+  Stethoscope,
+  Loader2,
+  Check,
+  ShieldCheck,
+  Target,
+  MessageSquare,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { PageHeader, Field } from "@/components/ui";
+import NutriNotes, { type Nota } from "@/components/NutriNotes";
 
 type Link_ = { id: string; nutritionist_id: string; status: string };
 
@@ -15,6 +23,8 @@ export default function MeuNutricionistaPage() {
   const [code, setCode] = useState("");
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [notas, setNotas] = useState<Nota[]>([]);
+  const [prescricao, setPrescricao] = useState<any>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -24,6 +34,22 @@ export default function MeuNutricionistaPage() {
       .eq("status", "active");
     const list = (data ?? []) as Link_[];
     setLinks(list);
+
+    const [{ data: n }, { data: pr }] = await Promise.all([
+      supabase
+        .from("patient_notes")
+        .select("id, body, created_at, read_at")
+        .order("created_at", { ascending: false })
+        .limit(30),
+      supabase
+        .from("prescriptions")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+    setNotas((n ?? []) as Nota[]);
+    setPrescricao(pr);
     const ids = list.map((l) => l.nutritionist_id);
     if (ids.length) {
       const { data: profs } = await supabase
@@ -173,6 +199,58 @@ export default function MeuNutricionistaPage() {
         <p className="text-sm text-slate-500 dark:text-slate-400">
           Você ainda não está conectado a nenhum nutricionista.
         </p>
+      )}
+
+      {links.length > 0 && prescricao && (
+        <div className="card mt-5">
+          <h2 className="section-title mb-3">
+            <span className="icon-badge">
+              <Target className="h-4 w-4" />
+            </span>
+            Suas metas, definidas pelo nutricionista
+          </h2>
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm sm:grid-cols-4">
+            {[
+              ["Calorias/dia", prescricao.daily_calorie_goal, "kcal"],
+              ["Proteína/dia", prescricao.protein_goal_g, "g"],
+              [
+                "Água/dia",
+                prescricao.daily_water_goal_ml
+                  ? (prescricao.daily_water_goal_ml / 1000).toFixed(1)
+                  : null,
+                "L",
+              ],
+              ["Peso alvo", prescricao.weight_goal_kg, "kg"],
+            ].map(([label, valor, unidade]: any) => (
+              <div key={label}>
+                <dt className="text-xs text-slate-500 dark:text-slate-400">
+                  {label}
+                </dt>
+                <dd className="font-semibold text-slate-900 dark:text-white">
+                  {valor ?? "—"}
+                  {valor ? (
+                    <span className="text-xs font-medium text-slate-400">
+                      {" "}
+                      {unidade}
+                    </span>
+                  ) : null}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      )}
+
+      {notas.length > 0 && (
+        <div className="mt-5">
+          <h2 className="section-title mb-3">
+            <span className="icon-badge">
+              <MessageSquare className="h-4 w-4" />
+            </span>
+            Recados
+          </h2>
+          <NutriNotes notas={notas} />
+        </div>
       )}
     </div>
   );

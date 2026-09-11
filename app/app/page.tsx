@@ -23,6 +23,7 @@ import { computeHealthScore } from "@/lib/healthScore";
 import { getPending } from "@/lib/pending";
 import NutriHome from "@/components/NutriHome";
 import PlanCheckIn from "@/components/PlanCheckIn";
+import NutriNotes from "@/components/NutriNotes";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -62,6 +63,7 @@ export default async function DashboardPage() {
     todayPlanRes,
     treatmentRes,
     todayCompletionsRes,
+    notasRes,
   ] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", uid).maybeSingle(),
     supabase
@@ -112,6 +114,13 @@ export default async function DashboardPage() {
       .select("id, plan_id, date, status, workout_id")
       .eq("user_id", uid)
       .eq("date", today),
+    supabase
+      .from("patient_notes")
+      .select("id, body, created_at, read_at")
+      .eq("patient_id", uid)
+      .is("read_at", null)
+      .order("created_at", { ascending: false })
+      .limit(5),
   ]);
 
   const profile = profileRes.data;
@@ -139,6 +148,7 @@ export default async function DashboardPage() {
   const recentWorkouts = recentWorkoutsRes.data ?? [];
   const todayPlan = todayPlanRes.data ?? [];
   const todayCompletions = todayCompletionsRes.data ?? [];
+  const notasNaoLidas = notasRes.data ?? [];
 
   const health = computeHealthScore({
     sleepHours: sleepToday,
@@ -228,7 +238,10 @@ export default async function DashboardPage() {
     (p: any) => !todayCompletions.some((c: any) => c.plan_id === p.id)
   ).length;
   const tudoEmDia =
-    checkinPendente === 0 && pending.items.length === 0 && !doseUrgent;
+    checkinPendente === 0 &&
+    pending.items.length === 0 &&
+    !doseUrgent &&
+    notasNaoLidas.length === 0;
 
   const atalhos = [
     { href: "/app/dieta", icon: Flame, label: "Refeição" },
@@ -271,6 +284,10 @@ export default async function DashboardPage() {
           </div>
         ) : (
           <div className="space-y-3">
+            {notasNaoLidas.length > 0 && (
+              <NutriNotes notas={notasNaoLidas as any} compact />
+            )}
+
             {todayPlan.length > 0 && (
               <div>
                 <p className="eyebrow mb-1.5">Treino de hoje</p>

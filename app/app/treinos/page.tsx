@@ -13,6 +13,7 @@ import {
   TrendingUp,
   Trophy,
   Check,
+  Stethoscope,
   X,
   BarChart3,
   Copy,
@@ -915,13 +916,21 @@ export default function TreinosPage() {
                           className="rounded-xl border border-slate-100 bg-slate-50/70 p-2.5 dark:border-white/[0.05] dark:bg-slate-800/40"
                         >
                           <div className="flex items-start justify-between gap-2">
-                            <span
-                              className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${sportChip(
-                                s.sport
-                              )}`}
-                            >
-                              {s.sport}
-                            </span>
+                            <div className="flex flex-wrap items-center gap-1">
+                              <span
+                                className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${sportChip(
+                                  s.sport
+                                )}`}
+                              >
+                                {s.sport}
+                              </span>
+                              {(s as any).prescribed_by && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-semibold text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">
+                                  <Stethoscope className="h-2.5 w-2.5" />
+                                  do nutri
+                                </span>
+                              )}
+                            </div>
                             <button
                               onClick={() => removePlanEntry(s.id)}
                               className="rounded-lg p-1 text-slate-400 hover:text-rose-600"

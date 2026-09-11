@@ -54,11 +54,26 @@ paciente**; construímos o **lado profissional** por cima.
 - Regras de atenção: 3+ dias sem registrar, dose atrasada, exames fora da
   referência.
 
-**Fase 3 — Prescrição + feedback**
-- Nutri define **plano alimentar/metas** para o paciente (tabela `prescriptions`
-  ou grava metas no perfil do paciente) e deixa **comentários** (`patient_notes`,
-  visíveis ao paciente). Precisa de policies de ESCRITA cruzada específicas.
-- Gaia ciente da prescrição (orienta o paciente dentro do plano do nutri).
+**Fase 3 — Prescrição + feedback — ✅ FEITO**
+- `prescriptions`: histórico do que foi prescrito e por quem. `patient_notes`:
+  recados do nutri para o paciente, com marcação de lido.
+- Metas são aplicadas no perfil do paciente por `set_patient_goals()`, função
+  SECURITY DEFINER. Não é policy de UPDATE em profiles de propósito:
+  privilégio por coluna no Postgres é por ROLE, não por linha — restringir o
+  nutri às colunas de meta restringiria também o paciente de editar o próprio
+  nome. Assim as 12 telas que já leem as metas do perfil seguem intactas.
+- `workout_plan.prescribed_by` + policies de insert/update/delete para o nutri
+  do paciente. Aqui escrita direta é adequada: a linha é do paciente e o
+  profissional legitimamente a gerencia.
+- Comentários são imutáveis por GATILHO, não só por grant: o projeto tem
+  DEFAULT PRIVILEGES concedendo ALL em tabelas novas do schema public para
+  anon/authenticated, então `grant update (read_at)` não restringia nada e o
+  paciente conseguia reescrever o texto do nutricionista. Descoberto em teste.
+- UI: aba "Prescrição" no painel (metas, plano, recados) — a única que
+  escreve. No paciente: recado não lido aparece em "Hoje", metas marcadas como
+  vindas do nutri no Perfil, sessões prescritas com selo na aba Treino, e a
+  página "Meu nutricionista" lista metas vigentes e histórico de recados.
+- Pendente: Gaia ciente da prescrição (orientar dentro do plano do nutri).
 
 **Fase 4 — Conta/cobrança**
 - Assinatura do nutricionista (limite de pacientes por plano), paciente grátis.
