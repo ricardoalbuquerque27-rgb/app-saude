@@ -54,6 +54,7 @@ export default function PerfilPage() {
   const [height, setHeight] = useState("");
   const [birthDate, setBirthDate] = useState("");
   const [sex, setSex] = useState("");
+  const [role, setRole] = useState("patient");
   const [weightGoal, setWeightGoal] = useState("");
   const [waterGoal, setWaterGoal] = useState("");
   const [calorieGoal, setCalorieGoal] = useState("");
@@ -75,6 +76,7 @@ export default function PerfilPage() {
       setHeight(p.height_cm?.toString() ?? "");
       setBirthDate(p.birth_date ?? "");
       setSex(p.sex ?? "");
+      setRole(p.role ?? "patient");
       setWeightGoal(p.weight_goal_kg?.toString() ?? "");
       setWaterGoal(p.daily_water_goal_ml?.toString() ?? "");
       setCalorieGoal(p.daily_calorie_goal?.toString() ?? "");
@@ -126,6 +128,7 @@ export default function PerfilPage() {
       height_cm: height ? Number(height) : null,
       birth_date: birthDate || null,
       sex: sex || null,
+      role: role === "nutritionist" ? "nutritionist" : "patient",
       weight_goal_kg: weightGoal ? Number(weightGoal) : null,
       daily_water_goal_ml: waterGoal ? Number(waterGoal) : 2500,
       daily_calorie_goal: calorieGoal ? Number(calorieGoal) : null,
@@ -197,6 +200,31 @@ export default function PerfilPage() {
         <h2 className="flex items-center gap-2 font-semibold text-slate-900 dark:text-white">
           <User className="h-4 w-4 text-brand-600 dark:text-brand-400" /> Dados
         </h2>
+        <Field label="Tipo de conta">
+          <div className="flex gap-2">
+            {[
+              { v: "patient", label: "Sou paciente" },
+              { v: "nutritionist", label: "Sou nutricionista" },
+            ].map((o) => (
+              <button
+                key={o.v}
+                type="button"
+                onClick={() => setRole(o.v)}
+                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition ${
+                  role === o.v
+                    ? "border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-300"
+                    : "border-slate-300 text-slate-600 dark:border-slate-700 dark:text-slate-400"
+                }`}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+            Nutricionista acompanha pacientes; paciente registra a própria rotina.
+            Ao salvar, a navegação do app muda.
+          </p>
+        </Field>
         <Field label="Nome completo">
           <input
             className="input"

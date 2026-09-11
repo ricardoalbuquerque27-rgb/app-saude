@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import {
   Dumbbell,
   Flame,
@@ -100,6 +101,8 @@ export default async function DashboardPage() {
   ]);
 
   const profile = profileRes.data;
+  // Nutricionista não usa o dashboard de paciente.
+  if ((profile as any)?.role === "nutritionist") redirect("/app/pacientes");
   const firstName = (profile?.full_name || "Atleta").split(" ")[0];
   const initials = (profile?.full_name || "Atleta")
     .split(" ")

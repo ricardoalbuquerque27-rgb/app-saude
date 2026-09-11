@@ -69,6 +69,12 @@ const menuGroups = [
     ],
   },
   {
+    title: "Acompanhamento profissional",
+    items: [
+      { href: "/app/nutricionista", label: "Meu nutricionista", icon: Stethoscope },
+    ],
+  },
+  {
     title: "Conta",
     items: [
       { href: "/app/integracoes", label: "Integrações", icon: Watch },
@@ -78,24 +84,35 @@ const menuGroups = [
   },
 ];
 
-const menuHrefs = menuGroups.flatMap((g) => g.items.map((i) => i.href));
-
-// Itens da barra lateral do desktop = tudo do menu "Mais" que não está na nav principal
-const mainHrefs = new Set(nav.map((n) => n.href));
-const secondaryItems = menuGroups
-  .flatMap((g) => g.items)
-  .filter((i) => !mainHrefs.has(i.href));
+// Navegação do NUTRICIONISTA (perfil profissional)
+const nutriNav = [
+  { href: "/app/pacientes", label: "Pacientes", icon: Users, exact: false },
+];
+const nutriMobileNav = [
+  { href: "/app/pacientes", label: "Pacientes", icon: Users, exact: false },
+];
+const nutriMenuGroups = [
+  {
+    title: "Conta",
+    items: [
+      { href: "/app/perfil", label: "Perfil", icon: User },
+      { href: "/app/diagnostico", label: "Diagnóstico", icon: Stethoscope },
+    ],
+  },
+];
 
 export default function AppShell({
   children,
   userName,
   userEmail,
+  role = "patient",
   needsOnboarding,
   pendingHrefs = [],
 }: {
   children: React.ReactNode;
   userName: string;
   userEmail: string;
+  role?: "patient" | "nutritionist";
   needsOnboarding?: boolean;
   pendingHrefs?: string[];
 }) {
@@ -104,6 +121,17 @@ export default function AppShell({
   const supabase = createClient();
   const [dark, setDark] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // Navegação conforme o papel (paciente x nutricionista).
+  const isNutri = role === "nutritionist";
+  const mainNav = isNutri ? nutriNav : nav;
+  const mobNav = isNutri ? nutriMobileNav : mobileNav;
+  const menuGroupsEff = isNutri ? nutriMenuGroups : menuGroups;
+  const menuHrefs = menuGroupsEff.flatMap((g) => g.items.map((i) => i.href));
+  const mainHrefs = new Set(mainNav.map((n) => n.href));
+  const secondaryItems = menuGroupsEff
+    .flatMap((g) => g.items)
+    .filter((i) => !mainHrefs.has(i.href));
 
   // Fecha o menu "Mais" ao trocar de página
   useEffect(() => {
@@ -141,12 +169,12 @@ export default function AppShell({
     router.refresh();
   }
 
-  const isActive = (item: (typeof nav)[number]) =>
+  const isActive = (item: { href: string; exact?: boolean }) =>
     item.exact ? pathname === item.href : pathname.startsWith(item.href);
 
   const hasPending = (href: string) => pendingHrefs.includes(href);
   // Pendências que ficam dentro do menu "Mais" (para sinalizar o botão Mais).
-  const mobileHrefs = new Set(mobileNav.map((n) => n.href));
+  const mobileHrefs = new Set(mobNav.map((n) => n.href));
   const morePending = pendingHrefs.some((h) => !mobileHrefs.has(h));
 
   return (
@@ -163,7 +191,7 @@ export default function AppShell({
         </div>
 
         <nav className="mt-8 flex-1 space-y-1">
-          {nav.map((item) => (
+          {mainNav.map((item) => (
             <Link
               key={item.href}
               href={item.href}
@@ -246,7 +274,7 @@ export default function AppShell({
       {/* Bottom nav — mobile */}
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur lg:hidden dark:border-slate-800 dark:bg-slate-900/95">
         <div className="mx-auto grid max-w-lg grid-cols-5">
-          {mobileNav.map((item) => (
+          {mobNav.map((item) => (
             <Link
               key={item.href}
               href={item.href}
@@ -306,7 +334,7 @@ export default function AppShell({
             </div>
 
             <div className="flex-1 overflow-y-auto px-3 py-4">
-              {menuGroups.map((group) => (
+              {menuGroupsEff.map((group) => (
                 <div key={group.title} className="mb-5">
                   <p className="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
                     {group.title}

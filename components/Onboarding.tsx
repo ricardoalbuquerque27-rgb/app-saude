@@ -29,6 +29,7 @@ const MEDS = [
 export default function Onboarding({ initialName }: { initialName?: string }) {
   const router = useRouter();
   const [step, setStep] = useState(0);
+  const [role, setRole] = useState<"patient" | "nutritionist">("patient");
   const [saving, setSaving] = useState(false);
 
   // dados
@@ -75,10 +76,17 @@ export default function Onboarding({ initialName }: { initialName?: string }) {
         protein_goal_g: proteinGoal ? Number(proteinGoal) : null,
         sex: sex || null,
         birth_date: birthDate || null,
+        role,
         onboarded: true,
         updated_at: new Date().toISOString(),
       })
       .eq("id", user.id);
+
+    // Dados de paciente não se aplicam a uma conta de nutricionista.
+    if (role === "nutritionist") {
+      router.refresh();
+      return;
+    }
 
     if (weight) {
       await supabase.from("body_measurements").insert({
@@ -166,6 +174,27 @@ export default function Onboarding({ initialName }: { initialName?: string }) {
                   Vamos configurar seu app em 1 minuto para deixá-lo sob medida.
                 </p>
               </div>
+              <FieldLabel>Você é...</FieldLabel>
+              <div className="flex gap-2">
+                {[
+                  { v: "patient" as const, label: "Paciente" },
+                  { v: "nutritionist" as const, label: "Nutricionista" },
+                ].map((o) => (
+                  <button
+                    key={o.v}
+                    type="button"
+                    onClick={() => setRole(o.v)}
+                    className={`flex-1 rounded-xl border px-3 py-2.5 text-sm font-semibold transition ${
+                      role === o.v
+                        ? "border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-300"
+                        : "border-slate-300 text-slate-600 dark:border-slate-700 dark:text-slate-400"
+                    }`}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+
               <FieldLabel>Como podemos te chamar?</FieldLabel>
               <input
                 className="input"
@@ -173,6 +202,14 @@ export default function Onboarding({ initialName }: { initialName?: string }) {
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Seu nome"
               />
+
+              {role === "nutritionist" ? (
+                <p className="rounded-xl bg-brand-50 px-3 py-2.5 text-sm text-brand-800 dark:bg-brand-950/30 dark:text-brand-200">
+                  Perfeito! Vamos criar sua conta profissional. No próximo passo
+                  você já pode convidar seus pacientes.
+                </p>
+              ) : (
+                <>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <FieldLabel>Peso atual (kg)</FieldLabel>
@@ -224,6 +261,8 @@ export default function Onboarding({ initialName }: { initialName?: string }) {
                 Usamos sexo e idade só para ajustar as faixas de referência dos
                 seus exames. Você pode deixar em branco.
               </p>
+                </>
+              )}
             </div>
           )}
 
@@ -383,7 +422,7 @@ export default function Onboarding({ initialName }: { initialName?: string }) {
             </button>
           )}
           <div className="flex-1" />
-          {step < TOTAL - 1 ? (
+          {step < TOTAL - 1 && role === "patient" ? (
             <button
               onClick={() => setStep((s) => s + 1)}
               disabled={!canNext || saving}

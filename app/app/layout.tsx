@@ -19,20 +19,24 @@ export default async function AppLayout({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, onboarded")
+    .select("full_name, onboarded, role")
     .eq("id", user.id)
     .maybeSingle();
 
   const userName =
     profile?.full_name || user.user_metadata?.full_name || "Atleta";
+  const role = profile?.role === "nutritionist" ? "nutritionist" : "patient";
 
-  const pending = await getPending(supabase, user.id);
+  // Pendências só fazem sentido para o paciente.
+  const pending =
+    role === "patient" ? await getPending(supabase, user.id) : { hrefs: [] };
 
   return (
     <AppShell
       userName={userName}
       userEmail={user.email ?? ""}
-      needsOnboarding={profile ? !profile.onboarded : false}
+      role={role}
+      needsOnboarding={role === "patient" && (profile ? !profile.onboarded : false)}
       pendingHrefs={pending.hrefs}
     >
       {children}
