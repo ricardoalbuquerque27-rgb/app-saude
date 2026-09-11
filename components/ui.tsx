@@ -164,9 +164,3 @@ export function Field({
   );
 }
 
-export function formatDate(date: string) {
-  // date no formato YYYY-MM-DD
-  const [y, m, d] = date.split("-");
-  if (!y || !m || !d) return date;
-  return `${d}/${m}/${y}`;
-}

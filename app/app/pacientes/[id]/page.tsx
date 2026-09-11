@@ -16,9 +16,8 @@ import {
   HeartPulse,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { todayISO, addDaysISO } from "@/lib/date";
+import { todayISO, addDaysISO, formatDate } from "@/lib/date";
 import { computeHealthScore } from "@/lib/healthScore";
-import { formatDate } from "@/components/ui";
 import { TrendChart, BarsChart } from "@/components/charts";
 import {
   getPatientsSummary,

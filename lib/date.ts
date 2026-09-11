@@ -28,3 +28,16 @@ export function weekStartISO(fromISO?: string): string {
   const day = (d.getDay() + 6) % 7; // segunda = 0
   return addDaysISO(base, -day);
 }
+
+/**
+ * Formata uma data ISO (YYYY-MM-DD) como DD/MM/AAAA.
+ *
+ * Mora aqui, e não em components/ui.tsx, porque aquele módulo é "use client":
+ * um server component que importasse esta função de lá receberia uma
+ * referência de cliente no lugar da função e quebraria ao chamá-la.
+ */
+export function formatDate(date: string) {
+  const [y, m, d] = date.split("-");
+  if (!y || !m || !d) return date;
+  return `${d}/${m}/${y}`;
+}

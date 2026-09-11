@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDate } from "@/lib/date";
 import { useCallback, useEffect, useState } from "react";
 import {
   Loader2,
@@ -16,7 +17,7 @@ import {
   Activity,
   Info,
 } from "lucide-react";
-import { PageHeader, formatDate } from "@/components/ui";
+import { PageHeader } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 
 type Insight = {

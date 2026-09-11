@@ -16,13 +16,13 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { StatCard, formatDate } from "@/components/ui";
+import { StatCard } from "@/components/ui";
 import { TrendChart } from "@/components/charts";
 import { getGamification } from "@/lib/gamification";
 import OpenChatButton from "@/components/OpenChatButton";
 import { ProgressRing } from "@/components/ProgressRing";
 import { CHALLENGES, weekStartISO } from "@/lib/challenges";
-import { todayISO, addDaysISO } from "@/lib/date";
+import { todayISO, addDaysISO, formatDate } from "@/lib/date";
 import { computeHealthScore } from "@/lib/healthScore";
 import { getPending } from "@/lib/pending";
 import NutriHome from "@/components/NutriHome";

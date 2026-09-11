@@ -13,15 +13,9 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { BodyMeasurement } from "@/lib/types";
-import {
-  PageHeader,
-  Modal,
-  Field,
-  EmptyState,
-  formatDate,
-} from "@/components/ui";
+import { PageHeader, Modal, Field, EmptyState } from "@/components/ui";
 import { TrendChart } from "@/components/charts";
-import { todayISO } from "@/lib/date";
+import { todayISO, formatDate } from "@/lib/date";
 import { useLiveRefresh } from "@/lib/useLiveRefresh";
 
 const FIELDS: { key: keyof BodyMeasurement; label: string; unit: string }[] = [

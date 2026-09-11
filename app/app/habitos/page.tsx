@@ -13,9 +13,9 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { DailyLog, Profile } from "@/lib/types";
-import { PageHeader, Field, formatDate } from "@/components/ui";
+import { PageHeader, Field } from "@/components/ui";
 import { ProgressRing } from "@/components/ProgressRing";
-import { todayISO } from "@/lib/date";
+import { todayISO, formatDate } from "@/lib/date";
 import { useLiveRefresh } from "@/lib/useLiveRefresh";
 
 const MOODS = [

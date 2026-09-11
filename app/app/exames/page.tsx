@@ -14,14 +14,8 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { Exam } from "@/lib/types";
-import {
-  PageHeader,
-  Modal,
-  Field,
-  EmptyState,
-  formatDate,
-} from "@/components/ui";
-import { todayISO } from "@/lib/date";
+import { PageHeader, Modal, Field, EmptyState } from "@/components/ui";
+import { todayISO, formatDate } from "@/lib/date";
 import { useLiveRefresh } from "@/lib/useLiveRefresh";
 import { classifyExam, type Sex } from "@/lib/examRanges";
 

@@ -21,16 +21,9 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { Workout, Exercise } from "@/lib/types";
-import {
-  PageHeader,
-  Modal,
-  Field,
-  EmptyState,
-  StatCard,
-  formatDate,
-} from "@/components/ui";
+import { PageHeader, Modal, Field, EmptyState, StatCard } from "@/components/ui";
 import { TrendChart, BarsChart } from "@/components/charts";
-import { todayISO, weekStartISO } from "@/lib/date";
+import { todayISO, weekStartISO, formatDate } from "@/lib/date";
 import { useLiveRefresh } from "@/lib/useLiveRefresh";
 import RestTimer from "@/components/RestTimer";
 import PlateCalculator from "@/components/PlateCalculator";
