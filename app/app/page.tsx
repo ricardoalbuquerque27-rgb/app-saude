@@ -252,11 +252,13 @@ export default async function DashboardPage() {
       {/* ----------------------------------------------------------------
           1. HOJE — o que precisa da ação da pessoa agora
       ---------------------------------------------------------------- */}
-      <section className="card border-brand-200 bg-gradient-to-b from-brand-50/70 to-white dark:border-brand-900/40 dark:from-brand-950/20 dark:to-slate-900/40">
-        <div className="mb-3 flex items-center gap-2">
-          <CalendarDays className="h-5 w-5 text-brand-600 dark:text-brand-400" />
-          <h2 className="font-semibold text-slate-900 dark:text-white">Hoje</h2>
-        </div>
+      <section className="card card-accent pl-6">
+        <h2 className="section-title mb-3">
+          <span className="icon-badge">
+            <CalendarDays className="h-4 w-4" />
+          </span>
+          Hoje
+        </h2>
 
         {tudoEmDia ? (
           <div className="flex items-center gap-3 py-1">
@@ -271,9 +273,7 @@ export default async function DashboardPage() {
           <div className="space-y-3">
             {todayPlan.length > 0 && (
               <div>
-                <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Treino de hoje
-                </p>
+                <p className="eyebrow mb-1.5">Treino de hoje</p>
                 <PlanCheckIn
                   sessions={todayPlan as any}
                   date={today}
@@ -334,7 +334,7 @@ export default async function DashboardPage() {
         )}
 
         {/* Registrar algo — atalhos junto da ação, não numa caixa separada */}
-        <div className="mt-4 flex flex-wrap gap-2 border-t border-brand-100 pt-3 dark:border-brand-900/30">
+        <div className="mt-4 flex flex-wrap gap-2 border-t border-brand-200/70 pt-3 dark:border-brand-800/40">
           {atalhos.map((a) => (
             <Link
               key={a.label}
@@ -353,12 +353,12 @@ export default async function DashboardPage() {
       ---------------------------------------------------------------- */}
       <section className="card">
         <div className="mb-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <HeartPulse className="h-5 w-5 text-brand-600 dark:text-brand-400" />
-            <h2 className="font-semibold text-slate-900 dark:text-white">
-              Seu dia
-            </h2>
-          </div>
+          <h2 className="section-title">
+            <span className="icon-badge">
+              <HeartPulse className="h-4 w-4" />
+            </span>
+            Seu dia
+          </h2>
           {(!calorieGoal || !proteinGoal) && (
             <Link
               href="/app/perfil"
@@ -412,12 +412,12 @@ export default async function DashboardPage() {
       ---------------------------------------------------------------- */}
       <section className="card">
         <div className="mb-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Scale className="h-5 w-5 text-brand-600 dark:text-brand-400" />
-            <h2 className="font-semibold text-slate-900 dark:text-white">
-              Progresso
-            </h2>
-          </div>
+          <h2 className="section-title">
+            <span className="icon-badge">
+              <Scale className="h-4 w-4" />
+            </span>
+            Progresso
+          </h2>
           <Link
             href="/app/medidas"
             className="text-xs font-medium text-brand-700 hover:underline dark:text-brand-400"

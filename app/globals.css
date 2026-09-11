@@ -294,4 +294,38 @@ input[type="number"] {
       transform: translateY(-2px);
     }
   }
+
+  /* ---- Hierarquia visual ----------------------------------------- */
+
+  /* Cartão em destaque. Antes isso era um gradiente vertical, que em tema
+     escuro clareava o topo e derrubava o contraste do texto secundário.
+     Agora é uma superfície de tom único (alpha sobre o fundo, então
+     funciona nos dois temas) com uma barra de acento à esquerda. */
+  .card-accent {
+    @apply relative overflow-hidden border-brand-200 bg-brand-50/60
+      dark:border-brand-800/50 dark:bg-brand-500/[0.07];
+  }
+  .card-accent::before {
+    content: "";
+    @apply absolute inset-y-0 left-0 w-1
+      bg-gradient-to-b from-brand-400 to-brand-600;
+  }
+
+  /* O verde do título vira um selo atrás do ícone, em vez de texto verde
+     sobre fundo colorido. Legível nos dois temas e mais bonito. */
+  .icon-badge {
+    @apply flex h-8 w-8 shrink-0 items-center justify-center rounded-xl
+      bg-brand-100 text-brand-700
+      dark:bg-brand-500/15 dark:text-brand-300;
+  }
+  .section-title {
+    @apply flex items-center gap-2.5 font-semibold tracking-tight
+      text-slate-900 dark:text-white;
+  }
+  /* Rótulo pequeno acima de um bloco. Contraste suficiente para ser lido
+     — o slate-400 anterior sumia sobre superfícies tingidas. */
+  .eyebrow {
+    @apply text-[11px] font-semibold uppercase tracking-wider
+      text-slate-600 dark:text-slate-300;
+  }
 }

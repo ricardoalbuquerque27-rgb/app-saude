@@ -20,6 +20,7 @@ const config: Config = {
           700: "#0c763e",
           800: "#0e5d34",
           900: "#0d4c2d",
+          950: "#062e1a",
         },
       },
       fontFamily: {

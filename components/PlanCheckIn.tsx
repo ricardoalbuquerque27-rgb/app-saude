@@ -88,12 +88,12 @@ export default function PlanCheckIn({
             className={
               compact
                 ? "mt-2 flex gap-1.5"
-                : "rounded-xl border border-slate-100 bg-slate-50/70 p-3 dark:border-white/[0.05] dark:bg-slate-800/40"
+                : "rounded-xl border border-slate-200/80 bg-white p-3 dark:border-white/[0.07] dark:bg-slate-900/70"
             }
           >
             {!compact && (
               <>
-                <span className="inline-block rounded-full bg-brand-100 px-2 py-0.5 text-[11px] font-semibold text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
+                <span className="inline-block rounded-full bg-brand-100 px-2.5 py-0.5 text-[11px] font-semibold text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">
                   {s.sport}
                 </span>
                 {s.title && (
@@ -114,7 +114,7 @@ export default function PlanCheckIn({
                 } ${
                   done
                     ? "bg-brand-600 text-white"
-                    : "border border-slate-300 text-slate-600 hover:bg-white dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                    : "border border-slate-300 text-slate-700 hover:border-brand-400 hover:text-brand-700 dark:border-slate-600 dark:text-slate-200 dark:hover:border-brand-500 dark:hover:text-brand-300"
                 }`}
               >
                 {loading ? (
@@ -133,7 +133,7 @@ export default function PlanCheckIn({
                 } ${
                   skipped
                     ? "bg-rose-600 text-white"
-                    : "border border-slate-300 text-slate-600 hover:bg-white dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                    : "border border-slate-300 text-slate-700 hover:border-rose-400 hover:text-rose-700 dark:border-slate-600 dark:text-slate-200 dark:hover:border-rose-500 dark:hover:text-rose-300"
                 }`}
               >
                 <X className="h-3.5 w-3.5" />
@@ -142,7 +142,7 @@ export default function PlanCheckIn({
             </div>
 
             {!compact && !current && (
-              <p className="mt-1.5 text-[11px] text-slate-400 dark:text-slate-500">
+              <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
                 Seu nutricionista vê essa confirmação.
               </p>
             )}

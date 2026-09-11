@@ -61,7 +61,7 @@ function PatientRow({ s, today }: { s: PatientSummary; today: string }) {
       href={`/app/pacientes/${s.id}`}
       className="tappable flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/60"
     >
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-100 text-sm font-semibold text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-100 text-sm font-semibold text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">
         {s.name.slice(0, 1).toUpperCase()}
       </div>
       <div className="min-w-0 flex-1">
@@ -201,12 +201,12 @@ export default async function NutriHome({
 
       {needAttention.length > 0 && (
         <div className="card mb-4 p-3">
-          <div className="mb-1 flex items-center gap-2 px-2 pt-1">
-            <AlertTriangle className="h-4 w-4 text-amber-500" />
-            <h2 className="font-semibold text-slate-900 dark:text-white">
-              Precisam de atenção
-            </h2>
-          </div>
+          <h2 className="section-title mb-1 px-2 pt-1">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
+              <AlertTriangle className="h-4 w-4" />
+            </span>
+            Precisam de atenção
+          </h2>
           <div className="pf-stagger divide-y divide-slate-100 dark:divide-slate-800">
             {needAttention.map((s) => (
               <PatientRow key={s.id} s={s} today={today} />
@@ -217,12 +217,12 @@ export default async function NutriHome({
 
       {loggedToday.length > 0 && (
         <div className="card mb-4 p-3">
-          <div className="mb-1 flex items-center gap-2 px-2 pt-1">
-            <Activity className="h-4 w-4 text-emerald-500" />
-            <h2 className="font-semibold text-slate-900 dark:text-white">
-              Movimento de hoje
-            </h2>
-          </div>
+          <h2 className="section-title mb-1 px-2 pt-1">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+              <Activity className="h-4 w-4" />
+            </span>
+            Movimento de hoje
+          </h2>
           <div className="pf-stagger divide-y divide-slate-100 dark:divide-slate-800">
             {loggedToday.map((s) => (
               <Link
@@ -230,7 +230,7 @@ export default async function NutriHome({
                 href={`/app/pacientes/${s.id}`}
                 className="tappable flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/60"
               >
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-sm font-semibold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-sm font-semibold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
                   {s.name.slice(0, 1).toUpperCase()}
                 </div>
                 <div className="min-w-0 flex-1">
@@ -261,12 +261,12 @@ export default async function NutriHome({
 
       {onTrack.length > 0 && (
         <div className="card mb-4 p-3">
-          <div className="mb-1 flex items-center gap-2 px-2 pt-1">
-            <CheckCircle2 className="h-4 w-4 text-brand-500" />
-            <h2 className="font-semibold text-slate-900 dark:text-white">
-              Em dia ({onTrack.length})
-            </h2>
-          </div>
+          <h2 className="section-title mb-1 px-2 pt-1">
+            <span className="icon-badge">
+              <CheckCircle2 className="h-4 w-4" />
+            </span>
+            Em dia ({onTrack.length})
+          </h2>
           <div className="pf-stagger divide-y divide-slate-100 dark:divide-slate-800">
             {onTrack.map((s) => (
               <PatientRow key={s.id} s={s} today={today} />

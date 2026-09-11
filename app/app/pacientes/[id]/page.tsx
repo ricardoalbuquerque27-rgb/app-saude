@@ -67,10 +67,10 @@ function Card({
   return (
     <div className={`card mb-4 ${className}`}>
       {title && (
-        <div className="mb-3 flex items-center gap-2">
-          {icon}
-          <h2 className="font-semibold text-slate-900 dark:text-white">{title}</h2>
-        </div>
+        <h2 className="section-title mb-3">
+          {icon && <span className="icon-badge">{icon}</span>}
+          {title}
+        </h2>
       )}
       {children}
     </div>
@@ -385,7 +385,7 @@ async function TabGeral({
       {health.hasData && (
         <Card
           title="Score de Saúde de hoje"
-          icon={<HeartPulse className="h-4 w-4 text-brand-600" />}
+          icon={<HeartPulse className="h-4 w-4" />}
         >
           <div className="flex items-center gap-4">
             <div className="text-center">
@@ -405,7 +405,7 @@ async function TabGeral({
 
       <Card
         title="Perfil e metas"
-        icon={<Target className="h-4 w-4 text-brand-600" />}
+        icon={<Target className="h-4 w-4" />}
       >
         <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-3">
           {[
@@ -447,7 +447,7 @@ async function TabGeral({
       {weightPoints.length > 1 && (
         <Card
           title="Peso (14 dias)"
-          icon={<Scale className="h-4 w-4 text-brand-600" />}
+          icon={<Scale className="h-4 w-4" />}
         >
           <TrendChart data={weightPoints} unit=" kg" />
         </Card>
@@ -455,7 +455,7 @@ async function TabGeral({
 
       <Card
         title="Registros por dia (14 dias)"
-        icon={<CalendarCheck className="h-4 w-4 text-brand-600" />}
+        icon={<CalendarCheck className="h-4 w-4" />}
       >
         <div className="flex items-end gap-1">
           {series.map((s: any) => {
@@ -503,7 +503,7 @@ async function TabAtividade({ supabase, uid }: any) {
 
   if (items.length === 0) {
     return (
-      <Card title="Atividade" icon={<Activity className="h-4 w-4 text-brand-600" />}>
+      <Card title="Atividade" icon={<Activity className="h-4 w-4" />}>
         <Empty>Nenhum registro nos últimos 30 dias.</Empty>
       </Card>
     );
@@ -520,7 +520,7 @@ async function TabAtividade({ supabase, uid }: any) {
   return (
     <Card
       title="Linha do tempo (30 dias)"
-      icon={<Activity className="h-4 w-4 text-brand-600" />}
+      icon={<Activity className="h-4 w-4" />}
     >
       <div className="space-y-5">
         {byDay.map((g) => (
@@ -623,7 +623,7 @@ async function TabNutricao({ supabase, uid, profile }: any) {
 
       {withData.length > 0 && (
         <>
-          <Card title="Calorias por dia (14 dias)" icon={<Flame className="h-4 w-4 text-brand-600" />}>
+          <Card title="Calorias por dia (14 dias)" icon={<Flame className="h-4 w-4" />}>
             <BarsChart
               data={series.map((s: any) => ({
                 label: dayLabel(s.date),
@@ -632,7 +632,7 @@ async function TabNutricao({ supabase, uid, profile }: any) {
               unit=" kcal"
             />
           </Card>
-          <Card title="Proteína por dia (14 dias)" icon={<Utensils className="h-4 w-4 text-brand-600" />}>
+          <Card title="Proteína por dia (14 dias)" icon={<Utensils className="h-4 w-4" />}>
             <BarsChart
               data={series.map((s: any) => ({
                 label: dayLabel(s.date),
@@ -645,7 +645,7 @@ async function TabNutricao({ supabase, uid, profile }: any) {
         </>
       )}
 
-      <Card title="Refeições recentes" icon={<Utensils className="h-4 w-4 text-brand-600" />}>
+      <Card title="Refeições recentes" icon={<Utensils className="h-4 w-4" />}>
         {(meals ?? []).length === 0 ? (
           <Empty>Nenhuma refeição registrada nos últimos 14 dias.</Empty>
         ) : (
@@ -756,7 +756,7 @@ async function TabTreino({ supabase, uid }: any) {
       {adesao.previstas > 0 && (
         <Card
           title="Adesão ao plano (4 semanas)"
-          icon={<CalendarCheck className="h-4 w-4 text-brand-600" />}
+          icon={<CalendarCheck className="h-4 w-4" />}
         >
           <div className="mb-3 flex items-baseline gap-3">
             <p className="text-3xl font-bold text-brand-600 dark:text-brand-400">
@@ -839,7 +839,7 @@ async function TabTreino({ supabase, uid }: any) {
         </Card>
       )}
 
-      <Card title="Plano semanal" icon={<CalendarCheck className="h-4 w-4 text-brand-600" />}>
+      <Card title="Plano semanal" icon={<CalendarCheck className="h-4 w-4" />}>
         {plan.length === 0 ? (
           <Empty>Sem plano semanal montado.</Empty>
         ) : (
@@ -874,7 +874,7 @@ async function TabTreino({ supabase, uid }: any) {
       </Card>
 
       {routines.length > 0 && (
-        <Card title="Rotinas salvas" icon={<Dumbbell className="h-4 w-4 text-brand-600" />}>
+        <Card title="Rotinas salvas" icon={<Dumbbell className="h-4 w-4" />}>
           <ul className="space-y-1.5">
             {routines.map((r) => (
               <li key={r.id} className="text-sm text-slate-700 dark:text-slate-300">
@@ -888,7 +888,7 @@ async function TabTreino({ supabase, uid }: any) {
         </Card>
       )}
 
-      <Card title="Treinos (30 dias)" icon={<Dumbbell className="h-4 w-4 text-brand-600" />}>
+      <Card title="Treinos (30 dias)" icon={<Dumbbell className="h-4 w-4" />}>
         {workouts.length === 0 ? (
           <Empty>Nenhum treino registrado nos últimos 30 dias.</Empty>
         ) : (
@@ -958,7 +958,7 @@ async function TabCorpo({ supabase, uid, profile }: any) {
   return (
     <>
       {withWeight.length > 1 && (
-        <Card title="Evolução do peso" icon={<Scale className="h-4 w-4 text-brand-600" />}>
+        <Card title="Evolução do peso" icon={<Scale className="h-4 w-4" />}>
           <TrendChart
             data={withWeight.map((r) => ({
               label: dayLabel(r.date),
@@ -979,7 +979,7 @@ async function TabCorpo({ supabase, uid, profile }: any) {
         </Card>
       )}
 
-      <Card title="Medidas registradas" icon={<Ruler className="h-4 w-4 text-brand-600" />}>
+      <Card title="Medidas registradas" icon={<Ruler className="h-4 w-4" />}>
         {rows.length === 0 ? (
           <Empty>Nenhuma medida registrada.</Empty>
         ) : (
@@ -1066,7 +1066,7 @@ async function TabClinico({ supabase, uid }: any) {
 
   return (
     <>
-      <Card title="Tratamento" icon={<Syringe className="h-4 w-4 text-brand-600" />}>
+      <Card title="Tratamento" icon={<Syringe className="h-4 w-4" />}>
         {!treat ? (
           <Empty>Nenhum tratamento ativo cadastrado.</Empty>
         ) : (
@@ -1116,7 +1116,7 @@ async function TabClinico({ supabase, uid }: any) {
       {effects.length > 0 && (
         <Card
           title="Efeitos colaterais relatados"
-          icon={<AlertTriangle className="h-4 w-4 text-amber-500" />}
+          icon={<AlertTriangle className="h-4 w-4" />}
         >
           <ul className="divide-y divide-slate-100 dark:divide-slate-800">
             {effects.map((e, i) => (
@@ -1143,7 +1143,7 @@ async function TabClinico({ supabase, uid }: any) {
         </Card>
       )}
 
-      <Card title="Exames" icon={<FileText className="h-4 w-4 text-brand-600" />}>
+      <Card title="Exames" icon={<FileText className="h-4 w-4" />}>
         {exams.length === 0 ? (
           <Empty>Nenhum exame registrado.</Empty>
         ) : (
