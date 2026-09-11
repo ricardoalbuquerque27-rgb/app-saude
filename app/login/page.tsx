@@ -96,7 +96,7 @@ export default function LoginPage() {
         router.refresh();
       }
     } catch (err: any) {
-      setError(traduzErro(err?.message ?? "Ocorreu um erro."));
+      setError(traduzErro(err));
     } finally {
       setLoading(false);
     }
@@ -400,8 +400,24 @@ function validateCPF(value: string) {
   return d2 === parseInt(cpf[10]);
 }
 
-function traduzErro(msg: string): string {
-  const m = msg.toLowerCase();
+const ERRO_GENERICO =
+  "Não foi possível completar a ação. Tente novamente em alguns instantes.";
+
+// Só mostramos ao usuário um texto que pareça uma frase. O Supabase às vezes
+// devolve o corpo cru da resposta como mensagem (ex.: "{}" num erro 500), e
+// isso não pode vazar para a tela.
+function mensagemLegivel(msg: string): boolean {
+  const t = msg.trim();
+  if (t.length < 4) return false;
+  if (/^[[{<]/.test(t)) return false; // JSON ou HTML cru
+  return /[a-zA-ZÀ-ÿ]{3}/.test(t);
+}
+
+function traduzErro(err: any): string {
+  const raw = typeof err === "string" ? err : (err?.message ?? "");
+  const status = Number(err?.status) || 0;
+  const m = String(raw).toLowerCase();
+
   if (m.includes("invalid login credentials"))
     return "E-mail ou senha incorretos.";
   if (m.includes("user already registered"))
@@ -410,7 +426,16 @@ function traduzErro(msg: string): string {
     return "A senha deve ter pelo menos 6 caracteres.";
   if (m.includes("email not confirmed"))
     return "Confirme seu e-mail antes de entrar.";
+  if (m.includes("email rate limit") || m.includes("too many"))
+    return "Muitas tentativas seguidas. Espere um minuto e tente de novo.";
+  if (m.includes("failed to fetch") || m.includes("networkerror"))
+    return "Sem conexão com o servidor. Verifique sua internet.";
   if (m.includes("database error"))
     return "Não foi possível criar a conta. Verifique se o CPF ou e-mail já está cadastrado.";
-  return msg;
+
+  // 5xx: problema do lado do servidor de autenticação, não do que foi digitado.
+  if (status >= 500)
+    return "O servidor de autenticação falhou (erro " + status + "). Tente novamente em instantes.";
+
+  return mensagemLegivel(String(raw)) ? String(raw) : ERRO_GENERICO;
 }
