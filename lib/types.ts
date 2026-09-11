@@ -472,28 +472,34 @@ export type Database = {
       };
       patient_notes: {
         Row: {
+          author_id: string;
           body: string;
           created_at: string;
           id: string;
           nutritionist_id: string;
           patient_id: string;
           read_at: string | null;
+          visibility: string;
         };
         Insert: {
+          author_id: string;
           body: string;
           created_at?: string;
           id?: string;
           nutritionist_id: string;
           patient_id: string;
           read_at?: string | null;
+          visibility?: string;
         };
         Update: {
+          author_id?: string;
           body?: string;
           created_at?: string;
           id?: string;
           nutritionist_id?: string;
           patient_id?: string;
           read_at?: string | null;
+          visibility?: string;
         };
         Relationships: [];
       };
@@ -705,6 +711,7 @@ export type Database = {
           name: string;
           notes: string | null;
           position: number;
+          prescribed_by: string | null;
           created_at: string;
         };
         Insert: {
@@ -713,6 +720,7 @@ export type Database = {
           name: string;
           notes?: string | null;
           position?: number;
+          prescribed_by?: string | null;
           created_at?: string;
         };
         Update: {
@@ -721,6 +729,7 @@ export type Database = {
           name?: string;
           notes?: string | null;
           position?: number;
+          prescribed_by?: string | null;
           created_at?: string;
         };
         Relationships: [];

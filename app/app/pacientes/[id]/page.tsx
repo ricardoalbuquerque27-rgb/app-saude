@@ -1198,20 +1198,35 @@ async function TabPrescricao({ supabase, uid, profile }: any) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [planoRes, notasRes] = await Promise.all([
+  const [planoRes, rotinasRes, exsRes, msgsRes] = await Promise.all([
     supabase
       .from("workout_plan")
-      .select("id, day_of_week, sport, title, prescribed_by")
+      .select("id, day_of_week, sport, title, routine_id, prescribed_by")
       .eq("user_id", uid)
       .order("day_of_week", { ascending: true })
       .order("position", { ascending: true }),
     supabase
+      .from("routines")
+      .select("id, name, notes, prescribed_by")
+      .eq("user_id", uid)
+      .order("position", { ascending: true })
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("routine_exercises")
+      .select("id, routine_id, name, target_sets, target_reps, target_weight_kg, rest_seconds, position")
+      .eq("user_id", uid)
+      .order("position", { ascending: true }),
+    // Conversa e notas privadas vêm juntas; a RLS já garante que o paciente
+    // nunca enxerga as privadas, e aqui separamos por visibility.
+    supabase
       .from("patient_notes")
-      .select("id, body, created_at, read_at")
+      .select("id, body, created_at, read_at, author_id, visibility")
       .eq("patient_id", uid)
       .order("created_at", { ascending: false })
-      .limit(20),
+      .limit(100),
   ]);
+
+  const todas = (msgsRes.data ?? []) as any[];
 
   return (
     <PrescricaoClient
@@ -1223,8 +1238,11 @@ async function TabPrescricao({ supabase, uid, profile }: any) {
         daily_water_goal_ml: profile.daily_water_goal_ml ?? null,
         weight_goal_kg: profile.weight_goal_kg ?? null,
       }}
+      rotinas={(rotinasRes.data ?? []) as any}
+      exercicios={(exsRes.data ?? []) as any}
       plano={(planoRes.data ?? []) as any}
-      comentarios={(notasRes.data ?? []) as any}
+      mensagens={todas.filter((m) => m.visibility === "shared")}
+      notasPrivadas={todas.filter((m) => m.visibility === "private")}
     />
   );
 }

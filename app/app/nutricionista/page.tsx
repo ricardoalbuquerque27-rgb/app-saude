@@ -24,6 +24,7 @@ export default function MeuNutricionistaPage() {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const [notas, setNotas] = useState<Nota[]>([]);
+  const [meuId, setMeuId] = useState("");
   const [prescricao, setPrescricao] = useState<any>(null);
 
   const load = useCallback(async () => {
@@ -35,10 +36,15 @@ export default function MeuNutricionistaPage() {
     const list = (data ?? []) as Link_[];
     setLinks(list);
 
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    setMeuId(user?.id ?? "");
+
     const [{ data: n }, { data: pr }] = await Promise.all([
       supabase
         .from("patient_notes")
-        .select("id, body, created_at, read_at")
+        .select("id, body, created_at, read_at, author_id")
         .order("created_at", { ascending: false })
         .limit(30),
       supabase
@@ -241,15 +247,19 @@ export default function MeuNutricionistaPage() {
         </div>
       )}
 
-      {notas.length > 0 && (
+      {links.length > 0 && (
         <div className="mt-5">
           <h2 className="section-title mb-3">
             <span className="icon-badge">
               <MessageSquare className="h-4 w-4" />
             </span>
-            Recados
+            Conversa
           </h2>
-          <NutriNotes notas={notas} />
+          <NutriNotes
+            notas={notas}
+            meuId={meuId}
+            nutriId={links[0]?.nutritionist_id}
+          />
         </div>
       )}
     </div>

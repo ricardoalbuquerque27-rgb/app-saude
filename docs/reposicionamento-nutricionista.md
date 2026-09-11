@@ -73,6 +73,23 @@ paciente**; construímos o **lado profissional** por cima.
   escreve. No paciente: recado não lido aparece em "Hoje", metas marcadas como
   vindas do nutri no Perfil, sessões prescritas com selo na aba Treino, e a
   página "Meu nutricionista" lista metas vigentes e histórico de recados.
+**Fase 3b — treino completo e canal de acompanhamento — ✅ FEITO**
+- O nutri monta o treino DE VERDADE: policies de escrita em routines e
+  routine_exercises (+ routines.prescribed_by). Ele cria a rotina com
+  exercícios, séries, reps, carga e descanso, e encaixa num dia da semana
+  ligando workout_plan.routine_id — o que faz o paciente ver "Iniciar treino"
+  e executar série por série.
+- patient_notes vira duas coisas separadas, via author_id + visibility:
+  CONVERSA (shared, mão dupla — o paciente responde pelo app dele) e NOTAS
+  PRIVADAS (private, só o nutricionista; anamnese e conduta). O gatilho de
+  imutabilidade passou a congelar também autoria e visibilidade, para ninguém
+  converter nota privada em mensagem.
+- Aba Prescrição reorganizada em Metas / Treino / Conversa / Notas privadas,
+  com contador de mensagens não lidas.
+- Validado: nota privada não vaza para o paciente (0 linhas), paciente não
+  cria nota privada, não forja autoria do nutricionista e não escreve na
+  conversa de outro paciente.
+
 - Pendente: Gaia ciente da prescrição (orientar dentro do plano do nutri).
 
 **Fase 4 — Conta/cobrança**

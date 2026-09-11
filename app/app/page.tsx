@@ -116,8 +116,10 @@ export default async function DashboardPage() {
       .eq("date", today),
     supabase
       .from("patient_notes")
-      .select("id, body, created_at, read_at")
+      .select("id, body, created_at, read_at, author_id")
       .eq("patient_id", uid)
+      .eq("visibility", "shared")
+      .neq("author_id", uid)
       .is("read_at", null)
       .order("created_at", { ascending: false })
       .limit(5),
@@ -285,7 +287,7 @@ export default async function DashboardPage() {
         ) : (
           <div className="space-y-3">
             {notasNaoLidas.length > 0 && (
-              <NutriNotes notas={notasNaoLidas as any} compact />
+              <NutriNotes notas={notasNaoLidas as any} meuId={uid} compact />
             )}
 
             {todayPlan.length > 0 && (
