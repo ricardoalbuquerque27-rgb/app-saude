@@ -9,7 +9,6 @@ import {
   Syringe,
   Leaf,
   HeartPulse,
-  Trophy,
   BarChart3,
   Smartphone,
   ShieldCheck,
@@ -112,14 +111,9 @@ const diferenciais = [
 // Recursos que completam a experiência.
 const extras = [
   {
-    icon: Trophy,
-    name: "Gamificação",
-    desc: "Sequência (streak), níveis e XP, conquistas e desafios semanais para manter o engajamento.",
-  },
-  {
     icon: Users,
-    name: "Ranking com amigos",
-    desc: "Adicione amigos por código e compare XP e nível num ranking saudável.",
+    name: "Acompanhamento pelo nutricionista",
+    desc: "O nutricionista convida o paciente, acompanha treino, alimentação, medidas, exames e tratamento num painel só — e o paciente confirma se cumpriu o treino do dia.",
   },
   {
     icon: BarChart3,

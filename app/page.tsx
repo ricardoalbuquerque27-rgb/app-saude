@@ -13,7 +13,7 @@ import {
   HeartPulse,
   ShieldCheck,
   Check,
-  Trophy,
+  Stethoscope,
 } from "lucide-react";
 import Reveal from "@/components/Reveal";
 import { Logo, Pill } from "@/components/landing";
@@ -71,7 +71,7 @@ const mediaCards = [
 const pillars = [
   {
     name: "Treino",
-    points: ["Plano semanal", "Registro por série", "Progressão de carga", "Ranking com amigos"],
+    points: ["Plano semanal", "Registro por série", "Progressão de carga", "Check-in do treino"],
   },
   {
     name: "Nutrição",
@@ -174,7 +174,7 @@ export default function Home() {
         <div className="flex w-max animate-marquee">
           {[0, 1].map((dup) => (
             <div key={dup} className="flex items-center">
-              {["Treino", "Dieta", "Sono", "Água", "Exames", "IA", "Modo Caneta", "Conquistas"].map(
+              {["Treino", "Dieta", "Sono", "Água", "Exames", "IA", "Modo Caneta", "Nutricionista"].map(
                 (w) => (
                   <span
                     key={w}
@@ -351,7 +351,7 @@ export default function Home() {
               { icon: Camera, t: "Foto do prato", d: "Calorias e macros pela imagem." },
               { icon: Leaf, t: "Gaia, sua IA 24h", d: "Companheira de saúde em qualquer tela." },
               { icon: FileText, t: "Leitura de exames", d: "Entenda o PDF sem juridiquês." },
-              { icon: Trophy, t: "Gamificação", d: "Sequência, níveis e desafios." },
+              { icon: Stethoscope, t: "Nutricionista junto", d: "Seu profissional acompanha tudo." },
             ].map((f) => (
               <div key={f.t} className="bg-black p-7">
                 <f.icon className="h-6 w-6 text-brand-400" />

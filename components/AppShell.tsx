@@ -16,13 +16,11 @@ import {
   Sun,
   Watch,
   BarChart3,
-  Trophy,
   Users,
   Syringe,
   Menu,
   X,
   ChevronRight,
-  Target,
   HeartPulse,
   Stethoscope,
 } from "lucide-react";
@@ -48,10 +46,18 @@ const mobileNav = [
   { href: "/app/habitos", label: "Hábitos", icon: Droplets },
 ];
 
-// Tudo o mais fica organizado no menu "Mais"
+// Tudo o mais fica organizado no menu "Mais". Depois da saída da
+// gamificação (Desafios, Conquistas, Amigos), sobraram 3 grupos.
 const menuGroups = [
   {
-    title: "Acompanhamento",
+    title: "Meu acompanhamento",
+    items: [
+      { href: "/app/nutricionista", label: "Meu nutricionista", icon: Stethoscope },
+      { href: "/app/relatorios", label: "Relatórios", icon: BarChart3 },
+    ],
+  },
+  {
+    title: "Saúde",
     items: [
       { href: "/app/medidas", label: "Medidas", icon: LineChart },
       { href: "/app/exames", label: "Exames", icon: FileText },
@@ -60,25 +66,10 @@ const menuGroups = [
     ],
   },
   {
-    title: "Progresso",
-    items: [
-      { href: "/app/conquistas", label: "Conquistas", icon: Trophy },
-      { href: "/app/desafios", label: "Desafios", icon: Target },
-      { href: "/app/amigos", label: "Amigos", icon: Users },
-      { href: "/app/relatorios", label: "Relatórios", icon: BarChart3 },
-    ],
-  },
-  {
-    title: "Acompanhamento profissional",
-    items: [
-      { href: "/app/nutricionista", label: "Meu nutricionista", icon: Stethoscope },
-    ],
-  },
-  {
     title: "Conta",
     items: [
-      { href: "/app/integracoes", label: "Integrações", icon: Watch },
       { href: "/app/perfil", label: "Perfil", icon: User },
+      { href: "/app/integracoes", label: "Integrações", icon: Watch },
       { href: "/app/diagnostico", label: "Diagnóstico", icon: Stethoscope },
     ],
   },

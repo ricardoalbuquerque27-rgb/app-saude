@@ -4,24 +4,20 @@ import {
   Flame,
   Scale,
   ArrowRight,
-  LineChart as LineIcon,
-  BarChart3,
   Camera,
   CalendarDays,
-  Trophy,
   Syringe,
-  Target,
   HeartPulse,
-  Bell,
   ChevronRight,
+  MessageCircle,
+  BarChart3,
+  Plus,
+  CheckCircle2,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { StatCard } from "@/components/ui";
 import { TrendChart } from "@/components/charts";
-import { getGamification } from "@/lib/gamification";
 import OpenChatButton from "@/components/OpenChatButton";
 import { ProgressRing } from "@/components/ProgressRing";
-import { CHALLENGES, weekStartISO } from "@/lib/challenges";
 import { todayISO, addDaysISO, formatDate } from "@/lib/date";
 import { computeHealthScore } from "@/lib/healthScore";
 import { getPending } from "@/lib/pending";
@@ -65,7 +61,6 @@ export default async function DashboardPage() {
     recentWorkoutsRes,
     todayPlanRes,
     treatmentRes,
-    challengesRes,
     todayCompletionsRes,
   ] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", uid).maybeSingle(),
@@ -113,11 +108,6 @@ export default async function DashboardPage() {
       .limit(1)
       .maybeSingle(),
     supabase
-      .from("challenge_completions")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", uid)
-      .eq("week_start", weekStartISO()),
-    supabase
       .from("plan_completions")
       .select("id, plan_id, date, status, workout_id")
       .eq("user_id", uid)
@@ -126,13 +116,6 @@ export default async function DashboardPage() {
 
   const profile = profileRes.data;
   const firstName = (profile?.full_name || "Atleta").split(" ")[0];
-  const initials = (profile?.full_name || "Atleta")
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((s) => s[0])
-    .join("")
-    .toUpperCase();
 
   const workoutsWeek = workoutsWeekRes.count ?? 0;
   const caloriesToday = (mealsTodayRes.data ?? []).reduce(
@@ -145,18 +128,20 @@ export default async function DashboardPage() {
   );
   const measurements = measurementsRes.data ?? [];
   const currentWeight =
-    measurements.length > 0 ? measurements[measurements.length - 1].weight_kg : null;
+    measurements.length > 0
+      ? measurements[measurements.length - 1].weight_kg
+      : null;
   const waterToday = dailyTodayRes.data?.water_ml ?? 0;
   const waterGoal = profile?.daily_water_goal_ml ?? 2500;
   const calorieGoal = profile?.daily_calorie_goal ?? null;
   const proteinGoal = profile?.protein_goal_g ?? null;
+  const sleepToday = dailyTodayRes.data?.sleep_hours ?? null;
   const recentWorkouts = recentWorkoutsRes.data ?? [];
   const todayPlan = todayPlanRes.data ?? [];
   const todayCompletions = todayCompletionsRes.data ?? [];
 
-  // Score de Saúde do dia (usa só dados que o app já coleta).
   const health = computeHealthScore({
-    sleepHours: dailyTodayRes.data?.sleep_hours ?? null,
+    sleepHours: sleepToday,
     trainedToday: recentWorkouts.some((w) => w.date === today),
     workoutsWeek,
     mealsLoggedToday: (mealsTodayRes.data ?? []).length,
@@ -175,14 +160,9 @@ export default async function DashboardPage() {
       : health.color === "amber"
         ? "text-amber-500"
         : "text-rose-500";
-  const healthBadge =
-    health.color === "brand"
-      ? "bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300"
-      : health.color === "amber"
-        ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
-        : "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300";
 
-  // Anéis do dia
+  // Um único conjunto de números do dia. Antes o mesmo dado aparecia em três
+  // blocos seguidos: pilares do Score, anéis e mini-stats.
   const rings = [
     {
       label: "Calorias",
@@ -207,11 +187,7 @@ export default async function DashboardPage() {
     },
   ];
 
-  const game = await getGamification(supabase, uid);
   const pending = await getPending(supabase, uid);
-
-  const challengesDone = challengesRes.count ?? 0;
-  const challengesTotal = CHALLENGES.length;
 
   const treatment = treatmentRes.data;
   let doseLabel: string | null = null;
@@ -246,188 +222,143 @@ export default async function DashboardPage() {
     month: "long",
   });
 
-  const actions = [
-    { href: "/app/treinos", icon: Dumbbell, label: "Registrar treino" },
-    { href: "/app/dieta", icon: Camera, label: "Analisar foto do prato" },
-    { href: "/app/relatorios", icon: BarChart3, label: "Gerar relatório" },
+  // O dia só está resolvido quando não há treino previsto sem check-in, nem
+  // pendência de cadastro, nem dose vencendo.
+  const checkinPendente = todayPlan.filter(
+    (p: any) => !todayCompletions.some((c: any) => c.plan_id === p.id)
+  ).length;
+  const tudoEmDia =
+    checkinPendente === 0 && pending.items.length === 0 && !doseUrgent;
+
+  const atalhos = [
+    { href: "/app/dieta", icon: Flame, label: "Refeição" },
+    { href: "/app/treinos", icon: Dumbbell, label: "Treino" },
+    { href: "/app/medidas", icon: Scale, label: "Peso" },
+    { href: "/app/dieta", icon: Camera, label: "Foto do prato" },
   ];
 
   return (
-    <div className="space-y-6">
-      {/* Hero */}
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-600 to-brand-800 p-6 text-white shadow-xl sm:p-8">
-        <div className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-white/10 blur-2xl" />
-        <div className="pointer-events-none absolute -bottom-24 -left-10 h-56 w-56 rounded-full bg-black/10 blur-2xl" />
-        <div className="pointer-events-none absolute inset-0 opacity-[0.06] [background-image:linear-gradient(white_1px,transparent_1px),linear-gradient(90deg,white_1px,transparent_1px)] [background-size:36px_36px]" />
+    <div className="space-y-5">
+      {/* Saudação enxuta — o espaço nobre é do bloco "Hoje", logo abaixo. */}
+      <div>
+        <p className="text-sm capitalize text-slate-500 dark:text-slate-400">
+          {dataLonga}
+        </p>
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-3xl">
+          Olá, {firstName} 👋
+        </h1>
+      </div>
 
-        <div className="relative flex items-start gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15 text-lg font-bold backdrop-blur ring-1 ring-white/20">
-            {initials}
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm capitalize text-brand-50/80">{dataLonga}</p>
-            <h1 className="mt-0.5 text-2xl font-bold tracking-tight sm:text-3xl">
-              Olá, {firstName} 👋
-            </h1>
-          </div>
+      {/* ----------------------------------------------------------------
+          1. HOJE — o que precisa da ação da pessoa agora
+      ---------------------------------------------------------------- */}
+      <section className="card border-brand-200 bg-gradient-to-b from-brand-50/70 to-white dark:border-brand-900/40 dark:from-brand-950/20 dark:to-slate-900/40">
+        <div className="mb-3 flex items-center gap-2">
+          <CalendarDays className="h-5 w-5 text-brand-600 dark:text-brand-400" />
+          <h2 className="font-semibold text-slate-900 dark:text-white">Hoje</h2>
         </div>
 
-        {/* Nível, sequência e plano */}
-        <div className="relative mt-5 flex flex-wrap items-center gap-2">
-          <Link
-            href="/app/conquistas"
-            className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold ring-1 ring-white/15 backdrop-blur transition hover:bg-white/25"
-          >
-            <Trophy className="h-3.5 w-3.5" /> Nível {game.level}
-          </Link>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold ring-1 ring-white/15 backdrop-blur">
-            <Flame className="h-3.5 w-3.5" /> {game.current}{" "}
-            {game.current === 1 ? "dia" : "dias"}
-          </span>
-          {todayPlan.map((p, i) => (
-            <span
-              key={i}
-              className="inline-flex items-center rounded-full bg-white/15 px-3 py-1 text-xs font-medium ring-1 ring-white/15 backdrop-blur"
+        {tudoEmDia ? (
+          <div className="flex items-center gap-3 py-1">
+            <CheckCircle2 className="h-6 w-6 shrink-0 text-brand-600 dark:text-brand-400" />
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              {todayPlan.length > 0
+                ? "Treino de hoje já confirmado. Siga registrando o resto do dia."
+                : "Dia de descanso no plano. Siga registrando o resto do dia."}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {todayPlan.length > 0 && (
+              <div>
+                <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Treino de hoje
+                </p>
+                <PlanCheckIn
+                  sessions={todayPlan as any}
+                  date={today}
+                  completions={todayCompletions as any}
+                />
+              </div>
+            )}
+
+            {treatment && doseLabel && doseUrgent && (
+              <Link
+                href="/app/tratamento"
+                className="group flex items-center gap-3 rounded-xl border border-brand-200 bg-white/70 p-3 transition hover:border-brand-300 dark:border-brand-900/50 dark:bg-slate-900/40"
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
+                  <Syringe className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                    {doseLabel}
+                  </p>
+                  <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                    {treatment.medication}
+                    {treatment.dose ? ` · ${treatment.dose}` : ""}
+                  </p>
+                </div>
+                <ArrowRight className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-brand-500" />
+              </Link>
+            )}
+
+            {pending.items.length > 0 && (
+              <ul className="space-y-1.5">
+                {pending.items.map((it) => (
+                  <li key={it.key}>
+                    <Link
+                      href={it.href}
+                      className="group flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white/70 p-2.5 transition hover:border-brand-300 dark:border-slate-700 dark:bg-slate-900/40"
+                    >
+                      <span
+                        className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                          it.urgent ? "bg-rose-500" : "bg-amber-500"
+                        }`}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-200">
+                          {it.label}
+                        </p>
+                        <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                          {it.description}
+                        </p>
+                      </div>
+                      <ChevronRight className="h-4 w-4 shrink-0 text-slate-300 dark:text-slate-600" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
+        {/* Registrar algo — atalhos junto da ação, não numa caixa separada */}
+        <div className="mt-4 flex flex-wrap gap-2 border-t border-brand-100 pt-3 dark:border-brand-900/30">
+          {atalhos.map((a) => (
+            <Link
+              key={a.label}
+              href={a.href}
+              className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-brand-300 hover:text-brand-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-brand-700"
             >
-              {p.sport}
-              {p.title ? ` · ${p.title}` : ""}
-            </span>
+              <Plus className="h-3.5 w-3.5" />
+              {a.label}
+            </Link>
           ))}
-        </div>
-
-        {/* Barra de nível */}
-        <div className="relative mt-4">
-          <div className="mb-1 flex justify-between text-[11px] text-brand-50/80">
-            <span>Progresso de nível</span>
-            <span>
-              {game.xpPerLevel - game.xpIntoLevel} XP p/ nível {game.level + 1}
-            </span>
-          </div>
-          <div className="h-2 w-full overflow-hidden rounded-full bg-black/20">
-            <div
-              className="h-full rounded-full bg-white/90 transition-all"
-              style={{ width: `${Math.round(game.progress * 100)}%` }}
-            />
-          </div>
         </div>
       </section>
 
-      {/* Pendências — o que falta preencher/fazer */}
-      {pending.items.length > 0 && (
-        <div className="card border-l-4 border-l-amber-400 dark:border-l-amber-500/70">
-          <div className="mb-3 flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
-              <Bell className="h-4 w-4" />
-            </span>
-            <h2 className="font-semibold text-slate-900 dark:text-white">Para você</h2>
-            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
-              {pending.items.length}
-            </span>
-          </div>
-          <div className="space-y-2">
-            {pending.items.map((it) => (
-              <Link
-                key={it.key}
-                href={it.href}
-                className="flex items-center gap-3 rounded-xl border border-slate-200 p-3 transition hover:border-brand-300 hover:bg-brand-50/40 dark:border-white/[0.06] dark:hover:border-brand-800 dark:hover:bg-brand-950/20"
-              >
-                <span
-                  className={`mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full ${
-                    it.urgent ? "bg-rose-500" : "bg-amber-500"
-                  }`}
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-slate-900 dark:text-white">
-                    {it.label}
-                  </p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    {it.description}
-                  </p>
-                </div>
-                <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Score de Saúde do dia */}
-      <div className="card">
-        {health.hasData ? (
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-            <div className="flex items-center gap-4 sm:block sm:shrink-0 sm:text-center">
-              <ProgressRing
-                pct={health.score / 100}
-                centerMain={`${health.score}`}
-                centerSub="/ 100"
-                label="Score de Saúde"
-                colorClass={healthColor}
-              />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="mb-2 flex items-center gap-2">
-                <h2 className="font-semibold text-slate-900 dark:text-white">
-                  Seu dia hoje
-                </h2>
-                <span
-                  className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${healthBadge}`}
-                >
-                  {health.label}
-                </span>
-              </div>
-              <p className="mb-3 text-sm text-slate-500 dark:text-slate-400">
-                {health.topTip}
-              </p>
-              <div className="space-y-2">
-                {health.pillars.map((p) => (
-                  <div key={p.key}>
-                    <div className="mb-0.5 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-                      <span>{p.label}</span>
-                      <span className="tabular font-medium text-slate-600 dark:text-slate-300">
-                        {p.value}
-                      </span>
-                    </div>
-                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                      <div
-                        className={`h-full rounded-full ${
-                          p.value >= 70
-                            ? "bg-brand-500"
-                            : p.value >= 55
-                              ? "bg-amber-500"
-                              : "bg-rose-500"
-                        }`}
-                        style={{ width: `${p.value}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
-              <HeartPulse className="h-6 w-6" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h2 className="font-semibold text-slate-900 dark:text-white">
-                Seu Score de Saúde aparece aqui
-              </h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                Comece registrando água, sono, uma refeição ou um treino — a Gaia
-                também pode fazer isso por você.
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Resumo do dia — anéis */}
-      <div className="card">
+      {/* ----------------------------------------------------------------
+          2. SEU DIA — Score e números num bloco só
+      ---------------------------------------------------------------- */}
+      <section className="card">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-semibold text-slate-900 dark:text-white">
-            Resumo de hoje
-          </h2>
+          <div className="flex items-center gap-2">
+            <HeartPulse className="h-5 w-5 text-brand-600 dark:text-brand-400" />
+            <h2 className="font-semibold text-slate-900 dark:text-white">
+              Seu dia
+            </h2>
+          </div>
           {(!calorieGoal || !proteinGoal) && (
             <Link
               href="/app/perfil"
@@ -437,147 +368,136 @@ export default async function DashboardPage() {
             </Link>
           )}
         </div>
-        <div className="grid grid-cols-3 gap-2">
-          {rings.map((r) => (
-            <ProgressRing
-              key={r.label}
-              pct={r.pct}
-              centerMain={r.centerMain}
-              centerSub={r.centerSub}
-              label={r.label}
-              colorClass={r.colorClass}
-            />
-          ))}
+
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+          {health.hasData && (
+            <div className="shrink-0 sm:w-40">
+              <p className={`text-4xl font-bold leading-none ${healthColor}`}>
+                {health.score}
+              </p>
+              <p className="mt-1 text-[11px] uppercase tracking-wide text-slate-400">
+                Score de Saúde · {health.label}
+              </p>
+            </div>
+          )}
+
+          <div className="grid flex-1 grid-cols-3 gap-2">
+            {rings.map((r) => (
+              <ProgressRing
+                key={r.label}
+                pct={r.pct}
+                centerMain={r.centerMain}
+                centerSub={r.centerSub}
+                label={r.label}
+                colorClass={r.colorClass}
+              />
+            ))}
+          </div>
         </div>
-      </div>
 
-      {/* Mini-stats */}
-      <div className="grid grid-cols-2 gap-3">
-        <StatCard
-          label="Treinos (7 dias)"
-          value={workoutsWeek}
-          icon={<Dumbbell className="h-5 w-5" />}
-          accent="brand"
-        />
-        <StatCard
-          label="Peso atual"
-          value={currentWeight ?? "—"}
-          unit={currentWeight ? "kg" : ""}
-          icon={<Scale className="h-5 w-5" />}
-          accent="violet"
-        />
-      </div>
+        {health.hasData && health.topTip ? (
+          <p className="mt-3 border-t border-slate-100 pt-3 text-sm text-slate-600 dark:border-slate-800 dark:text-slate-300">
+            {health.topTip}
+          </p>
+        ) : !health.hasData ? (
+          <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+            Registre uma refeição, a água ou o sono para o Score do dia
+            aparecer.
+          </p>
+        ) : null}
+      </section>
 
-      {/* Tratamento + Desafios */}
-      <div className="grid gap-3 sm:grid-cols-2">
-        {treatment && doseLabel && (
-          <Link
-            href="/app/tratamento"
-            className={`card group flex items-center gap-4 transition duration-200 hover:-translate-y-0.5 ${
-              doseUrgent
-                ? "border-brand-300 bg-brand-50/60 dark:border-brand-800/60 dark:bg-brand-950/20"
-                : ""
-            }`}
-          >
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
-              <Syringe className="h-6 w-6" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                {doseLabel}
-              </p>
-              <p className="truncate text-xs text-slate-500 dark:text-slate-400">
-                {treatment.medication}
-                {treatment.dose ? ` · ${treatment.dose}` : ""}
-              </p>
-            </div>
-            <ArrowRight className="h-5 w-5 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-brand-500" />
-          </Link>
-        )}
-
-        <Link
-          href="/app/desafios"
-          className="card group flex items-center gap-4 transition duration-200 hover:-translate-y-0.5"
-        >
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-300">
-            <Target className="h-6 w-6" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-slate-900 dark:text-white">
-              Desafios da semana
-            </p>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              {challengesDone > 0
-                ? `${challengesDone}/${challengesTotal} concluídos — resgate mais XP!`
-                : "Complete metas e ganhe XP extra."}
-            </p>
-          </div>
-          <ArrowRight className="h-5 w-5 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-brand-500" />
-        </Link>
-      </div>
-
-      {/* Gráfico + Plano de hoje */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="card lg:col-span-2">
-          <div className="mb-4 flex items-center justify-between">
+      {/* ----------------------------------------------------------------
+          3. PROGRESSO — peso e números da semana
+      ---------------------------------------------------------------- */}
+      <section className="card">
+        <div className="mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Scale className="h-5 w-5 text-brand-600 dark:text-brand-400" />
             <h2 className="font-semibold text-slate-900 dark:text-white">
-              Evolução do peso
+              Progresso
             </h2>
+          </div>
+          <Link
+            href="/app/medidas"
+            className="text-xs font-medium text-brand-700 hover:underline dark:text-brand-400"
+          >
+            Ver medidas
+          </Link>
+        </div>
+
+        <div className="mb-4 grid grid-cols-3 gap-3 text-center">
+          <div>
+            <p className="text-xl font-bold text-slate-900 dark:text-white">
+              {currentWeight ?? "—"}
+              {currentWeight ? (
+                <span className="text-sm font-medium text-slate-400"> kg</span>
+              ) : null}
+            </p>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              Peso atual
+            </p>
+          </div>
+          <div>
+            <p className="text-xl font-bold text-slate-900 dark:text-white">
+              {workoutsWeek}
+            </p>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              Treinos (7 dias)
+            </p>
+          </div>
+          <div>
+            <p className="text-xl font-bold text-slate-900 dark:text-white">
+              {sleepToday != null ? sleepToday : "—"}
+              {sleepToday != null ? (
+                <span className="text-sm font-medium text-slate-400"> h</span>
+              ) : null}
+            </p>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              Sono hoje
+            </p>
+          </div>
+        </div>
+
+        {chartData.length > 1 ? (
+          <TrendChart data={chartData as any} unit=" kg" />
+        ) : (
+          <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center dark:border-slate-700">
+            <Scale className="mx-auto h-6 w-6 text-slate-300 dark:text-slate-600" />
+            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+              Registre seu peso algumas vezes para ver a evolução aqui.
+            </p>
             <Link
               href="/app/medidas"
-              className="text-sm font-medium text-brand-700 hover:underline dark:text-brand-400"
+              className="btn-primary mx-auto mt-3 w-fit px-4 py-1.5 text-xs"
             >
-              Ver mais
+              Registrar peso
             </Link>
           </div>
-          {chartData.length > 1 ? (
-            <TrendChart data={chartData} unit="kg" color="#18b85e" />
-          ) : (
-            <div className="flex h-[240px] flex-col items-center justify-center text-center text-sm text-slate-500 dark:text-slate-400">
-              <LineIcon className="mb-2 h-8 w-8 text-slate-300" />
-              Registre seu peso em Medidas para ver o gráfico.
-            </div>
-          )}
-        </div>
+        )}
+      </section>
 
-        <div className="card">
-          <div className="mb-4 flex items-center gap-2">
-            <CalendarDays className="h-5 w-5 text-brand-600 dark:text-brand-400" />
+      {/* ----------------------------------------------------------------
+          4. Histórico recente e atalhos secundários
+      ---------------------------------------------------------------- */}
+      <div className="grid gap-5 lg:grid-cols-2">
+        <section className="card">
+          <div className="mb-3 flex items-center justify-between">
             <h2 className="font-semibold text-slate-900 dark:text-white">
-              Plano de hoje
+              Treinos recentes
             </h2>
+            <Link
+              href="/app/treinos"
+              className="text-xs font-medium text-brand-700 hover:underline dark:text-brand-400"
+            >
+              Ver todos
+            </Link>
           </div>
-          {todayPlan.length > 0 ? (
-            <PlanCheckIn
-              sessions={todayPlan as any}
-              date={today}
-              completions={todayCompletions as any}
-            />
-          ) : (
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Nada planejado para hoje.
-            </p>
-          )}
-          <Link
-            href="/app/treinos"
-            className="mt-4 flex items-center gap-1 text-sm font-medium text-brand-700 hover:underline dark:text-brand-400"
-          >
-            Ver plano semanal <ArrowRight className="h-4 w-4" />
-          </Link>
-        </div>
-      </div>
-
-      {/* Treinos recentes + Ações rápidas */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="card lg:col-span-2">
-          <h2 className="mb-4 font-semibold text-slate-900 dark:text-white">
-            Treinos recentes
-          </h2>
           {recentWorkouts.length > 0 ? (
             <ul className="space-y-3">
               {recentWorkouts.map((w) => (
                 <li key={w.id} className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
                     <Dumbbell className="h-4 w-4" />
                   </div>
                   <div className="min-w-0">
@@ -594,34 +514,64 @@ export default async function DashboardPage() {
             </ul>
           ) : (
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              Nenhum treino ainda.
+              Nenhum treino registrado ainda.
             </p>
           )}
-        </div>
+        </section>
 
-        <div className="card">
-          <h2 className="mb-3 font-semibold text-slate-900 dark:text-white">
-            Ações rápidas
-          </h2>
-          <div className="space-y-2">
-            {actions.map((a) => (
-              <Link
-                key={a.href}
-                href={a.href}
-                className="group flex items-center gap-3 rounded-xl border border-slate-200 px-3 py-2.5 transition hover:border-brand-300 hover:bg-brand-50/50 dark:border-white/[0.06] dark:hover:border-brand-800 dark:hover:bg-brand-950/20"
-              >
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
-                  <a.icon className="h-4 w-4" />
-                </div>
-                <span className="flex-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                  {a.label}
-                </span>
-                <ArrowRight className="h-4 w-4 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-brand-500" />
-              </Link>
-            ))}
+        <section className="space-y-3">
+          {treatment && doseLabel && !doseUrgent && (
+            <Link
+              href="/app/tratamento"
+              className="card group flex items-center gap-4 transition duration-200 hover:-translate-y-0.5"
+            >
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
+                <Syringe className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                  {doseLabel}
+                </p>
+                <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                  {treatment.medication}
+                  {treatment.dose ? ` · ${treatment.dose}` : ""}
+                </p>
+              </div>
+              <ArrowRight className="h-5 w-5 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-brand-500" />
+            </Link>
+          )}
+
+          <Link
+            href="/app/relatorios"
+            className="card group flex items-center gap-4 transition duration-200 hover:-translate-y-0.5"
+          >
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
+              <BarChart3 className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                Relatório com IA
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Um resumo do seu período para levar à consulta.
+              </p>
+            </div>
+            <ArrowRight className="h-5 w-5 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-brand-500" />
+          </Link>
+
+          <div className="card">
+            <div className="mb-2 flex items-center gap-2">
+              <MessageCircle className="h-4 w-4 text-brand-600 dark:text-brand-400" />
+              <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                Fale com a Gaia
+              </p>
+            </div>
+            <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
+              Ela registra treino, refeição, água e peso por você — é só pedir.
+            </p>
             <OpenChatButton />
           </div>
-        </div>
+        </section>
       </div>
     </div>
   );
