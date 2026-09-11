@@ -86,9 +86,11 @@ const menuGroups = [
 
 // Navegação do NUTRICIONISTA (perfil profissional)
 const nutriNav = [
+  { href: "/app", label: "Visão geral", icon: LayoutDashboard, exact: true },
   { href: "/app/pacientes", label: "Pacientes", icon: Users, exact: false },
 ];
 const nutriMobileNav = [
+  { href: "/app", label: "Visão geral", icon: LayoutDashboard, exact: true },
   { href: "/app/pacientes", label: "Pacientes", icon: Users, exact: false },
 ];
 const nutriMenuGroups = [

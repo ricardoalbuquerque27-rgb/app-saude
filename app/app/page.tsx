@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import {
   Dumbbell,
   Flame,
@@ -26,6 +25,7 @@ import { CHALLENGES, weekStartISO } from "@/lib/challenges";
 import { todayISO, addDaysISO } from "@/lib/date";
 import { computeHealthScore } from "@/lib/healthScore";
 import { getPending } from "@/lib/pending";
+import NutriHome from "@/components/NutriHome";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -35,6 +35,23 @@ export default async function DashboardPage() {
   const uid = user!.id;
 
   const today = todayISO();
+
+  // Nutricionista tem uma home própria (visão macro da carteira); nada do
+  // dashboard de paciente abaixo é carregado para ele.
+  const { data: roleRow } = await supabase
+    .from("profiles")
+    .select("role, full_name")
+    .eq("id", uid)
+    .maybeSingle();
+  if ((roleRow as any)?.role === "nutritionist") {
+    return (
+      <NutriHome
+        firstName={((roleRow as any)?.full_name || "Nutri").split(" ")[0]}
+        today={today}
+      />
+    );
+  }
+
   const weekAgo = addDaysISO(today, -7);
   const dow = (new Date(today + "T12:00:00").getDay() + 6) % 7; // 0 = Segunda
 
@@ -101,8 +118,6 @@ export default async function DashboardPage() {
   ]);
 
   const profile = profileRes.data;
-  // Nutricionista não usa o dashboard de paciente.
-  if ((profile as any)?.role === "nutritionist") redirect("/app/pacientes");
   const firstName = (profile?.full_name || "Atleta").split(" ")[0];
   const initials = (profile?.full_name || "Atleta")
     .split(" ")
