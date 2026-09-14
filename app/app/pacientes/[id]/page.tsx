@@ -1198,7 +1198,7 @@ async function TabPrescricao({ supabase, uid, profile }: any) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [planoRes, rotinasRes, exsRes, msgsRes] = await Promise.all([
+  const [planoRes, rotinasRes, exsRes, msgsRes, desviosRes] = await Promise.all([
     supabase
       .from("workout_plan")
       .select("id, day_of_week, sport, title, routine_id, prescribed_by")
@@ -1224,6 +1224,12 @@ async function TabPrescricao({ supabase, uid, profile }: any) {
       .eq("patient_id", uid)
       .order("created_at", { ascending: false })
       .limit(100),
+    supabase
+      .from("prescription_deviations")
+      .select("id, kind, field, prescribed, current_value, created_at")
+      .eq("patient_id", uid)
+      .is("acknowledged_at", null)
+      .order("created_at", { ascending: false }),
   ]);
 
   const todas = (msgsRes.data ?? []) as any[];
@@ -1243,6 +1249,7 @@ async function TabPrescricao({ supabase, uid, profile }: any) {
       plano={(planoRes.data ?? []) as any}
       mensagens={todas.filter((m) => m.visibility === "shared")}
       notasPrivadas={todas.filter((m) => m.visibility === "private")}
+      desvios={(desviosRes.data ?? []) as any}
     />
   );
 }

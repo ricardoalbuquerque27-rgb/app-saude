@@ -68,9 +68,10 @@ export default function ChatWidget() {
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       // Marcador fora de banda enviado pelo servidor no fim do stream:
-      // " PF_REFRESH:treinos,habitos". Removemos do texto e usamos para
+      // "\0PF_REFRESH:treinos,habitos" (o \0 delimita: nunca aparece em
+      // texto natural). Removemos do texto e usamos para
       // recarregar as telas abertas.
-      const MARKER = /\s*PF_REFRESH:[a-z,]*\s*$/i;
+      const MARKER = /[\s\0]*PF_REFRESH:[a-z,]*[\s\0]*$/i;
       let acc = "";
       while (true) {
         const { done, value } = await reader.read();

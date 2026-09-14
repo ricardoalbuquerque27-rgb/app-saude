@@ -15,6 +15,7 @@ import {
   Eye,
   X,
   CalendarPlus,
+  AlertTriangle,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Field } from "@/components/ui";
@@ -61,6 +62,22 @@ export type PlanoItem = {
   prescribed_by: string | null;
 };
 
+export type Desvio = {
+  id: string;
+  kind: string;
+  field: string;
+  prescribed: string | null;
+  current_value: string | null;
+  created_at: string;
+};
+
+const ROTULO_CAMPO: Record<string, string> = {
+  daily_calorie_goal: "Calorias/dia",
+  protein_goal_g: "Proteína/dia",
+  daily_water_goal_ml: "Água/dia (ml)",
+  weight_goal_kg: "Peso alvo",
+};
+
 export type Mensagem = {
   id: string;
   body: string;
@@ -97,6 +114,7 @@ export default function PrescricaoClient({
   plano,
   mensagens,
   notasPrivadas,
+  desvios,
 }: {
   patientId: string;
   nutriId: string;
@@ -111,6 +129,7 @@ export default function PrescricaoClient({
   plano: PlanoItem[];
   mensagens: Mensagem[];
   notasPrivadas: Mensagem[];
+  desvios: Desvio[];
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -134,6 +153,38 @@ export default function PrescricaoClient({
         <p className="card mb-4 border-rose-200 bg-rose-50 text-sm text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-300">
           {erro}
         </p>
+      )}
+
+      {desvios.length > 0 && (
+        <div className="card mb-4 border-amber-300 bg-amber-50/70 dark:border-amber-700/50 dark:bg-amber-500/[0.08]">
+          <h2 className="section-title mb-2">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300">
+              <AlertTriangle className="h-4 w-4" />
+            </span>
+            O paciente mudou o que você prescreveu
+          </h2>
+          <ul className="mb-3 space-y-1.5">
+            {desvios.map((d) => (
+              <li key={d.id} className="text-sm text-slate-700 dark:text-slate-200">
+                <span className="font-medium">
+                  {ROTULO_CAMPO[d.field] ?? d.field}
+                </span>
+                : você definiu{" "}
+                <span className="font-semibold">{d.prescribed ?? "—"}</span>, está{" "}
+                <span className="font-semibold text-amber-700 dark:text-amber-300">
+                  {d.current_value ?? "—"}
+                </span>
+                <span className="text-slate-500 dark:text-slate-400">
+                  {" "}· {formatDate(d.created_at.slice(0, 10))}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-slate-600 dark:text-slate-300">
+            Os dados são do paciente e ele pode ajustá-los. Reaplicar as metas
+            abaixo resolve estes avisos.
+          </p>
+        </div>
       )}
 
       <div className="mb-4 flex gap-1 overflow-x-auto pb-1">

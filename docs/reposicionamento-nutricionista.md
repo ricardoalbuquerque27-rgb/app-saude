@@ -90,7 +90,25 @@ paciente**; construímos o **lado profissional** por cima.
   cria nota privada, não forja autoria do nutricionista e não escreve na
   conversa de outro paciente.
 
-- Pendente: Gaia ciente da prescrição (orientar dentro do plano do nutri).
+**Fase 3c — a prescrição passa a valer de verdade — ✅ FEITO**
+- Defeito que isso corrige: TUDO que o nutricionista prescrevia podia ser
+  desfeito em silêncio. A Gaia se apresentava como "nutricionista e personal
+  trainer virtual" e tinha 4 ferramentas que gravavam por cima da prescrição
+  (definir_metas escreve direto nas mesmas colunas do set_patient_goals); e a
+  policy workout_plan_delete_own deixava o paciente apagar sessão prescrita.
+  O painel do profissional seguia mostrando a meta dele como se valesse.
+- Escolha: TRANSPARÊNCIA, não bloqueio. Os dados são do paciente e ele pode
+  mudá-los; o que não pode é o painel mentir para o profissional.
+- prescription_deviations + gatilhos em profiles e workout_plan registram toda
+  divergência entre prescrito e vigente. Gatilho, e não checagem na aplicação,
+  para pegar alteração vinda do Perfil, da Gaia ou da API. Represcrever
+  reconhece as divergências abertas automaticamente.
+- Gaia: persona corrigida (assistente, não a profissional), contexto passa a
+  incluir a prescrição ativa, definir_metas RECUSA quando há prescrição e
+  remover_do_plano recusa sessão prescrita. As travas estão no servidor, não
+  só no prompt — prompt é orientação, policy/código é garantia.
+- Nova ferramenta falar_com_nutricionista: a Gaia vira ponte em vez de atalho.
+- Painel: card de divergências no topo da aba Prescrição e alerta no resumo.
 
 **Fase 4 — Conta/cobrança**
 - Assinatura do nutricionista (limite de pacientes por plano), paciente grátis.

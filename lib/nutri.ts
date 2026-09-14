@@ -25,6 +25,8 @@ export type PatientSummary = {
   planConfirmadas7: number;
   planFaltas7: number;
   planSemResposta7: number;
+  /** Divergências abertas entre o prescrito e o que está valendo. */
+  desvios: number;
   /** Motivos de atenção, já em texto pronto para exibir. */
   alerts: string[];
 };
@@ -57,8 +59,9 @@ export async function getPatientsSummary(
   const d30 = addDaysISO(today, -30);
   const d180 = addDaysISO(today, -180);
 
-  const [mealsRes, wkRes, logsRes, bodyRes, examsRes, treatRes, planRes, checksRes] =
-    await Promise.all([
+  const [
+    mealsRes, wkRes, logsRes, bodyRes, examsRes, treatRes, planRes, checksRes, desviosRes,
+  ] = await Promise.all([
       supabase
         .from("meals")
         .select("user_id, date, calories, protein_g")
@@ -101,6 +104,11 @@ export async function getPatientsSummary(
         .select("user_id, plan_id, date, status")
         .in("user_id", ids)
         .gte("date", d7),
+      supabase
+        .from("prescription_deviations")
+        .select("patient_id")
+        .in("patient_id", ids)
+        .is("acknowledged_at", null),
     ]);
 
   const meals = (mealsRes.data ?? []) as any[];
@@ -111,6 +119,7 @@ export async function getPatientsSummary(
   const treats = (treatRes.data ?? []) as any[];
   const planRows = (planRes.data ?? []) as any[];
   const checkRows = (checksRes.data ?? []) as any[];
+  const desvioRows = (desviosRes.data ?? []) as any[];
 
   // Datas dos últimos 7 dias já vencidos (inclui hoje), para cruzar o plano
   // — que é um molde por dia da semana — com os check-ins reais.
@@ -200,8 +209,14 @@ export async function getPatientsSummary(
       planConfirmadas7,
       planFaltas7,
       planSemResposta7: planPrevistas7 - planConfirmadas7 - planFaltas7,
+      desvios: desvioRows.filter((d) => d.patient_id === id).length,
       alerts: [],
     };
+
+    if (summary.desvios > 0)
+      summary.alerts.push(
+        `${summary.desvios} ${summary.desvios > 1 ? "mudanças" : "mudança"} na sua prescrição`
+      );
 
     const idle = idleDays(summary, today);
     if (idle == null) summary.alerts.push("Nunca registrou nada");

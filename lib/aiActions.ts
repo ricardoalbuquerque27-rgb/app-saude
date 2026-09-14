@@ -491,6 +491,7 @@ export const TOOL_AREAS: Record<string, string> = {
   concluir_treino_do_plano: "treinos",
   atualizar_peso: "medidas",
   remover_do_plano: "treinos",
+  falar_com_nutricionista: "nutricionista",
 };
 
 const DIAS = ["segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo"];
@@ -985,7 +986,60 @@ export async function executeAction(
         return { ok: true, resumo: `Registrei ${partes.join(", ")} na aba Hábitos.` };
       }
 
+      case "falar_com_nutricionista": {
+        const msg = String(args.mensagem ?? "").trim();
+        if (!msg) return { ok: false, resumo: "Escreva a mensagem para o nutricionista." };
+
+        const { data: vinculo } = await supabase
+          .from("patient_links")
+          .select("nutritionist_id")
+          .eq("patient_id", uid)
+          .eq("status", "active")
+          .limit(1)
+          .maybeSingle();
+
+        if (!vinculo) {
+          return {
+            ok: false,
+            resumo:
+              "Você ainda não está conectado a um nutricionista no app, então não tenho para quem enviar.",
+          };
+        }
+
+        const { error } = await supabase.from("patient_notes").insert({
+          nutritionist_id: (vinculo as any).nutritionist_id,
+          patient_id: uid,
+          author_id: uid,
+          body: msg,
+          visibility: "shared",
+        });
+        if (error) return { ok: false, resumo: "Não consegui enviar a mensagem." };
+        return {
+          ok: true,
+          resumo: "Mensagem enviada ao seu nutricionista.",
+          area: "nutricionista",
+        };
+      }
+
       case "definir_metas": {
+        // A prescrição do profissional não é sobrescrita pela IA. A regra está
+        // também no system prompt, mas aqui é onde ela realmente se sustenta:
+        // instrução de prompt é orientação, isto é garantia.
+        const { data: presc } = await supabase
+          .from("prescriptions")
+          .select("id")
+          .eq("patient_id", uid)
+          .limit(1)
+          .maybeSingle();
+        if (presc) {
+          return {
+            ok: false,
+            resumo:
+              "Essas metas foram definidas pelo seu nutricionista, então não posso alterá-las por aqui. " +
+              "Posso mandar um recado para ele pedindo o ajuste — quer que eu faça? " +
+              "(Se preferir mudar mesmo assim, dá para editar no Perfil; ele vai ser avisado da mudança.)",
+          };
+        }
         const patch: any = { id: uid, updated_at: new Date().toISOString() };
         const partes: string[] = [];
         const peso = toNum(args.peso_alvo_kg);
@@ -1143,11 +1197,32 @@ export async function executeAction(
         if (dia == null || dia < 0 || dia > 6) {
           return { ok: false, resumo: "Diga o dia da semana para remover do plano." };
         }
+        // Sessão prescrita pelo nutricionista não sai pela IA.
+        let checa = supabase
+          .from("workout_plan")
+          .select("id, sport")
+          .eq("user_id", uid)
+          .eq("day_of_week", dia)
+          .not("prescribed_by", "is", null);
+        if (typeof args.esporte === "string" && args.esporte.trim()) {
+          checa = checa.ilike("sport", `%${args.esporte.trim()}%`);
+        }
+        const { data: prescritas } = await checa;
+        if ((prescritas ?? []).length > 0) {
+          return {
+            ok: false,
+            resumo:
+              `O treino de ${DIAS[dia]} foi montado pelo seu nutricionista, então não posso removê-lo. ` +
+              "Se não der para fazer, posso avisar ele — quer?",
+          };
+        }
+
         let q = supabase
           .from("workout_plan")
           .delete()
           .eq("user_id", uid)
-          .eq("day_of_week", dia);
+          .eq("day_of_week", dia)
+          .is("prescribed_by", null);
         let alvo = DIAS[dia];
         if (typeof args.esporte === "string" && args.esporte.trim()) {
           q = q.ilike("sport", `%${args.esporte.trim()}%`);
