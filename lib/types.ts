@@ -203,6 +203,81 @@ export type Database = {
           },
         ];
       };
+      meal_plans: {
+        Row: {
+          active: boolean;
+          created_at: string;
+          id: string;
+          name: string;
+          notes: string | null;
+          nutritionist_id: string | null;
+          patient_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          active?: boolean;
+          created_at?: string;
+          id?: string;
+          name?: string;
+          notes?: string | null;
+          nutritionist_id?: string | null;
+          patient_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          active?: boolean;
+          created_at?: string;
+          id?: string;
+          name?: string;
+          notes?: string | null;
+          nutritionist_id?: string | null;
+          patient_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      meal_plan_items: {
+        Row: {
+          calories: number | null;
+          carbs_g: number | null;
+          description: string;
+          fat_g: number | null;
+          id: string;
+          meal_plan_id: string;
+          meal_type: string;
+          notes: string | null;
+          position: number;
+          protein_g: number | null;
+          user_id: string;
+        };
+        Insert: {
+          calories?: number | null;
+          carbs_g?: number | null;
+          description: string;
+          fat_g?: number | null;
+          id?: string;
+          meal_plan_id: string;
+          meal_type: string;
+          notes?: string | null;
+          position?: number;
+          protein_g?: number | null;
+          user_id: string;
+        };
+        Update: {
+          calories?: number | null;
+          carbs_g?: number | null;
+          description?: string;
+          fat_g?: number | null;
+          id?: string;
+          meal_plan_id?: string;
+          meal_type?: string;
+          notes?: string | null;
+          position?: number;
+          protein_g?: number | null;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       meals: {
         Row: {
           calories: number | null;
@@ -933,6 +1008,8 @@ export type PlanCompletion = PublicSchema["Tables"]["plan_completions"]["Row"];
 export type Treatment = PublicSchema["Tables"]["treatments"]["Row"];
 export type Routine = PublicSchema["Tables"]["routines"]["Row"];
 export type RoutineExercise = PublicSchema["Tables"]["routine_exercises"]["Row"];
+export type MealPlan = PublicSchema["Tables"]["meal_plans"]["Row"];
+export type MealPlanItem = PublicSchema["Tables"]["meal_plan_items"]["Row"];
 export type Prescription = PublicSchema["Tables"]["prescriptions"]["Row"];
 export type PatientNote = PublicSchema["Tables"]["patient_notes"]["Row"];
 export type PatientLink = PublicSchema["Tables"]["patient_links"]["Row"];

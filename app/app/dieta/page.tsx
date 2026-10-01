@@ -19,6 +19,9 @@ import { PageHeader, Modal, Field, EmptyState } from "@/components/ui";
 import { ProgressRing } from "@/components/ProgressRing";
 import { todayISO } from "@/lib/date";
 import { useLiveRefresh } from "@/lib/useLiveRefresh";
+import MealPlanView, {
+  type ItemCardapioPaciente,
+} from "@/components/MealPlanView";
 
 const MEAL_TYPES = [
   "Café da manhã",
@@ -33,6 +36,11 @@ export default function DietaPage() {
   const supabase = createClient();
   const [date, setDate] = useState(todayISO());
   const [meals, setMeals] = useState<Meal[]>([]);
+  const [cardapio, setCardapio] = useState<{
+    nome: string;
+    obs: string | null;
+    itens: ItemCardapioPaciente[];
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [calorieGoal, setCalorieGoal] = useState<number | null>(null);
   const [proteinGoal, setProteinGoal] = useState<number | null>(null);
@@ -60,6 +68,32 @@ export default function DietaPage() {
       .eq("date", date)
       .order("created_at", { ascending: true });
     setMeals((data ?? []) as Meal[]);
+
+    // Cardápio prescrito pelo nutricionista (se houver). A RLS já garante
+    // que só vem o do próprio paciente.
+    const { data: plano } = await supabase
+      .from("meal_plans")
+      .select("id, name, notes")
+      .eq("active", true)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (plano) {
+      const { data: itens } = await supabase
+        .from("meal_plan_items")
+        .select("id, meal_type, position, description, calories, protein_g, carbs_g, fat_g")
+        .eq("meal_plan_id", (plano as any).id)
+        .order("position", { ascending: true });
+      setCardapio({
+        nome: (plano as any).name,
+        obs: (plano as any).notes,
+        itens: (itens ?? []) as ItemCardapioPaciente[],
+      });
+    } else {
+      setCardapio(null);
+    }
+
     setLoading(false);
   }, [supabase, date]);
 
@@ -260,6 +294,17 @@ export default function DietaPage() {
           </button>
         )}
       </div>
+
+      {cardapio && (
+        <MealPlanView
+          nome={cardapio.nome}
+          observacao={cardapio.obs}
+          itens={cardapio.itens}
+          date={date}
+          jaRegistrados={meals.map((m) => m.meal_type)}
+          onRegistrado={load}
+        />
+      )}
 
       {/* Resumo do dia */}
       <div className="card mb-6">

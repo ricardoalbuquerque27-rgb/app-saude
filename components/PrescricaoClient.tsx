@@ -20,6 +20,10 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { Field } from "@/components/ui";
 import { formatDate } from "@/lib/date";
+import MealPlanEditor, {
+  type PlanoAlimentar,
+  type ItemCardapio,
+} from "@/components/MealPlanEditor";
 
 const DIAS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
 const ESPORTES = [
@@ -87,7 +91,7 @@ export type Mensagem = {
   visibility: string;
 };
 
-type Aba = "metas" | "treino" | "conversa" | "notas";
+type Aba = "metas" | "alimentacao" | "treino" | "conversa" | "notas";
 
 type LinhaExercicio = {
   nome: string;
@@ -115,6 +119,8 @@ export default function PrescricaoClient({
   mensagens,
   notasPrivadas,
   desvios,
+  planoAlimentar,
+  itensCardapio,
 }: {
   patientId: string;
   nutriId: string;
@@ -130,6 +136,8 @@ export default function PrescricaoClient({
   mensagens: Mensagem[];
   notasPrivadas: Mensagem[];
   desvios: Desvio[];
+  planoAlimentar: PlanoAlimentar | null;
+  itensCardapio: ItemCardapio[];
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -142,6 +150,7 @@ export default function PrescricaoClient({
 
   const abas: { key: Aba; label: string; badge?: number }[] = [
     { key: "metas", label: "Metas" },
+    { key: "alimentacao", label: "Alimentação" },
     { key: "treino", label: "Treino" },
     { key: "conversa", label: "Conversa", badge: naoLidas },
     { key: "notas", label: "Notas privadas" },
@@ -215,6 +224,16 @@ export default function PrescricaoClient({
           setErro={setErro}
           supabase={supabase}
           router={router}
+        />
+      )}
+      {aba === "alimentacao" && (
+        <MealPlanEditor
+          patientId={patientId}
+          nutriId={nutriId}
+          plano={planoAlimentar}
+          itens={itensCardapio}
+          metaCalorias={metas.daily_calorie_goal}
+          metaProteina={metas.protein_goal_g}
         />
       )}
       {aba === "treino" && (

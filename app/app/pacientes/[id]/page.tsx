@@ -1198,7 +1198,8 @@ async function TabPrescricao({ supabase, uid, profile }: any) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [planoRes, rotinasRes, exsRes, msgsRes, desviosRes] = await Promise.all([
+  const [planoRes, rotinasRes, exsRes, msgsRes, desviosRes, cardapioRes] =
+    await Promise.all([
     supabase
       .from("workout_plan")
       .select("id, day_of_week, sport, title, routine_id, prescribed_by")
@@ -1230,7 +1231,24 @@ async function TabPrescricao({ supabase, uid, profile }: any) {
       .eq("patient_id", uid)
       .is("acknowledged_at", null)
       .order("created_at", { ascending: false }),
+    supabase
+      .from("meal_plans")
+      .select("id, name, notes, created_at")
+      .eq("patient_id", uid)
+      .eq("active", true)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
+
+  const cardapio = cardapioRes.data as any;
+  const { data: itensCardapio } = cardapio
+    ? await supabase
+        .from("meal_plan_items")
+        .select("id, meal_plan_id, meal_type, position, description, calories, protein_g, carbs_g, fat_g")
+        .eq("meal_plan_id", cardapio.id)
+        .order("position", { ascending: true })
+    : { data: [] as any[] };
 
   const todas = (msgsRes.data ?? []) as any[];
 
@@ -1250,6 +1268,8 @@ async function TabPrescricao({ supabase, uid, profile }: any) {
       mensagens={todas.filter((m) => m.visibility === "shared")}
       notasPrivadas={todas.filter((m) => m.visibility === "private")}
       desvios={(desviosRes.data ?? []) as any}
+      planoAlimentar={cardapio ?? null}
+      itensCardapio={(itensCardapio ?? []) as any}
     />
   );
 }
