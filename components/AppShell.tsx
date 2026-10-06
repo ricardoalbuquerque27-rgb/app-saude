@@ -32,6 +32,7 @@ import Onboarding from "@/components/Onboarding";
 // Navegação completa (usada na sidebar do desktop)
 const nav = [
   { href: "/app", label: "Início", icon: LayoutDashboard, exact: true },
+  { href: "/app/nutricionista", label: "Meu plano", icon: Stethoscope },
   { href: "/app/treinos", label: "Treinos", icon: Dumbbell },
   { href: "/app/dieta", label: "Dieta", icon: Salad },
   { href: "/app/medidas", label: "Medidas", icon: LineChart },
@@ -42,6 +43,7 @@ const nav = [
 // Barra inferior do celular — apenas o essencial do dia a dia
 const mobileNav = [
   { href: "/app", label: "Início", icon: LayoutDashboard, exact: true },
+  { href: "/app/nutricionista", label: "Meu plano", icon: Stethoscope },
   { href: "/app/treinos", label: "Treinos", icon: Dumbbell },
   { href: "/app/dieta", label: "Dieta", icon: Salad },
   { href: "/app/habitos", label: "Hábitos", icon: Droplets },
@@ -52,10 +54,7 @@ const mobileNav = [
 const menuGroups = [
   {
     title: "Meu acompanhamento",
-    items: [
-      { href: "/app/nutricionista", label: "Meu nutricionista", icon: Stethoscope },
-      { href: "/app/relatorios", label: "Relatórios", icon: BarChart3 },
-    ],
+    items: [{ href: "/app/relatorios", label: "Relatórios", icon: BarChart3 }],
   },
   {
     title: "Saúde",
@@ -270,7 +269,12 @@ export default function AppShell({
 
       {/* Bottom nav — mobile */}
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur lg:hidden dark:border-slate-800 dark:bg-slate-900/95">
-        <div className="mx-auto grid max-w-lg grid-cols-5">
+        <div
+          className="mx-auto grid max-w-lg"
+          style={{
+            gridTemplateColumns: `repeat(${mobNav.length + 1}, minmax(0, 1fr))`,
+          }}
+        >
           {mobNav.map((item) => (
             <Link
               key={item.href}

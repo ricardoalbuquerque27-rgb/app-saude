@@ -13,6 +13,7 @@ import {
   BarChart3,
   Plus,
   CheckCircle2,
+  Stethoscope,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { TrendChart } from "@/components/charts";
@@ -66,6 +67,7 @@ export default async function DashboardPage() {
     todayCompletionsRes,
     notasRes,
     cardapioRes,
+    vinculoRes,
   ] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", uid).maybeSingle(),
     supabase
@@ -99,7 +101,7 @@ export default async function DashboardPage() {
       .limit(5),
     supabase
       .from("workout_plan")
-      .select("id, sport, title, day_of_week")
+      .select("id, sport, title, day_of_week, prescribed_by")
       .eq("user_id", uid)
       .eq("day_of_week", dow)
       .order("position", { ascending: true }),
@@ -131,6 +133,12 @@ export default async function DashboardPage() {
       .eq("patient_id", uid)
       .eq("active", true)
       .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("patient_links")
+      .select("nutritionist_id")
+      .eq("status", "active")
       .limit(1)
       .maybeSingle(),
   ]);
@@ -166,6 +174,7 @@ export default async function DashboardPage() {
   // aba. Trazemos para a primeira tela, e só as refeições que ainda faltam
   // hoje — o que sobra é exatamente o que ele tem a fazer.
   const cardapio = cardapioRes.data as any;
+  const vinculo = vinculoRes.data as any;
   const tiposJaRegistrados = (mealsTodayRes.data ?? []).map(
     (m: any) => m.meal_type
   );
@@ -179,6 +188,16 @@ export default async function DashboardPage() {
     itensCardapioPendentes = (itens ?? []).filter(
       (i: any) => !tiposJaRegistrados.includes(i.meal_type)
     );
+  }
+
+  let nutriNome = "";
+  if (vinculo?.nutritionist_id) {
+    const { data: prof } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", vinculo.nutritionist_id)
+      .maybeSingle();
+    nutriNome = (prof as any)?.full_name || "";
   }
 
   const health = computeHealthScore({
@@ -268,6 +287,19 @@ export default async function DashboardPage() {
   const checkinPendente = todayPlan.filter(
     (p: any) => !todayCompletions.some((c: any) => c.plan_id === p.id)
   ).length;
+
+  // O que vem do nutricionista fica junto, num bloco só e identificado. Antes
+  // o recado, o treino prescrito e o cardápio apareciam soltos no meio das
+  // pendências do próprio app — e a pessoa não sabia o que era orientação
+  // profissional e o que era lembrete do sistema.
+  const planoNutri = todayPlan.filter((p: any) => p.prescribed_by);
+  const planoProprio = todayPlan.filter((p: any) => !p.prescribed_by);
+  const temNutri = !!vinculo;
+  const blocoNutri =
+    temNutri &&
+    (notasNaoLidas.length > 0 ||
+      planoNutri.length > 0 ||
+      itensCardapioPendentes.length > 0);
   const tudoEmDia =
     checkinPendente === 0 &&
     pending.items.length === 0 &&
@@ -316,22 +348,77 @@ export default async function DashboardPage() {
           </div>
         ) : (
           <div className="space-y-3">
-            {notasNaoLidas.length > 0 && (
-              <NutriNotes notas={notasNaoLidas as any} meuId={uid} compact />
+            {/* Tudo o que veio do nutricionista, num bloco só e com o nome
+                dele no topo — e com um caminho único para o resto. */}
+            {blocoNutri && (
+              <div className="rounded-xl border border-brand-200 bg-brand-50/70 p-3 dark:border-brand-900/60 dark:bg-brand-500/[0.07]">
+                <div className="mb-2.5 flex items-center justify-between gap-2">
+                  <p className="flex min-w-0 items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-brand-700 dark:text-brand-300">
+                    <Stethoscope className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">
+                      {nutriNome
+                        ? `Do seu nutricionista · ${nutriNome.split(" ")[0]}`
+                        : "Do seu nutricionista"}
+                    </span>
+                  </p>
+                  <Link
+                    href="/app/nutricionista"
+                    className="shrink-0 text-[11px] font-semibold text-brand-700 hover:underline dark:text-brand-300"
+                  >
+                    Ver plano
+                  </Link>
+                </div>
+
+                <div className="space-y-3">
+                  {notasNaoLidas.length > 0 && (
+                    <NutriNotes notas={notasNaoLidas as any} meuId={uid} compact />
+                  )}
+
+                  {planoNutri.length > 0 && (
+                    <div>
+                      <p className="eyebrow mb-1.5">Treino prescrito para hoje</p>
+                      <PlanCheckIn
+                        sessions={planoNutri as any}
+                        date={today}
+                        completions={todayCompletions as any}
+                      />
+                    </div>
+                  )}
+
+                  {itensCardapioPendentes.length > 0 && (
+                    <div>
+                      <p className="eyebrow mb-1.5">
+                        Cardápio — o que ainda falta hoje
+                      </p>
+                      <MealPlanView
+                        nome={cardapio.name}
+                        observacao={cardapio.notes}
+                        itens={itensCardapioPendentes as any}
+                        date={today}
+                        jaRegistrados={tiposJaRegistrados}
+                        compacto
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
             )}
 
-            {todayPlan.length > 0 && (
+            {/* Fora do bloco: o que é do próprio paciente. */}
+            {(planoProprio.length > 0 || (!temNutri && planoNutri.length > 0)) && (
               <div>
                 <p className="eyebrow mb-1.5">Treino de hoje</p>
                 <PlanCheckIn
-                  sessions={todayPlan as any}
+                  sessions={
+                    (temNutri ? planoProprio : todayPlan) as any
+                  }
                   date={today}
                   completions={todayCompletions as any}
                 />
               </div>
             )}
 
-            {itensCardapioPendentes.length > 0 && (
+            {!temNutri && itensCardapioPendentes.length > 0 && (
               <div>
                 <p className="eyebrow mb-1.5">
                   Cardápio de hoje — o que ainda falta

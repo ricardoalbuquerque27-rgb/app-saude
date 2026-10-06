@@ -1,267 +1,393 @@
-"use client";
-
-import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import {
   Stethoscope,
-  Loader2,
-  Check,
-  ShieldCheck,
   Target,
+  Utensils,
+  Dumbbell,
   MessageSquare,
+  NotebookPen,
+  CalendarDays,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
-import { PageHeader, Field } from "@/components/ui";
+import { createClient } from "@/lib/supabase/server";
+import { PageHeader } from "@/components/ui";
+import { todayISO, formatDate } from "@/lib/date";
 import NutriNotes, { type Nota } from "@/components/NutriNotes";
+import MealPlanView from "@/components/MealPlanView";
+import ConectarNutri from "@/components/ConectarNutri";
+import RevogarNutri from "@/components/RevogarNutri";
 
-type Link_ = { id: string; nutritionist_id: string; status: string };
+export const dynamic = "force-dynamic";
 
-export default function MeuNutricionistaPage() {
-  const supabase = createClient();
-  const [links, setLinks] = useState<Link_[]>([]);
-  const [names, setNames] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(true);
-  const [code, setCode] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
-  const [notas, setNotas] = useState<Nota[]>([]);
-  const [meuId, setMeuId] = useState("");
-  const [prescricao, setPrescricao] = useState<any>(null);
+const DIAS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const { data } = await supabase
-      .from("patient_links")
-      .select("id, nutritionist_id, status")
-      .eq("status", "active");
-    const list = (data ?? []) as Link_[];
-    setLinks(list);
+const ABAS = [
+  { key: "metas", label: "Metas", icon: Target },
+  { key: "cardapio", label: "Cardápio", icon: Utensils },
+  { key: "treino", label: "Treino", icon: Dumbbell },
+  { key: "conversa", label: "Conversa", icon: MessageSquare },
+] as const;
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    setMeuId(user?.id ?? "");
+type AbaKey = (typeof ABAS)[number]["key"];
 
-    const [{ data: n }, { data: pr }] = await Promise.all([
-      supabase
-        .from("patient_notes")
-        .select("id, body, created_at, read_at, author_id")
-        .order("created_at", { ascending: false })
-        .limit(30),
+// Página única do acompanhamento, do lado do paciente. Ela espelha as abas
+// que o nutricionista preenche (metas, cardápio, treino, conversa), para o
+// que foi prescrito chegar organizado do mesmo jeito que foi escrito — antes
+// isso estava espalhado por Dieta, Treinos, Perfil e esta página.
+export default async function MeuNutricionistaPage({
+  searchParams,
+}: {
+  searchParams: { aba?: string; code?: string };
+}) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const uid = user!.id;
+  const today = todayISO();
+
+  const aba: AbaKey = (ABAS.find((a) => a.key === searchParams?.aba)?.key ??
+    "metas") as AbaKey;
+
+  const { data: linkRow } = await supabase
+    .from("patient_links")
+    .select("id, nutritionist_id, created_at, accepted_at")
+    .eq("status", "active")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const link = linkRow as any;
+
+  // Sem vínculo não há o que organizar: só o caminho para criar um.
+  if (!link) {
+    return (
+      <div className="max-w-2xl">
+        <PageHeader
+          title="Meu plano"
+          subtitle="Conecte-se ao seu nutricionista para receber metas, cardápio e treino aqui."
+        />
+        <ConectarNutri codeInicial={searchParams?.code ?? ""} />
+        <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
+          Você ainda não está conectado a nenhum nutricionista. Peça a ele o
+          código de convite ou o link que ele gera no painel dele.
+        </p>
+      </div>
+    );
+  }
+
+  const nutriId = link.nutritionist_id as string;
+
+  const [profRes, prescRes, planoRes, notasRes, refeicoesRes, sessoesRes] =
+    await Promise.all([
+      supabase.from("profiles").select("full_name").eq("id", nutriId).maybeSingle(),
       supabase
         .from("prescriptions")
         .select("*")
+        .eq("patient_id", uid)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
+      supabase
+        .from("meal_plans")
+        .select("id, name, notes, updated_at")
+        .eq("patient_id", uid)
+        .eq("active", true)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("patient_notes")
+        .select("id, body, created_at, read_at, author_id")
+        .eq("patient_id", uid)
+        .eq("visibility", "shared")
+        .order("created_at", { ascending: false })
+        .limit(50),
+      supabase
+        .from("meals")
+        .select("meal_type")
+        .eq("user_id", uid)
+        .eq("date", today),
+      supabase
+        .from("workout_plan")
+        .select("id, sport, title, notes, day_of_week, routine_id, prescribed_by")
+        .eq("user_id", uid)
+        .not("prescribed_by", "is", null)
+        .order("day_of_week", { ascending: true })
+        .order("position", { ascending: true }),
     ]);
-    setNotas((n ?? []) as Nota[]);
-    setPrescricao(pr);
-    const ids = list.map((l) => l.nutritionist_id);
-    if (ids.length) {
-      const { data: profs } = await supabase
-        .from("profiles")
-        .select("id, full_name")
-        .in("id", ids);
-      const m: Record<string, string> = {};
-      (profs ?? []).forEach((p: any) => (m[p.id] = p.full_name || "Nutricionista"));
-      setNames(m);
-    } else {
-      setNames({});
-    }
-    setLoading(false);
-  }, [supabase]);
 
-  useEffect(() => {
-    load();
-    // Pré-preenche o código vindo do link do convite (?code=...).
-    try {
-      const c = new URLSearchParams(window.location.search).get("code");
-      if (c) setCode(c.toUpperCase());
-    } catch {}
-  }, [load]);
+  const nutriNome = (profRes.data as any)?.full_name || "Seu nutricionista";
+  const presc = prescRes.data as any;
+  const plano = planoRes.data as any;
+  const notas = (notasRes.data ?? []) as Nota[];
+  const naoLidas = notas.filter((n) => n.author_id !== uid && !n.read_at).length;
+  const jaRegistrados = (refeicoesRes.data ?? []).map((m: any) => m.meal_type);
+  const sessoes = (sessoesRes.data ?? []) as any[];
 
-  async function accept() {
-    const c = code.trim().toUpperCase();
-    if (!c) return;
-    setSaving(true);
-    setMsg(null);
-    const { data, error } = await supabase.rpc("accept_patient_invite", { p_code: c });
-    setSaving(false);
-    if (error) {
-      setMsg({ type: "err", text: "Não foi possível conectar. Tente novamente." });
-      return;
-    }
-    const res = data as { ok: boolean; error?: string; already?: boolean };
-    if (res?.ok) {
-      setMsg({
-        type: "ok",
-        text: res.already ? "Você já estava vinculado." : "Pronto! Vínculo criado.",
-      });
-      setCode("");
-      await load();
-    } else {
-      setMsg({ type: "err", text: res?.error ?? "Convite inválido." });
-    }
+  let itensCardapio: any[] = [];
+  if (plano) {
+    const { data } = await supabase
+      .from("meal_plan_items")
+      .select("id, meal_type, position, description, calories, protein_g, carbs_g, fat_g")
+      .eq("meal_plan_id", plano.id)
+      .order("position", { ascending: true });
+    itensCardapio = data ?? [];
   }
 
-  async function revoke(id: string) {
-    if (
-      !confirm(
-        "Revogar o acesso deste nutricionista aos seus dados? Ele deixará de ver seus registros."
-      )
-    )
-      return;
-    await supabase.from("patient_links").update({ status: "revoked" }).eq("id", id);
-    setLinks((prev) => prev.filter((l) => l.id !== id));
+  // Exercícios das rotinas que as sessões prescritas apontam.
+  const rotinaIds = Array.from(
+    new Set(sessoes.map((s) => s.routine_id).filter(Boolean))
+  ) as string[];
+  let exercicios: any[] = [];
+  let rotinas: any[] = [];
+  if (rotinaIds.length > 0) {
+    const [r, e] = await Promise.all([
+      supabase.from("routines").select("id, name, notes").in("id", rotinaIds),
+      supabase
+        .from("routine_exercises")
+        .select("id, routine_id, name, target_sets, target_reps, target_weight_kg, rest_seconds, position")
+        .in("routine_id", rotinaIds)
+        .order("position", { ascending: true }),
+    ]);
+    rotinas = r.data ?? [];
+    exercicios = e.data ?? [];
   }
+
+  const temMetas =
+    presc &&
+    (presc.daily_calorie_goal ||
+      presc.protein_goal_g ||
+      presc.daily_water_goal_ml ||
+      presc.weight_goal_kg);
 
   return (
     <div className="max-w-2xl">
       <PageHeader
-        title="Meu nutricionista"
-        subtitle="Conecte-se ao seu nutricionista para ele acompanhar sua evolução."
+        title="Meu plano"
+        subtitle="Tudo o que seu nutricionista definiu para você, num lugar só."
       />
 
-      {/* Conectar por código */}
-      <div className="card mb-6">
-        <div className="mb-3 flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
-            <Stethoscope className="h-4 w-4" />
-          </span>
-          <h2 className="font-semibold text-slate-900 dark:text-white">
-            Conectar com um código
-          </h2>
+      {/* Quem está acompanhando */}
+      <div className="card mb-5 flex items-center gap-3 p-3">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
+          <Stethoscope className="h-5 w-5" />
         </div>
-        <Field label="Código do convite">
-          <input
-            className="input font-mono uppercase tracking-widest"
-            value={code}
-            onChange={(e) => setCode(e.target.value.toUpperCase())}
-            placeholder="Ex.: 7F3A9C2B"
-            maxLength={8}
-          />
-        </Field>
-        <p className="mb-3 flex items-start gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-          <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-600" />
-          Ao conectar, você autoriza este nutricionista a ver seus registros de
-          saúde (dieta, peso, exames, hábitos). Você pode revogar quando quiser.
-        </p>
-        <button
-          onClick={accept}
-          disabled={saving || !code.trim()}
-          className="btn-primary w-full py-2.5"
-        >
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-          Conectar
-        </button>
-        {msg && (
-          <p
-            className={`mt-3 rounded-lg px-3 py-2 text-sm ${
-              msg.type === "ok"
-                ? "bg-brand-50 text-brand-700 dark:bg-brand-950/30 dark:text-brand-300"
-                : "bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-300"
-            }`}
-          >
-            {msg.text}
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-semibold text-slate-900 dark:text-white">
+            {nutriNome}
           </p>
-        )}
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Acompanha você desde{" "}
+            {formatDate(String(link.accepted_at || link.created_at).slice(0, 10))}
+          </p>
+        </div>
+        <RevogarNutri linkId={link.id} />
       </div>
 
-      {/* Nutricionistas vinculados */}
-      {loading ? (
-        <div className="flex justify-center py-8 text-slate-400">
-          <Loader2 className="h-6 w-6 animate-spin" />
-        </div>
-      ) : links.length > 0 ? (
-        <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-            Conectado com
-          </p>
-          <div className="space-y-2">
-            {links.map((l) => (
-              <div key={l.id} className="card flex items-center gap-3 p-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
-                  <Stethoscope className="h-5 w-5" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold text-slate-900 dark:text-white">
-                    {names[l.nutritionist_id] || "Seu nutricionista"}
-                  </p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Acompanhando seus dados
-                  </p>
-                </div>
-                <button
-                  onClick={() => revoke(l.id)}
-                  className="rounded-lg px-3 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30"
-                >
-                  Revogar
-                </button>
+      {/* Abas espelham as do painel do nutricionista */}
+      <div className="mb-5 -mx-1 flex gap-1 overflow-x-auto pb-1">
+        {ABAS.map((a) => (
+          <Link
+            key={a.key}
+            href={`/app/nutricionista?aba=${a.key}`}
+            scroll={false}
+            className={`tappable inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium ${
+              aba === a.key
+                ? "bg-brand-600 text-white"
+                : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+            }`}
+          >
+            <a.icon className="h-3.5 w-3.5" />
+            {a.label}
+            {a.key === "conversa" && naoLidas > 0 ? (
+              <span className="rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white">
+                {naoLidas}
+              </span>
+            ) : null}
+          </Link>
+        ))}
+      </div>
+
+      {/* ---------------- METAS ---------------- */}
+      {aba === "metas" &&
+        (temMetas ? (
+          <>
+            <div className="card">
+              <h2 className="section-title mb-3">
+                <span className="icon-badge">
+                  <Target className="h-4 w-4" />
+                </span>
+                Suas metas do dia
+              </h2>
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm sm:grid-cols-4">
+                {[
+                  ["Calorias/dia", presc.daily_calorie_goal, "kcal"],
+                  ["Proteína/dia", presc.protein_goal_g, "g"],
+                  [
+                    "Água/dia",
+                    presc.daily_water_goal_ml
+                      ? (presc.daily_water_goal_ml / 1000).toFixed(1)
+                      : null,
+                    "L",
+                  ],
+                  ["Peso alvo", presc.weight_goal_kg, "kg"],
+                ].map(([label, valor, unidade]: any) => (
+                  <div key={label}>
+                    <dt className="text-xs text-slate-500 dark:text-slate-400">
+                      {label}
+                    </dt>
+                    <dd className="font-semibold text-slate-900 dark:text-white">
+                      {valor ?? "—"}
+                      {valor ? (
+                        <span className="text-xs font-medium text-slate-400">
+                          {" "}
+                          {unidade}
+                        </span>
+                      ) : null}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+              <p className="mt-3 border-t border-slate-100 pt-3 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
+                Definidas por {nutriNome} em{" "}
+                {formatDate(String(presc.created_at).slice(0, 10))}. O
+                acompanhamento do dia contra estas metas aparece em{" "}
+                <Link href="/app" className="font-medium text-brand-700 hover:underline dark:text-brand-400">
+                  Início
+                </Link>
+                .
+              </p>
+            </div>
+
+            {presc.notes && (
+              <div className="card mt-4">
+                <h2 className="section-title mb-2">
+                  <span className="icon-badge">
+                    <NotebookPen className="h-4 w-4" />
+                  </span>
+                  Orientações
+                </h2>
+                <p className="whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-200">
+                  {presc.notes}
+                </p>
               </div>
-            ))}
+            )}
+          </>
+        ) : (
+          <Vazio texto="Seu nutricionista ainda não definiu metas para você." />
+        ))}
+
+      {/* ---------------- CARDÁPIO ---------------- */}
+      {aba === "cardapio" &&
+        (plano && itensCardapio.length > 0 ? (
+          <>
+            <MealPlanView
+              nome={plano.name}
+              observacao={plano.notes}
+              itens={itensCardapio as any}
+              date={today}
+              jaRegistrados={jaRegistrados}
+            />
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Tocar em “Comi isso” registra a refeição na sua Dieta — não
+              precisa digitar de novo.
+            </p>
+          </>
+        ) : (
+          <Vazio texto="Seu nutricionista ainda não montou um cardápio para você." />
+        ))}
+
+      {/* ---------------- TREINO ---------------- */}
+      {aba === "treino" &&
+        (sessoes.length > 0 ? (
+          <div className="space-y-3">
+            {DIAS.map((dia, i) => {
+              const doDia = sessoes.filter((s) => s.day_of_week === i);
+              if (doDia.length === 0) return null;
+              return (
+                <div key={dia} className="card">
+                  <p className="eyebrow mb-2 flex items-center gap-1.5">
+                    <CalendarDays className="h-3.5 w-3.5" />
+                    {dia}
+                  </p>
+                  <div className="space-y-3">
+                    {doDia.map((s) => {
+                      const rotina = rotinas.find((r) => r.id === s.routine_id);
+                      const exs = exercicios.filter(
+                        (e) => e.routine_id === s.routine_id
+                      );
+                      return (
+                        <div key={s.id}>
+                          <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                            {s.title || rotina?.name || s.sport}
+                          </p>
+                          {s.notes && (
+                            <p className="mt-0.5 whitespace-pre-wrap text-xs text-slate-500 dark:text-slate-400">
+                              {s.notes}
+                            </p>
+                          )}
+                          {exs.length > 0 && (
+                            <ul className="mt-2 space-y-1">
+                              {exs.map((e) => (
+                                <li
+                                  key={e.id}
+                                  className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-2.5 py-1.5 text-sm dark:bg-slate-900/60"
+                                >
+                                  <span className="min-w-0 truncate text-slate-800 dark:text-slate-200">
+                                    {e.name}
+                                  </span>
+                                  <span className="shrink-0 text-xs text-slate-500 dark:text-slate-400">
+                                    {[
+                                      e.target_sets && e.target_reps
+                                        ? `${e.target_sets}×${e.target_reps}`
+                                        : e.target_sets
+                                          ? `${e.target_sets} séries`
+                                          : null,
+                                      e.target_weight_kg
+                                        ? `${e.target_weight_kg} kg`
+                                        : null,
+                                      e.rest_seconds ? `${e.rest_seconds}s desc.` : null,
+                                    ]
+                                      .filter(Boolean)
+                                      .join(" · ")}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              A confirmação de cada dia (“fui” ou “não fui”) fica em{" "}
+              <Link
+                href="/app"
+                className="font-medium text-brand-700 hover:underline dark:text-brand-400"
+              >
+                Início
+              </Link>
+              , no treino do dia.
+            </p>
           </div>
-        </div>
-      ) : (
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          Você ainda não está conectado a nenhum nutricionista.
-        </p>
-      )}
+        ) : (
+          <Vazio texto="Seu nutricionista ainda não montou um treino para você." />
+        ))}
 
-      {links.length > 0 && prescricao && (
-        <div className="card mt-5">
-          <h2 className="section-title mb-3">
-            <span className="icon-badge">
-              <Target className="h-4 w-4" />
-            </span>
-            Suas metas, definidas pelo nutricionista
-          </h2>
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm sm:grid-cols-4">
-            {[
-              ["Calorias/dia", prescricao.daily_calorie_goal, "kcal"],
-              ["Proteína/dia", prescricao.protein_goal_g, "g"],
-              [
-                "Água/dia",
-                prescricao.daily_water_goal_ml
-                  ? (prescricao.daily_water_goal_ml / 1000).toFixed(1)
-                  : null,
-                "L",
-              ],
-              ["Peso alvo", prescricao.weight_goal_kg, "kg"],
-            ].map(([label, valor, unidade]: any) => (
-              <div key={label}>
-                <dt className="text-xs text-slate-500 dark:text-slate-400">
-                  {label}
-                </dt>
-                <dd className="font-semibold text-slate-900 dark:text-white">
-                  {valor ?? "—"}
-                  {valor ? (
-                    <span className="text-xs font-medium text-slate-400">
-                      {" "}
-                      {unidade}
-                    </span>
-                  ) : null}
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </div>
+      {/* ---------------- CONVERSA ---------------- */}
+      {aba === "conversa" && (
+        <NutriNotes notas={notas} meuId={uid} nutriId={nutriId} />
       )}
+    </div>
+  );
+}
 
-      {links.length > 0 && (
-        <div className="mt-5">
-          <h2 className="section-title mb-3">
-            <span className="icon-badge">
-              <MessageSquare className="h-4 w-4" />
-            </span>
-            Conversa
-          </h2>
-          <NutriNotes
-            notas={notas}
-            meuId={meuId}
-            nutriId={links[0]?.nutritionist_id}
-          />
-        </div>
-      )}
+function Vazio({ texto }: { texto: string }) {
+  return (
+    <div className="rounded-xl border border-dashed border-slate-200 p-8 text-center dark:border-slate-700">
+      <p className="text-sm text-slate-500 dark:text-slate-400">{texto}</p>
     </div>
   );
 }

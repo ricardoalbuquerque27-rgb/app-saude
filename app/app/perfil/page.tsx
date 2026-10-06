@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState, useCallback } from "react";
 import { LogOut, Loader2, Check, User, Target, CalendarClock } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -291,7 +292,13 @@ export default function PerfilPage() {
         {metasDoNutri && (
           <p className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-xs text-brand-800 dark:border-brand-800/50 dark:bg-brand-500/10 dark:text-brand-200">
             Estas metas foram definidas pelo seu nutricionista. Você pode
-            alterá-las, mas vale combinar antes — ele acompanha esses números.
+            alterá-las, mas vale combinar antes — ele acompanha esses números.{" "}
+            <Link
+              href="/app/nutricionista?aba=metas"
+              className="font-semibold underline underline-offset-2 hover:no-underline"
+            >
+              Ver em Meu plano
+            </Link>
           </p>
         )}
         <div className="grid grid-cols-2 gap-3">

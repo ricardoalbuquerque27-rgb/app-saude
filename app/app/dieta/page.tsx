@@ -304,6 +304,7 @@ export default function DietaPage() {
           date={date}
           jaRegistrados={meals.map((m) => m.meal_type)}
           onRegistrado={load}
+          linkPlano
         />
       )}
 

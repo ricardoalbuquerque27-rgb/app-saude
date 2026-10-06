@@ -18,7 +18,7 @@ export type Nota = {
 //
 // `compact` é a versão que aparece no bloco "Hoje": mostra só o que chegou e
 // ainda não foi lido, com confirmação de leitura. A conversa completa, com
-// campo de resposta, fica na página "Meu nutricionista".
+// campo de resposta, fica na aba Conversa de "Meu plano".
 export default function NutriNotes({
   notas,
   meuId,

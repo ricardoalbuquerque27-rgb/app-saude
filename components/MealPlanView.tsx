@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Utensils, Check, Loader2, Stethoscope } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -27,6 +28,7 @@ export default function MealPlanView({
   jaRegistrados,
   onRegistrado,
   compacto = false,
+  linkPlano = false,
 }: {
   nome: string;
   observacao: string | null;
@@ -38,6 +40,9 @@ export default function MealPlanView({
   onRegistrado?: () => void;
   /** Versão enxuta para caber dentro do bloco "Hoje". */
   compacto?: boolean;
+  /** Fora de "Meu plano", aponta de volta para lá — o cardápio aparece em
+   *  mais de uma tela e a pessoa precisa saber qual é a fonte. */
+  linkPlano?: boolean;
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -87,9 +92,17 @@ export default function MealPlanView({
             </span>
             {nome}
           </h2>
-          <p className="mb-3 flex items-center gap-1.5 text-[11px] font-medium text-brand-700 dark:text-brand-300">
+          <p className="mb-3 flex flex-wrap items-center gap-1.5 text-[11px] font-medium text-brand-700 dark:text-brand-300">
             <Stethoscope className="h-3 w-3" />
             Prescrito pelo seu nutricionista
+            {linkPlano && (
+              <Link
+                href="/app/nutricionista?aba=cardapio"
+                className="underline underline-offset-2 hover:no-underline"
+              >
+                ver em Meu plano
+              </Link>
+            )}
           </p>
         </>
       )}
