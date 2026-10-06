@@ -42,9 +42,16 @@ export default function LoginPage() {
 
     const supabase = createClient();
 
+    // E-mail colado traz espaço no fim com frequência, e o servidor de
+    // autenticação então NÃO ENCONTRA a conta — devolvendo "credenciais
+    // inválidas", que manda a pessoa procurar erro na senha. Normalizar aqui
+    // (minúsculas é como o e-mail fica guardado) evita esse beco sem saída.
+    // A SENHA não é tocada: espaço nela pode ser proposital.
+    const emailLimpo = email.trim().toLowerCase();
+
     try {
       if (mode === "recover") {
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        const { error } = await supabase.auth.resetPasswordForEmail(emailLimpo, {
           redirectTo: `${window.location.origin}/redefinir-senha`,
         });
         if (error) throw error;
@@ -71,7 +78,7 @@ export default function LoginPage() {
           return;
         }
         const { error } = await supabase.auth.signUp({
-          email,
+          email: emailLimpo,
           password,
           options: { data: { full_name: fullName, cpf: cpfDigits } },
         });
@@ -88,7 +95,7 @@ export default function LoginPage() {
         }
       } else {
         const { error } = await supabase.auth.signInWithPassword({
-          email,
+          email: emailLimpo,
           password,
         });
         if (error) throw error;
@@ -233,6 +240,7 @@ export default function LoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                onBlur={() => setEmail((v) => v.trim().toLowerCase())}
                 placeholder="voce@email.com"
               />
             </div>
