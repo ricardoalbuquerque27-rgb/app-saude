@@ -24,6 +24,7 @@ import { getPending } from "@/lib/pending";
 import NutriHome from "@/components/NutriHome";
 import PlanCheckIn from "@/components/PlanCheckIn";
 import NutriNotes from "@/components/NutriNotes";
+import MealPlanView from "@/components/MealPlanView";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -64,6 +65,7 @@ export default async function DashboardPage() {
     treatmentRes,
     todayCompletionsRes,
     notasRes,
+    cardapioRes,
   ] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", uid).maybeSingle(),
     supabase
@@ -73,7 +75,7 @@ export default async function DashboardPage() {
       .gte("date", weekAgo),
     supabase
       .from("meals")
-      .select("calories, protein_g")
+      .select("calories, protein_g, meal_type")
       .eq("user_id", uid)
       .eq("date", today),
     supabase
@@ -123,6 +125,14 @@ export default async function DashboardPage() {
       .is("read_at", null)
       .order("created_at", { ascending: false })
       .limit(5),
+    supabase
+      .from("meal_plans")
+      .select("id, name, notes")
+      .eq("patient_id", uid)
+      .eq("active", true)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   const profile = profileRes.data;
@@ -151,6 +161,25 @@ export default async function DashboardPage() {
   const todayPlan = todayPlanRes.data ?? [];
   const todayCompletions = todayCompletionsRes.data ?? [];
   const notasNaoLidas = notasRes.data ?? [];
+
+  // Cardápio prescrito: o paciente não deveria precisar ir atrás dele numa
+  // aba. Trazemos para a primeira tela, e só as refeições que ainda faltam
+  // hoje — o que sobra é exatamente o que ele tem a fazer.
+  const cardapio = cardapioRes.data as any;
+  const tiposJaRegistrados = (mealsTodayRes.data ?? []).map(
+    (m: any) => m.meal_type
+  );
+  let itensCardapioPendentes: any[] = [];
+  if (cardapio) {
+    const { data: itens } = await supabase
+      .from("meal_plan_items")
+      .select("id, meal_type, position, description, calories, protein_g, carbs_g, fat_g")
+      .eq("meal_plan_id", cardapio.id)
+      .order("position", { ascending: true });
+    itensCardapioPendentes = (itens ?? []).filter(
+      (i: any) => !tiposJaRegistrados.includes(i.meal_type)
+    );
+  }
 
   const health = computeHealthScore({
     sleepHours: sleepToday,
@@ -243,6 +272,7 @@ export default async function DashboardPage() {
     checkinPendente === 0 &&
     pending.items.length === 0 &&
     !doseUrgent &&
+    itensCardapioPendentes.length === 0 &&
     notasNaoLidas.length === 0;
 
   const atalhos = [
@@ -297,6 +327,22 @@ export default async function DashboardPage() {
                   sessions={todayPlan as any}
                   date={today}
                   completions={todayCompletions as any}
+                />
+              </div>
+            )}
+
+            {itensCardapioPendentes.length > 0 && (
+              <div>
+                <p className="eyebrow mb-1.5">
+                  Cardápio de hoje — o que ainda falta
+                </p>
+                <MealPlanView
+                  nome={cardapio.name}
+                  observacao={cardapio.notes}
+                  itens={itensCardapioPendentes as any}
+                  date={today}
+                  jaRegistrados={tiposJaRegistrados}
+                  compacto
                 />
               </div>
             )}

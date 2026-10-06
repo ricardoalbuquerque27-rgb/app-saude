@@ -1022,9 +1022,17 @@ export default function TreinosPage() {
               <div key={r.id} className="card flex flex-col">
                 <div className="mb-2 flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <h3 className="font-semibold text-slate-900 dark:text-white">
-                      {r.name}
-                    </h3>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <h3 className="font-semibold text-slate-900 dark:text-white">
+                        {r.name}
+                      </h3>
+                      {(r as any).prescribed_by && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-semibold text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">
+                          <Stethoscope className="h-2.5 w-2.5" />
+                          do nutri
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-slate-500 dark:text-slate-400">
                       {r.exercises.length} exercício(s)
                       {r.notes ? ` · ${r.notes}` : ""}

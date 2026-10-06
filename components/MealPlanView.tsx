@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Utensils, Check, Loader2, Stethoscope } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -25,6 +26,7 @@ export default function MealPlanView({
   date,
   jaRegistrados,
   onRegistrado,
+  compacto = false,
 }: {
   nome: string;
   observacao: string | null;
@@ -32,9 +34,13 @@ export default function MealPlanView({
   date: string;
   /** meal_type das refeições já registradas hoje, para não duplicar. */
   jaRegistrados: string[];
-  onRegistrado: () => void;
+  /** Quando ausente, recarrega a rota — serve o dashboard, que é servidor. */
+  onRegistrado?: () => void;
+  /** Versão enxuta para caber dentro do bloco "Hoje". */
+  compacto?: boolean;
 }) {
   const supabase = createClient();
+  const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -65,25 +71,30 @@ export default function MealPlanView({
       setErro("Não foi possível registrar. Tente de novo.");
       return;
     }
-    onRegistrado();
+    if (onRegistrado) onRegistrado();
+    else router.refresh();
   }
 
   if (itens.length === 0) return null;
 
   return (
-    <div className="card card-accent mb-5 pl-6">
-      <h2 className="section-title mb-1">
-        <span className="icon-badge">
-          <Utensils className="h-4 w-4" />
-        </span>
-        {nome}
-      </h2>
-      <p className="mb-3 flex items-center gap-1.5 text-[11px] font-medium text-brand-700 dark:text-brand-300">
-        <Stethoscope className="h-3 w-3" />
-        Prescrito pelo seu nutricionista
-      </p>
+    <div className={compacto ? "" : "card card-accent mb-5 pl-6"}>
+      {!compacto && (
+        <>
+          <h2 className="section-title mb-1">
+            <span className="icon-badge">
+              <Utensils className="h-4 w-4" />
+            </span>
+            {nome}
+          </h2>
+          <p className="mb-3 flex items-center gap-1.5 text-[11px] font-medium text-brand-700 dark:text-brand-300">
+            <Stethoscope className="h-3 w-3" />
+            Prescrito pelo seu nutricionista
+          </p>
+        </>
+      )}
 
-      {observacao && (
+      {observacao && !compacto && (
         <p className="mb-3 rounded-lg bg-white/70 px-3 py-2 text-sm text-slate-700 dark:bg-slate-900/50 dark:text-slate-200">
           {observacao}
         </p>
