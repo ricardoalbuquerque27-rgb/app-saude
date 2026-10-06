@@ -12,6 +12,8 @@ import {
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import FoodSearch from "@/components/FoodSearch";
+import TemplateBar from "@/components/TemplateBar";
 
 export const MEAL_TYPES = [
   "Café da manhã",
@@ -170,6 +172,57 @@ export default function MealPlanEditor({
     else router.refresh();
   }
 
+  // Modelo = a lista de itens do cardápio, sem ids nem vínculo a paciente.
+  function capturarModelo() {
+    if (itens.length === 0) return null;
+    return itens
+      .sort((a, b) => a.position - b.position)
+      .map((i) => ({
+        meal_type: i.meal_type,
+        position: i.position,
+        description: i.description,
+        calories: i.calories,
+        protein_g: i.protein_g,
+        carbs_g: i.carbs_g,
+        fat_g: i.fat_g,
+      }));
+  }
+
+  async function aplicarModelo(conteudo: any[]) {
+    const planId = await garantirPlano();
+    if (!planId) throw new Error("sem plano");
+
+    // Continua depois do que já existe, por refeição, para aplicar um modelo
+    // não apagar o que o profissional já tinha escrito.
+    const base: Record<string, number> = {};
+    for (const i of itens) {
+      base[i.meal_type] = Math.max(base[i.meal_type] ?? 0, i.position);
+    }
+    const contador: Record<string, number> = { ...base };
+
+    const linhas = conteudo
+      .filter((c) => c?.meal_type && c?.description)
+      .map((c) => {
+        contador[c.meal_type] = (contador[c.meal_type] ?? 0) + 1;
+        return {
+          meal_plan_id: planId,
+          user_id: patientId,
+          meal_type: c.meal_type,
+          position: contador[c.meal_type],
+          description: String(c.description),
+          calories: c.calories ?? null,
+          protein_g: c.protein_g ?? null,
+          carbs_g: c.carbs_g ?? null,
+          fat_g: c.fat_g ?? null,
+        };
+      });
+
+    if (linhas.length === 0) return;
+    const { error } = await supabase.from("meal_plan_items").insert(linhas);
+    if (error) throw error;
+    router.refresh();
+  }
+
   function abrir(tipo: string) {
     setDesc("");
     setKcal("");
@@ -184,6 +237,14 @@ export default function MealPlanEditor({
           {erro}
         </p>
       )}
+
+      <TemplateBar
+        kind="cardapio"
+        nutriId={nutriId}
+        capturarAtual={capturarModelo}
+        aplicar={aplicarModelo}
+        rotulo="cardápio"
+      />
 
       <div className="card mb-4">
         <h2 className="section-title mb-3">
@@ -309,6 +370,23 @@ export default function MealPlanEditor({
 
               {abertoEm === tipo && (
                 <div className="mt-2 rounded-xl border border-brand-200 bg-brand-50/50 p-3 dark:border-brand-800/50 dark:bg-brand-500/[0.07]">
+                  <p className="eyebrow mb-1.5">Buscar na tabela TACO</p>
+                  <FoodSearch
+                    onEscolher={(a) => {
+                      // Acumula no texto e soma os macros: uma refeição é
+                      // feita de vários alimentos.
+                      setDesc((d) => (d ? d + "\n+ " + a.nome : a.nome));
+                      setKcal((k) => String((Number(k) || 0) + a.calories));
+                      setProt((p) =>
+                        String(
+                          Math.round(((Number(p) || 0) + a.protein_g) * 10) / 10
+                        )
+                      );
+                    }}
+                  />
+                  <p className="mb-1.5 mt-3 text-[11px] text-slate-500 dark:text-slate-400">
+                    Ou escreva à mão:
+                  </p>
                   <textarea
                     className="input min-h-[70px] resize-y"
                     value={desc}

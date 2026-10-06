@@ -203,6 +203,39 @@ export type Database = {
           },
         ];
       };
+      nutri_templates: {
+        Row: {
+          content: Json;
+          created_at: string;
+          id: string;
+          kind: string;
+          name: string;
+          notes: string | null;
+          nutritionist_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          content?: Json;
+          created_at?: string;
+          id?: string;
+          kind: string;
+          name: string;
+          notes?: string | null;
+          nutritionist_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          content?: Json;
+          created_at?: string;
+          id?: string;
+          kind?: string;
+          name?: string;
+          notes?: string | null;
+          nutritionist_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       meal_plans: {
         Row: {
           active: boolean;
@@ -1008,6 +1041,7 @@ export type PlanCompletion = PublicSchema["Tables"]["plan_completions"]["Row"];
 export type Treatment = PublicSchema["Tables"]["treatments"]["Row"];
 export type Routine = PublicSchema["Tables"]["routines"]["Row"];
 export type RoutineExercise = PublicSchema["Tables"]["routine_exercises"]["Row"];
+export type NutriTemplate = PublicSchema["Tables"]["nutri_templates"]["Row"];
 export type MealPlan = PublicSchema["Tables"]["meal_plans"]["Row"];
 export type MealPlanItem = PublicSchema["Tables"]["meal_plan_items"]["Row"];
 export type Prescription = PublicSchema["Tables"]["prescriptions"]["Row"];

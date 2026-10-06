@@ -19,6 +19,7 @@ import { PageHeader, Modal, Field, EmptyState } from "@/components/ui";
 import { ProgressRing } from "@/components/ProgressRing";
 import { todayISO } from "@/lib/date";
 import { useLiveRefresh } from "@/lib/useLiveRefresh";
+import FoodSearch from "@/components/FoodSearch";
 import MealPlanView, {
   type ItemCardapioPaciente,
 } from "@/components/MealPlanView";
@@ -497,6 +498,29 @@ export default function DietaPage() {
               ))}
             </select>
           </Field>
+          <Field label="Buscar alimento">
+            <FoodSearch
+              onEscolher={(a) => {
+                // Soma ao que já está no formulário: uma refeição é feita de
+                // vários alimentos.
+                setDescription((d) => (d ? d + ", " + a.nome : a.nome));
+                setCalories((c) => String((Number(c) || 0) + a.calories));
+                setProtein((v) =>
+                  String(Math.round(((Number(v) || 0) + a.protein_g) * 10) / 10)
+                );
+                setCarbs((v) =>
+                  String(Math.round(((Number(v) || 0) + a.carbs_g) * 10) / 10)
+                );
+                setFat((v) =>
+                  String(Math.round(((Number(v) || 0) + a.fat_g) * 10) / 10)
+                );
+              }}
+            />
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              Tabela TACO (Unicamp). Os macros abaixo preenchem sozinhos.
+            </p>
+          </Field>
+
           <Field label="Descrição">
             <textarea
               className="input min-h-[70px]"

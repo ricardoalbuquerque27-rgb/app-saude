@@ -20,6 +20,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { Field } from "@/components/ui";
 import { formatDate } from "@/lib/date";
+import TemplateBar from "@/components/TemplateBar";
 import MealPlanEditor, {
   type PlanoAlimentar,
   type ItemCardapio,
@@ -432,6 +433,62 @@ function AbaTreino({
     router.refresh();
   }
 
+  // Modelo de treino = as rotinas com seus exercícios, sem ids.
+  function capturarModelo() {
+    if (rotinas.length === 0) return null;
+    return rotinas.map((r: Rotina) => ({
+      name: r.name,
+      notes: r.notes,
+      exercicios: exercicios
+        .filter((e: ExercicioRotina) => e.routine_id === r.id)
+        .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0))
+        .map((e: ExercicioRotina) => ({
+          name: e.name,
+          target_sets: e.target_sets,
+          target_reps: e.target_reps,
+          target_weight_kg: e.target_weight_kg,
+          rest_seconds: e.rest_seconds,
+        })),
+    }));
+  }
+
+  async function aplicarModelo(conteudo: any[]) {
+    for (const r of conteudo) {
+      if (!r?.name) continue;
+      const { data: nova, error } = await supabase
+        .from("routines")
+        .insert({
+          user_id: patientId,
+          name: String(r.name),
+          notes: r.notes ?? null,
+          prescribed_by: nutriId,
+        })
+        .select("id")
+        .single();
+      if (error || !nova) throw error ?? new Error("rotina");
+
+      const exs = Array.isArray(r.exercicios) ? r.exercicios : [];
+      if (exs.length > 0) {
+        const { error: e2 } = await supabase.from("routine_exercises").insert(
+          exs
+            .filter((e: any) => e?.name)
+            .map((e: any, i: number) => ({
+              routine_id: (nova as any).id,
+              user_id: patientId,
+              name: String(e.name),
+              target_sets: e.target_sets ?? null,
+              target_reps: e.target_reps ?? null,
+              target_weight_kg: e.target_weight_kg ?? null,
+              rest_seconds: e.rest_seconds ?? null,
+              position: i + 1,
+            }))
+        );
+        if (e2) throw e2;
+      }
+    }
+    router.refresh();
+  }
+
   async function excluirRotina(id: string) {
     if (!confirm("Excluir esta rotina do paciente? Os exercícios vão junto."))
       return;
@@ -465,6 +522,14 @@ function AbaTreino({
 
   return (
     <>
+      <TemplateBar
+        kind="treino"
+        nutriId={nutriId}
+        capturarAtual={capturarModelo}
+        aplicar={aplicarModelo}
+        rotulo="treino"
+      />
+
       {/* ---- Rotinas com exercícios ---- */}
       <div className="card mb-4">
         <div className="mb-3 flex items-center justify-between gap-2">
