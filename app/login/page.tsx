@@ -85,8 +85,8 @@ export default function LoginPage() {
         if (error) throw error;
         const { data } = await supabase.auth.getSession();
         if (data.session) {
-          router.push("/app");
-          router.refresh();
+          // Mesmo motivo do login: navegação dura ao trocar de sessão.
+          window.location.assign("/app");
         } else {
           setMessage(
             "Cadastro criado! Verifique seu e-mail para confirmar a conta e depois faça login."
@@ -99,8 +99,12 @@ export default function LoginPage() {
           password,
         });
         if (error) throw error;
-        router.push("/app");
-        router.refresh();
+        // Navegação DURA de propósito. router.push usa o Router Cache do
+        // Next, que ainda guarda a renderização da sessão anterior — foi
+        // assim que um login de paciente caiu no painel do nutricionista.
+        // Trocar de conta tem que descartar tudo que foi renderizado para a
+        // conta antiga, e só um carregamento completo garante isso.
+        window.location.assign("/app");
       }
     } catch (err: any) {
       setError(traduzErro(err));

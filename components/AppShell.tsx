@@ -159,8 +159,9 @@ export default function AppShell({
 
   async function signOut() {
     await supabase.auth.signOut();
-    router.push("/login");
-    router.refresh();
+    // Navegação dura: ver comentário no login. Depois de sair, nenhuma tela
+    // renderizada para o usuário anterior pode sobreviver no cache.
+    window.location.assign("/login");
   }
 
   const isActive = (item: { href: string; exact?: boolean }) =>

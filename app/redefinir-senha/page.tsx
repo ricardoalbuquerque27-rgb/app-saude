@@ -2,12 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Dumbbell, Loader2, Check, Eye, EyeOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 export default function RedefinirSenhaPage() {
-  const router = useRouter();
   const [ready, setReady] = useState(false);
   const [checking, setChecking] = useState(true);
   const [password, setPassword] = useState("");
@@ -61,8 +59,8 @@ export default function RedefinirSenhaPage() {
     }
     setDone(true);
     setTimeout(() => {
-      router.push("/app");
-      router.refresh();
+      // Navegação dura: a sessão mudou, nada renderizado antes vale mais.
+      window.location.assign("/app");
     }, 1400);
   }
 

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import { LogOut, Loader2, Check, User, Target, CalendarClock } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { Profile } from "@/lib/types";
@@ -41,7 +40,6 @@ function initials(name: string) {
 
 export default function PerfilPage() {
   const supabase = createClient();
-  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -160,8 +158,9 @@ export default function PerfilPage() {
 
   async function signOut() {
     await supabase.auth.signOut();
-    router.push("/login");
-    router.refresh();
+    // Navegação dura: ver comentário no login. Depois de sair, nenhuma tela
+    // renderizada para o usuário anterior pode sobreviver no cache.
+    window.location.assign("/login");
   }
 
   if (loading) {
