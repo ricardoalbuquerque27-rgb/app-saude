@@ -125,7 +125,7 @@ export default function MealPlanView({
               <div className="mb-1.5 flex items-center gap-2">
                 <p className="eyebrow">{tipo}</p>
                 {feito && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-semibold text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-brand-100 px-2 py-0.5 text-[11px] font-semibold text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">
                     <Check className="h-2.5 w-2.5" /> registrado
                   </span>
                 )}
@@ -138,7 +138,7 @@ export default function MealPlanView({
                     className="rounded-xl border border-slate-200/80 bg-white p-2.5 dark:border-white/[0.07] dark:bg-slate-900/60"
                   >
                     {opcoes.length > 1 && (
-                      <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                      <p className="mb-0.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-500">
                         Opção {i + 1}
                       </p>
                     )}

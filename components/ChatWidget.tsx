@@ -211,13 +211,13 @@ export default function ChatWidget() {
                 <div
                   className={`max-w-[80%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm ${
                     m.role === "user"
-                      ? "bg-brand-600 text-white"
+                      ? "bg-brand-700 text-white"
                       : "bg-white text-slate-800 shadow-sm dark:bg-slate-900 dark:text-slate-200"
                   }`}
                 >
                   {m.content ||
                     (loading && i === messages.length - 1 ? (
-                      <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+                      <Loader2 className="h-4 w-4 animate-spin text-slate-500" />
                     ) : (
                       ""
                     ))}
@@ -226,7 +226,7 @@ export default function ChatWidget() {
             ))}
 
             {error && (
-              <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-950/40 dark:text-red-300">
+              <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
                 {error}
               </p>
             )}

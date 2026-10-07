@@ -163,7 +163,7 @@ export default function LoginPage() {
         </div>
 
         <div className="relative">
-          <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs text-slate-400">
+          <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs text-slate-500">
             <span className="flex items-center gap-1.5">
               <ShieldCheck className="h-3.5 w-3.5 text-brand-400" /> Dados isolados
               por conta
@@ -279,7 +279,7 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={() => setShowPw((v) => !v)}
-                    className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                    className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-500 hover:text-slate-600 dark:hover:text-slate-200"
                     aria-label={showPw ? "Ocultar senha" : "Mostrar senha"}
                     tabIndex={-1}
                   >
@@ -294,7 +294,7 @@ export default function LoginPage() {
             )}
 
             {error && (
-              <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
+              <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
                 {error}
               </p>
             )}
@@ -368,13 +368,13 @@ export default function LoginPage() {
           </div>
 
           {/* Confiança (mobile) */}
-          <div className="mt-8 flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs text-slate-400 lg:hidden dark:text-slate-500">
+          <div className="mt-8 flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs text-slate-500 lg:hidden dark:text-slate-500">
             <span className="flex items-center gap-1.5">
-              <ShieldCheck className="h-3.5 w-3.5 text-brand-600 dark:text-brand-400" />
+              <ShieldCheck className="h-3.5 w-3.5 text-brand-700 dark:text-brand-400" />
               Dados isolados
             </span>
             <span className="flex items-center gap-1.5">
-              <Lock className="h-3.5 w-3.5 text-brand-600 dark:text-brand-400" />
+              <Lock className="h-3.5 w-3.5 text-brand-700 dark:text-brand-400" />
               Criptografia
             </span>
           </div>

@@ -50,7 +50,7 @@ const SEV = {
   bom: {
     ring: "border-brand-200 dark:border-brand-900/50",
     chip: "bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300",
-    icon: "text-brand-600 dark:text-brand-400",
+    icon: "text-brand-700 dark:text-brand-400",
   },
   atencao: {
     ring: "border-amber-200 dark:border-amber-900/50",
@@ -153,13 +153,13 @@ export default function SaudePage() {
       </button>
 
       {error && (
-        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
+        <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
           {error}
         </p>
       )}
 
       {loading ? (
-        <div className="flex justify-center py-10 text-slate-400">
+        <div className="flex justify-center py-10 text-slate-500">
           <Loader2 className="h-6 w-6 animate-spin" />
         </div>
       ) : !a ? (
@@ -178,7 +178,7 @@ export default function SaudePage() {
       ) : (
         <div className="space-y-5">
           {current && (
-            <p className="text-xs text-slate-400 dark:text-slate-500">
+            <p className="text-xs text-slate-500 dark:text-slate-500">
               Análise de {formatDate(current.created_at.slice(0, 10))}
             </p>
           )}
@@ -199,7 +199,7 @@ export default function SaudePage() {
           {a.prioridades?.length > 0 && (
             <div className="card">
               <div className="mb-3 flex items-center gap-2">
-                <Target className="h-5 w-5 text-brand-600 dark:text-brand-400" />
+                <Target className="h-5 w-5 text-brand-700 dark:text-brand-400" />
                 <h2 className="font-semibold text-slate-900 dark:text-white">
                   Prioridades agora
                 </h2>
@@ -207,7 +207,7 @@ export default function SaudePage() {
               <ol className="space-y-2">
                 {a.prioridades.map((p, i) => (
                   <li key={i} className="flex items-start gap-2.5 text-sm">
-                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-600 text-[11px] font-bold text-white">
+                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-700 text-[11px] font-bold text-white">
                       {i + 1}
                     </span>
                     <span className="text-slate-700 dark:text-slate-200">{p}</span>
@@ -233,7 +233,7 @@ export default function SaudePage() {
                       <h3 className="flex-1 text-sm font-semibold text-slate-900 dark:text-white">
                         {ins.titulo}
                       </h3>
-                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${st.chip}`}>
+                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${st.chip}`}>
                         {ins.area}
                       </span>
                     </div>
@@ -255,7 +255,7 @@ export default function SaudePage() {
                     )}
                     {ins.acao && (
                       <p className="mt-2 flex items-start gap-1.5 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:bg-slate-800/50 dark:text-slate-200">
-                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" />
+                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-brand-700" />
                         {ins.acao}
                       </p>
                     )}
@@ -274,7 +274,7 @@ export default function SaudePage() {
               <ul className="space-y-1.5">
                 {a.pontos_fortes.map((p, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-200">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" />
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-brand-700" />
                     {p}
                   </li>
                 ))}
@@ -308,7 +308,7 @@ export default function SaudePage() {
         </div>
       )}
 
-      <p className="flex items-start gap-1.5 text-[11px] text-slate-400 dark:text-slate-500">
+      <p className="flex items-start gap-1.5 text-[11px] text-slate-500 dark:text-slate-500">
         <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
         Esta análise é educativa e não substitui um profissional de saúde. Para
         exames alterados ou dúvidas sobre medicação, procure seu médico.

@@ -196,7 +196,7 @@ export default function WorkoutSession({
         <button
           onClick={finish}
           disabled={saving}
-          className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-500 disabled:opacity-60"
+          className="rounded-lg bg-brand-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-60"
         >
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Finalizar"}
         </button>
@@ -212,7 +212,7 @@ export default function WorkoutSession({
 
       {/* Exercícios */}
       <div className="flex-1 space-y-4 overflow-y-auto p-4 pb-40">
-        <p className="text-center text-xs text-slate-400">
+        <p className="text-center text-xs text-slate-500">
           {doneSets}/{totalSets} séries concluídas
         </p>
         {exs.map((ex, ei) => {
@@ -228,7 +228,7 @@ export default function WorkoutSession({
                 )}
               </div>
               {last?.weight != null && (
-                <p className="mb-2 text-xs text-slate-400">
+                <p className="mb-2 text-xs text-slate-500">
                   Última vez: {last.reps ?? "?"}×{last.weight}kg
                 </p>
               )}
@@ -240,7 +240,7 @@ export default function WorkoutSession({
                       s.done ? "bg-brand-50 dark:bg-brand-950/20" : ""
                     }`}
                   >
-                    <span className="w-6 shrink-0 text-center text-xs font-medium text-slate-400">
+                    <span className="w-6 shrink-0 text-center text-xs font-medium text-slate-500">
                       {si + 1}
                     </span>
                     <input
@@ -264,8 +264,8 @@ export default function WorkoutSession({
                       onClick={() => toggleDone(ei, si)}
                       className={`flex h-9 w-10 shrink-0 items-center justify-center rounded-lg transition ${
                         s.done
-                          ? "bg-brand-600 text-white"
-                          : "border border-slate-300 text-slate-400 hover:border-brand-400 dark:border-slate-700"
+                          ? "bg-brand-700 text-white"
+                          : "border border-slate-300 text-slate-500 hover:border-brand-400 dark:border-slate-700"
                       }`}
                       aria-label="Concluir série"
                     >

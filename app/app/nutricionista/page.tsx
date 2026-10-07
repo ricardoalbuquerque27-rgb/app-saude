@@ -192,14 +192,14 @@ export default async function MeuNutricionistaPage({
             scroll={false}
             className={`tappable inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium ${
               aba === a.key
-                ? "bg-brand-600 text-white"
+                ? "bg-brand-700 text-white"
                 : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
             }`}
           >
             <a.icon className="h-3.5 w-3.5" />
             {a.label}
             {a.key === "conversa" && naoLidas > 0 ? (
-              <span className="rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white">
+              <span className="rounded-full bg-rose-600 px-1.5 text-[11px] font-bold text-white">
                 {naoLidas}
               </span>
             ) : null}
@@ -238,7 +238,7 @@ export default async function MeuNutricionistaPage({
                     <dd className="font-semibold text-slate-900 dark:text-white">
                       {valor ?? "—"}
                       {valor ? (
-                        <span className="text-xs font-medium text-slate-400">
+                        <span className="text-xs font-medium text-slate-500">
                           {" "}
                           {unidade}
                         </span>

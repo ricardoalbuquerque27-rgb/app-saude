@@ -163,14 +163,14 @@ export default function MedidasPage() {
               </p>
               <p className="tabular mt-1 text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
                 {currentWeight ?? "—"}
-                <span className="ml-1 text-base font-medium text-slate-400">
+                <span className="ml-1 text-base font-medium text-slate-500">
                   {currentWeight ? "kg" : ""}
                 </span>
               </p>
               {weightDiff != null && (
                 <p
                   className={`mt-1 flex items-center gap-1 text-xs font-medium ${
-                    weightDiff <= 0 ? "text-brand-600 dark:text-brand-400" : "text-rose-500"
+                    weightDiff <= 0 ? "text-brand-700 dark:text-brand-400" : "text-rose-500"
                   }`}
                 >
                   {weightDiff <= 0 ? (
@@ -192,7 +192,7 @@ export default function MedidasPage() {
             <div className="mt-4">
               <div className="mb-1.5 flex items-center justify-between text-xs">
                 <span className="flex items-center gap-1 font-medium text-slate-600 dark:text-slate-300">
-                  <Target className="h-3.5 w-3.5 text-brand-600 dark:text-brand-400" />
+                  <Target className="h-3.5 w-3.5 text-brand-700 dark:text-brand-400" />
                   Meta: {weightGoal} kg
                 </span>
                 <span className="font-medium text-slate-500 dark:text-slate-400">
@@ -232,7 +232,7 @@ export default function MedidasPage() {
                 </p>
                 <p className="tabular mt-1 text-2xl font-bold text-slate-900 dark:text-white">
                   {latest.body_fat_pct}
-                  <span className="ml-1 text-sm font-medium text-slate-400">%</span>
+                  <span className="ml-1 text-sm font-medium text-slate-500">%</span>
                 </p>
               </div>
             )}
@@ -243,7 +243,7 @@ export default function MedidasPage() {
                 </p>
                 <p className="tabular mt-1 text-2xl font-bold text-slate-900 dark:text-white">
                   {latest.waist_cm}
-                  <span className="ml-1 text-sm font-medium text-slate-400">cm</span>
+                  <span className="ml-1 text-sm font-medium text-slate-500">cm</span>
                 </p>
               </div>
             )}
@@ -263,7 +263,7 @@ export default function MedidasPage() {
                 onClick={() => setMetric(f.key)}
                 className={`rounded-full px-3 py-1 text-xs font-medium transition ${
                   metric === f.key
-                    ? "bg-brand-600 text-white"
+                    ? "bg-brand-700 text-white"
                     : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
                 }`}
               >
@@ -283,7 +283,7 @@ export default function MedidasPage() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-16 text-slate-400">
+        <div className="flex justify-center py-16 text-slate-500">
           <Loader2 className="h-6 w-6 animate-spin" />
         </div>
       ) : rows.length === 0 ? (
@@ -311,7 +311,7 @@ export default function MedidasPage() {
               </div>
               <button
                 onClick={() => remove(r.id)}
-                className="rounded-lg p-1.5 text-slate-400 hover:text-rose-600"
+                className="rounded-lg p-1.5 text-slate-500 hover:text-rose-600"
               >
                 <Trash2 className="h-4 w-4" />
               </button>

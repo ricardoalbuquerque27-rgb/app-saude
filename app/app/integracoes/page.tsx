@@ -71,7 +71,7 @@ export default function IntegracoesPage() {
               </div>
               <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{d.desc}</p>
               {d.note && (
-                <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">{d.note}</p>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-500">{d.note}</p>
               )}
               <button
                 disabled
@@ -84,7 +84,7 @@ export default function IntegracoesPage() {
         ))}
       </div>
 
-      <p className="mt-6 text-center text-xs text-slate-400 dark:text-slate-500">
+      <p className="mt-6 text-center text-xs text-slate-500 dark:text-slate-500">
         As conexões usam login seguro (OAuth) — o Pace Fit nunca vê sua senha do dispositivo.
       </p>
     </div>

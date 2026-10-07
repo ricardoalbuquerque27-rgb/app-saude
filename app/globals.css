@@ -143,10 +143,15 @@ input[type="number"] {
     @apply inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white/70 px-3 py-1 text-xs font-medium text-slate-600
       dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-slate-300;
   }
+  /* O verde claro não carrega texto branco: branco sobre brand-500 dá
+     2.61:1 e sobre brand-600 dá 3.83:1 — abaixo do mínimo de 4.5:1 para
+     texto de 14px semibold. brand-700 dá 5.71:1 e brand-800, 7.97:1. O
+     hover escurece (em vez de clarear) e a elevação fica por conta da
+     sombra, que é o que já dava a sensação de relevo. */
   .btn-primary {
-    @apply btn bg-gradient-to-b from-brand-500 to-brand-600 text-white
+    @apply btn bg-gradient-to-b from-brand-600 to-brand-700 text-white
       shadow-[0_8px_20px_-10px_rgba(12,150,75,0.85)]
-      hover:from-brand-400 hover:to-brand-500
+      hover:from-brand-700 hover:to-brand-800
       hover:shadow-[0_10px_26px_-10px_rgba(24,184,94,0.9)];
   }
   .btn-ghost {

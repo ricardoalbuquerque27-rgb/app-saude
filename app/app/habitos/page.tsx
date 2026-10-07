@@ -48,7 +48,7 @@ function ScalePicker({
           onClick={() => onChange(n)}
           className={`h-9 w-9 rounded-lg text-sm font-semibold transition ${
             value === n
-              ? "bg-brand-600 text-white shadow-sm"
+              ? "bg-brand-700 text-white shadow-sm"
               : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
           }`}
         >
@@ -135,7 +135,7 @@ export default function HabitosPage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center py-20 text-slate-400">
+      <div className="flex justify-center py-20 text-slate-500">
         <Loader2 className="h-6 w-6 animate-spin" />
       </div>
     );
@@ -227,7 +227,7 @@ export default function HabitosPage() {
 
         <div className="card">
           <div className="mb-3 flex items-center gap-2">
-            <Footprints className="h-5 w-5 text-brand-500" />
+            <Footprints className="h-5 w-5 text-brand-700 dark:text-brand-400" />
             <h2 className="font-semibold text-slate-900 dark:text-white">Passos</h2>
           </div>
           <Field label="Passos no dia">
@@ -250,7 +250,7 @@ export default function HabitosPage() {
 
       <div className="card mb-4">
         <div className="mb-3 flex items-center gap-2">
-          <Smile className="h-5 w-5 text-amber-500" />
+          <Smile className="h-5 w-5 text-amber-600 dark:text-amber-400" />
           <h2 className="font-semibold text-slate-900 dark:text-white">
             Como você se sente?
           </h2>
@@ -312,7 +312,7 @@ export default function HabitosPage() {
       </div>
 
       {saving && (
-        <p className="mb-4 flex items-center gap-2 text-xs text-slate-400">
+        <p className="mb-4 flex items-center gap-2 text-xs text-slate-500">
           <Loader2 className="h-3 w-3 animate-spin" /> salvando...
         </p>
       )}

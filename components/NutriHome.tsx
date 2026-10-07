@@ -35,13 +35,12 @@ function Kpi({
   label: string;
   value: string | number;
   icon: React.ReactNode;
-  tone?: "slate" | "brand" | "amber" | "emerald";
+  tone?: "slate" | "brand" | "amber";
 }) {
   const tones: Record<string, string> = {
-    slate: "text-slate-400",
-    brand: "text-brand-500",
-    amber: "text-amber-500",
-    emerald: "text-emerald-500",
+    slate: "text-slate-500 dark:text-slate-400",
+    brand: "text-brand-700 dark:text-brand-400",
+    amber: "text-amber-600 dark:text-amber-400",
   };
   return (
     <div className="card">
@@ -92,7 +91,7 @@ function PatientRow({ s, today }: { s: PatientSummary; today: string }) {
           )}
         </div>
       </div>
-      <ChevronRight className="h-4 w-4 shrink-0 text-slate-300 dark:text-slate-600" />
+      <ChevronRight className="h-4 w-4 shrink-0 text-slate-300 dark:text-slate-400" />
     </Link>
   );
 }
@@ -184,7 +183,7 @@ export default async function NutriHome({
           label="Registraram hoje"
           value={loggedToday.length}
           icon={<Activity className="h-4 w-4" />}
-          tone="emerald"
+          tone="brand"
         />
         <Kpi
           label="Precisam de atenção"
@@ -218,7 +217,7 @@ export default async function NutriHome({
       {loggedToday.length > 0 && (
         <div className="card mb-4 p-3">
           <h2 className="section-title mb-1 px-2 pt-1">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand-100 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">
               <Activity className="h-4 w-4" />
             </span>
             Movimento de hoje
@@ -230,7 +229,7 @@ export default async function NutriHome({
                 href={`/app/pacientes/${s.id}`}
                 className="tappable flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/60"
               >
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-sm font-semibold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-100 text-sm font-semibold text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">
                   {s.name.slice(0, 1).toUpperCase()}
                 </div>
                 <div className="min-w-0 flex-1">
@@ -252,7 +251,7 @@ export default async function NutriHome({
                       .join(" · ") || "Registrou hoje"}
                   </p>
                 </div>
-                <ChevronRight className="h-4 w-4 shrink-0 text-slate-300 dark:text-slate-600" />
+                <ChevronRight className="h-4 w-4 shrink-0 text-slate-300 dark:text-slate-400" />
               </Link>
             ))}
           </div>

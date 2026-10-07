@@ -49,7 +49,7 @@ export function ProgressRing({
             {centerMain}
           </span>
           {centerSub && (
-            <span className="mt-0.5 text-[10px] leading-none text-slate-400">
+            <span className="mt-0.5 text-[11px] leading-none text-slate-500">
               {centerSub}
             </span>
           )}

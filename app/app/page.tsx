@@ -214,33 +214,36 @@ export default async function DashboardPage() {
     mood: (dailyTodayRes.data as any)?.mood ?? null,
     energy: (dailyTodayRes.data as any)?.energy ?? null,
   });
+  // O número do Score é texto grande (4xl), então o mínimo é 3:1 — e os tons
+  // 500 ficavam em 2.15:1 (amber) e 2.53:1 (brand) sobre o card branco. Cada
+  // cor ganha o par claro/escuro: um tom só não serve os dois temas.
   const healthColor =
     health.color === "brand"
-      ? "text-brand-500"
+      ? "text-brand-700 dark:text-brand-400"
       : health.color === "amber"
-        ? "text-amber-500"
-        : "text-rose-500";
+        ? "text-amber-600 dark:text-amber-400"
+        : "text-rose-600 dark:text-rose-400";
 
   // Um único conjunto de números do dia. Antes o mesmo dado aparecia em três
   // blocos seguidos: pilares do Score, anéis e mini-stats.
   const rings = [
     {
       label: "Calorias",
-      colorClass: "text-amber-500",
+      colorClass: "text-amber-600 dark:text-amber-400",
       pct: calorieGoal ? caloriesToday / calorieGoal : 0,
       centerMain: `${Math.round(caloriesToday)}`,
       centerSub: calorieGoal ? `/ ${calorieGoal}` : "kcal",
     },
     {
       label: "Água",
-      colorClass: "text-blue-500",
+      colorClass: "text-blue-600 dark:text-blue-400",
       pct: waterGoal ? waterToday / waterGoal : 0,
       centerMain: `${(waterToday / 1000).toFixed(1)}`,
       centerSub: `/ ${(waterGoal / 1000).toFixed(1)} L`,
     },
     {
       label: "Proteína",
-      colorClass: "text-rose-500",
+      colorClass: "text-rose-600 dark:text-rose-400",
       pct: proteinGoal ? proteinToday / proteinGoal : 0,
       centerMain: `${Math.round(proteinToday)}`,
       centerSub: proteinGoal ? `/ ${proteinGoal} g` : "g",
@@ -339,7 +342,7 @@ export default async function DashboardPage() {
 
         {tudoEmDia ? (
           <div className="flex items-center gap-3 py-1">
-            <CheckCircle2 className="h-6 w-6 shrink-0 text-brand-600 dark:text-brand-400" />
+            <CheckCircle2 className="h-6 w-6 shrink-0 text-brand-700 dark:text-brand-400" />
             <p className="text-sm text-slate-600 dark:text-slate-300">
               {todayPlan.length > 0
                 ? "Treino de hoje já confirmado. Siga registrando o resto do dia."
@@ -476,7 +479,7 @@ export default async function DashboardPage() {
                           {it.description}
                         </p>
                       </div>
-                      <ChevronRight className="h-4 w-4 shrink-0 text-slate-300 dark:text-slate-600" />
+                      <ChevronRight className="h-4 w-4 shrink-0 text-slate-300 dark:text-slate-400" />
                     </Link>
                   </li>
                 ))}
@@ -527,7 +530,7 @@ export default async function DashboardPage() {
               <p className={`text-4xl font-bold leading-none ${healthColor}`}>
                 {health.score}
               </p>
-              <p className="mt-1 text-[11px] uppercase tracking-wide text-slate-400">
+              <p className="mt-1 text-[11px] uppercase tracking-wide text-slate-500">
                 Score de Saúde · {health.label}
               </p>
             </div>
@@ -583,7 +586,7 @@ export default async function DashboardPage() {
             <p className="text-xl font-bold text-slate-900 dark:text-white">
               {currentWeight ?? "—"}
               {currentWeight ? (
-                <span className="text-sm font-medium text-slate-400"> kg</span>
+                <span className="text-sm font-medium text-slate-500"> kg</span>
               ) : null}
             </p>
             <p className="text-[11px] text-slate-500 dark:text-slate-400">
@@ -602,7 +605,7 @@ export default async function DashboardPage() {
             <p className="text-xl font-bold text-slate-900 dark:text-white">
               {sleepToday != null ? sleepToday : "—"}
               {sleepToday != null ? (
-                <span className="text-sm font-medium text-slate-400"> h</span>
+                <span className="text-sm font-medium text-slate-500"> h</span>
               ) : null}
             </p>
             <p className="text-[11px] text-slate-500 dark:text-slate-400">
@@ -615,7 +618,7 @@ export default async function DashboardPage() {
           <TrendChart data={chartData as any} unit=" kg" />
         ) : (
           <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center dark:border-slate-700">
-            <Scale className="mx-auto h-6 w-6 text-slate-300 dark:text-slate-600" />
+            <Scale className="mx-auto h-6 w-6 text-slate-300 dark:text-slate-400" />
             <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
               Registre seu peso algumas vezes para ver a evolução aqui.
             </p>
@@ -713,7 +716,7 @@ export default async function DashboardPage() {
 
           <div className="card">
             <div className="mb-2 flex items-center gap-2">
-              <MessageCircle className="h-4 w-4 text-brand-600 dark:text-brand-400" />
+              <MessageCircle className="h-4 w-4 text-brand-700 dark:text-brand-400" />
               <p className="text-sm font-semibold text-slate-900 dark:text-white">
                 Fale com a Gaia
               </p>

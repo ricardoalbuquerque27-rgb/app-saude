@@ -155,7 +155,7 @@ export default function TratamentoPage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center py-20 text-slate-400">
+      <div className="flex justify-center py-20 text-slate-500">
         <Loader2 className="h-6 w-6 animate-spin" />
       </div>
     );
@@ -318,7 +318,7 @@ function SetupTreatment({ onCreated }: { onCreated: () => void }) {
         </button>
       </form>
 
-      <p className="flex items-start gap-1.5 text-xs text-slate-400 dark:text-slate-500">
+      <p className="flex items-start gap-1.5 text-xs text-slate-500 dark:text-slate-500">
         <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
         O Pace Fit ajuda a organizar seu tratamento, mas não substitui seu médico.
         Doses e mudanças devem ser sempre orientadas por um profissional.
@@ -399,7 +399,7 @@ function ActiveTreatment({
       {/* Progresso de peso */}
       <div className="card">
         <div className="mb-3 flex items-center gap-2">
-          <TrendingDown className="h-5 w-5 text-brand-600 dark:text-brand-400" />
+          <TrendingDown className="h-5 w-5 text-brand-700 dark:text-brand-400" />
           <h2 className="font-semibold text-slate-900 dark:text-white">
             Progresso desde o início
           </h2>
@@ -429,7 +429,7 @@ function ActiveTreatment({
       {/* Efeitos colaterais */}
       <SideEffectsCard effects={effects} onChange={onChange} />
 
-      <p className="flex items-start gap-1.5 text-xs text-slate-400 dark:text-slate-500">
+      <p className="flex items-start gap-1.5 text-xs text-slate-500 dark:text-slate-500">
         <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
         Em caso de efeitos fortes ou persistentes, procure seu médico. O Pace Fit
         não substitui acompanhamento profissional.
@@ -451,7 +451,7 @@ function Stat({
 }) {
   const color =
     highlight === "good"
-      ? "text-brand-600 dark:text-brand-400"
+      ? "text-brand-700 dark:text-brand-400"
       : highlight === "bad"
         ? "text-rose-600 dark:text-rose-400"
         : "text-slate-900 dark:text-white";
@@ -460,7 +460,7 @@ function Stat({
       <p className="text-xs font-medium text-slate-500 dark:text-slate-400">{label}</p>
       <p className={`mt-0.5 text-xl font-bold tracking-tight ${color}`}>
         {value}
-        {unit && <span className="ml-0.5 text-sm font-medium text-slate-400">{unit}</span>}
+        {unit && <span className="ml-0.5 text-sm font-medium text-slate-500">{unit}</span>}
       </p>
     </div>
   );
@@ -589,7 +589,7 @@ function ProteinCard({
           <div className="flex items-baseline justify-between">
             <p className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
               {Math.round(proteinToday)}
-              <span className="text-sm font-medium text-slate-400"> / {proteinGoal} g</span>
+              <span className="text-sm font-medium text-slate-500"> / {proteinGoal} g</span>
             </p>
             {low && (
               <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
@@ -706,7 +706,7 @@ function SideEffectsCard({
                   title={`${fmt(e.date)}: ${SEV[e.nausea]?.label ?? "-"}`}
                   style={{ opacity: 0.5 + e.nausea * 0.16 }}
                 />
-                <span className="text-[9px] text-slate-400">
+                <span className="text-[11px] text-slate-500">
                   {e.date.slice(8, 10)}
                 </span>
               </div>
@@ -738,7 +738,7 @@ function SevRow({
             onClick={() => onChange(s.v)}
             className={`rounded-lg px-2.5 py-1 text-xs font-medium transition ${
               value === s.v
-                ? "bg-brand-600 text-white"
+                ? "bg-brand-700 text-white"
                 : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
             }`}
           >

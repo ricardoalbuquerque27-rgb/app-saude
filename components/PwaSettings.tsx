@@ -270,15 +270,15 @@ export default function PwaSettings() {
                     </p>
                     <ol className="mt-2 space-y-1.5">
                       <li className="flex items-center gap-2">
-                        <Share className="h-4 w-4 shrink-0 text-brand-600" /> 1.
+                        <Share className="h-4 w-4 shrink-0 text-brand-700" /> 1.
                         Toque no botão <b>Compartilhar</b>.
                       </li>
                       <li className="flex items-center gap-2">
-                        <PlusSquare className="h-4 w-4 shrink-0 text-brand-600" />{" "}
+                        <PlusSquare className="h-4 w-4 shrink-0 text-brand-700" />{" "}
                         2. Escolha <b>Adicionar à Tela de Início</b>.
                       </li>
                       <li className="flex items-center gap-2">
-                        <Check className="h-4 w-4 shrink-0 text-brand-600" /> 3.
+                        <Check className="h-4 w-4 shrink-0 text-brand-700" /> 3.
                         Abra o app pela tela inicial para ativar os lembretes.
                       </li>
                     </ol>
@@ -293,7 +293,7 @@ export default function PwaSettings() {
       {/* Lembretes */}
       <div className="card">
         <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-300">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
             {reminderOn ? (
               <Bell className="h-5 w-5" />
             ) : (
@@ -361,7 +361,7 @@ export default function PwaSettings() {
                 >
                   {tested ? (
                     <>
-                      <Check className="h-4 w-4 text-brand-600" /> Enviada
+                      <Check className="h-4 w-4 text-brand-700" /> Enviada
                     </>
                   ) : (
                     "Testar agora"

@@ -112,7 +112,11 @@ export default function RestTimer() {
               stroke="currentColor"
               strokeDasharray={2 * Math.PI * 42}
               strokeDashoffset={2 * Math.PI * 42 * (1 - pct)}
-              className={done ? "text-rose-500" : "text-brand-500"}
+              className={
+                done
+                  ? "text-rose-600 dark:text-rose-400"
+                  : "text-brand-700 dark:text-brand-400"
+              }
             />
           </svg>
           <span
@@ -147,7 +151,7 @@ export default function RestTimer() {
                 onClick={() => setPreset(s)}
                 className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
                   total === s
-                    ? "bg-brand-600 text-white"
+                    ? "bg-brand-700 text-white"
                     : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300"
                 }`}
               >

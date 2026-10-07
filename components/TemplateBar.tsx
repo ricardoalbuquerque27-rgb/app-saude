@@ -199,7 +199,7 @@ export default function TemplateBar({
               </button>
               <button
                 onClick={() => excluir(m.id)}
-                className="tappable rounded-full p-1 text-slate-400 hover:text-rose-600"
+                className="tappable rounded-full p-1 text-slate-500 hover:text-rose-600"
                 aria-label={`Excluir modelo ${m.name}`}
               >
                 <Trash2 className="h-3 w-3" />

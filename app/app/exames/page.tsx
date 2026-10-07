@@ -321,7 +321,7 @@ export default function ExamesPage() {
         </div>
 
         {analyzeError && (
-          <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
+          <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
             {analyzeError}
           </p>
         )}
@@ -360,7 +360,7 @@ export default function ExamesPage() {
                             </span>
                           )}
                           {it.referencia && (
-                            <span className="text-slate-400">
+                            <span className="text-slate-500">
                               {" "}
                               (ref.: {it.referencia})
                             </span>
@@ -420,13 +420,13 @@ export default function ExamesPage() {
                 </button>
               )}
               {savedMsg && (
-                <span className="text-xs font-medium text-brand-600 dark:text-brand-400">
+                <span className="text-xs font-medium text-brand-700 dark:text-brand-400">
                   {savedMsg}
                 </span>
               )}
             </div>
 
-            <p className="text-[11px] text-slate-400 dark:text-slate-500">
+            <p className="text-[11px] text-slate-500 dark:text-slate-500">
               Leitura automática por IA — pode conter erros e não substitui a
               avaliação de um médico.
             </p>
@@ -449,7 +449,7 @@ export default function ExamesPage() {
             <p className="text-xs text-slate-500 dark:text-slate-400">Em atenção</p>
           </div>
           <div className="card py-3 text-center">
-            <p className="tabular text-2xl font-bold text-brand-600 dark:text-brand-400">
+            <p className="tabular text-2xl font-bold text-brand-700 dark:text-brand-400">
               {statusCounts.normal}
             </p>
             <p className="text-xs text-slate-500 dark:text-slate-400">Normais</p>
@@ -458,7 +458,7 @@ export default function ExamesPage() {
       )}
 
       {loading ? (
-        <div className="flex justify-center py-16 text-slate-400">
+        <div className="flex justify-center py-16 text-slate-500">
           <Loader2 className="h-6 w-6 animate-spin" />
         </div>
       ) : exams.length === 0 ? (
@@ -491,7 +491,7 @@ export default function ExamesPage() {
               key === "alterado"
                 ? "bg-rose-100 text-rose-600 dark:bg-rose-950/40 dark:text-rose-300"
                 : key === "atencao"
-                  ? "bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-300"
+                  ? "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
                   : "bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300";
             return (
               <div
@@ -536,7 +536,7 @@ export default function ExamesPage() {
                         {ex.unit ? ` ${ex.unit}` : ""}
                       </span>
                       {ex.reference_range && (
-                        <span className="text-slate-400">
+                        <span className="text-slate-500">
                           {" "}
                           (ref.: {ex.reference_range})
                         </span>
@@ -551,7 +551,7 @@ export default function ExamesPage() {
                 </div>
                 <button
                   onClick={() => remove(ex.id)}
-                  className="rounded-lg p-1.5 text-slate-400 hover:text-rose-600"
+                  className="rounded-lg p-1.5 text-slate-500 hover:text-rose-600"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
@@ -656,7 +656,7 @@ export default function ExamesPage() {
                 </button>
               ))}
             </div>
-            <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-500">
               {auto.matched
                 ? "Preenchida automaticamente pela faixa de referência — você pode ajustar se quiser."
                 : auto.needs?.includes("sexo")

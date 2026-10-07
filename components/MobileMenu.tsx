@@ -41,7 +41,7 @@ export default function MobileMenu({ links }: { links: NavLink[] }) {
       {open && (
         <div className="fixed inset-0 z-50 flex flex-col bg-black/95 backdrop-blur">
           <div className="flex items-center justify-between px-5 py-4">
-            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
               Menu
             </span>
             <button
@@ -67,7 +67,7 @@ export default function MobileMenu({ links }: { links: NavLink[] }) {
               <Link
                 href="/login"
                 onClick={() => setOpen(false)}
-                className="rounded-full bg-brand-500 px-6 py-3.5 text-center text-xs font-bold uppercase tracking-[0.15em] text-white hover:bg-brand-400"
+                className="rounded-full bg-brand-700 px-6 py-3.5 text-center text-xs font-bold uppercase tracking-[0.15em] text-white hover:bg-brand-600"
               >
                 Criar conta
               </Link>

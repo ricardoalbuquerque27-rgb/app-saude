@@ -257,7 +257,7 @@ export default function Onboarding({ initialName }: { initialName?: string }) {
                   />
                 </div>
               </div>
-              <p className="text-xs text-slate-400 dark:text-slate-500">
+              <p className="text-xs text-slate-500 dark:text-slate-500">
                 Usamos sexo e idade só para ajustar as faixas de referência dos
                 seus exames. Você pode deixar em branco.
               </p>
@@ -270,7 +270,7 @@ export default function Onboarding({ initialName }: { initialName?: string }) {
             <div className="space-y-4">
               <div>
                 <h2 className="flex items-center gap-2 text-xl font-bold text-slate-900 dark:text-white">
-                  <Target className="h-5 w-5 text-brand-600" /> Suas metas
+                  <Target className="h-5 w-5 text-brand-700" /> Suas metas
                 </h2>
                 <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                   Isso ajuda a acompanhar seu dia a dia. Pode ajustar depois.
@@ -301,7 +301,7 @@ export default function Onboarding({ initialName }: { initialName?: string }) {
                   onChange={(e) => setProteinGoal(e.target.value)}
                   placeholder="ex: 110"
                 />
-                <p className="mt-1.5 text-xs text-slate-400 dark:text-slate-500">
+                <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-500">
                   Dica: proteína ajuda a preservar músculo. Se não souber, deixe em
                   branco.
                 </p>
@@ -313,7 +313,7 @@ export default function Onboarding({ initialName }: { initialName?: string }) {
             <div className="space-y-4">
               <div>
                 <h2 className="flex items-center gap-2 text-xl font-bold text-slate-900 dark:text-white">
-                  <Syringe className="h-5 w-5 text-brand-600" /> Tratamento
+                  <Syringe className="h-5 w-5 text-brand-700" /> Tratamento
                 </h2>
                 <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                   Você usa alguma caneta emagrecedora (GLP-1)?
@@ -400,7 +400,7 @@ export default function Onboarding({ initialName }: { initialName?: string }) {
                       onChange={(e) => setNextDose(e.target.value)}
                     />
                   </div>
-                  <p className="text-xs text-slate-400 dark:text-slate-500">
+                  <p className="text-xs text-slate-500 dark:text-slate-500">
                     Vamos te lembrar no dia da aplicação. Isso não substitui seu
                     médico.
                   </p>

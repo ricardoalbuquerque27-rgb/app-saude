@@ -67,7 +67,7 @@ export function StatCard({
         <p className="mt-0.5 text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
           {value}
           {unit && (
-            <span className="ml-1 text-sm font-medium text-slate-400">
+            <span className="ml-1 text-sm font-medium text-slate-500">
               {unit}
             </span>
           )}
@@ -88,7 +88,7 @@ export function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 py-12 text-center dark:border-slate-700">
-      {icon && <div className="mb-3 text-slate-400">{icon}</div>}
+      {icon && <div className="mb-3 text-slate-500">{icon}</div>}
       <p className="font-medium text-slate-700 dark:text-slate-300">{title}</p>
       {description && (
         <p className="mt-1 max-w-xs text-sm text-slate-500 dark:text-slate-400">

@@ -150,7 +150,7 @@ export default function PacientesClient({
                     onClick={() => setFilter(f.key)}
                     className={`tappable rounded-lg px-3 py-1.5 text-sm font-medium ${
                       filter === f.key
-                        ? "bg-brand-600 text-white"
+                        ? "bg-brand-700 text-white"
                         : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
                     }`}
                   >
@@ -159,7 +159,7 @@ export default function PacientesClient({
                       className={`ml-1.5 text-xs ${
                         filter === f.key
                           ? "text-white/70"
-                          : "text-slate-400 dark:text-slate-500"
+                          : "text-slate-500 dark:text-slate-500"
                       }`}
                     >
                       {f.count}
@@ -228,14 +228,14 @@ export default function PacientesClient({
                         </Link>
                         <button
                           onClick={() => removePatient(l.id)}
-                          className="tappable rounded-lg p-1.5 text-slate-400 hover:text-rose-600"
+                          className="tappable rounded-lg p-1.5 text-slate-500 hover:text-rose-600"
                           aria-label="Remover paciente"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
                         <Link
                           href={`/app/pacientes/${l.patient_id}`}
-                          className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                          className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
                         >
                           <ChevronRight className="h-5 w-5" />
                         </Link>
@@ -272,14 +272,14 @@ export default function PacientesClient({
                     </div>
                     <button
                       onClick={() => l.invite_code && copyInvite(l.invite_code)}
-                      className="tappable rounded-lg p-1.5 text-slate-400 hover:text-brand-600"
+                      className="tappable rounded-lg p-1.5 text-slate-500 hover:text-brand-700"
                       aria-label="Copiar convite"
                     >
                       <Copy className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => cancelInvite(l.id)}
-                      className="tappable rounded-lg p-1.5 text-slate-400 hover:text-rose-600"
+                      className="tappable rounded-lg p-1.5 text-slate-500 hover:text-rose-600"
                       aria-label="Cancelar convite"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -335,7 +335,7 @@ export default function PacientesClient({
                 onChange={(e) => setLabel(e.target.value)}
                 placeholder="Ex.: Maria Silva"
               />
-              <p className="mt-1 text-xs text-slate-400">
+              <p className="mt-1 text-xs text-slate-500">
                 Só para você identificar o convite enquanto o paciente não aceita.
               </p>
             </Field>

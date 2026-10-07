@@ -113,7 +113,7 @@ export default function PlanCheckIn({
                   pop === s.id && done ? "pf-pop" : ""
                 } ${
                   done
-                    ? "bg-brand-600 text-white"
+                    ? "bg-brand-700 text-white"
                     : "border border-slate-300 text-slate-700 hover:border-brand-400 hover:text-brand-700 dark:border-slate-600 dark:text-slate-200 dark:hover:border-brand-500 dark:hover:text-brand-300"
                 }`}
               >

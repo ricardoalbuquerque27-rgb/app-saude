@@ -204,13 +204,13 @@ export default function PrescricaoClient({
             onClick={() => setAba(a.key)}
             className={`tappable shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium ${
               aba === a.key
-                ? "bg-brand-600 text-white"
+                ? "bg-brand-700 text-white"
                 : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
             }`}
           >
             {a.label}
             {a.badge ? (
-              <span className="ml-1.5 rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white">
+              <span className="ml-1.5 rounded-full bg-rose-600 px-1.5 text-[11px] font-bold text-white">
                 {a.badge}
               </span>
             ) : null}
@@ -577,7 +577,7 @@ function AbaTreino({
                     {linhas.length > 1 && (
                       <button
                         onClick={() => setLinhas((p) => p.filter((_, k) => k !== i))}
-                        className="tappable rounded-lg px-2 text-slate-400 hover:text-rose-600"
+                        className="tappable rounded-lg px-2 text-slate-500 hover:text-rose-600"
                         aria-label="Remover exercício"
                       >
                         <X className="h-4 w-4" />
@@ -592,7 +592,7 @@ function AbaTreino({
                       ["descanso", "Desc. s"],
                     ] as [keyof LinhaExercicio, string][]).map(([campo, rotulo]) => (
                       <div key={campo}>
-                        <label className="mb-0.5 block text-[10px] font-medium text-slate-500 dark:text-slate-400">
+                        <label className="mb-0.5 block text-[11px] font-medium text-slate-500 dark:text-slate-400">
                           {rotulo}
                         </label>
                         <input
@@ -649,7 +649,7 @@ function AbaTreino({
                     </div>
                     <button
                       onClick={() => excluirRotina(r.id)}
-                      className="tappable rounded-lg p-1.5 text-slate-400 hover:text-rose-600"
+                      className="tappable rounded-lg p-1.5 text-slate-500 hover:text-rose-600"
                       aria-label="Excluir rotina"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -712,7 +712,7 @@ function AbaTreino({
                 </div>
                 <button
                   onClick={() => removerDoDia(p.id)}
-                  className="tappable rounded-lg p-1.5 text-slate-400 hover:text-rose-600"
+                  className="tappable rounded-lg p-1.5 text-slate-500 hover:text-rose-600"
                   aria-label="Remover do plano"
                 >
                   <Trash2 className="h-4 w-4" />
@@ -824,13 +824,13 @@ function AbaConversa({ patientId, nutriId, mensagens, setErro, supabase, router 
                 <div
                   className={`max-w-[85%] rounded-2xl px-3 py-2 ${
                     meu
-                      ? "bg-brand-600 text-white"
+                      ? "bg-brand-700 text-white"
                       : "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-100"
                   }`}
                 >
                   <p className="whitespace-pre-wrap text-sm">{m.body}</p>
                   <p
-                    className={`mt-1 flex items-center gap-1 text-[10px] ${
+                    className={`mt-1 flex items-center gap-1 text-[11px] ${
                       meu ? "text-white/70" : "text-slate-500 dark:text-slate-400"
                     }`}
                   >
@@ -953,7 +953,7 @@ function AbaNotas({ patientId, nutriId, notas, setErro, supabase, router }: any)
                 </span>
                 <button
                   onClick={() => excluir(n.id)}
-                  className="tappable rounded-lg p-1 text-slate-400 hover:text-rose-600"
+                  className="tappable rounded-lg p-1 text-slate-500 hover:text-rose-600"
                   aria-label="Excluir nota"
                 >
                   <Trash2 className="h-3.5 w-3.5" />

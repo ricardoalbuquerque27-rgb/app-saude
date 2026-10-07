@@ -281,7 +281,7 @@ export default function AppShell({
               href={item.href}
               className={`tappable relative flex flex-col items-center gap-0.5 py-2.5 text-[11px] font-medium ${
                 isActive(item)
-                  ? "text-brand-600 dark:text-brand-400"
+                  ? "text-brand-700 dark:text-brand-400"
                   : "text-slate-500 dark:text-slate-400"
               }`}
             >
@@ -305,7 +305,7 @@ export default function AppShell({
             onClick={() => setMenuOpen(true)}
             className={`tappable flex flex-col items-center gap-0.5 py-2.5 text-[11px] font-medium ${
               menuHrefs.includes(pathname)
-                ? "text-brand-600 dark:text-brand-400"
+                ? "text-brand-700 dark:text-brand-400"
                 : "text-slate-500 dark:text-slate-400"
             }`}
           >
@@ -344,7 +344,7 @@ export default function AppShell({
             <div className="flex-1 overflow-y-auto px-3 py-4">
               {menuGroupsEff.map((group) => (
                 <div key={group.title} className="mb-5">
-                  <p className="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                  <p className="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-500">
                     {group.title}
                   </p>
                   <div className="space-y-0.5">

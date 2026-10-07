@@ -34,7 +34,7 @@ export function Pill({
   className?: string;
 }) {
   const variants = {
-    green: "bg-brand-500 text-white hover:bg-brand-400",
+    green: "bg-brand-700 text-white hover:bg-brand-600",
     black: "bg-slate-900 text-white hover:bg-slate-800",
     white: "bg-white text-slate-900 hover:bg-slate-100",
     outline: "border border-current/20 text-current hover:bg-current/5",

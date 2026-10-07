@@ -29,7 +29,7 @@ type Level = "ok" | "warn" | "error";
 const STYLES: Record<Level, { icon: any; cls: string; badge: string }> = {
   ok: {
     icon: CheckCircle2,
-    cls: "text-brand-600 dark:text-brand-400",
+    cls: "text-brand-700 dark:text-brand-400",
     badge:
       "bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300",
   },
@@ -177,7 +177,7 @@ export default function DiagnosticoPage() {
       />
 
       {loading && !data ? (
-        <div className="flex justify-center py-16 text-slate-400">
+        <div className="flex justify-center py-16 text-slate-500">
           <Loader2 className="h-6 w-6 animate-spin" />
         </div>
       ) : error ? (
@@ -244,7 +244,7 @@ export default function DiagnosticoPage() {
                 />
               </div>
 
-              <p className="mt-3 text-center text-xs text-slate-400 dark:text-slate-500">
+              <p className="mt-3 text-center text-xs text-slate-500 dark:text-slate-500">
                 Verificado em {new Date(data.checkedAt).toLocaleString("pt-BR")}.
                 Os valores das chaves nunca são exibidos — apenas se existem.
               </p>

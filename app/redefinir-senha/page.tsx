@@ -91,7 +91,7 @@ export default function RedefinirSenhaPage() {
             </div>
           ) : checking ? (
             <div className="flex flex-col items-center py-8 text-center">
-              <Loader2 className="mb-3 h-6 w-6 animate-spin text-brand-500" />
+              <Loader2 className="mb-3 h-6 w-6 animate-spin text-brand-700 dark:text-brand-400" />
               <p className="text-sm text-slate-500 dark:text-slate-400">
                 Validando o link…
               </p>
@@ -120,7 +120,7 @@ export default function RedefinirSenhaPage() {
                     <button
                       type="button"
                       onClick={() => setShowPw((v) => !v)}
-                      className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                      className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-500 hover:text-slate-600 dark:hover:text-slate-200"
                       tabIndex={-1}
                       aria-label={showPw ? "Ocultar senha" : "Mostrar senha"}
                     >
@@ -133,7 +133,7 @@ export default function RedefinirSenhaPage() {
                   </div>
                 </div>
                 {error && (
-                  <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
+                  <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
                     {error}
                   </p>
                 )}

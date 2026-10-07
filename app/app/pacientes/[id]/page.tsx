@@ -92,13 +92,13 @@ function Stat({
 }) {
   return (
     <div className="card">
-      <div className="text-slate-400">{icon}</div>
+      <div className="text-slate-500">{icon}</div>
       <p className="mt-2 text-xl font-bold text-slate-900 dark:text-white">
         {value}
       </p>
       <p className="text-xs text-slate-500 dark:text-slate-400">{label}</p>
       {sub && (
-        <p className="mt-0.5 text-[11px] text-slate-400 dark:text-slate-500">
+        <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-500">
           {sub}
         </p>
       )}
@@ -146,7 +146,7 @@ const ACTIVITY_STYLE: Record<
   },
   checkin: {
     icon: <CalendarCheck className="h-3.5 w-3.5" />,
-    cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300",
+    cls: "bg-brand-100 text-brand-700 dark:bg-brand-950/40 dark:text-brand-300",
   },
 };
 
@@ -177,7 +177,7 @@ export default async function PacienteDetalhe({
       <div className="max-w-2xl">
         <Link
           href="/app/pacientes"
-          className="mb-4 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-600"
+          className="mb-4 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-700"
         >
           <ArrowLeft className="h-4 w-4" /> Pacientes
         </Link>
@@ -203,7 +203,7 @@ export default async function PacienteDetalhe({
     <div className="max-w-3xl">
       <Link
         href="/app/pacientes"
-        className="mb-4 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-600"
+        className="mb-4 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-700"
       >
         <ArrowLeft className="h-4 w-4" /> Pacientes
       </Link>
@@ -251,7 +251,7 @@ export default async function PacienteDetalhe({
             scroll={false}
             className={`tappable shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium ${
               tab === t.key
-                ? "bg-brand-600 text-white"
+                ? "bg-brand-700 text-white"
                 : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
             }`}
           >
@@ -283,7 +283,7 @@ export default async function PacienteDetalhe({
         <TabPrescricao supabase={supabase} uid={uid} profile={profile} />
       )}
 
-      <p className="mt-6 text-center text-xs text-slate-400 dark:text-slate-500">
+      <p className="mt-6 text-center text-xs text-slate-500 dark:text-slate-500">
         As demais abas são somente leitura. Para alterar metas, plano ou enviar
         um recado, use a aba Prescrição.
       </p>
@@ -394,10 +394,10 @@ async function TabGeral({
         >
           <div className="flex items-center gap-4">
             <div className="text-center">
-              <p className="text-3xl font-bold text-brand-600 dark:text-brand-400">
+              <p className="text-3xl font-bold text-brand-700 dark:text-brand-400">
                 {health.score}
               </p>
-              <p className="text-[10px] uppercase tracking-wide text-slate-400">
+              <p className="text-[11px] uppercase tracking-wide text-slate-500">
                 {health.label}
               </p>
             </div>
@@ -440,7 +440,7 @@ async function TabGeral({
             ["No app desde", profile.created_at ? formatDate(profile.created_at.slice(0, 10)) : "—"],
           ].map(([k, v]) => (
             <div key={k as string}>
-              <dt className="text-xs text-slate-400 dark:text-slate-500">{k}</dt>
+              <dt className="text-xs text-slate-500 dark:text-slate-500">{k}</dt>
               <dd className="font-medium text-slate-800 dark:text-slate-200">
                 {v}
               </dd>
@@ -476,14 +476,14 @@ async function TabGeral({
                   }`}
                   title={`${s.date}: ${has ? "registrou" : "sem registro"}`}
                 />
-                <span className="text-[9px] text-slate-400">
+                <span className="text-[11px] text-slate-500">
                   {s.date.slice(8, 10)}
                 </span>
               </div>
             );
           })}
         </div>
-        <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">
+        <p className="mt-2 text-xs text-slate-500 dark:text-slate-500">
           Verde = houve algum registro no dia.
         </p>
       </Card>
@@ -670,7 +670,7 @@ async function TabNutricao({ supabase, uid, profile }: any) {
                   <p className="font-semibold text-slate-700 dark:text-slate-300">
                     {m.calories ? `${Math.round(Number(m.calories))} kcal` : "—"}
                   </p>
-                  <p className="text-slate-400">
+                  <p className="text-slate-500">
                     {[
                       m.protein_g ? `P ${Math.round(Number(m.protein_g))}` : null,
                       m.carbs_g ? `C ${Math.round(Number(m.carbs_g))}` : null,
@@ -764,7 +764,7 @@ async function TabTreino({ supabase, uid }: any) {
           icon={<CalendarCheck className="h-4 w-4" />}
         >
           <div className="mb-3 flex items-baseline gap-3">
-            <p className="text-3xl font-bold text-brand-600 dark:text-brand-400">
+            <p className="text-3xl font-bold text-brand-700 dark:text-brand-400">
               {adesao.percentual}%
             </p>
             <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -773,11 +773,11 @@ async function TabTreino({ supabase, uid }: any) {
             </p>
           </div>
           <div className="mb-3 grid grid-cols-3 gap-2 text-center">
-            <div className="rounded-lg bg-emerald-50 py-2 dark:bg-emerald-950/30">
-              <p className="text-lg font-bold text-emerald-700 dark:text-emerald-300">
+            <div className="rounded-lg bg-brand-50 py-2 dark:bg-brand-950/30">
+              <p className="text-lg font-bold text-brand-700 dark:text-brand-300">
                 {adesao.confirmadas}
               </p>
-              <p className="text-[11px] text-emerald-700/80 dark:text-emerald-400/80">
+              <p className="text-[11px] text-brand-700/80 dark:text-brand-400/80">
                 confirmou
               </p>
             </div>
@@ -813,13 +813,13 @@ async function TabTreino({ supabase, uid }: any) {
                   (x: any) => checkIdx.get(`${x.id}|${date}`) ?? "sem"
                 );
                 if (estados.every((e) => e === "done")) {
-                  cls = "bg-emerald-500";
+                  cls = "bg-brand-500";
                   titulo = `${date}: confirmou`;
                 } else if (estados.some((e) => e === "skipped")) {
                   cls = "bg-rose-500";
                   titulo = `${date}: disse que faltou`;
                 } else if (estados.some((e) => e === "done")) {
-                  cls = "bg-emerald-300";
+                  cls = "bg-brand-300";
                   titulo = `${date}: confirmou em parte`;
                 } else {
                   cls = "bg-amber-300 dark:bg-amber-600";
@@ -835,7 +835,7 @@ async function TabTreino({ supabase, uid }: any) {
               );
             })}
           </div>
-          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-400 dark:text-slate-500">
+          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-500 dark:text-slate-500">
             <span>🟩 confirmou</span>
             <span>🟥 faltou</span>
             <span>🟨 sem resposta</span>
@@ -853,18 +853,18 @@ async function TabTreino({ supabase, uid }: any) {
               const items = plan.filter((p) => p.day_of_week === i);
               return (
                 <div key={d} className="text-center">
-                  <p className="mb-1 text-[10px] font-semibold uppercase text-slate-400">
+                  <p className="mb-1 text-[11px] font-semibold uppercase text-slate-500">
                     {d}
                   </p>
                   {items.length === 0 ? (
-                    <div className="rounded-lg bg-slate-100 py-2 text-[10px] text-slate-400 dark:bg-slate-800">
+                    <div className="rounded-lg bg-slate-100 py-2 text-[11px] text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                       —
                     </div>
                   ) : (
                     items.map((p, k) => (
                       <div
                         key={k}
-                        className="mb-1 rounded-lg bg-brand-100 px-1 py-1.5 text-[10px] font-medium leading-tight text-brand-800 dark:bg-brand-900/40 dark:text-brand-300"
+                        className="mb-1 rounded-lg bg-brand-100 px-1 py-1.5 text-[11px] font-medium leading-tight text-brand-800 dark:bg-brand-900/40 dark:text-brand-300"
                         title={p.title || p.sport}
                       >
                         {p.sport || p.title}
@@ -885,7 +885,7 @@ async function TabTreino({ supabase, uid }: any) {
               <li key={r.id} className="text-sm text-slate-700 dark:text-slate-300">
                 <span className="font-medium">{r.name}</span>
                 {r.notes && (
-                  <span className="text-slate-400"> — {r.notes}</span>
+                  <span className="text-slate-500"> — {r.notes}</span>
                 )}
               </li>
             ))}
@@ -904,7 +904,7 @@ async function TabTreino({ supabase, uid }: any) {
                   <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
                     {w.name || "Treino"}
                   </p>
-                  <p className="shrink-0 text-xs text-slate-400">
+                  <p className="shrink-0 text-xs text-slate-500">
                     {formatDate(w.date)}
                   </p>
                 </div>
@@ -991,7 +991,7 @@ async function TabCorpo({ supabase, uid, profile }: any) {
           <div className="-mx-2 overflow-x-auto">
             <table className="w-full min-w-[480px] text-sm">
               <thead>
-                <tr className="text-left text-xs text-slate-400">
+                <tr className="text-left text-xs text-slate-500">
                   <th className="px-2 pb-2 font-medium">Data</th>
                   <th className="px-2 pb-2 font-medium">Peso</th>
                   <th className="px-2 pb-2 font-medium">%GC</th>
@@ -1033,7 +1033,7 @@ const STATUS_CLS: Record<string, string> = {
   atencao: "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300",
   atenção: "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300",
   normal:
-    "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300",
+    "bg-brand-100 text-brand-700 dark:bg-brand-950/40 dark:text-brand-300",
 };
 
 async function TabClinico({ supabase, uid }: any) {
@@ -1098,7 +1098,7 @@ async function TabClinico({ supabase, uid }: any) {
             )}
             {doses.length > 0 && (
               <div className="mt-3">
-                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Últimas aplicações
                 </p>
                 <ul className="flex flex-wrap gap-1.5">
@@ -1126,7 +1126,7 @@ async function TabClinico({ supabase, uid }: any) {
           <ul className="divide-y divide-slate-100 dark:divide-slate-800">
             {effects.map((e, i) => (
               <li key={i} className="py-2">
-                <p className="text-xs text-slate-400">{formatDate(e.date)}</p>
+                <p className="text-xs text-slate-500">{formatDate(e.date)}</p>
                 <p className="text-sm text-slate-700 dark:text-slate-300">
                   {[
                     e.nausea ? `náusea ${e.nausea}/5` : null,
@@ -1160,7 +1160,7 @@ async function TabClinico({ supabase, uid }: any) {
                     <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-200">
                       {e.title}
                     </p>
-                    <p className="text-xs text-slate-400">
+                    <p className="text-xs text-slate-500">
                       {formatDate(e.date)}
                       {e.reference_range ? ` · ref. ${e.reference_range}` : ""}
                     </p>

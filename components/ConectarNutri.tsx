@@ -65,7 +65,7 @@ export default function ConectarNutri({ codeInicial = "" }: { codeInicial?: stri
         />
       </Field>
       <p className="mb-3 flex items-start gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-        <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-600" />
+        <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-700" />
         Ao conectar, você autoriza este nutricionista a ver seus registros de
         saúde (dieta, peso, exames, hábitos). Você pode revogar quando quiser.
       </p>

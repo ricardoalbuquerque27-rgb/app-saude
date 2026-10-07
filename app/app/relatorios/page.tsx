@@ -115,14 +115,14 @@ export default function RelatoriosPage() {
       />
 
       {error && (
-        <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
+        <p className="mb-4 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
           {error}
         </p>
       )}
 
       {generating && (
         <div className="card mb-6 flex flex-col items-center py-16 text-center">
-          <Loader2 className="mb-3 h-7 w-7 animate-spin text-brand-500" />
+          <Loader2 className="mb-3 h-7 w-7 animate-spin text-brand-700 dark:text-brand-400" />
           <p className="text-sm text-slate-500 dark:text-slate-400">
             Analisando seus dados… isso leva alguns segundos.
           </p>
@@ -156,7 +156,7 @@ export default function RelatoriosPage() {
               <>
                 {current && (
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-xs font-medium text-slate-400">
+                    <p className="text-xs font-medium text-slate-500">
                       Relatório de {formatDateTime(current.created_at)}
                     </p>
                     <span className="chip">Últimos 30 dias</span>
@@ -184,7 +184,7 @@ export default function RelatoriosPage() {
                 {report.pontos_fortes.length > 0 && (
                   <section>
                     <h2 className="mb-3 flex items-center gap-2 font-semibold text-slate-900 dark:text-white">
-                      <TrendingUp className="h-5 w-5 text-brand-600 dark:text-brand-400" />
+                      <TrendingUp className="h-5 w-5 text-brand-700 dark:text-brand-400" />
                       Pontos fortes
                     </h2>
                     <ul className="space-y-2">
@@ -193,7 +193,7 @@ export default function RelatoriosPage() {
                           key={i}
                           className="card flex items-start gap-3 py-3 text-sm text-slate-700 dark:text-slate-300"
                         >
-                          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-brand-600 dark:text-brand-400" />
+                          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-brand-700 dark:text-brand-400" />
                           <span>{p}</span>
                         </li>
                       ))}
@@ -250,7 +250,7 @@ export default function RelatoriosPage() {
                 {report.proximos_passos.length > 0 && (
                   <section>
                     <h2 className="mb-3 flex items-center gap-2 font-semibold text-slate-900 dark:text-white">
-                      <CheckCircle2 className="h-5 w-5 text-brand-600 dark:text-brand-400" />
+                      <CheckCircle2 className="h-5 w-5 text-brand-700 dark:text-brand-400" />
                       Próximos passos
                     </h2>
                     <ol className="space-y-2">
@@ -259,7 +259,7 @@ export default function RelatoriosPage() {
                           key={i}
                           className="card flex items-start gap-3 py-3 text-sm text-slate-700 dark:text-slate-300"
                         >
-                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-600 text-xs font-bold text-white">
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-700 text-xs font-bold text-white">
                             {i + 1}
                           </span>
                           <span>{p}</span>
@@ -269,7 +269,7 @@ export default function RelatoriosPage() {
                   </section>
                 )}
 
-                <p className="text-center text-[11px] text-slate-400 dark:text-slate-500">
+                <p className="text-center text-[11px] text-slate-500 dark:text-slate-500">
                   Análise gerada por IA a partir dos seus registros. Não substitui um
                   profissional de saúde.
                 </p>
@@ -281,7 +281,7 @@ export default function RelatoriosPage() {
           <div className="lg:col-span-1">
             <div className="card lg:sticky lg:top-6">
               <h2 className="mb-3 flex items-center gap-2 font-semibold text-slate-900 dark:text-white">
-                <History className="h-5 w-5 text-slate-400" /> Histórico
+                <History className="h-5 w-5 text-slate-500" /> Histórico
               </h2>
               <div className="space-y-2">
                 {reports.map((r) => {
@@ -308,7 +308,7 @@ export default function RelatoriosPage() {
                       </button>
                       <button
                         onClick={() => removeReport(r.id)}
-                        className="rounded-lg p-1 text-slate-400 hover:text-rose-600"
+                        className="rounded-lg p-1 text-slate-500 hover:text-rose-600"
                         aria-label="Excluir"
                       >
                         <Trash2 className="h-4 w-4" />

@@ -166,7 +166,7 @@ export default function PerfilPage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center py-20 text-slate-400">
+      <div className="flex justify-center py-20 text-slate-500">
         <Loader2 className="h-6 w-6 animate-spin" />
       </div>
     );
@@ -191,7 +191,7 @@ export default function PerfilPage() {
               {email}
             </p>
             {memberSince && (
-              <p className="mt-1.5 inline-flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500">
+              <p className="mt-1.5 inline-flex items-center gap-1 text-xs text-slate-500 dark:text-slate-500">
                 <CalendarClock className="h-3.5 w-3.5" />
                 Membro desde{" "}
                 {new Date(memberSince).toLocaleDateString("pt-BR", {
@@ -206,7 +206,7 @@ export default function PerfilPage() {
 
       <form onSubmit={save} className="card space-y-4">
         <h2 className="flex items-center gap-2 font-semibold text-slate-900 dark:text-white">
-          <User className="h-4 w-4 text-brand-600 dark:text-brand-400" /> Dados
+          <User className="h-4 w-4 text-brand-700 dark:text-brand-400" /> Dados
         </h2>
         <Field label="Tipo de conta">
           <div className="flex gap-2">
@@ -228,7 +228,7 @@ export default function PerfilPage() {
               </button>
             ))}
           </div>
-          <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-500">
             Nutricionista acompanha pacientes; paciente registra a própria rotina.
             Ao salvar, a navegação do app muda.
           </p>
@@ -280,14 +280,14 @@ export default function PerfilPage() {
             <option value="F">Feminino</option>
             <option value="M">Masculino</option>
           </select>
-          <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-500">
             Usado para ajustar as faixas de referência dos seus exames (junto
             com a idade). Não é exibido para ninguém.
           </p>
         </Field>
 
         <h2 className="flex items-center gap-2 pt-2 font-semibold text-slate-900 dark:text-white">
-          <Target className="h-4 w-4 text-brand-600 dark:text-brand-400" /> Metas
+          <Target className="h-4 w-4 text-brand-700 dark:text-brand-400" /> Metas
         </h2>
         {metasDoNutri && (
           <p className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-xs text-brand-800 dark:border-brand-800/50 dark:bg-brand-500/10 dark:text-brand-200">
@@ -342,7 +342,7 @@ export default function PerfilPage() {
         </div>
 
         {error && (
-          <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
+          <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
             {error}
           </p>
         )}

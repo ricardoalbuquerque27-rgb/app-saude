@@ -97,7 +97,7 @@ export default function FoodSearch({
       {!sel ? (
         <>
           <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
             <input
               className="input pl-9"
               value={termo}
@@ -106,7 +106,7 @@ export default function FoodSearch({
               placeholder={placeholder}
             />
             {buscando && (
-              <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-slate-400" />
+              <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-slate-500" />
             )}
           </div>
 
@@ -154,7 +154,7 @@ export default function FoodSearch({
             <button
               type="button"
               onClick={limpar}
-              className="tappable shrink-0 rounded-lg p-1 text-slate-400 hover:text-rose-600"
+              className="tappable shrink-0 rounded-lg p-1 text-slate-500 hover:text-rose-600"
               aria-label="Trocar alimento"
             >
               <X className="h-4 w-4" />

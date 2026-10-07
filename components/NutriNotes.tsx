@@ -133,13 +133,13 @@ export default function NutriNotes({
                 <div
                   className={`max-w-[85%] rounded-2xl px-3 py-2 ${
                     meu
-                      ? "bg-brand-600 text-white"
+                      ? "bg-brand-700 text-white"
                       : "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-100"
                   }`}
                 >
                   <p className="whitespace-pre-wrap text-sm">{n.body}</p>
                   <p
-                    className={`mt-1 text-[10px] ${
+                    className={`mt-1 text-[11px] ${
                       meu ? "text-white/70" : "text-slate-500 dark:text-slate-400"
                     }`}
                   >

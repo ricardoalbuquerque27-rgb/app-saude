@@ -315,7 +315,7 @@ export default function DietaPage() {
             <h2 className="font-semibold text-slate-900 dark:text-white">
               Resumo do dia
             </h2>
-            <p className="text-xs capitalize text-slate-400">{dateLabel}</p>
+            <p className="text-xs capitalize text-slate-500">{dateLabel}</p>
           </div>
           {(!calorieGoal || !proteinGoal) && (
             <Link
@@ -333,7 +333,7 @@ export default function DietaPage() {
             centerMain={`${Math.round(totals.calories)}`}
             centerSub={calorieGoal ? `/ ${calorieGoal}` : "kcal"}
             label="Calorias"
-            colorClass="text-amber-500"
+            colorClass="text-amber-600 dark:text-amber-400"
           />
           <ProgressRing
             pct={proteinGoal ? totals.protein / proteinGoal : 0}
@@ -375,7 +375,7 @@ export default function DietaPage() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-16 text-slate-400">
+        <div className="flex justify-center py-16 text-slate-500">
           <Loader2 className="h-6 w-6 animate-spin" />
         </div>
       ) : meals.length === 0 ? (
@@ -393,12 +393,12 @@ export default function DietaPage() {
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-brand-600 dark:text-brand-400">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-brand-700 dark:text-brand-400">
                     {m.meal_type}
                   </p>
                   <button
                     onClick={() => remove(m.id)}
-                    className="rounded-lg p-1 text-slate-400 hover:text-rose-600"
+                    className="rounded-lg p-1 text-slate-500 hover:text-rose-600"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -482,7 +482,7 @@ export default function DietaPage() {
               </p>
             )}
             {analyzeError && (
-              <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-950/40 dark:text-red-300">
+              <p className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
                 {analyzeError}
               </p>
             )}

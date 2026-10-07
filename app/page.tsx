@@ -87,7 +87,7 @@ export default function Home() {
   return (
     <main className="bg-black">
       {/* Barra de promoção */}
-      <div className="bg-brand-500 px-4 py-2.5 text-center text-sm font-medium text-white">
+      <div className="bg-brand-700 px-4 py-2.5 text-center text-sm font-medium text-white">
         Comece grátis hoje — sem cartão, no celular ou no computador.{" "}
         <Link href="/login" className="font-bold underline underline-offset-2">
           Criar conta

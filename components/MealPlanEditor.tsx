@@ -357,7 +357,7 @@ export default function MealPlanEditor({
                         <button
                           onClick={() => removerItem(o.id)}
                           disabled={busy === o.id}
-                          className="tappable shrink-0 rounded-lg p-1.5 text-slate-400 hover:text-rose-600"
+                          className="tappable shrink-0 rounded-lg p-1.5 text-slate-500 hover:text-rose-600"
                           aria-label="Remover opção"
                         >
                           <Trash2 className="h-4 w-4" />
