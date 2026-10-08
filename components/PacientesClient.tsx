@@ -159,7 +159,7 @@ export default function PacientesClient({
                       className={`ml-1.5 text-xs ${
                         filter === f.key
                           ? "text-white/70"
-                          : "text-slate-500 dark:text-slate-500"
+                          : "text-slate-500 dark:text-slate-400"
                       }`}
                     >
                       {f.count}

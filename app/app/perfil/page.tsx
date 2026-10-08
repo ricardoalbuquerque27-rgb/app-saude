@@ -191,7 +191,7 @@ export default function PerfilPage() {
               {email}
             </p>
             {memberSince && (
-              <p className="mt-1.5 inline-flex items-center gap-1 text-xs text-slate-500 dark:text-slate-500">
+              <p className="mt-1.5 inline-flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
                 <CalendarClock className="h-3.5 w-3.5" />
                 Membro desde{" "}
                 {new Date(memberSince).toLocaleDateString("pt-BR", {
@@ -228,7 +228,7 @@ export default function PerfilPage() {
               </button>
             ))}
           </div>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-500">
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
             Nutricionista acompanha pacientes; paciente registra a própria rotina.
             Ao salvar, a navegação do app muda.
           </p>
@@ -280,7 +280,7 @@ export default function PerfilPage() {
             <option value="F">Feminino</option>
             <option value="M">Masculino</option>
           </select>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-500">
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
             Usado para ajustar as faixas de referência dos seus exames (junto
             com a idade). Não é exibido para ninguém.
           </p>

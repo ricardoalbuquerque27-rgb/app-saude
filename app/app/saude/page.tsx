@@ -178,7 +178,7 @@ export default function SaudePage() {
       ) : (
         <div className="space-y-5">
           {current && (
-            <p className="text-xs text-slate-500 dark:text-slate-500">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
               Análise de {formatDate(current.created_at.slice(0, 10))}
             </p>
           )}
@@ -308,7 +308,7 @@ export default function SaudePage() {
         </div>
       )}
 
-      <p className="flex items-start gap-1.5 text-[11px] text-slate-500 dark:text-slate-500">
+      <p className="flex items-start gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
         <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
         Esta análise é educativa e não substitui um profissional de saúde. Para
         exames alterados ou dúvidas sobre medicação, procure seu médico.

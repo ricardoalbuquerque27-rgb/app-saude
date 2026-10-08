@@ -344,7 +344,7 @@ export default function AppShell({
             <div className="flex-1 overflow-y-auto px-3 py-4">
               {menuGroupsEff.map((group) => (
                 <div key={group.title} className="mb-5">
-                  <p className="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-500">
+                  <p className="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                     {group.title}
                   </p>
                   <div className="space-y-0.5">

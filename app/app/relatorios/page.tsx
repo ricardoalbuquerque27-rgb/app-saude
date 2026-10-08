@@ -269,7 +269,7 @@ export default function RelatoriosPage() {
                   </section>
                 )}
 
-                <p className="text-center text-[11px] text-slate-500 dark:text-slate-500">
+                <p className="text-center text-[11px] text-slate-500 dark:text-slate-400">
                   Análise gerada por IA a partir dos seus registros. Não substitui um
                   profissional de saúde.
                 </p>

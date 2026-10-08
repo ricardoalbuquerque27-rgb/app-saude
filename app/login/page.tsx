@@ -163,7 +163,7 @@ export default function LoginPage() {
         </div>
 
         <div className="relative">
-          <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs text-slate-500">
+          <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs text-slate-400">
             <span className="flex items-center gap-1.5">
               <ShieldCheck className="h-3.5 w-3.5 text-brand-400" /> Dados isolados
               por conta
@@ -172,7 +172,7 @@ export default function LoginPage() {
               <Lock className="h-3.5 w-3.5 text-brand-400" /> Conexão criptografada
             </span>
           </div>
-          <p className="mt-3 text-xs text-slate-500">
+          <p className="mt-3 text-xs text-slate-400">
             © {new Date().getFullYear()} Pace Fit
           </p>
         </div>
@@ -368,7 +368,7 @@ export default function LoginPage() {
           </div>
 
           {/* Confiança (mobile) */}
-          <div className="mt-8 flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs text-slate-500 lg:hidden dark:text-slate-500">
+          <div className="mt-8 flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs text-slate-500 lg:hidden dark:text-slate-400">
             <span className="flex items-center gap-1.5">
               <ShieldCheck className="h-3.5 w-3.5 text-brand-700 dark:text-brand-400" />
               Dados isolados

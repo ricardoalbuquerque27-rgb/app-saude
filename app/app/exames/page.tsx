@@ -426,7 +426,7 @@ export default function ExamesPage() {
               )}
             </div>
 
-            <p className="text-[11px] text-slate-500 dark:text-slate-500">
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
               Leitura automática por IA — pode conter erros e não substitui a
               avaliação de um médico.
             </p>
@@ -656,7 +656,7 @@ export default function ExamesPage() {
                 </button>
               ))}
             </div>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-500">
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
               {auto.matched
                 ? "Preenchida automaticamente pela faixa de referência — você pode ajustar se quiser."
                 : auto.needs?.includes("sexo")

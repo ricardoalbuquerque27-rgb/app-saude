@@ -138,7 +138,7 @@ export default function MealPlanView({
                     className="rounded-xl border border-slate-200/80 bg-white p-2.5 dark:border-white/[0.07] dark:bg-slate-900/60"
                   >
                     {opcoes.length > 1 && (
-                      <p className="mb-0.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-500">
+                      <p className="mb-0.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                         Opção {i + 1}
                       </p>
                     )}

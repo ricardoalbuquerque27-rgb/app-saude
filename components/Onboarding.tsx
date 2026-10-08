@@ -257,7 +257,7 @@ export default function Onboarding({ initialName }: { initialName?: string }) {
                   />
                 </div>
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-500">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 Usamos sexo e idade só para ajustar as faixas de referência dos
                 seus exames. Você pode deixar em branco.
               </p>
@@ -301,7 +301,7 @@ export default function Onboarding({ initialName }: { initialName?: string }) {
                   onChange={(e) => setProteinGoal(e.target.value)}
                   placeholder="ex: 110"
                 />
-                <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-500">
+                <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
                   Dica: proteína ajuda a preservar músculo. Se não souber, deixe em
                   branco.
                 </p>
@@ -400,7 +400,7 @@ export default function Onboarding({ initialName }: { initialName?: string }) {
                       onChange={(e) => setNextDose(e.target.value)}
                     />
                   </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-500">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
                     Vamos te lembrar no dia da aplicação. Isso não substitui seu
                     médico.
                   </p>

@@ -318,7 +318,7 @@ function SetupTreatment({ onCreated }: { onCreated: () => void }) {
         </button>
       </form>
 
-      <p className="flex items-start gap-1.5 text-xs text-slate-500 dark:text-slate-500">
+      <p className="flex items-start gap-1.5 text-xs text-slate-500 dark:text-slate-400">
         <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
         O Pace Fit ajuda a organizar seu tratamento, mas não substitui seu médico.
         Doses e mudanças devem ser sempre orientadas por um profissional.
@@ -429,7 +429,7 @@ function ActiveTreatment({
       {/* Efeitos colaterais */}
       <SideEffectsCard effects={effects} onChange={onChange} />
 
-      <p className="flex items-start gap-1.5 text-xs text-slate-500 dark:text-slate-500">
+      <p className="flex items-start gap-1.5 text-xs text-slate-500 dark:text-slate-400">
         <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
         Em caso de efeitos fortes ou persistentes, procure seu médico. O Pace Fit
         não substitui acompanhamento profissional.

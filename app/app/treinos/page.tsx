@@ -889,7 +889,7 @@ export default function TreinosPage() {
                 >
                 <div className="mb-3 flex items-center gap-2">
                   <h3 className="font-semibold text-slate-900 dark:text-white">{dayName}</h3>
-                  <span className="text-xs text-slate-500 dark:text-slate-500">
+                  <span className="text-xs text-slate-500 dark:text-slate-400">
                     {dataDoDia.slice(8, 10)}/{dataDoDia.slice(5, 7)}
                   </span>
                   {isToday && (
@@ -900,7 +900,7 @@ export default function TreinosPage() {
                 </div>
 
                 {sessions.length === 0 ? (
-                  <p className="mb-3 text-sm text-slate-500 dark:text-slate-500">
+                  <p className="mb-3 text-sm text-slate-500 dark:text-slate-400">
                     Nada planejado.
                   </p>
                 ) : (
@@ -1216,7 +1216,7 @@ export default function TreinosPage() {
                   <span className="text-xs text-slate-500">carga total (kg)</span>
                 </div>
                 <BarsChart data={volumeData} unit=" kg" color="#18b85e" />
-                <p className="mt-2 text-xs text-slate-500 dark:text-slate-500">
+                <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
                   Volume = soma de (repetições × carga) de todos os exercícios na semana.
                 </p>
               </div>

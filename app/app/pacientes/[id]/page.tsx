@@ -98,7 +98,7 @@ function Stat({
       </p>
       <p className="text-xs text-slate-500 dark:text-slate-400">{label}</p>
       {sub && (
-        <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-500">
+        <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
           {sub}
         </p>
       )}
@@ -283,7 +283,7 @@ export default async function PacienteDetalhe({
         <TabPrescricao supabase={supabase} uid={uid} profile={profile} />
       )}
 
-      <p className="mt-6 text-center text-xs text-slate-500 dark:text-slate-500">
+      <p className="mt-6 text-center text-xs text-slate-500 dark:text-slate-400">
         As demais abas são somente leitura. Para alterar metas, plano ou enviar
         um recado, use a aba Prescrição.
       </p>
@@ -440,7 +440,7 @@ async function TabGeral({
             ["No app desde", profile.created_at ? formatDate(profile.created_at.slice(0, 10)) : "—"],
           ].map(([k, v]) => (
             <div key={k as string}>
-              <dt className="text-xs text-slate-500 dark:text-slate-500">{k}</dt>
+              <dt className="text-xs text-slate-500 dark:text-slate-400">{k}</dt>
               <dd className="font-medium text-slate-800 dark:text-slate-200">
                 {v}
               </dd>
@@ -483,7 +483,7 @@ async function TabGeral({
             );
           })}
         </div>
-        <p className="mt-2 text-xs text-slate-500 dark:text-slate-500">
+        <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
           Verde = houve algum registro no dia.
         </p>
       </Card>
@@ -835,7 +835,7 @@ async function TabTreino({ supabase, uid }: any) {
               );
             })}
           </div>
-          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-500 dark:text-slate-500">
+          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-500 dark:text-slate-400">
             <span>🟩 confirmou</span>
             <span>🟥 faltou</span>
             <span>🟨 sem resposta</span>

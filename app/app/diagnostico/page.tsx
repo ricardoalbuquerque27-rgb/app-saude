@@ -244,7 +244,7 @@ export default function DiagnosticoPage() {
                 />
               </div>
 
-              <p className="mt-3 text-center text-xs text-slate-500 dark:text-slate-500">
+              <p className="mt-3 text-center text-xs text-slate-500 dark:text-slate-400">
                 Verificado em {new Date(data.checkedAt).toLocaleString("pt-BR")}.
                 Os valores das chaves nunca são exibidos — apenas se existem.
               </p>
