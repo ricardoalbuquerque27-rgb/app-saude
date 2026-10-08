@@ -54,7 +54,9 @@ export default async function DashboardPage() {
     );
   }
 
-  const weekAgo = addDaysISO(today, -7);
+  // -6 porque a comparação é >=: de hoje-6 até hoje são 7 dias. Com -7 o
+  // "Treinos (7 dias)" contava 8 dias de treino.
+  const weekAgo = addDaysISO(today, -6);
   const dow = (new Date(today + "T12:00:00").getDay() + 6) % 7; // 0 = Segunda
 
   const [

@@ -203,31 +203,51 @@ function aplicaOrdem(linhas, params) {
   });
 }
 
-const USUARIO = {
-  id: PAC, aud: "authenticated", role: "authenticated",
-  email: "maria.teste@exemplo.com", email_confirmed_at: "2026-09-11T02:21:22Z",
-  phone: "", confirmed_at: "2026-09-11T02:21:22Z", last_sign_in_at: new Date().toISOString(),
-  app_metadata: { provider: "email", providers: ["email"] },
-  user_metadata: { full_name: "Maria Souza (teste)" },
-  identities: [], created_at: "2026-09-11T02:21:22Z", updated_at: new Date().toISOString(),
-  is_anonymous: false,
-};
+// Dois usuários: a paciente e o nutricionista. Quem entra depende do
+// e-mail enviado no login — qualquer coisa com "nutri" cai no profissional.
+// Serve para inspecionar os DOIS lados do produto sem trocar nada de lugar.
+function usuario(id) {
+  const ehNutri = id === NUT;
+  return {
+    id, aud: "authenticated", role: "authenticated",
+    email: ehNutri ? "nutri.teste@exemplo.com" : "maria.teste@exemplo.com",
+    email_confirmed_at: "2026-09-11T02:21:22Z", phone: "",
+    confirmed_at: "2026-09-11T02:21:22Z", last_sign_in_at: new Date().toISOString(),
+    app_metadata: { provider: "email", providers: ["email"] },
+    user_metadata: { full_name: ehNutri ? "Ricardo Albuquerque" : "Maria Souza (teste)" },
+    identities: [], created_at: "2026-09-11T02:21:22Z",
+    updated_at: new Date().toISOString(), is_anonymous: false,
+  };
+}
 
-function jwt() {
+function jwt(id) {
   const b64 = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
   return [
     b64({ alg: "HS256", typ: "JWT" }),
-    b64({ sub: PAC, role: "authenticated", aud: "authenticated",
+    b64({ sub: id, role: "authenticated", aud: "authenticated",
           exp: Math.floor(Date.now() / 1000) + 3600, iat: Math.floor(Date.now() / 1000),
-          email: USUARIO.email, session_id: "sessao-falsa" }),
+          email: usuario(id).email, session_id: "sessao-falsa" }),
     "assinatura-irrelevante-neste-mock",
   ].join(".");
 }
 
-const sessao = () => ({
-  access_token: jwt(), token_type: "bearer", expires_in: 3600,
+/** Lê o `sub` do Bearer para saber quem está pedindo. */
+function quemPede(req) {
+  const h = req.headers["authorization"] || "";
+  const t = h.replace(/^Bearer\s+/i, "").split(".")[1];
+  if (!t) return PAC;
+  try {
+    const c = JSON.parse(Buffer.from(t, "base64url").toString());
+    return c.sub === NUT ? NUT : PAC;
+  } catch {
+    return PAC;
+  }
+}
+
+const sessao = (id) => ({
+  access_token: jwt(id), token_type: "bearer", expires_in: 3600,
   expires_at: Math.floor(Date.now() / 1000) + 3600,
-  refresh_token: "refresh-falso", user: USUARIO,
+  refresh_token: "refresh-falso", user: usuario(id),
 });
 
 const srv = http.createServer((req, res) => {
@@ -252,10 +272,13 @@ const srv = http.createServer((req, res) => {
     // --- GoTrue ---
     if (url.pathname.startsWith("/auth/v1/")) {
       const p = url.pathname.replace("/auth/v1/", "");
-      if (p === "user") return envia(200, USUARIO);
-      if (p === "token") return envia(200, sessao());
+      if (p === "user") return envia(200, usuario(quemPede(req)));
+      if (p === "token" || p === "signup") {
+        let email = "";
+        try { email = String(JSON.parse(corpo || "{}").email || ""); } catch {}
+        return envia(200, sessao(/nutri/i.test(email) ? NUT : PAC));
+      }
       if (p === "logout") return envia(204, null);
-      if (p === "signup") return envia(200, sessao());
       return envia(200, {});
     }
 
@@ -264,7 +287,12 @@ const srv = http.createServer((req, res) => {
       const alvo = url.pathname.replace("/rest/v1/", "");
       if (alvo.startsWith("rpc/")) return envia(200, { ok: true });
       const linhas = T[alvo] ?? [];
-      if (req.method !== "GET") return envia(201, []);
+      // HEAD é o que o supabase-js manda em .select(..., { head: true,
+      // count: "exact" }) — a contagem vem só no cabeçalho. Sem tratar
+      // isto, todo contador do app aparecia zerado AQUI, o que parece bug
+      // do app e não é.
+      if (req.method !== "GET" && req.method !== "HEAD")
+        return envia(201, []);
 
       let out = aplicaOrdem(aplicaFiltros(linhas, params), params);
       const total = out.length;
@@ -275,6 +303,7 @@ const srv = http.createServer((req, res) => {
       const cabecalhos = prefer.includes("count=")
         ? { "content-range": `0-${Math.max(total - 1, 0)}/${total}` }
         : {};
+      if (req.method === "HEAD") return envia(200, null, cabecalhos);
       // .single() / .maybeSingle() pedem objeto, não lista
       if ((req.headers["accept"] || "").includes("vnd.pgrst.object")) {
         if (!out.length) return envia(406, { code: "PGRST116", message: "0 rows" }, cabecalhos);

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, X, Loader2 } from "lucide-react";
+import { Check, X, Loader2, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import {
   setPlanCheck,
@@ -94,17 +95,27 @@ export default function PlanCheckIn({
                 : "rounded-xl border border-slate-200/80 bg-white p-3 dark:border-white/[0.07] dark:bg-slate-900/70"
             }
           >
+            {/* O cabeçalho leva para a tela do treino, onde os exercícios
+                cabem com tipografia de ler em pé. Os botões de check-in
+                continuam aqui: confirmar é a ação de um toque, e não deve
+                exigir abrir outra tela. */}
             {!compact && (
-              <>
-                <span className="inline-block rounded-full bg-brand-100 px-2.5 py-0.5 text-[11px] font-semibold text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">
-                  {s.sport}
+              <Link
+                href={`/app/treino/${s.id}`}
+                className="tappable group -m-1 flex items-start gap-2 rounded-lg p-1 hover:bg-slate-50 dark:hover:bg-slate-800/50"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="inline-block rounded-full bg-brand-100 px-2.5 py-0.5 text-[11px] font-semibold text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">
+                    {s.sport}
+                  </span>
+                  {s.title && (
+                    <span className="mt-1 block text-sm font-medium text-slate-800 dark:text-slate-200">
+                      {s.title}
+                    </span>
+                  )}
                 </span>
-                {s.title && (
-                  <p className="mt-1 text-sm font-medium text-slate-800 dark:text-slate-200">
-                    {s.title}
-                  </p>
-                )}
-              </>
+                <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-brand-700 dark:group-hover:text-brand-400" />
+              </Link>
             )}
 
             <div className={compact ? "flex w-full gap-1.5" : "mt-2.5 flex gap-2"}>

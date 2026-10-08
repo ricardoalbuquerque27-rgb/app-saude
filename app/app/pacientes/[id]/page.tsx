@@ -31,14 +31,17 @@ import {
 
 export const dynamic = "force-dynamic";
 
+// Prescrição vem em segundo porque é a única aba onde o nutricionista AGE
+// — as outras são leitura. Era a sétima, fora da tela em 390px, e o rodapé
+// da própria página mandava usá-la.
 const TABS = [
   { key: "geral", label: "Visão geral" },
+  { key: "prescricao", label: "Prescrição" },
   { key: "atividade", label: "Atividade" },
   { key: "nutricao", label: "Nutrição" },
   { key: "treino", label: "Treino" },
   { key: "corpo", label: "Corpo" },
   { key: "clinico", label: "Clínico" },
-  { key: "prescricao", label: "Prescrição" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];

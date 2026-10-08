@@ -55,7 +55,11 @@ export async function getPatientsSummary(
   if (ids.length === 0) return [];
 
   const today = todayISO();
-  const d7 = addDaysISO(today, -7);
+  // -6, não -7: a comparação é >=, então de hoje-6 até hoje dá 7 dias.
+  // Com -7 a janela pegava 8 e o painel mostrava "8 de 7 dias", 114% de
+  // adesão. O dias28 logo abaixo já era montado certo, o que mostra que
+  // isto era engano e não convenção.
+  const d7 = addDaysISO(today, -6);
   const d30 = addDaysISO(today, -30);
   const d180 = addDaysISO(today, -180);
 
