@@ -32,6 +32,13 @@ OUT=/tmp/prints node ferramentas/tirar-prints.cjs
 Sai um PNG por tela × dispositivo × tema, e o script avisa no terminal quando
 alguma página transborda a largura do viewport.
 
+**Não rode `npm run build` com o `npm run dev` no ar.** Os dois escrevem na
+mesma pasta `.next`, e o build apaga os chunks que o dev está servindo. O
+sintoma é traiçoeiro: o navegador toma 404 nos scripts, o React não hidrata,
+o formulário de login faz submit nativo e o script fotografa a tela de login
+achando que é a Início. Se acontecer, pare o dev, `rm -rf .next` e suba de
+novo.
+
 ## Guia de estilo
 
 A rota `/estilo` (só em desenvolvimento, `notFound()` em produção) mostra cor,

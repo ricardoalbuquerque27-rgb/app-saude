@@ -366,8 +366,14 @@ export default async function DashboardPage() {
           <div className="space-y-3">
             {/* Tudo o que veio do nutricionista, num bloco só e com o nome
                 dele no topo — e com um caminho único para o resto. */}
+            {/* Isto já foi uma caixa dentro da caixa "Hoje". Medindo as duas
+                superfícies, elas diferiam por 1.018:1 no tema claro — a
+                mesma cor. A caixa não distinguia nada: só somava uma borda
+                e comia 24px de largura de cada lado, numa tela de 390px
+                onde os cartões de dentro já disputam espaço. O que agrupa
+                aqui é o rótulo e a proximidade, não uma segunda moldura. */}
             {blocoNutri && (
-              <div className="rounded-xl border border-brand-200 bg-brand-50/70 p-3 dark:border-brand-900/60 dark:bg-brand-500/[0.07]">
+              <div>
                 <div className="mb-2.5 flex items-center justify-between gap-2">
                   <p className="flex min-w-0 items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-brand-700 dark:text-brand-300">
                     <Stethoscope className="h-3.5 w-3.5 shrink-0" />
@@ -444,7 +450,12 @@ export default async function DashboardPage() {
               </div>
             )}
 
-            {/* Fora do bloco: o que é do próprio paciente. */}
+            {/* Fora do bloco: o que é do próprio paciente. Sem a moldura,
+                quem marca a virada é esta linha. */}
+            {blocoNutri && (
+              <hr className="border-brand-200/70 dark:border-brand-800/40" />
+            )}
+
             {(planoProprio.length > 0 || (!temNutri && planoNutri.length > 0)) && (
               <div>
                 <p className="eyebrow mb-1.5">Treino de hoje</p>
