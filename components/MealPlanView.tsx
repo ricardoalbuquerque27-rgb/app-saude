@@ -131,11 +131,29 @@ export default function MealPlanView({
                 )}
               </div>
 
-              <div className="space-y-1.5">
+              {/* No modo compacto esta lista já vive DENTRO de um cartão
+                  branco (o cardápio recolhido da tela Início), que por sua
+                  vez vive dentro do cartão "Hoje". Dar moldura a cada opção
+                  aqui empilhava a quarta borda — branco sobre branco, que
+                  não separa nada e só come largura. Aí as opções viram
+                  linhas, separadas por um fio. Fora do modo compacto a
+                  lista fica sobre a superfície tingida e o cartão cumpre
+                  seu papel, então continua cartão. */}
+              <div
+                className={
+                  compacto
+                    ? "divide-y divide-slate-100 dark:divide-white/[0.06]"
+                    : "space-y-1.5"
+                }
+              >
                 {opcoes.map((o, i) => (
                   <div
                     key={o.id}
-                    className="rounded-xl border border-slate-200/80 bg-white p-2.5 dark:border-white/[0.07] dark:bg-slate-900/60"
+                    className={
+                      compacto
+                        ? "py-2.5 first:pt-0 last:pb-0"
+                        : "rounded-xl border border-slate-200/80 bg-white p-2.5 dark:border-white/[0.07] dark:bg-slate-900/60"
+                    }
                   >
                     {opcoes.length > 1 && (
                       <p className="mb-0.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
