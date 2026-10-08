@@ -7,6 +7,7 @@ import {
   MessageSquare,
   NotebookPen,
   CalendarDays,
+  ChevronRight,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui";
@@ -151,6 +152,9 @@ export default async function MeuNutricionistaPage({
     rotinas = r.data ?? [];
     exercicios = e.data ?? [];
   }
+
+  // Segunda = 0, igual ao resto do app.
+  const dowHoje = (new Date(today + "T12:00:00").getDay() + 6) % 7;
 
   const temMetas =
     presc &&
@@ -312,6 +316,11 @@ export default async function MeuNutricionistaPage({
                   <p className="eyebrow mb-2 flex items-center gap-1.5">
                     <CalendarDays className="h-3.5 w-3.5" />
                     {dia}
+                    {i === dowHoje && (
+                      <span className="rounded-full bg-brand-100 px-2 py-0.5 text-[11px] font-bold normal-case tracking-normal text-brand-800 dark:bg-brand-500/20 dark:text-brand-200">
+                        hoje
+                      </span>
+                    )}
                   </p>
                   <div className="space-y-3">
                     {doDia.map((s) => {
@@ -319,46 +328,34 @@ export default async function MeuNutricionistaPage({
                       const exs = exercicios.filter(
                         (e) => e.routine_id === s.routine_id
                       );
+                      // O dia agora é um atalho para a tela do treino, onde
+                      // a lista cabe com tipografia de ler em pé na
+                      // academia. Aqui fica só o bastante para escolher:
+                      // nome, modalidade e quantos exercícios.
+                      const resumo = [
+                        s.sport,
+                        exs.length > 0
+                          ? `${exs.length} exercício${exs.length > 1 ? "s" : ""}`
+                          : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ");
                       return (
-                        <div key={s.id}>
-                          <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                            {s.title || rotina?.name || s.sport}
-                          </p>
-                          {s.notes && (
-                            <p className="mt-0.5 whitespace-pre-wrap text-xs text-slate-500 dark:text-slate-400">
-                              {s.notes}
+                        <Link
+                          key={s.id}
+                          href={`/app/treino/${s.id}`}
+                          className="tappable group -mx-2 flex items-center gap-3 rounded-xl px-2 py-2 hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                              {s.title || rotina?.name || s.sport}
                             </p>
-                          )}
-                          {exs.length > 0 && (
-                            <ul className="mt-2 space-y-1">
-                              {exs.map((e) => (
-                                <li
-                                  key={e.id}
-                                  className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-2.5 py-1.5 text-sm dark:bg-slate-900/60"
-                                >
-                                  <span className="min-w-0 truncate text-slate-800 dark:text-slate-200">
-                                    {e.name}
-                                  </span>
-                                  <span className="shrink-0 text-xs text-slate-500 dark:text-slate-400">
-                                    {[
-                                      e.target_sets && e.target_reps
-                                        ? `${e.target_sets}×${e.target_reps}`
-                                        : e.target_sets
-                                          ? `${e.target_sets} séries`
-                                          : null,
-                                      e.target_weight_kg
-                                        ? `${e.target_weight_kg} kg`
-                                        : null,
-                                      e.rest_seconds ? `${e.rest_seconds}s desc.` : null,
-                                    ]
-                                      .filter(Boolean)
-                                      .join(" · ")}
-                                  </span>
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                        </div>
+                            <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                              {resumo}
+                            </p>
+                          </div>
+                          <ChevronRight className="h-4 w-4 shrink-0 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-brand-700 dark:group-hover:text-brand-400" />
+                        </Link>
                       );
                     })}
                   </div>
@@ -366,7 +363,8 @@ export default async function MeuNutricionistaPage({
               );
             })}
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              A confirmação de cada dia (“fui” ou “não fui”) fica em{" "}
+              Toque num treino para ver os exercícios. A confirmação
+              (“fui” ou “não fui”) fica na própria tela do treino e em{" "}
               <Link
                 href="/app"
                 className="font-medium text-brand-700 hover:underline dark:text-brand-400"
