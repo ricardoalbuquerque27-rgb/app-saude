@@ -21,11 +21,14 @@ export default function PlanCheckIn({
   date,
   completions,
   compact = false,
+  nota = true,
 }: {
   sessions: PlanSession[];
   date: string;
   completions: Completion[];
   compact?: boolean;
+  /** A explicação do check-in só precisa aparecer uma vez por tela. */
+  nota?: boolean;
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -141,7 +144,7 @@ export default function PlanCheckIn({
               </button>
             </div>
 
-            {!compact && !current && (
+            {nota && !compact && !current && (
               <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
                 Seu nutricionista vê essa confirmação.
               </p>

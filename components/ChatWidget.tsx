@@ -25,7 +25,13 @@ export default function ChatWidget() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // O balão fica fixo no canto inferior direito e cobre o que estiver ali —
+  // no celular, bem em cima dos botões "Comi isso" do cardápio, que são
+  // alinhados à direita. Some ao descer (que é quando se está lendo) e
+  // volta ao subir ou ao chegar no topo.
+  const [escondido, setEscondido] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const ultimoY = useRef(0);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({
@@ -116,6 +122,19 @@ export default function ChatWidget() {
     }
   }
 
+  useEffect(() => {
+    const aoRolar = () => {
+      const y = window.scrollY;
+      const desceu = y > ultimoY.current + 4;
+      const subiu = y < ultimoY.current - 4;
+      if (desceu && y > 160) setEscondido(true);
+      else if (subiu || y <= 160) setEscondido(false);
+      ultimoY.current = y;
+    };
+    window.addEventListener("scroll", aoRolar, { passive: true });
+    return () => window.removeEventListener("scroll", aoRolar);
+  }, []);
+
   return (
     <>
       {/* Botão flutuante (balãozinho) */}
@@ -123,7 +142,11 @@ export default function ChatWidget() {
         <button
           onClick={() => setOpen(true)}
           aria-label="Abrir a Gaia"
-          className="fixed bottom-20 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-lg shadow-brand-600/30 transition hover:scale-105 active:scale-95 lg:bottom-6 lg:right-6"
+          className={`fixed bottom-20 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-lg shadow-brand-600/30 transition duration-200 hover:scale-105 active:scale-95 lg:bottom-6 lg:right-6 ${
+            escondido
+              ? "pointer-events-none translate-y-24 opacity-0 focus-visible:translate-y-0 focus-visible:opacity-100"
+              : "translate-y-0 opacity-100"
+          }`}
         >
           <Leaf className="h-6 w-6" />
           <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center">

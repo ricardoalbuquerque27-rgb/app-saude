@@ -81,7 +81,7 @@ export default function NutriNotes({
           >
             <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-brand-700 dark:text-brand-300">
               <MessageSquare className="h-3 w-3" />
-              Recado do seu nutricionista
+              Recado
             </p>
             <p className="whitespace-pre-wrap text-sm text-slate-800 dark:text-slate-200">
               {n.body}

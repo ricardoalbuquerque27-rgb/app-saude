@@ -300,6 +300,14 @@ export default async function DashboardPage() {
   const tiposPendentes = Array.from(
     new Set(itensCardapioPendentes.map((i: any) => i.meal_type))
   );
+  // O cartão de dose logo acima já cobre o assunto com mais detalhe
+  // (remédio e dosagem); repetir como pendência mostrava a mesma coisa
+  // duas vezes seguidas.
+  const mostraCartaoDose = !!(treatment && doseLabel && doseUrgent);
+  const pendenciasVisiveis = pending.items.filter(
+    (it) => !(mostraCartaoDose && it.key === "dose")
+  );
+
   const planoNutri = todayPlan.filter((p: any) => p.prescribed_by);
   const planoProprio = todayPlan.filter((p: any) => !p.prescribed_by);
   const temNutri = !!vinculo;
@@ -310,7 +318,7 @@ export default async function DashboardPage() {
       itensCardapioPendentes.length > 0);
   const tudoEmDia =
     checkinPendente === 0 &&
-    pending.items.length === 0 &&
+    pendenciasVisiveis.length === 0 &&
     !doseUrgent &&
     itensCardapioPendentes.length === 0 &&
     notasNaoLidas.length === 0;
@@ -326,7 +334,7 @@ export default async function DashboardPage() {
     <div className="space-y-5">
       {/* Saudação enxuta — o espaço nobre é do bloco "Hoje", logo abaixo. */}
       <div>
-        <p className="text-sm capitalize text-slate-500 dark:text-slate-400">
+        <p className="text-sm text-slate-500 first-letter:uppercase dark:text-slate-400">
           {dataLonga}
         </p>
         <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-3xl">
@@ -446,6 +454,7 @@ export default async function DashboardPage() {
                   }
                   date={today}
                   completions={todayCompletions as any}
+                  nota={planoNutri.length === 0}
                 />
               </div>
             )}
@@ -487,9 +496,9 @@ export default async function DashboardPage() {
               </Link>
             )}
 
-            {pending.items.length > 0 && (
+            {pendenciasVisiveis.length > 0 && (
               <ul className="pf-stagger space-y-1.5">
-                {pending.items.map((it) => (
+                {pendenciasVisiveis.map((it) => (
                   <li key={it.key}>
                     <Link
                       href={it.href}
