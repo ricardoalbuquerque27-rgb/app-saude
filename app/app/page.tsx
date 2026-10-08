@@ -14,6 +14,8 @@ import {
   Plus,
   CheckCircle2,
   Stethoscope,
+  Utensils,
+  ChevronDown,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { TrendChart } from "@/components/charts";
@@ -295,6 +297,9 @@ export default async function DashboardPage() {
   // o recado, o treino prescrito e o cardápio apareciam soltos no meio das
   // pendências do próprio app — e a pessoa não sabia o que era orientação
   // profissional e o que era lembrete do sistema.
+  const tiposPendentes = Array.from(
+    new Set(itensCardapioPendentes.map((i: any) => i.meal_type))
+  );
   const planoNutri = todayPlan.filter((p: any) => p.prescribed_by);
   const planoProprio = todayPlan.filter((p: any) => !p.prescribed_by);
   const temNutri = !!vinculo;
@@ -389,19 +394,43 @@ export default async function DashboardPage() {
                   )}
 
                   {itensCardapioPendentes.length > 0 && (
-                    <div>
-                      <p className="eyebrow mb-1.5">
-                        Cardápio — o que ainda falta hoje
-                      </p>
-                      <MealPlanView
-                        nome={cardapio.name}
-                        observacao={cardapio.notes}
-                        itens={itensCardapioPendentes as any}
-                        date={today}
-                        jaRegistrados={tiposJaRegistrados}
-                        compacto
-                      />
-                    </div>
+                    // Resumo que abre no lugar. Despejar as cinco refeições
+                    // aqui fazia o cardápio sozinho ocupar um terço da tela
+                    // e empurrava o resto do dia para fora da vista. O aviso
+                    // de que há refeição pendente continua — é a contagem —,
+                    // o que sai da frente é o conteúdo. <details> nativo:
+                    // sem JavaScript e abre instantâneo.
+                    <details className="group rounded-xl border border-brand-200 bg-white dark:border-brand-800/50 dark:bg-slate-900/60">
+                      {/* Três caixas aninhadas já comeram a largura: o
+                          selo de ícone mais a contagem em pílula faziam o
+                          título quebrar em duas linhas e o subtítulo
+                          truncar. Ícone solto, contagem por extenso embaixo
+                          e só a seta à direita — não trunca em 390px. */}
+                      <summary className="tappable flex cursor-pointer list-none items-center gap-2.5 p-3 [&::-webkit-details-marker]:hidden">
+                        <Utensils className="h-4 w-4 shrink-0 text-brand-700 dark:text-brand-400" />
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-sm font-semibold text-slate-900 dark:text-white">
+                            Cardápio de hoje
+                          </span>
+                          <span className="block text-xs text-slate-500 dark:text-slate-400">
+                            {tiposPendentes.length === 1
+                              ? "1 refeição ainda falta"
+                              : `${tiposPendentes.length} refeições ainda faltam`}
+                          </span>
+                        </span>
+                        <ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition group-open:rotate-180" />
+                      </summary>
+                      <div className="border-t border-brand-100 p-3 dark:border-brand-900/50">
+                        <MealPlanView
+                          nome={cardapio.name}
+                          observacao={cardapio.notes}
+                          itens={itensCardapioPendentes as any}
+                          date={today}
+                          jaRegistrados={tiposJaRegistrados}
+                          compacto
+                        />
+                      </div>
+                    </details>
                   )}
                 </div>
               </div>

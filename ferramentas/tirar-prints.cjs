@@ -35,7 +35,7 @@ const TELAS = [
       // existir e o formulário faz submit nativo — fica na própria tela.
       await page.waitForTimeout(800);
       await page.fill('input[type="email"]', "maria.teste@exemplo.com");
-      await page.fill('input[type="password"]', "qualquer-coisa");
+      await page.fill('input[type="password"]', "senha-de-mentira");  // o campo tem minLength={6}
       await page.click('button[type="submit"]');
       await page.waitForURL("**/app", { timeout: 20000 });
 
