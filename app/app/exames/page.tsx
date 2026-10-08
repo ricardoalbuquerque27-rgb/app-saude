@@ -18,6 +18,7 @@ import { PageHeader, Modal, Field, EmptyState } from "@/components/ui";
 import { todayISO, formatDate } from "@/lib/date";
 import { useLiveRefresh } from "@/lib/useLiveRefresh";
 import { classifyExam, type Sex } from "@/lib/examRanges";
+import { meuPerfil } from "@/lib/perfil";
 
 function ageFromBirth(birth?: string | null): number | null {
   if (!birth) return null;
@@ -131,10 +132,7 @@ export default function ExamesPage() {
   // Perfil (sexo/idade) para personalizar a classificação automática.
   useEffect(() => {
     (async () => {
-      const { data } = await supabase
-        .from("profiles")
-        .select("sex, birth_date")
-        .maybeSingle();
+      const data = await meuPerfil(supabase, "sex, birth_date");
       setProfileCtx({
         sex: (data?.sex as Sex) ?? null,
         age: ageFromBirth(data?.birth_date),

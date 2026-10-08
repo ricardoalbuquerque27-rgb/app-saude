@@ -29,7 +29,7 @@ export default function RevogarNutri({ linkId }: { linkId: string }) {
       disabled={busy}
       className="shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-500 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-60 dark:text-slate-400 dark:hover:bg-rose-950/30"
     >
-      {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Revogar acesso"}
+      {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Revogar"}
     </button>
   );
 }

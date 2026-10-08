@@ -176,10 +176,11 @@ export default async function MeuNutricionistaPage({
             {nutriNome}
           </p>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Acompanha você desde{" "}
-            {formatDate(String(link.accepted_at || link.created_at).slice(0, 10))}
+            Desde {formatDate(String(link.accepted_at || link.created_at).slice(0, 10))}
           </p>
         </div>
+        {/* "Revogar acesso" roubava largura do nome, que truncava em
+            "Ricardo Albuque…". A ação é secundária; o nome é que importa. */}
         <RevogarNutri linkId={link.id} />
       </div>
 
@@ -196,7 +197,10 @@ export default async function MeuNutricionistaPage({
                 : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
             }`}
           >
-            <a.icon className="h-3.5 w-3.5" />
+            {/* O ícone some no celular: com ele, as quatro abas não cabiam
+                em 390px e "Conversa" ficava cortada pela borda — logo a que
+                carrega o aviso de mensagem não lida. */}
+            <a.icon className="hidden h-3.5 w-3.5 sm:block" />
             {a.label}
             {a.key === "conversa" && naoLidas > 0 ? (
               <span className="rounded-full bg-rose-600 px-1.5 text-[11px] font-bold text-white">

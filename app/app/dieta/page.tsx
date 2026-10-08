@@ -20,6 +20,7 @@ import { ProgressRing } from "@/components/ProgressRing";
 import { todayISO } from "@/lib/date";
 import { useLiveRefresh } from "@/lib/useLiveRefresh";
 import FoodSearch from "@/components/FoodSearch";
+import { meuPerfil } from "@/lib/perfil";
 import MealPlanView, {
   type ItemCardapioPaciente,
 } from "@/components/MealPlanView";
@@ -107,10 +108,10 @@ export default function DietaPage() {
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase
-        .from("profiles")
-        .select("daily_calorie_goal, protein_goal_g")
-        .maybeSingle();
+      const data = await meuPerfil<any>(
+        supabase,
+        "daily_calorie_goal, protein_goal_g"
+      );
       setCalorieGoal(data?.daily_calorie_goal ?? null);
       setProteinGoal(data?.protein_goal_g ?? null);
     })();
@@ -315,7 +316,7 @@ export default function DietaPage() {
             <h2 className="font-semibold text-slate-900 dark:text-white">
               Resumo do dia
             </h2>
-            <p className="text-xs capitalize text-slate-500">{dateLabel}</p>
+            <p className="text-xs text-slate-500 first-letter:uppercase">{dateLabel}</p>
           </div>
           {(!calorieGoal || !proteinGoal) && (
             <Link

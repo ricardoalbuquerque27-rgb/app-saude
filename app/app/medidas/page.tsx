@@ -17,6 +17,7 @@ import { PageHeader, Modal, Field, EmptyState } from "@/components/ui";
 import { TrendChart } from "@/components/charts";
 import { todayISO, formatDate } from "@/lib/date";
 import { useLiveRefresh } from "@/lib/useLiveRefresh";
+import { meuPerfil } from "@/lib/perfil";
 
 const FIELDS: { key: keyof BodyMeasurement; label: string; unit: string }[] = [
   { key: "weight_kg", label: "Peso", unit: "kg" },
@@ -61,10 +62,7 @@ export default function MedidasPage() {
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase
-        .from("profiles")
-        .select("weight_goal_kg")
-        .maybeSingle();
+      const data = await meuPerfil<any>(supabase, "weight_goal_kg");
       setWeightGoal(data?.weight_goal_kg ?? null);
     })();
   }, [supabase]);

@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { VAPID_PUBLIC_KEY } from "@/lib/vapidPublicKey";
+import { meuPerfil } from "@/lib/perfil";
 
 type InstallEvent = Event & {
   prompt: () => Promise<void>;
@@ -62,10 +63,10 @@ export default function PwaSettings() {
 
   const loadPrefs = useCallback(async () => {
     const supabase = createClient();
-    const { data } = await supabase
-      .from("profiles")
-      .select("reminder_enabled, reminder_time")
-      .maybeSingle();
+    const data = await meuPerfil<any>(
+      supabase,
+      "reminder_enabled, reminder_time"
+    );
     if (data) {
       setReminderOn(!!data.reminder_enabled);
       if (data.reminder_time) setTime(data.reminder_time.slice(0, 5));

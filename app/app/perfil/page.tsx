@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { Profile } from "@/lib/types";
 import { PageHeader, Field } from "@/components/ui";
 import PwaSettings from "@/components/PwaSettings";
+import { meuPerfil } from "@/lib/perfil";
 
 function onlyDigits(s: string) {
   return s.replace(/\D/g, "");
@@ -74,7 +75,7 @@ export default function PerfilPage() {
       .maybeSingle();
     setMetasDoNutri(!!pres);
 
-    const { data } = await supabase.from("profiles").select("*").maybeSingle();
+    const data = await meuPerfil(supabase);
     const p = data as Profile | null;
     if (p) {
       setFullName(p.full_name ?? "");

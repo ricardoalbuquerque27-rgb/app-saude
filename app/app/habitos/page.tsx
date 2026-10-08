@@ -17,6 +17,7 @@ import { PageHeader, Field } from "@/components/ui";
 import { ProgressRing } from "@/components/ProgressRing";
 import { todayISO, formatDate } from "@/lib/date";
 import { useLiveRefresh } from "@/lib/useLiveRefresh";
+import { meuPerfil } from "@/lib/perfil";
 
 const MOODS = [
   { value: "otimo", label: "😄 Ótimo" },
@@ -72,7 +73,7 @@ export default function HabitosPage() {
     setLoading(true);
     const [{ data: current }, { data: prof }, { data: hist }] = await Promise.all([
       supabase.from("daily_logs").select("*").eq("date", date).maybeSingle(),
-      supabase.from("profiles").select("*").maybeSingle(),
+      meuPerfil(supabase).then((p) => ({ data: p })),
       supabase
         .from("daily_logs")
         .select("*")
