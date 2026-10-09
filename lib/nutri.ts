@@ -5,6 +5,14 @@ import { computeAdherence } from "@/lib/planCheckIn";
 // cliente autenticado do nutri — a RLS ("nutri reads patient") é quem libera
 // as linhas dos pacientes vinculados. Nada aqui usa service role.
 
+/**
+ * Tipo de cada alerta. A tela liga uma ação a cada um (abrir a dose, a
+ * prescrição, a aba de treino...), então o tipo não pode ser lido do texto.
+ */
+export type TipoAlerta = "dose" | "prescricao" | "parado" | "treino" | "exame";
+
+export type Alerta = { tipo: TipoAlerta; nivel: number; texto: string };
+
 export type PatientSummary = {
   id: string;
   name: string;
@@ -30,6 +38,11 @@ export type PatientSummary = {
   desvios: number;
   /** Motivos de atenção, já em texto pronto para exibir. */
   alerts: string[];
+  /**
+   * Os mesmos alertas de `alerts`, na mesma ordem, com tipo e nível. `alerts`
+   * continua só texto porque NutriHome e PacientesClient só exibem.
+   */
+  alertas: Alerta[];
   /**
    * Nível do alerta mais grave, de 1 (dose atrasada) a 5 (exame fora).
    * null = nenhum alerta. Mora aqui, e não é deduzido dos campos acima,
@@ -292,35 +305,40 @@ export function montarResumos(
       planSemResposta7: adesao.semResposta,
       desvios: desvios.filter((d) => d.patient_id === id).length,
       alerts: [],
+      alertas: [],
       gravidade: null,
     };
-    const alertar = (nivel: number, texto: string) => {
+    const alertar = (tipo: TipoAlerta, nivel: number, texto: string) => {
       summary.alerts.push(texto);
+      summary.alertas.push({ tipo, nivel, texto });
       summary.gravidade = Math.min(summary.gravidade ?? nivel, nivel);
     };
 
     // Do mais grave para o menos grave: a Início e a lista de pacientes só
     // mostram os dois primeiros. Exame fica por último porque o alerta dura
     // 180 dias e não some quando o exame é refeito.
-    if (doseOverdue) alertar(1, "Dose atrasada");
+    if (doseOverdue) alertar("dose", 1, "Dose atrasada");
     if (summary.desvios > 0)
       alertar(
+        "prescricao",
         2,
         `${summary.desvios} ${summary.desvios > 1 ? "mudanças" : "mudança"} na sua prescrição`
       );
 
     const idle = idleDays(summary, today);
-    if (idle == null) alertar(3, "Nunca registrou nada");
-    else if (idle >= 3) alertar(3, `${idle} dias sem registrar`);
+    if (idle == null) alertar("parado", 3, "Nunca registrou nada");
+    else if (idle >= 3) alertar("parado", 3, `${idle} dias sem registrar`);
     if (summary.planFaltas7 > 0)
       alertar(
+        "treino",
         4,
         `Faltou a ${summary.planFaltas7} treino${summary.planFaltas7 > 1 ? "s" : ""} (7d)`
       );
     if (summary.planSemResposta7 >= 2)
-      alertar(4, `${summary.planSemResposta7} treinos sem confirmação (7d)`);
+      alertar("treino", 4, `${summary.planSemResposta7} treinos sem confirmação (7d)`);
     if (summary.alteredExams > 0)
       alertar(
+        "exame",
         5,
         `${summary.alteredExams} exame${summary.alteredExams > 1 ? "s" : ""} fora da referência`
       );

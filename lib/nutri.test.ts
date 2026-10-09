@@ -36,6 +36,22 @@ function resumo(parcial: Partial<DadosResumo>, id = A) {
   return montarResumos(dados(parcial), [id], { [id]: "Ana" }, HOJE)[0];
 }
 
+/** Um paciente com um alerta de cada tipo, na ordem da escala. */
+function cenarioDeAlertas(): Partial<DadosResumo> {
+  return {
+    treatments: [{ user_id: A, next_dose_date: "2026-10-01" }],
+    desvios: [{ patient_id: A }],
+    workouts: [{ user_id: A, date: "2026-10-05" }],
+    exams: [{ user_id: A, status: "alterado" }],
+    plan: [
+      { id: "p-seg", user_id: A, day_of_week: SEG, sport: "Musculação" },
+      { id: "p-ter", user_id: A, day_of_week: 1, sport: "Corrida" },
+      { id: "p-qua", user_id: A, day_of_week: QUA, sport: "Corrida" },
+    ],
+    checks: [{ user_id: A, plan_id: "p-seg", date: "2026-10-05", status: "skipped" }],
+  };
+}
+
 describe("montarResumos — registros", () => {
   it("conta cada dia uma vez, venha de qual fonte vier", () => {
     // Refeição e treino no mesmo dia são UM dia com registro, não dois.
@@ -248,18 +264,7 @@ describe("montarResumos — alertas", () => {
     // mudança na prescrição (a única que ele mesmo resolve). Exame vai por
     // último porque o alerta dura 180 dias e não some quando o exame é
     // refeito.
-    const r = resumo({
-      treatments: [{ user_id: A, next_dose_date: "2026-10-01" }],
-      desvios: [{ patient_id: A }],
-      workouts: [{ user_id: A, date: "2026-10-05" }],
-      exams: [{ user_id: A, status: "alterado" }],
-      plan: [
-        { id: "p-seg", user_id: A, day_of_week: SEG, sport: "Musculação" },
-        { id: "p-ter", user_id: A, day_of_week: 1, sport: "Corrida" },
-        { id: "p-qua", user_id: A, day_of_week: QUA, sport: "Corrida" },
-      ],
-      checks: [{ user_id: A, plan_id: "p-seg", date: "2026-10-05", status: "skipped" }],
-    });
+    const r = resumo(cenarioDeAlertas());
     expect(r.alerts).toEqual([
       "Dose atrasada",
       "1 mudança na sua prescrição",
@@ -267,6 +272,23 @@ describe("montarResumos — alertas", () => {
       "Faltou a 1 treino (7d)",
       "2 treinos sem confirmação (7d)",
       "1 exame fora da referência",
+    ]);
+  });
+});
+
+describe("montarResumos — tipo dos alertas", () => {
+  it("cada alerta leva o tipo que o identifica, na mesma ordem de `alerts`", () => {
+    const r = resumo(cenarioDeAlertas());
+    expect(r.alertas.map((a) => a.tipo)).toEqual([
+      "dose", "prescricao", "parado", "treino", "treino", "exame",
+    ]);
+    expect(r.alertas.map((a) => a.texto)).toEqual(r.alerts);
+    expect(r.alertas.map((a) => a.nivel)).toEqual([1, 2, 3, 4, 4, 5]);
+  });
+
+  it("paciente sem dado nenhum tem só o alerta de nunca registrou", () => {
+    expect(resumo({}).alertas).toEqual([
+      { tipo: "parado", nivel: 3, texto: "Nunca registrou nada" },
     ]);
   });
 });
