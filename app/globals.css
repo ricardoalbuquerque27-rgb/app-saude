@@ -347,8 +347,10 @@ input[type="number"] {
 
    Dentro de `@layer components`, no FIM da camada, e com o escopo em
    `:where(.tema-clinico)` (especificidade zero). Isso faz duas coisas:
-   vence a regra global do componente por ORDEM, e perde para qualquer
-   utilitário na mesma tag. Fora da camada, ou com o escopo contando
+   vence a regra global do componente por ORDEM, e perde para um
+   utilitário na mesma tag — no claro. No escuro, a cópia com `.dark`
+   (abaixo) tem duas classes e vence um utilitário sem `dark:`; repita a
+   variante (`text-x dark:text-x`). Fora da camada, ou com o escopo contando
    especificidade, `card border-rose-200 bg-rose-50` (o banner de erro do
    MealPlanEditor) virava um card comum aqui dentro, em silêncio.
 

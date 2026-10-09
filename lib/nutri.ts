@@ -887,8 +887,9 @@ export async function getUltimaPrescricao(
 /**
  * Os campos de META que `set_patient_goals` grava. A tabela
  * prescription_deviations recebe também avisos do plano de treino (o gatilho
- * de workout_plan), e esses não são metas: mostrá-los em Alimentação poria
- * uma sessão de treino apagada entre as metas, com o nome cru da coluna.
+ * de workout_plan, com o NOME da sessão em `field`), e esses não são metas:
+ * mostrá-los em Alimentação poria uma sessão de treino apagada entre as
+ * metas, sem rótulo (o campo não está em ROTULO_CAMPO).
  * Mesmo assim, qualquer `set_patient_goals` (Reaplicar ou Aplicar metas) dá
  * baixa neles também, pelo gatilho prescriptions_ack_deviations. Tudo o que
  * é "desvio de meta" filtra por esta lista.
