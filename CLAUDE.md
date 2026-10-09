@@ -7,6 +7,27 @@ profissional — logo, o lado dele é o produto, não um extra.
 Next.js 14 (App Router) · TypeScript · Tailwind · Supabase · Vercel.
 Interface e commits em português do Brasil.
 
+## Como o app se divide
+
+**A mesma rota serve duas interfaces.** `/app` devolve o painel do
+paciente ou o `NutriHome` conforme `profiles.role` — não existe `/nutri`.
+Isso não é óbvio lendo a árvore de arquivos.
+
+- **Paciente:** `app/app/page.tsx` (Início), `nutricionista/` ("Meu plano":
+  metas, cardápio, treino, conversa), `dieta/`, `treinos/`, `habitos/`,
+  `medidas/`, `exames/`, `tratamento/`, `treino/[id]` (leitura do treino).
+- **Nutricionista:** `components/NutriHome.tsx`, `app/app/pacientes/` e o
+  detalhe em `pacientes/[id]`, cuja aba **Prescrição** é a única onde ele
+  age — as outras são leitura.
+- **Lógica testada:** `lib/date.ts` (datas e janelas), `lib/planCheckIn.ts`
+  (adesão), `lib/perfil.ts`, `lib/foods.ts` (tabela TACO), `lib/nutri.ts`
+  (leitura do lado profissional).
+
+Toda segurança é por **RLS no Postgres**, nunca por service role no app.
+Ao mexer em política, teste com `BEGIN ... ROLLBACK` e
+`set_config('request.jwt.claims', ...)` antes de `set local role
+authenticated` — nessa ordem.
+
 ## Comandos
 
 ```bash
