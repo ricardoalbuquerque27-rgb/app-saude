@@ -667,3 +667,75 @@ export async function getPatientSeries(
   }
   return out;
 }
+
+/** Média de um item na janela. `dias` diz quantos dias entraram na conta. */
+export type Media = { valor: number | null; dias: number };
+export type MediasDaSemana = { calorias: Media; proteina: Media; agua: Media };
+
+/**
+ * Média dos dias com registro daquele item, na janela de 7 dias até hoje.
+ *
+ * Dia sem registro (valor 0) fica fora da conta: zero aqui quer dizer "não
+ * registrou", não "comeu 0 kcal", e puxaria a média para baixo sem motivo.
+ * A água sai em ml, a mesma unidade de `water` na série.
+ */
+export function mediasDaSemana(serie: DailySeries[], hoje: string): MediasDaSemana {
+  const janela = serie.filter((d) => naJanela(d.date, hoje, 7));
+  return {
+    calorias: mediaDe(janela.map((d) => d.calories)),
+    proteina: mediaDe(janela.map((d) => d.protein)),
+    agua: mediaDe(janela.map((d) => d.water)),
+  };
+}
+
+function mediaDe(valores: number[]): Media {
+  const comRegistro = valores.filter((v) => v > 0);
+  if (comRegistro.length === 0) return { valor: null, dias: 0 };
+  const soma = comRegistro.reduce((s, v) => s + v, 0);
+  return {
+    valor: Math.round(soma / comRegistro.length),
+    dias: comRegistro.length,
+  };
+}
+
+export type ItemMeta = "calorias" | "proteina" | "agua";
+export type StatusMeta = "ok" | "atencao" | "sem-meta" | "sem-dado";
+export type Comparacao = { delta: number | null; status: StatusMeta };
+
+/**
+ * Quanto o real pode fugir da meta, em %, antes de virar "atenção". Vem da
+ * spec docs/superpowers/specs/2026-10-09-detalhe-paciente-design.md, Seção 4.
+ * É palpite de produto, não regra clínica: se um nutricionista discordar, troque
+ * os números aqui.
+ *
+ * Calorias erra para os dois lados, então o limite é em módulo. Proteína e água
+ * só preocupam abaixo da meta.
+ *
+ * O status é decidido sobre o Δ JÁ ARREDONDADO, o mesmo número que a tela mostra.
+ * Com o Δ cru, 10,4% sairia como "+10%" na tela e ainda assim em "atenção",
+ * e o nutricionista veria um número que não bate com o alerta.
+ */
+const LIMITE_ATENCAO = {
+  calorias: 10, // atenção quando |Δ| > 10
+  proteina: -10, // atenção quando Δ < -10
+  agua: -10, // atenção quando Δ < -10
+};
+
+/**
+ * Real contra meta, em porcentagem. Sem meta (nula ou zero) a tela mostra
+ * "Definir metas", então ela vence sobre o real ausente.
+ */
+export function compararComMeta(
+  item: ItemMeta,
+  real: number | null,
+  meta: number | null
+): Comparacao {
+  if (meta == null || meta <= 0) return { delta: null, status: "sem-meta" };
+  if (real == null) return { delta: null, status: "sem-dado" };
+  const delta = Math.round((real / meta - 1) * 100);
+  const atencao =
+    item === "calorias"
+      ? Math.abs(delta) > LIMITE_ATENCAO.calorias
+      : delta < LIMITE_ATENCAO[item];
+  return { delta, status: atencao ? "atencao" : "ok" };
+}

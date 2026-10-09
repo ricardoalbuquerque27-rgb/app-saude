@@ -3,8 +3,12 @@ import {
   montarResumos,
   montarLinhaDoTempo,
   filaDeTriagem,
+  mediasDaSemana,
+  compararComMeta,
   type DadosResumo,
   type DadosAtividade,
+  type DailySeries,
+  type ItemMeta,
 } from "./nutri";
 
 /** 2026-10-08 é uma quinta. A janela de 7 dias vai de 02 (sexta) a 08. */
@@ -501,5 +505,51 @@ describe("montarLinhaDoTempo", () => {
       2
     );
     expect(itens.map((i) => i.date)).toEqual(["2026-10-08", "2026-10-06"]);
+  });
+});
+
+/** Um dia da série do detalhe do paciente, só com o que a média usa. */
+function dia(date: string, calories: number, protein: number, water: number): DailySeries {
+  return { date, calories, protein, water, sleep: null, workouts: 0, weight: null };
+}
+
+describe("mediasDaSemana", () => {
+  it("média só dos dias com registro daquele item", () => {
+    const m = mediasDaSemana(
+      [dia("2026-10-08", 2000, 90, 2000), dia("2026-10-07", 0, 0, 0), dia("2026-10-06", 1801, 80, 0)],
+      HOJE
+    );
+    expect(m.calorias).toEqual({ valor: 1901, dias: 2 }); // 1900,5 arredonda
+    expect(m.proteina).toEqual({ valor: 85, dias: 2 });
+    expect(m.agua).toEqual({ valor: 2000, dias: 1 });
+  });
+  it("o oitavo dia e o futuro ficam fora", () => {
+    const m = mediasDaSemana(
+      [dia("2026-10-01", 3000, 200, 3000), dia("2026-10-09", 3000, 200, 3000), dia("2026-10-02", 1500, 60, 1500)],
+      HOJE
+    );
+    expect(m.calorias).toEqual({ valor: 1500, dias: 1 });
+  });
+  it("sem registro, valor nulo", () => {
+    expect(mediasDaSemana([], HOJE).agua).toEqual({ valor: null, dias: 0 });
+  });
+});
+
+describe("compararComMeta", () => {
+  it.each([
+    ["calorias", 2050, 1800, { delta: 14, status: "atencao" }],
+    ["calorias", 1980, 1800, { delta: 10, status: "ok" }],
+    ["calorias", 1600, 1800, { delta: -11, status: "atencao" }],
+    ["proteina", 92, 110, { delta: -16, status: "atencao" }],
+    ["proteina", 130, 110, { delta: 18, status: "ok" }],
+    ["agua", 1900, 2500, { delta: -24, status: "atencao" }],
+    ["agua", 2300, 2500, { delta: -8, status: "ok" }],
+    ["calorias", 2000, null, { delta: null, status: "sem-meta" }],
+    ["calorias", null, 1800, { delta: null, status: "sem-dado" }],
+  ])("compararComMeta(%s, %s, %s)", (item, real, meta, esperado) => {
+    expect(compararComMeta(item as ItemMeta, real, meta)).toEqual(esperado);
+  });
+  it("meta zero conta como sem meta", () => {
+    expect(compararComMeta("calorias", 2000, 0)).toEqual({ delta: null, status: "sem-meta" });
   });
 });
