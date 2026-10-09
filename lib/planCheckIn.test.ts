@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   computeAdherence,
+  estadosDaSemana,
   indexCompletions,
   mondayOf,
   weekDates,
@@ -119,5 +120,73 @@ describe("mondayOf / weekDates", () => {
     expect(dias).toHaveLength(7);
     expect(dias[0]).toBe("2026-10-05");
     expect(dias[6]).toBe("2026-10-11");
+  });
+});
+
+describe("estadosDaSemana", () => {
+  const HOJE = "2026-10-08"; // quinta
+  const plano = [
+    { id: "a", day_of_week: SEG, sport: "Musculação" },
+    { id: "b", day_of_week: QUA, sport: "Corrida" },
+    { id: "c", day_of_week: 1, sport: "Corrida" }, // terça
+    { id: "d", day_of_week: 3, sport: "Corrida" }, // quinta, hoje
+    { id: "e", day_of_week: 5, sport: "Corrida" }, // sábado
+    { id: "f", day_of_week: 6, sport: "Descanso" },
+  ];
+  const checkins = [
+    check("a", "2026-10-05", "done"),
+    check("b", "2026-10-07", "skipped"),
+  ];
+
+  it("dá um estado por dia, de segunda a domingo", () => {
+    // Cada estado responde a uma pergunta diferente do nutri: "treinou?",
+    // "disse que não foi?", "nem respondeu?", "ainda vai chegar?".
+    const semana = estadosDaSemana(plano, checkins, HOJE);
+    expect(semana).toHaveLength(7);
+    expect(semana[0].data).toBe("2026-10-05");
+    expect(semana[6].data).toBe("2026-10-11");
+    expect(semana.map((d) => d.estado)).toEqual([
+      "feito", "sem-resposta", "falta", "hoje", "livre", "previsto", "descanso",
+    ]);
+  });
+
+  it("hoje já respondido vira feito ou falta, não fica como hoje", () => {
+    const feito = estadosDaSemana(plano, [check("d", HOJE, "done")], HOJE);
+    expect(feito[3].estado).toBe("feito");
+    const falta = estadosDaSemana(plano, [check("d", HOJE, "skipped")], HOJE);
+    expect(falta[3].estado).toBe("falta");
+  });
+
+  it("num dia com duas sessões vale o pior estado", () => {
+    // Furar uma das duas não pode ser escondido pela outra que foi feita.
+    const dois = [
+      { id: "x", day_of_week: SEG, sport: "Musculação" },
+      { id: "y", day_of_week: SEG, sport: "Corrida" },
+    ];
+    const dia = (cs: Completion[]) => estadosDaSemana(dois, cs, HOJE)[0].estado;
+    expect(dia([check("x", "2026-10-05", "done"), check("y", "2026-10-05", "skipped")])).toBe("falta");
+    expect(dia([check("x", "2026-10-05", "done")])).toBe("sem-resposta");
+    expect(dia([check("x", "2026-10-05", "skipped")])).toBe("falta");
+    expect(dia([check("x", "2026-10-05", "done"), check("y", "2026-10-05", "done")])).toBe("feito");
+  });
+
+  it("check-in de dia futuro não muda o previsto", () => {
+    // Registro com data futura não é treino feito; a mesma classe de erro
+    // que já inflou a adesão para 114%.
+    const semana = estadosDaSemana(plano, [check("e", "2026-10-10", "done")], HOJE);
+    expect(semana[5].estado).toBe("previsto");
+  });
+
+  it("dia com descanso e treino conta como treino", () => {
+    const misto = [
+      { id: "r", day_of_week: SEG, sport: "Descanso ativo" },
+      { id: "t", day_of_week: SEG, sport: "Musculação" },
+    ];
+    expect(estadosDaSemana(misto, [], HOJE)[0].estado).toBe("sem-resposta");
+  });
+
+  it("sem plano, a semana toda é livre", () => {
+    const semana = estadosDaSemana([], [], HOJE);
+    expect(semana.every((d) => d.estado === "livre")).toBe(true);
   });
 });

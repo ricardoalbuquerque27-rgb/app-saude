@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Utensils,
   Plus,
   Trash2,
   Loader2,
@@ -14,15 +13,8 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import FoodSearch from "@/components/FoodSearch";
 import TemplateBar from "@/components/TemplateBar";
-
-export const MEAL_TYPES = [
-  "Café da manhã",
-  "Lanche da manhã",
-  "Almoço",
-  "Lanche da tarde",
-  "Jantar",
-  "Ceia",
-];
+import { useRecarregar } from "@/components/clinico/useRecarregar";
+import { MEAL_TYPES } from "@/lib/cardapio";
 
 export type PlanoAlimentar = {
   id: string;
@@ -46,6 +38,20 @@ export type ItemCardapio = {
 // Editor do cardápio, para o nutricionista. Modelo "um dia padrão": cada
 // refeição pode ter várias OPÇÕES, que é como o cardápio costuma ser
 // entregue aqui ("Café — Opção 1 / Opção 2"), em vez de uma grade semanal.
+//
+// As três props opcionais do fim ligam o editor à regra de uma edição por vez
+// da página do paciente, sem ele conhecer a página:
+// - `aoAlterar`: o rascunho deixou de estar vazio. Há rascunho porque nem
+//   tudo grava na hora: nome e orientação só vão no "Salvar", e a opção nova
+//   de uma refeição só no "Adicionar". Sem este aviso, "Editar metas" abria o
+//   outro editor por cima e o texto sumia;
+// - `aoLimpar`: o rascunho voltou a ficar vazio, porque gravou ou porque foi
+//   descartado (o X da opção nova, ou abrir a opção de outra refeição, que
+//   zera os campos). Uma marca que sobrevivesse ao rascunho travaria as
+//   outras seções sem nada a perder;
+// - `gravacao`: envolve cada gravação, para quem chama saber que há uma em
+//   voo (a página desliga o "Fechar edição" até ela voltar).
+// Cada aviso vai uma vez por mudança de estado, não a cada tecla.
 export default function MealPlanEditor({
   patientId,
   nutriId,
@@ -53,6 +59,9 @@ export default function MealPlanEditor({
   itens,
   metaCalorias,
   metaProteina,
+  aoAlterar,
+  aoLimpar,
+  gravacao = async (acao) => acao(),
 }: {
   patientId: string;
   nutriId: string;
@@ -60,6 +69,9 @@ export default function MealPlanEditor({
   itens: ItemCardapio[];
   metaCalorias: number | null;
   metaProteina: number | null;
+  aoAlterar?: () => void;
+  aoLimpar?: () => void;
+  gravacao?: <T>(acao: () => PromiseLike<T>) => Promise<T>;
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -74,6 +86,17 @@ export default function MealPlanEditor({
   const [desc, setDesc] = useState("");
   const [kcal, setKcal] = useState("");
   const [prot, setProt] = useState("");
+
+  // O que tem rascunho: o cabeçalho (nome e orientação) e a opção nova. Em
+  // ref, e não em estado: só decide quando avisar, nada na tela depende dela.
+  const rascunho = useRef({ cabecalho: false, opcao: false });
+  function marcarRascunho(parte: "cabecalho" | "opcao", tem: boolean) {
+    const antes = rascunho.current.cabecalho || rascunho.current.opcao;
+    rascunho.current = { ...rascunho.current, [parte]: tem };
+    const depois = rascunho.current.cabecalho || rascunho.current.opcao;
+    if (!antes && depois) aoAlterar?.();
+    if (antes && !depois) aoLimpar?.();
+  }
 
   // Soma do cardápio considerando só a PRIMEIRA opção de cada refeição —
   // somar todas as alternativas daria um total que ninguém vai comer.
@@ -101,8 +124,16 @@ export default function MealPlanEditor({
       setErro("Não foi possível criar o plano.");
       return null;
     }
+    // O plano nasce com o nome e a orientação digitados: o cabeçalho gravou.
+    marcarRascunho("cabecalho", false);
     return (data as any).id;
   }
+
+  // "Criar plano" espera a página nova (R23): até ela chegar o `plano` ainda é
+  // nulo e o botão diria "Criar plano" de novo, e um segundo clique inseria
+  // outro meal_plans ativo. Mesmo padrão dos botões da página (useRecarregar).
+  const [recarregandoCabecalho, recarregarCabecalho] = useRecarregar();
+  const ocupadoCabecalho = busy === "cabecalho" || recarregandoCabecalho;
 
   async function salvarCabecalho() {
     setBusy("cabecalho");
@@ -119,9 +150,11 @@ export default function MealPlanEditor({
         })
         .eq("id", plano.id);
       if (error) setErro("Não foi possível salvar.");
+      else marcarRascunho("cabecalho", false);
     }
+    // A transição começa antes de soltar o `busy`: o botão não acende no meio.
+    recarregarCabecalho();
     setBusy(null);
-    router.refresh();
   }
 
   async function addOpcao(tipo: string) {
@@ -161,6 +194,7 @@ export default function MealPlanEditor({
     setKcal("");
     setProt("");
     setAbertoEm(null);
+    marcarRascunho("opcao", false);
     router.refresh();
   }
 
@@ -228,6 +262,7 @@ export default function MealPlanEditor({
     setKcal("");
     setProt("");
     setAbertoEm(tipo);
+    marcarRascunho("opcao", false);
   }
 
   return (
@@ -242,43 +277,48 @@ export default function MealPlanEditor({
         kind="cardapio"
         nutriId={nutriId}
         capturarAtual={capturarModelo}
-        aplicar={aplicarModelo}
+        aplicar={(conteudo) => gravacao(() => aplicarModelo(conteudo))}
         rotulo="cardápio"
       />
 
       <div className="card mb-4">
-        <h2 className="section-title mb-3">
-          <span className="icon-badge">
-            <Utensils className="h-4 w-4" />
-          </span>
-          Cardápio prescrito
-        </h2>
-
         <div className="grid gap-2 sm:grid-cols-2">
           <input
             className="input"
             value={nome}
-            onChange={(e) => setNome(e.target.value)}
+            onChange={(e) => {
+              setNome(e.target.value);
+              marcarRascunho("cabecalho", true);
+            }}
             placeholder="Nome do plano (ex.: Plano de outubro)"
           />
           <input
             className="input"
             value={obs}
-            onChange={(e) => setObs(e.target.value)}
+            onChange={(e) => {
+              setObs(e.target.value);
+              marcarRascunho("cabecalho", true);
+            }}
             placeholder="Orientação geral (opcional)"
           />
         </div>
         <button
-          onClick={salvarCabecalho}
-          disabled={busy === "cabecalho"}
+          onClick={() => gravacao(salvarCabecalho)}
+          disabled={ocupadoCabecalho}
           className="btn-ghost mt-2 w-full py-2 text-sm"
         >
-          {busy === "cabecalho" ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+          {ocupadoCabecalho ? (
+            <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
           ) : (
             <Check className="h-4 w-4" />
           )}
-          {plano ? "Salvar nome e orientação" : "Criar plano"}
+          {plano
+            ? ocupadoCabecalho
+              ? "Salvando…"
+              : "Salvar nome e orientação"
+            : ocupadoCabecalho
+              ? "Criando…"
+              : "Criar plano"}
         </button>
 
         {principais.length > 0 && (
@@ -308,9 +348,9 @@ export default function MealPlanEditor({
           return (
             <div key={tipo} className="card">
               <div className="mb-2 flex items-center justify-between gap-2">
-                <h3 className="font-semibold text-slate-900 dark:text-white">
+                <h4 className="font-semibold text-slate-900 dark:text-white">
                   {tipo}
-                </h3>
+                </h4>
                 {abertoEm !== tipo && (
                   <button
                     onClick={() => abrir(tipo)}
@@ -355,7 +395,7 @@ export default function MealPlanEditor({
                           )}
                         </div>
                         <button
-                          onClick={() => removerItem(o.id)}
+                          onClick={() => gravacao(() => removerItem(o.id))}
                           disabled={busy === o.id}
                           className="tappable shrink-0 rounded-lg p-1.5 text-slate-500 hover:text-rose-600"
                           aria-label="Remover opção"
@@ -375,6 +415,7 @@ export default function MealPlanEditor({
                     onEscolher={(a) => {
                       // Acumula no texto e soma os macros: uma refeição é
                       // feita de vários alimentos.
+                      marcarRascunho("opcao", true);
                       setDesc((d) => (d ? d + "\n+ " + a.nome : a.nome));
                       setKcal((k) => String((Number(k) || 0) + a.calories));
                       setProt((p) =>
@@ -390,7 +431,10 @@ export default function MealPlanEditor({
                   <textarea
                     className="input min-h-[70px] resize-y"
                     value={desc}
-                    onChange={(e) => setDesc(e.target.value)}
+                    onChange={(e) => {
+                      setDesc(e.target.value);
+                      marcarRascunho("opcao", true);
+                    }}
                     placeholder="Ex.: 2 ovos mexidos + 1 fatia de pão integral + café sem açúcar"
                     maxLength={2000}
                   />
@@ -399,20 +443,26 @@ export default function MealPlanEditor({
                       type="number"
                       className="input"
                       value={kcal}
-                      onChange={(e) => setKcal(e.target.value)}
+                      onChange={(e) => {
+                        setKcal(e.target.value);
+                        marcarRascunho("opcao", true);
+                      }}
                       placeholder="kcal (opcional)"
                     />
                     <input
                       type="number"
                       className="input"
                       value={prot}
-                      onChange={(e) => setProt(e.target.value)}
+                      onChange={(e) => {
+                        setProt(e.target.value);
+                        marcarRascunho("opcao", true);
+                      }}
                       placeholder="proteína g (opcional)"
                     />
                   </div>
                   <div className="mt-2 flex gap-2">
                     <button
-                      onClick={() => addOpcao(tipo)}
+                      onClick={() => gravacao(() => addOpcao(tipo))}
                       disabled={busy === tipo || !desc.trim()}
                       className="btn-primary flex-1 py-2 text-sm"
                     >
@@ -424,7 +474,13 @@ export default function MealPlanEditor({
                       Adicionar
                     </button>
                     <button
-                      onClick={() => setAbertoEm(null)}
+                      onClick={() => {
+                        // Fechar a opção nova é descartá-la: abrir de novo
+                        // zera os campos (abrir()).
+                        setAbertoEm(null);
+                        marcarRascunho("opcao", false);
+                      }}
+                      aria-label="Descartar esta opção"
                       className="btn-ghost px-3 py-2 text-sm"
                     >
                       <X className="h-4 w-4" />

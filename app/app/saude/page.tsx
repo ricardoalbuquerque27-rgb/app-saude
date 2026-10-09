@@ -1,6 +1,6 @@
 "use client";
 
-import { formatDate } from "@/lib/date";
+import { formatDate, dataNoBrasil } from "@/lib/date";
 import { useCallback, useEffect, useState } from "react";
 import {
   Loader2,
@@ -179,7 +179,7 @@ export default function SaudePage() {
         <div className="space-y-5">
           {current && (
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Análise de {formatDate(current.created_at.slice(0, 10))}
+              Análise de {formatDate(dataNoBrasil(current.created_at))}
             </p>
           )}
 
@@ -299,7 +299,7 @@ export default function SaudePage() {
                         : "border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-900"
                     }`}
                   >
-                    {formatDate(r.created_at.slice(0, 10))}
+                    {formatDate(dataNoBrasil(r.created_at))}
                   </button>
                 ))}
               </div>

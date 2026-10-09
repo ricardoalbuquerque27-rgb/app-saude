@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { withTimeout, isAbortError, parseModelJson } from "@/lib/aiHttp";
+import { todayISO, limitesDaJanela } from "@/lib/date";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,11 +26,6 @@ const SYSTEM =
   "}\n" +
   "Máximo 6 insights, ordenados do mais importante ao menos. Use os números dos dados quando fizer sentido.";
 
-function isoDaysAgo(days: number) {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  return d.toISOString().slice(0, 10);
-}
 function avg(nums: number[]) {
   const f = nums.filter((n) => n > 0);
   if (f.length === 0) return null;
@@ -54,7 +50,11 @@ export async function POST() {
   }
 
   const uid = user.id;
-  const since = isoDaysAgo(30);
+  // Os últimos 30 dias contando hoje, no dia de São Paulo. O isoDaysAgo que
+  // estava aqui tirava o dia de toISOString() no servidor em UTC: depois das
+  // 21h o "hoje" já era amanhã, e com `>=` sem teto a janela tinha 31 dias e
+  // aceitava registro com data futura.
+  const { desde, ate } = limitesDaJanela(todayISO(), 30);
 
   const [profileRes, mealsRes, workoutsRes, logsRes, measRes, examsRes, treatRes] =
     await Promise.all([
@@ -63,17 +63,20 @@ export async function POST() {
         .from("meals")
         .select("date, calories, protein_g, carbs_g, fat_g")
         .eq("user_id", uid)
-        .gte("date", since),
+        .gte("date", desde)
+        .lte("date", ate),
       supabase
         .from("workouts")
         .select("date, category, duration_min")
         .eq("user_id", uid)
-        .gte("date", since),
+        .gte("date", desde)
+        .lte("date", ate),
       supabase
         .from("daily_logs")
         .select("date, water_ml, sleep_hours, energy, stress, pain, mood")
         .eq("user_id", uid)
-        .gte("date", since),
+        .gte("date", desde)
+        .lte("date", ate),
       supabase
         .from("body_measurements")
         .select("date, weight_kg, body_fat_pct, waist_cm")

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { MessageSquare, Check, Loader2, Send } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { formatDate } from "@/lib/date";
+import { formatDate, dataNoBrasil } from "@/lib/date";
 
 export type Nota = {
   id: string;
@@ -88,7 +88,7 @@ export default function NutriNotes({
             </p>
             <div className="mt-2 flex items-center justify-between gap-2">
               <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                {formatDate(n.created_at.slice(0, 10))}
+                {formatDate(dataNoBrasil(n.created_at))}
               </span>
               <button
                 onClick={() => marcarLido(n.id)}
@@ -143,7 +143,7 @@ export default function NutriNotes({
                       meu ? "text-white/70" : "text-slate-500 dark:text-slate-400"
                     }`}
                   >
-                    {formatDate(n.created_at.slice(0, 10))}
+                    {formatDate(dataNoBrasil(n.created_at))}
                     {!meu && !n.read_at ? " · novo" : ""}
                   </p>
                 </div>

@@ -179,3 +179,80 @@ export function computeAdherence(
     percentual: previstas ? Math.round((confirmadas / previstas) * 100) : null,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Semana de treino (detalhe do paciente, visão do nutricionista)
+// ---------------------------------------------------------------------------
+
+/**
+ * O que o nutricionista precisa ler de relance em cada dia da semana.
+ * "falta" (o paciente disse que não foi) e "sem-resposta" (venceu e ele nem
+ * marcou) são separados de propósito, como no check-in: furar o treino e
+ * esquecer de marcar não são a mesma conversa.
+ */
+export type EstadoDia =
+  | "feito"
+  | "falta"
+  | "sem-resposta"
+  | "hoje"
+  | "previsto"
+  | "descanso"
+  | "livre";
+
+// Mesma regra de "descanso" usada nas telas do paciente.
+function ehDescanso(sport: string | null): boolean {
+  return String(sport ?? "").toLowerCase().includes("descanso");
+}
+
+// Quanto maior, pior. Furar uma das sessões do dia não pode ser escondido
+// pela outra que foi feita. "hoje" e "sem-resposta" nunca aparecem no mesmo
+// dia (um é hoje, o outro já passou); empatam de propósito.
+const GRAVIDADE: Partial<Record<EstadoDia, number>> = {
+  feito: 0,
+  hoje: 1,
+  "sem-resposta": 1,
+  falta: 2,
+};
+
+/**
+ * Estado de cada dia da semana de `hoje`, de segunda a domingo.
+ *
+ * O plano é um molde por dia da semana, então a data vem da posição na
+ * semana (0 = segunda). Dia futuro é sempre "previsto", mesmo com check-in
+ * gravado: registro com data futura não é treino feito (ver as armadilhas
+ * de janela em lib/date.ts).
+ */
+export function estadosDaSemana(
+  plano: { id: string; day_of_week: number; sport: string | null }[],
+  checkins: Completion[],
+  hoje: string
+): { data: string; estado: EstadoDia }[] {
+  const idx = indexCompletions(checkins);
+
+  return weekDates(hoje).map((data, dow) => {
+    const sessoes = plano.filter((p) => p.day_of_week === dow);
+    if (sessoes.length === 0) return { data, estado: "livre" as const };
+
+    // Descanso só vale quando é a única coisa do dia: um "Descanso ativo"
+    // ao lado de uma musculação não pode apagar o treino da semana.
+    const treinos = sessoes.filter((s) => !ehDescanso(s.sport));
+    if (treinos.length === 0) return { data, estado: "descanso" as const };
+
+    if (data > hoje) return { data, estado: "previsto" as const };
+
+    let pior: EstadoDia = "feito";
+    for (const s of treinos) {
+      const status = idx[completionKey(s.id, data)]?.status;
+      const estado: EstadoDia =
+        status === "done"
+          ? "feito"
+          : status === "skipped"
+            ? "falta"
+            : data === hoje
+              ? "hoje"
+              : "sem-resposta";
+      if ((GRAVIDADE[estado] ?? 0) > (GRAVIDADE[pior] ?? 0)) pior = estado;
+    }
+    return { data, estado: pior };
+  });
+}

@@ -126,6 +126,14 @@ export default function AppShell({
     .flatMap((g) => g.items)
     .filter((i) => !mainHrefs.has(i.href));
 
+  // O detalhe do paciente (/app/pacientes/<id>, não a lista nem a linha do
+  // tempo) é a única tela com duas colunas: a conversa fica numa coluna de
+  // 360 px ao lado do conteúdo. Com max-w-5xl, menos o menu lateral e as
+  // margens, sobram 720 px em qualquer largura, e a coluna principal ficava
+  // com 336 px, mais estreita que um celular. As outras telas continuam como
+  // estavam.
+  const detalheDoPaciente = /^\/app\/pacientes\/[^/]+\/?$/.test(pathname);
+
   // Fecha o menu "Mais" ao trocar de página
   useEffect(() => {
     setMenuOpen(false);
@@ -261,7 +269,11 @@ export default function AppShell({
       </header>
 
       {/* Conteúdo */}
-      <main className="mx-auto max-w-5xl px-4 pb-28 pt-6 lg:pl-64 lg:pr-8">
+      <main
+        className={`mx-auto px-4 pb-28 pt-6 lg:pl-64 lg:pr-8 ${
+          detalheDoPaciente ? "max-w-7xl" : "max-w-5xl"
+        }`}
+      >
         <div className="lg:pl-4">
           <PageTransition>{children}</PageTransition>
         </div>

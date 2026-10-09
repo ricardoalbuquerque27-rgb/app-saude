@@ -89,6 +89,21 @@ export function naJanela(data: string, hoje: string, dias: number): boolean {
 }
 
 /**
+ * As bordas da mesma janela, para a consulta ao banco:
+ * `.gte("date", desde).lte("date", ate)`.
+ *
+ * Os relatórios de IA pediam `date >= isoDaysAgo(30)`, com o dia tirado de
+ * `toISOString()` no servidor em UTC: depois das 21h em São Paulo o "hoje"
+ * já era amanhã, os "30 dias" eram 31 e um registro com data futura entrava.
+ */
+export function limitesDaJanela(
+  hoje: string,
+  dias: number
+): { desde: string; ate: string } {
+  return { desde: addDaysISO(hoje, -(dias - 1)), ate: hoje };
+}
+
+/**
  * Anda `dias` a partir de `iso`, sem passar de `maximo`.
  *
  * Substitui o `new Date(...).toISOString().slice(0,10)` que a navegação de
@@ -107,4 +122,48 @@ export function avancarDia(
   const destino = addDaysISO(iso, dias);
   if (maximo && destino > maximo) return maximo;
   return destino;
+}
+
+/**
+ * Idade em anos completos na data `hoje` (YYYY-MM-DD), ou null quando a data
+ * de nascimento falta, não é YYYY-MM-DD ou dá uma idade impossível.
+ *
+ * Substitui a conta do detalhe do paciente que dividia `Date.now()` menos o
+ * nascimento por 365,25 dias: ela errava em um ano perto do aniversário e
+ * usava o relógio do servidor (UTC na Vercel) em vez do dia do Brasil. Aqui
+ * a comparação é só de texto ("MM-DD"), sem fuso: quem nasceu em 29/02 faz
+ * aniversário em 01/03 nos anos que não são bissextos.
+ */
+export function idadeEm(
+  nascimento: string | null | undefined,
+  hoje: string
+): number | null {
+  if (!nascimento || !/^\d{4}-\d{2}-\d{2}/.test(nascimento)) return null;
+  const anos =
+    Number(hoje.slice(0, 4)) -
+    Number(nascimento.slice(0, 4)) -
+    (hoje.slice(5, 10) < nascimento.slice(5, 10) ? 1 : 0);
+  return anos >= 0 && anos < 130 ? anos : null;
+}
+
+/**
+ * O dia (YYYY-MM-DD) em que um instante caiu no Brasil.
+ *
+ * `created_at` vem do banco em UTC, e `created_at.slice(0, 10)` dá o dia de
+ * Greenwich: uma mensagem mandada às 22h em São Paulo aparecia com a data de
+ * amanhã na conversa. Uma data sem hora volta como veio; texto que não é
+ * data volta como os 10 primeiros caracteres, que é o que a tela mostrava.
+ */
+export function dataNoBrasil(instante: string): string {
+  // Só a data, sem hora, já é o dia: `new Date("2026-10-08")` leria como
+  // meia-noite UTC e devolveria o dia 7.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(instante)) return instante;
+  const d = new Date(instante);
+  if (Number.isNaN(d.getTime())) return instante.slice(0, 10);
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
 }

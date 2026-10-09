@@ -7,7 +7,10 @@ import {
   hojeLongo,
   diasNaJanela,
   naJanela,
+  limitesDaJanela,
   avancarDia,
+  idadeEm,
+  dataNoBrasil,
 } from "./date";
 
 afterEach(() => vi.useRealTimers());
@@ -146,6 +149,33 @@ describe("naJanela", () => {
   });
 });
 
+describe("limitesDaJanela", () => {
+  // Ainda não existe. Os relatórios de IA (api/report e api/insights)
+  // pediam ao banco `date >= isoDaysAgo(30)`, com isoDaysAgo feito por
+  // toISOString no servidor em UTC: depois das 21h em São Paulo o "hoje"
+  // já era amanhã, a janela de "30 dias" tinha 31 e não tinha teto.
+  it("dá o primeiro e o último dia da janela de N dias, contando hoje", () => {
+    // De 10/09 a 30/09 são 21 dias; de 01/10 a 09/10, mais 9: 30.
+    expect(limitesDaJanela("2026-10-09", 30)).toEqual({
+      desde: "2026-09-10",
+      ate: "2026-10-09",
+    });
+    // Atravessa fevereiro de 2026 (28 dias): 23 a 28/02 e 01/03 são 7.
+    expect(limitesDaJanela("2026-03-01", 7)).toEqual({
+      desde: "2026-02-23",
+      ate: "2026-03-01",
+    });
+  });
+
+  it("é a mesma janela de naJanela, nas duas bordas", () => {
+    const { desde, ate } = limitesDaJanela("2026-10-08", 7);
+    expect(naJanela(desde, "2026-10-08", 7)).toBe(true);
+    expect(naJanela(addDaysISO(desde, -1), "2026-10-08", 7)).toBe(false);
+    expect(naJanela(ate, "2026-10-08", 7)).toBe(true);
+    expect(naJanela(addDaysISO(ate, 1), "2026-10-08", 7)).toBe(false);
+  });
+});
+
 describe("avancarDia", () => {
   // Ainda não existe. Nasce para resolver duas coisas de uma vez:
   //
@@ -184,5 +214,47 @@ describe("avancarDia", () => {
     // Já existe dado gravado à frente: navegar dali não deve seguir em
     // frente, deve voltar para o limite.
     expect(avancarDia("2026-12-25", 1, hoje)).toBe(hoje);
+  });
+});
+
+describe("idadeEm", () => {
+  it("conta os anos completos até hoje", () => {
+    expect(idadeEm("1991-06-12", "2026-10-09")).toBe(35);
+  });
+
+  it("antes do aniversário do ano, ainda não fez", () => {
+    // A conta antiga dividia milissegundos por 365,25 dias e errava em um
+    // ano perto do aniversário.
+    expect(idadeEm("1991-10-10", "2026-10-09")).toBe(34);
+    expect(idadeEm("1991-10-09", "2026-10-09")).toBe(35);
+  });
+
+  it("nascido em 29/02 faz aniversário em 01/03 no ano que não é bissexto", () => {
+    expect(idadeEm("2000-02-29", "2026-02-28")).toBe(25);
+    expect(idadeEm("2000-03-01", "2026-03-01")).toBe(26);
+    expect(idadeEm("2000-02-29", "2026-03-01")).toBe(26);
+  });
+
+  it("sem data, data inválida ou fora do plausível, não inventa idade", () => {
+    expect(idadeEm(null, "2026-10-09")).toBeNull();
+    expect(idadeEm(undefined, "2026-10-09")).toBeNull();
+    expect(idadeEm("", "2026-10-09")).toBeNull();
+    expect(idadeEm("12/06/1991", "2026-10-09")).toBeNull();
+    expect(idadeEm("2027-01-01", "2026-10-09")).toBeNull();
+    expect(idadeEm("1880-01-01", "2026-10-09")).toBeNull();
+  });
+});
+
+describe("dataNoBrasil", () => {
+  it("o dia de um instante é o do Brasil, não o de Greenwich", () => {
+    // Mensagem enviada às 22h30 de 8/out em São Paulo: em UTC já é dia 9, e
+    // `created_at.slice(0, 10)` mostrava a data de amanhã.
+    expect(dataNoBrasil("2026-10-09T01:30:00+00:00")).toBe("2026-10-08");
+    expect(dataNoBrasil("2026-10-09T03:00:00Z")).toBe("2026-10-09");
+    expect(dataNoBrasil("2026-10-08T22:30:00-03:00")).toBe("2026-10-08");
+  });
+  it("texto que não é instante volta como os 10 primeiros caracteres", () => {
+    expect(dataNoBrasil("2026-10-08")).toBe("2026-10-08");
+    expect(dataNoBrasil("lixo")).toBe("lixo");
   });
 });
