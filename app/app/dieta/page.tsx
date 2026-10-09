@@ -317,19 +317,9 @@ export default function DietaPage() {
         )}
       </div>
 
-      {cardapio && (
-        <MealPlanView
-          nome={cardapio.nome}
-          observacao={cardapio.obs}
-          itens={cardapio.itens}
-          date={date}
-          jaRegistrados={meals.map((m) => m.meal_type)}
-          onRegistrado={load}
-          linkPlano
-        />
-      )}
-
-      {/* Resumo do dia */}
+      {/* Resumo do dia — antes do cardápio: com cardápio prescrito, o
+          resumo ficava abaixo de todas as refeições do plano, e o "como
+          está o meu dia" era a última coisa que o paciente via. */}
       <div className="card mb-6">
         <div className="mb-4 flex items-center justify-between">
           <div>
@@ -394,6 +384,18 @@ export default function DietaPage() {
           </div>
         </div>
       </div>
+
+      {cardapio && (
+        <MealPlanView
+          nome={cardapio.nome}
+          observacao={cardapio.obs}
+          itens={cardapio.itens}
+          date={date}
+          jaRegistrados={meals.map((m) => m.meal_type)}
+          onRegistrado={load}
+          linkPlano
+        />
+      )}
 
       {loading ? (
         <div className="flex justify-center py-16 text-slate-500">
