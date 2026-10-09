@@ -4,7 +4,6 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
   useReducer,
   type ReactNode,
@@ -83,11 +82,13 @@ export function useEdicao(secao: SecaoEditavel): {
   const bloqueadaPor =
     !podeAbrir(estado, secao) && estado.aberta ? ROTULOS[estado.aberta] : null;
 
-  // Solta a trava ao desmontar: uma seção suja que sai da tela sem chamar
-  // fechar() deixaria as outras bloqueadas por algo que ninguém vê. É seguro
-  // mesmo quando a seção já cedeu o lugar, porque o reducer ignora fechar de
-  // quem não é a seção aberta.
-  useEffect(() => () => fechar(secao), [fechar, secao]);
+  // A liberação da trava ao desmontar NÃO mora aqui, e sim no <Editavel>.
+  // Os editores (EditorMetas, EditorTreino) usam este hook mas só montam
+  // depois de abrir(); no StrictMode do dev o React monta, desmonta e monta
+  // de novo, e uma limpeza aqui rodaria fechar(secao) com a seção JÁ aberta,
+  // fechando o formulário na hora em que ele aparece. O <Editavel> fica
+  // montado nos dois modos (leitura e edição), então a dupla montagem dele
+  // acontece com nada aberto, e o reducer ignora o fechar.
 
   // Quem chama vai identificado (`secao`) e o reducer decide. Uma guarda aqui
   // com `editando` não serviria: ele vem do último render e está velho dentro
