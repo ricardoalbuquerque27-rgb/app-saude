@@ -241,16 +241,32 @@ describe("montarResumos — alertas", () => {
     expect(dois.alerts).toContain("2 exames fora da referência");
   });
 
-  it("mudança na prescrição vem antes dos outros alertas", () => {
-    // A lista de pacientes mostra só os dois primeiros alertas. A mudança
-    // na prescrição é a única que pede ação do próprio nutricionista; se
-    // ficar no fim, some atrás de "dias sem registrar" e "dose atrasada".
+  it("os alertas saem do mais grave para o menos grave", () => {
+    // A Início e a lista de pacientes mostram só os dois primeiros. Têm de
+    // ser os dois que mais pedem o nutricionista: dose atrasada, depois a
+    // mudança na prescrição (a única que ele mesmo resolve). Exame vai por
+    // último porque o alerta dura 180 dias e não some quando o exame é
+    // refeito.
     const r = resumo({
-      desvios: [{ patient_id: A }, { patient_id: A }],
       treatments: [{ user_id: A, next_dose_date: "2026-10-01" }],
+      desvios: [{ patient_id: A }],
+      workouts: [{ user_id: A, date: "2026-10-05" }],
+      exams: [{ user_id: A, status: "alterado" }],
+      plan: [
+        { id: "p-seg", user_id: A, day_of_week: SEG, sport: "Musculação" },
+        { id: "p-ter", user_id: A, day_of_week: 1, sport: "Corrida" },
+        { id: "p-qua", user_id: A, day_of_week: QUA, sport: "Corrida" },
+      ],
+      checks: [{ user_id: A, plan_id: "p-seg", date: "2026-10-05", status: "skipped" }],
     });
-    expect(r.alerts[0]).toBe("2 mudanças na sua prescrição");
-    expect(r.alerts).toContain("Dose atrasada");
+    expect(r.alerts).toEqual([
+      "Dose atrasada",
+      "1 mudança na sua prescrição",
+      "3 dias sem registrar",
+      "Faltou a 1 treino (7d)",
+      "2 treinos sem confirmação (7d)",
+      "1 exame fora da referência",
+    ]);
   });
 });
 

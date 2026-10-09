@@ -288,6 +288,10 @@ export function montarResumos(
       alerts: [],
     };
 
+    // Do mais grave para o menos grave: a Início e a lista de pacientes só
+    // mostram os dois primeiros. Exame fica por último porque o alerta dura
+    // 180 dias e não some quando o exame é refeito.
+    if (doseOverdue) summary.alerts.push("Dose atrasada");
     if (summary.desvios > 0)
       summary.alerts.push(
         `${summary.desvios} ${summary.desvios > 1 ? "mudanças" : "mudança"} na sua prescrição`
@@ -296,7 +300,6 @@ export function montarResumos(
     const idle = idleDays(summary, today);
     if (idle == null) summary.alerts.push("Nunca registrou nada");
     else if (idle >= 3) summary.alerts.push(`${idle} dias sem registrar`);
-    if (doseOverdue) summary.alerts.push("Dose atrasada");
     if (summary.planFaltas7 > 0)
       summary.alerts.push(
         `Faltou a ${summary.planFaltas7} treino${summary.planFaltas7 > 1 ? "s" : ""} (7d)`
