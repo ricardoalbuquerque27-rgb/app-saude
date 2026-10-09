@@ -1,0 +1,227 @@
+import { describe, it, expect } from "vitest";
+import { montarResumos, type DadosResumo } from "./nutri";
+
+/** 2026-10-08 é uma quinta. A janela de 7 dias vai de 02 (sexta) a 08. */
+const HOJE = "2026-10-08";
+const A = "pac-a";
+const B = "pac-b";
+
+// Segunda = 0 no plano, como no resto do app.
+const SEG = 0;
+const QUA = 2;
+const SEX = 4;
+
+function dados(parcial: Partial<DadosResumo> = {}): DadosResumo {
+  return {
+    meals: [],
+    workouts: [],
+    logs: [],
+    body: [],
+    exams: [],
+    treatments: [],
+    plan: [],
+    checks: [],
+    desvios: [],
+    ...parcial,
+  };
+}
+
+function resumo(parcial: Partial<DadosResumo>, id = A) {
+  return montarResumos(dados(parcial), [id], { [id]: "Ana" }, HOJE)[0];
+}
+
+describe("montarResumos — registros", () => {
+  it("conta cada dia uma vez, venha de qual fonte vier", () => {
+    // Refeição e treino no mesmo dia são UM dia com registro, não dois.
+    const r = resumo({
+      meals: [{ user_id: A, date: "2026-10-08", calories: 400, protein_g: 20 }],
+      workouts: [{ user_id: A, date: "2026-10-08" }],
+      logs: [{ user_id: A, date: "2026-10-07", water_ml: 500 }],
+      body: [{ user_id: A, date: "2026-10-05", weight_kg: 80 }],
+    });
+    expect(r.daysLogged7).toBe(3);
+    expect(r.lastActivity).toBe("2026-10-08");
+  });
+
+  it("a janela de 7 dias não pega o oitavo dia nem data futura", () => {
+    // Foi aqui que o painel mostrou "8 de 7 dias": a conta à mão com -7 e
+    // sem teto. 01/10 é o oitavo dia; 09/10 é amanhã.
+    const r = resumo({
+      meals: [
+        { user_id: A, date: "2026-10-01", calories: 0, protein_g: 0 },
+        { user_id: A, date: "2026-10-02", calories: 0, protein_g: 0 },
+        { user_id: A, date: "2026-10-09", calories: 0, protein_g: 0 },
+      ],
+    });
+    expect(r.daysLogged7).toBe(1);
+  });
+
+  it("soma calorias, proteína e água só de hoje", () => {
+    const r = resumo({
+      meals: [
+        { user_id: A, date: HOJE, calories: 500, protein_g: "30.5" },
+        { user_id: A, date: HOJE, calories: 300, protein_g: 20 },
+        { user_id: A, date: "2026-10-07", calories: 1000, protein_g: 80 },
+      ],
+      logs: [
+        { user_id: A, date: HOJE, water_ml: 1500 },
+        { user_id: A, date: "2026-10-07", water_ml: 2000 },
+      ],
+    });
+    expect(r.caloriesToday).toBe(800);
+    expect(r.proteinToday).toBe(50.5);
+    expect(r.waterToday).toBe(1500);
+  });
+
+  it("os dados de um paciente não vazam para o outro", () => {
+    // As consultas trazem todos os pacientes juntos (.in(user_id, ids)).
+    const [a, b] = montarResumos(
+      dados({
+        meals: [{ user_id: A, date: HOJE, calories: 700, protein_g: 40 }],
+        workouts: [{ user_id: A, date: HOJE }],
+        plan: [{ id: "p-seg", user_id: A, day_of_week: SEG, sport: "Musculação" }],
+        treatments: [{ user_id: A, next_dose_date: "2026-10-01" }],
+        exams: [{ user_id: A, status: "alterado" }],
+        desvios: [{ patient_id: A }],
+      }),
+      [A, B],
+      {},
+      HOJE
+    );
+    expect(a.caloriesToday).toBe(700);
+    expect(a.workouts7).toBe(1);
+    expect(a.planPrevistas7).toBe(1);
+    expect(b.caloriesToday).toBe(0);
+    expect(b.workouts7).toBe(0);
+    expect(b.lastActivity).toBeNull();
+    expect(b.planPrevistas7).toBe(0);
+    expect(b.doseOverdue).toBe(false);
+    expect(b.alteredExams).toBe(0);
+    expect(b.desvios).toBe(0);
+  });
+
+  it("sem nome cadastrado, chama de Paciente", () => {
+    const [r] = montarResumos(dados(), [A], {}, HOJE);
+    expect(r.name).toBe("Paciente");
+  });
+});
+
+describe("montarResumos — peso", () => {
+  it("a variação é a última medida menos a primeira, arredondada", () => {
+    // 78.4 - 80 dá -1.5999999999999943 em ponto flutuante.
+    const r = resumo({
+      body: [
+        { user_id: A, date: "2026-09-10", weight_kg: 80 },
+        { user_id: A, date: "2026-10-07", weight_kg: "78.4" },
+      ],
+    });
+    expect(r.weightLast).toBe(78.4);
+    expect(r.weightDelta30).toBe(-1.6);
+  });
+
+  it("com uma medida só, não inventa variação", () => {
+    const r = resumo({
+      body: [{ user_id: A, date: "2026-10-07", weight_kg: 78 }],
+    });
+    expect(r.weightLast).toBe(78);
+    expect(r.weightDelta30).toBeNull();
+  });
+});
+
+describe("montarResumos — plano de treino", () => {
+  const plano = [
+    { id: "p-seg", user_id: A, day_of_week: SEG, sport: "Musculação" },
+    { id: "p-qua", user_id: A, day_of_week: QUA, sport: "Corrida" },
+    { id: "p-sex", user_id: A, day_of_week: SEX, sport: "Descanso" },
+  ];
+
+  it("descanso não conta como treino previsto", () => {
+    // Na janela de 02 a 08 caem uma segunda (05), uma quarta (07) e uma
+    // sexta (02). A sexta é descanso: cobrar confirmação dela gerava
+    // "sem resposta" para quem fez exatamente o que foi prescrito.
+    const r = resumo({ plan: plano });
+    expect(r.planPrevistas7).toBe(2);
+  });
+
+  it("separa quem faltou de quem não respondeu", () => {
+    const r = resumo({
+      plan: plano,
+      checks: [{ user_id: A, plan_id: "p-seg", date: "2026-10-05", status: "skipped" }],
+    });
+    expect(r.planFaltas7).toBe(1);
+    expect(r.planConfirmadas7).toBe(0);
+    expect(r.planSemResposta7).toBe(1);
+    expect(r.alerts).toContain("Faltou a 1 treino (7d)");
+    // Um só sem resposta ainda não é motivo de alerta.
+    expect(r.alerts.some((a) => a.includes("sem confirmação"))).toBe(false);
+  });
+
+  it("avisa a partir de dois treinos sem confirmação", () => {
+    const r = resumo({ plan: plano });
+    expect(r.alerts).toContain("2 treinos sem confirmação (7d)");
+  });
+
+  it("confirmado não vira alerta", () => {
+    const r = resumo({
+      plan: plano,
+      checks: [
+        { user_id: A, plan_id: "p-seg", date: "2026-10-05", status: "done" },
+        { user_id: A, plan_id: "p-qua", date: "2026-10-07", status: "done" },
+      ],
+    });
+    expect(r.planConfirmadas7).toBe(2);
+    expect(r.planSemResposta7).toBe(0);
+    expect(r.alerts.some((a) => a.includes("treino"))).toBe(false);
+  });
+});
+
+describe("montarResumos — alertas", () => {
+  it("avisa a partir de três dias parado", () => {
+    const tres = resumo({ workouts: [{ user_id: A, date: "2026-10-05" }] });
+    expect(tres.alerts).toContain("3 dias sem registrar");
+
+    const dois = resumo({ workouts: [{ user_id: A, date: "2026-10-06" }] });
+    expect(dois.alerts.some((a) => a.includes("sem registrar"))).toBe(false);
+  });
+
+  it("sem registro nenhum, diz que nunca registrou", () => {
+    expect(resumo({}).alerts).toContain("Nunca registrou nada");
+  });
+
+  it("dose de ontem está atrasada; dose de hoje não", () => {
+    const ontem = resumo({
+      treatments: [{ user_id: A, next_dose_date: "2026-10-07" }],
+    });
+    expect(ontem.doseOverdue).toBe(true);
+    expect(ontem.alerts).toContain("Dose atrasada");
+
+    const hoje = resumo({ treatments: [{ user_id: A, next_dose_date: HOJE }] });
+    expect(hoje.doseOverdue).toBe(false);
+    expect(hoje.nextDose).toBe(HOJE);
+  });
+
+  it("exames fora da referência, no singular e no plural", () => {
+    const um = resumo({ exams: [{ user_id: A, status: "alterado" }] });
+    expect(um.alerts).toContain("1 exame fora da referência");
+
+    const dois = resumo({
+      exams: [
+        { user_id: A, status: "alterado" },
+        { user_id: A, status: "atencao" },
+      ],
+    });
+    expect(dois.alerts).toContain("2 exames fora da referência");
+  });
+
+  it("mudança na prescrição vem antes dos outros alertas", () => {
+    // A lista de pacientes mostra só os dois primeiros alertas. A mudança
+    // na prescrição é a única que pede ação do próprio nutricionista; se
+    // ficar no fim, some atrás de "dias sem registrar" e "dose atrasada".
+    const r = resumo({
+      desvios: [{ patient_id: A }, { patient_id: A }],
+      treatments: [{ user_id: A, next_dose_date: "2026-10-01" }],
+    });
+    expect(r.alerts[0]).toBe("2 mudanças na sua prescrição");
+    expect(r.alerts).toContain("Dose atrasada");
+  });
+});

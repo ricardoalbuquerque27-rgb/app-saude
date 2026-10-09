@@ -1,4 +1,5 @@
 import { todayISO, addDaysISO, diasNaJanela, naJanela } from "@/lib/date";
+import { computeAdherence } from "@/lib/planCheckIn";
 
 // Camada de dados do lado do nutricionista. Todas as consultas rodam com o
 // cliente autenticado do nutri — a RLS ("nutri reads patient") é quem libera
@@ -44,8 +45,9 @@ export function idleDays(s: PatientSummary, today = todayISO()): number | null {
 }
 
 /**
- * Resumo de vários pacientes de uma vez. Faz 6 consultas no total,
- * independente da quantidade de pacientes (usa .in(user_id, ids)).
+ * Resumo de vários pacientes de uma vez. Faz 9 consultas no total,
+ * independente da quantidade de pacientes (usa .in(user_id, ids)). A conta
+ * em si fica em `montarResumos`.
  */
 export async function getPatientsSummary(
   supabase: any,
@@ -115,15 +117,52 @@ export async function getPatientsSummary(
         .is("acknowledged_at", null),
     ]);
 
-  const meals = (mealsRes.data ?? []) as any[];
-  const workouts = (wkRes.data ?? []) as any[];
-  const logs = (logsRes.data ?? []) as any[];
-  const body = (bodyRes.data ?? []) as any[];
-  const exams = (examsRes.data ?? []) as any[];
-  const treats = (treatRes.data ?? []) as any[];
-  const planRows = (planRes.data ?? []) as any[];
-  const checkRows = (checksRes.data ?? []) as any[];
-  const desvioRows = (desviosRes.data ?? []) as any[];
+  return montarResumos(
+    {
+      meals: mealsRes.data ?? [],
+      workouts: wkRes.data ?? [],
+      logs: logsRes.data ?? [],
+      body: bodyRes.data ?? [],
+      exams: examsRes.data ?? [],
+      treatments: treatRes.data ?? [],
+      plan: planRes.data ?? [],
+      checks: checksRes.data ?? [],
+      desvios: desviosRes.data ?? [],
+    },
+    ids,
+    names,
+    today
+  );
+}
+
+/** As linhas que `getPatientsSummary` busca, já de todos os pacientes juntos. */
+export type DadosResumo = {
+  meals: any[];
+  workouts: any[];
+  logs: any[];
+  /** Só medidas com peso, em ordem crescente de data. */
+  body: any[];
+  /** Só exames fora do normal. */
+  exams: any[];
+  /** Só tratamentos ativos. */
+  treatments: any[];
+  plan: any[];
+  checks: any[];
+  desvios: any[];
+};
+
+/**
+ * A conta do resumo, separada das consultas para poder ser testada sem
+ * banco. `today` entra como parâmetro pelo mesmo motivo.
+ */
+export function montarResumos(
+  dados: DadosResumo,
+  ids: string[],
+  names: Record<string, string>,
+  today: string
+): PatientSummary[] {
+  const { meals, workouts, logs, body, exams, treatments, plan, checks, desvios } =
+    dados;
 
   // Datas dos últimos 7 dias já vencidos (inclui hoje), para cruzar o plano
   // — que é um molde por dia da semana — com os check-ins reais.
@@ -172,30 +211,21 @@ export async function getPatientsSummary(
         ? Number((weightLast - weightFirst).toFixed(1))
         : null;
 
-    // Adesão ao plano nos últimos 7 dias.
-    const myPlan = planRows.filter(
-      (x) =>
-        x.user_id === id &&
-        !String(x.sport ?? "").toLowerCase().includes("descanso")
+    // Adesão ao plano nos últimos 7 dias. A mesma conta da aba do
+    // paciente: era uma cópia à mão do computeAdherence, e duas cópias da
+    // mesma regra acabam discordando entre a lista e o detalhe.
+    const adesao = computeAdherence(
+      plan.filter(
+        (x) =>
+          x.user_id === id &&
+          !String(x.sport ?? "").toLowerCase().includes("descanso")
+      ),
+      checks.filter((c) => c.user_id === id),
+      janela7,
+      today
     );
-    const myChecks = new Map<string, string>();
-    for (const c of checkRows.filter((c) => c.user_id === id)) {
-      myChecks.set(`${c.plan_id}|${c.date}`, c.status);
-    }
-    let planPrevistas7 = 0;
-    let planConfirmadas7 = 0;
-    let planFaltas7 = 0;
-    for (const date of janela7) {
-      const dow = (new Date(date + "T12:00:00").getDay() + 6) % 7;
-      for (const pl of myPlan.filter((x) => x.day_of_week === dow)) {
-        planPrevistas7++;
-        const st = myChecks.get(`${pl.id}|${date}`);
-        if (st === "done") planConfirmadas7++;
-        else if (st === "skipped") planFaltas7++;
-      }
-    }
 
-    const nextDose = treats.find((t) => t.user_id === id)?.next_dose_date ?? null;
+    const nextDose = treatments.find((t) => t.user_id === id)?.next_dose_date ?? null;
     const doseOverdue = !!nextDose && nextDose < today;
 
     const summary: PatientSummary = {
@@ -212,11 +242,11 @@ export async function getPatientsSummary(
       alteredExams: exams.filter((e) => e.user_id === id).length,
       nextDose,
       doseOverdue,
-      planPrevistas7,
-      planConfirmadas7,
-      planFaltas7,
-      planSemResposta7: planPrevistas7 - planConfirmadas7 - planFaltas7,
-      desvios: desvioRows.filter((d) => d.patient_id === id).length,
+      planPrevistas7: adesao.previstas,
+      planConfirmadas7: adesao.confirmadas,
+      planFaltas7: adesao.faltas,
+      planSemResposta7: adesao.semResposta,
+      desvios: desvios.filter((d) => d.patient_id === id).length,
       alerts: [],
     };
 
