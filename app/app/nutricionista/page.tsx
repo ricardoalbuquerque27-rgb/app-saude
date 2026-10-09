@@ -143,11 +143,11 @@ export default async function MeuNutricionistaPage({
   if (rotinaIds.length > 0) {
     const [r, e] = await Promise.all([
       supabase.from("routines").select("id, name, notes").in("id", rotinaIds),
+      // A aba só mostra QUANTOS exercícios: o detalhe vive em /app/treino.
       supabase
         .from("routine_exercises")
-        .select("id, routine_id, name, target_sets, target_reps, target_weight_kg, rest_seconds, position")
-        .in("routine_id", rotinaIds)
-        .order("position", { ascending: true }),
+        .select("id, routine_id")
+        .in("routine_id", rotinaIds),
     ]);
     rotinas = r.data ?? [];
     exercicios = e.data ?? [];

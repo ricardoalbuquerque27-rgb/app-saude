@@ -87,12 +87,14 @@ export default async function TreinoDetalhe({
 
   return (
     <div className="max-w-2xl">
+      {/* O treino do próprio paciente também abre aqui. Mandá-lo para "Meu
+          plano" despejava quem não tem nutricionista na tela de convite. */}
       <Link
-        href="/app/nutricionista?aba=treino"
+        href={sessao.prescribed_by ? "/app/nutricionista?aba=treino" : "/app/treinos"}
         className="tappable mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-brand-700 dark:text-slate-300 dark:hover:text-brand-400"
       >
         <ArrowLeft className="h-4 w-4" />
-        Meu plano
+        {sessao.prescribed_by ? "Meu plano" : "Treinos"}
       </Link>
 
       <div className="mb-1 flex flex-wrap items-center gap-2">

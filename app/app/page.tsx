@@ -78,7 +78,10 @@ export default async function DashboardPage() {
       .from("workouts")
       .select("id", { count: "exact", head: true })
       .eq("user_id", uid)
-      .gte("date", weekAgo),
+      .gte("date", weekAgo)
+      // Teto: o campo de data do "Novo treino" não tem max, então um
+      // registro à frente inflava "Treinos (7 dias)" e o Score junto.
+      .lte("date", today),
     supabase
       .from("meals")
       .select("calories, protein_g, meal_type")
@@ -466,7 +469,10 @@ export default async function DashboardPage() {
                   }
                   date={today}
                   completions={todayCompletions as any}
-                  nota={planoNutri.length === 0}
+                  // A nota some só quando o bloco do nutri JÁ a mostrou.
+                  // Com o vínculo revogado, temNutri é falso e as linhas
+                  // prescritas caem aqui: antes a explicação sumia das duas.
+                  nota={!blocoNutri || planoNutri.length === 0}
                 />
               </div>
             )}

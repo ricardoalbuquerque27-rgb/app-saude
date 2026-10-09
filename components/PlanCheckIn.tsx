@@ -78,9 +78,17 @@ export default function PlanCheckIn({
 
   if (sessions.length === 0) return null;
 
+  // A nota explica o mecanismo do check-in: vale uma vez por tela, e só faz
+  // sentido junto de um treino que ainda PRECISA de resposta. Prender ao
+  // índice 0 escondia a nota quando o primeiro já estava respondido e o
+  // segundo não.
+  const primeiroSemResposta = sessions.findIndex(
+    (s) => !idx[completionKey(s.id, date)]
+  );
+
   return (
     <div className={compact ? "" : "space-y-2"}>
-      {sessions.map((s) => {
+      {sessions.map((s, i) => {
         const current = idx[completionKey(s.id, date)];
         const done = current?.status === "done";
         const skipped = current?.status === "skipped";
@@ -155,7 +163,7 @@ export default function PlanCheckIn({
               </button>
             </div>
 
-            {nota && !compact && !current && (
+            {nota && i === primeiroSemResposta && !compact && !current && (
               <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
                 Seu nutricionista vê essa confirmação.
               </p>

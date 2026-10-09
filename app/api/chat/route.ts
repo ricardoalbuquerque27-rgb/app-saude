@@ -144,7 +144,9 @@ type ChatMessage = { role: "user" | "assistant"; content: string };
 // Monta um resumo dos dados do usuário para personalizar as respostas.
 async function buildUserContext(supabase: any, uid: string): Promise<string> {
   const today = todayISO();
-  const weekAgo = addDaysISO(today, -7);
+  // -6, não -7: a comparação é >=, então de hoje-6 até hoje são 7 dias. Com
+  // -7 a Gaia contava oito e discordava do número da Início.
+  const weekAgo = addDaysISO(today, -6);
   const dow = (new Date(today + "T12:00:00").getDay() + 6) % 7;
 
   const [prof, weight, meals, wkCount, plan, log, exams, treat, wkToday] =

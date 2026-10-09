@@ -31,7 +31,11 @@ export default function ChatWidget() {
   // volta ao subir ou ao chegar no topo.
   const [escondido, setEscondido] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const ultimoY = useRef(0);
+  // Começa onde a página REALMENTE está. Com 0, depois de recarregar com a
+  // rolagem restaurada pelo navegador, a primeira subida era comparada
+  // contra o topo e lida como descida — o balão sumia sem a pessoa ter
+  // descido nada.
+  const ultimoY = useRef(typeof window === "undefined" ? 0 : window.scrollY);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({

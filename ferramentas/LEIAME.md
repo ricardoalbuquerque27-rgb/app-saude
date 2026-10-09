@@ -10,9 +10,12 @@ Nada disto entra no build do app. O Next só compila `app/`, `components/` e
 ## Como usar
 
 ```bash
-npm i -D playwright            # não fica no package.json de propósito:
-                               # o postinstall dela baixa navegadores e isso
-                               # atrasaria (ou quebraria) o build na Vercel
+PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm i -D playwright
+# Não fica no package.json de propósito: o postinstall dela baixa
+# navegadores e isso atrasaria (ou quebraria) o build na Vercel. O preço é
+# que QUALQUER `npm install` depois remove a playwright de novo (o npm poda
+# o que não está declarado). Se os scripts daqui derem MODULE_NOT_FOUND,
+# é isso: rode esta linha outra vez.
 
 node ferramentas/mock-supabase.cjs &        # Supabase de mentira na porta 54321
 
