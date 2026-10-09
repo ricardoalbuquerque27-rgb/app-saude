@@ -1,4 +1,5 @@
-// Requer: npm i -D playwright  (ver ferramentas/LEIAME.md)
+// Requer: PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm i --no-save playwright
+// (ver ferramentas/LEIAME.md; com -D ela entraria no package.json).
 // Abre o app no Chromium do container, faz login contra o Supabase de
 // mentira e tira print de cada tela, em claro/escuro e celular/desktop.
 const { chromium } = require("playwright");

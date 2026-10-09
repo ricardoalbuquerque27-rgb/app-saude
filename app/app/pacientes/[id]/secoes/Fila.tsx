@@ -3,9 +3,10 @@ import { AlertaFila } from "@/components/clinico/AlertaFila";
 import { Numeros } from "@/components/clinico/Numeros";
 import { ReaplicarMetas } from "@/components/clinico/ReaplicarMetas";
 import {
+  separarDesvios,
   textoVariacaoPeso,
   type Alerta,
-  type DesvioDeMeta,
+  type Desvio,
   type MetasPrescritas,
   type PatientSummary,
 } from "@/lib/nutri";
@@ -50,14 +51,14 @@ export async function Fila({
   uid,
   resumo,
   prescricao,
-  desviosDeMeta,
+  desvios: desviosAbertos,
 }: {
   uid: string;
   resumo: Promise<{ resumos: PatientSummary[]; falhou: boolean }>;
   prescricao: Promise<{ data: MetasPrescritas | null; error: unknown }>;
-  desviosDeMeta: Promise<{ data: DesvioDeMeta[]; error: unknown }>;
+  desvios: Promise<{ data: Desvio[]; error: unknown }>;
 }) {
-  const [r, presc, desvios] = await Promise.all([resumo, prescricao, desviosDeMeta]);
+  const [r, presc, desvios] = await Promise.all([resumo, prescricao, desviosAbertos]);
   if (r.falhou) {
     return (
       <div className="pb-6">
@@ -66,6 +67,7 @@ export async function Fila({
     );
   }
   const [s] = r.resumos;
+  const { meta: desviosDeMeta, plano: desviosDoPlano } = separarDesvios(desvios.data);
 
   function acoes(a: Alerta) {
     switch (a.tipo) {
@@ -73,18 +75,32 @@ export async function Fila({
       case "parado":
         return <Conversar uid={uid} />;
       case "prescricao":
-        // O alerta conta também os avisos do plano de treino, e Reaplicar
-        // não dá baixa neles: o botão só aparece com um aviso de META aberto,
-        // senão o nutricionista reaplicaria e o alerta continuaria ali. Sem
-        // prescrição não há o que reaplicar. Nos dois casos sobra o Conversar.
+        // O alerta conta também os avisos do plano de treino. Reaplicar só
+        // aparece com um aviso de META aberto: o gatilho
+        // prescriptions_ack_deviations dá baixa em TODOS os avisos abertos do
+        // paciente, então, sem aviso de meta, reaplicar gravaria uma prescrição
+        // repetida e sumiria com o aviso de treino sem ninguém tratar o treino.
+        // Com os dois abertos, Reaplicar dá baixa nos dois, e a linha embaixo
+        // do botão diz isso antes do clique. Sem prescrição não há o que
+        // reaplicar. Nos dois casos sobra o Conversar.
         return (
           <>
             {presc.error || desvios.error ? (
               <ErroSecao secao="a última prescrição" />
-            ) : presc.data && desvios.data.length > 0 ? (
+            ) : presc.data && desviosDeMeta.length > 0 ? (
               // As quatro metas da última prescrição, do jeito que vieram
               // (o porquê está no ReaplicarMetas).
-              <ReaplicarMetas pacienteId={uid} prescricao={presc.data} />
+              <ReaplicarMetas
+                pacienteId={uid}
+                prescricao={presc.data}
+                observacao={
+                  desviosDoPlano.length === 0
+                    ? undefined
+                    : desviosDoPlano.length === 1
+                      ? "Também dá baixa na mudança do plano de treino."
+                      : "Também dá baixa nas mudanças do plano de treino."
+                }
+              />
             ) : null}
             <Conversar uid={uid} />
           </>

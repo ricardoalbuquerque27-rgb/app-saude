@@ -7,11 +7,12 @@ import {
   mediasDaSemana,
   notaDasMedias,
   notaMedia,
+  separarDesvios,
   textoDaMeta,
   textoDoDesvio,
   ultimoDesvioPorCampo,
   type CampoMeta,
-  type DesvioDeMeta,
+  type Desvio,
   type ItemMeta,
   type Media,
   type MetasPrescritas,
@@ -22,10 +23,8 @@ import { EditorMetas } from "@/components/clinico/EditorMetas";
 import { BarraMeta } from "@/components/clinico/BarraMeta";
 import { TabelaRealMeta } from "@/components/clinico/TabelaRealMeta";
 import { VerHistorico } from "@/components/clinico/VerHistorico";
-import MealPlanEditor, {
-  type ItemCardapio,
-  type PlanoAlimentar,
-} from "@/components/MealPlanEditor";
+import { EditorCardapio } from "@/components/clinico/EditorCardapio";
+import type { ItemCardapio, PlanoAlimentar } from "@/components/MealPlanEditor";
 import { ErroSecao } from "./ErroSecao";
 
 const ROTULO_CAMPO: Record<CampoMeta, string> = {
@@ -54,20 +53,21 @@ export type PerfilAlimentacao = MetasPrescritas & { sex: string | null };
 // O editor abre com a mesma "Meta" da tabela, e cada campo com aviso aberto
 // mostra embaixo o que o paciente está usando.
 //
-// Só os avisos de META entram aqui (getDesviosDeMeta filtra os quatro
-// campos): os do plano de treino caem na mesma tabela, mas não são metas.
+// Só os avisos de META entram aqui (separarDesvios fica com os quatro
+// campos): os do plano de treino caem na mesma tabela, mas não são metas, e
+// moram no Treino.
 export async function Alimentacao({
   uid,
   nutriId,
   perfil,
   prescricao,
-  desviosDeMeta,
+  desvios: desviosAbertos,
 }: {
   uid: string;
   nutriId: string;
   perfil: PerfilAlimentacao;
   prescricao: Promise<{ data: MetasPrescritas | null; error: unknown }>;
-  desviosDeMeta: Promise<{ data: DesvioDeMeta[]; error: unknown }>;
+  desvios: Promise<{ data: Desvio[]; error: unknown }>;
 }) {
   const supabase = await createClient();
   const hoje = todayISO();
@@ -79,7 +79,7 @@ export async function Alimentacao({
   const [serieRes, presc, desviosRes, cardapioRes, refeicoesRes] = await Promise.all([
     getPatientSeries(supabase, uid, 14),
     prescricao,
-    desviosDeMeta,
+    desviosAbertos,
     supabase
       .from("meal_plans")
       .select("id, name, notes, created_at")
@@ -127,7 +127,7 @@ export async function Alimentacao({
   const meta: MetasPrescritas = presc.data ?? perfil;
   const medias = mediasDaSemana(serieRes.serie, hoje);
   const itens = (itensRes.data ?? []) as ItemCardapio[];
-  const desvios = ultimoDesvioPorCampo(desviosRes.data);
+  const desvios = ultimoDesvioPorCampo(separarDesvios(desviosRes.data).meta);
   const usando: Partial<Record<CampoMeta, string>> = {};
   for (const d of desvios) usando[d.field] = textoDoDesvio(d, perfil.sex);
   const refeicoes = (refeicoesRes.data ?? []) as any[];
@@ -243,7 +243,7 @@ export async function Alimentacao({
           titulo={<h3 className={TITULO_BLOCO}>Cardápio</h3>}
           rotuloBotao={plano ? "Editar cardápio" : "Montar cardápio"}
           editor={
-            <MealPlanEditor
+            <EditorCardapio
               patientId={uid}
               nutriId={nutriId}
               plano={plano}

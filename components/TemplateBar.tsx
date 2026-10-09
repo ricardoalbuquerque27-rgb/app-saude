@@ -114,12 +114,12 @@ export default function TemplateBar({
   return (
     <div className="card mb-4">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <h3 className="section-title text-sm">
+        <h4 className="section-title text-sm">
           <span className="icon-badge">
             <LayoutTemplate className="h-4 w-4" />
           </span>
           Meus modelos
-        </h3>
+        </h4>
         {!abrindoForm && (
           <button
             onClick={() => {

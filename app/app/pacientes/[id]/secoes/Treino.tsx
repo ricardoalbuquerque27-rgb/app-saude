@@ -1,10 +1,15 @@
 import { createClient } from "@/lib/supabase/server";
-import { addDaysISO, formatDate, todayISO } from "@/lib/date";
+import { addDaysISO, dataNoBrasil, formatDate, todayISO } from "@/lib/date";
 import {
   computeAdherence,
   estadosDaSemana,
   type Completion,
 } from "@/lib/planCheckIn";
+import {
+  separarDesvios,
+  textoDoDesvioDoPlano,
+  type Desvio,
+} from "@/lib/nutri";
 import { Secao } from "@/components/clinico/Secao";
 import { Editavel } from "@/components/clinico/Editavel";
 import { EditorTreino } from "@/components/clinico/EditorTreino";
@@ -29,7 +34,23 @@ const ehDescanso = (sport: string | null) =>
 // editor grava nas mesmas tabelas de antes (routines, routine_exercises,
 // workout_plan). Os treinos registrados nos últimos 30 dias ficam no
 // histórico.
-export async function Treino({ uid, nutriId }: { uid: string; nutriId: string }) {
+//
+// Os avisos de mudança no plano de treino (o gatilho de workout_plan grava em
+// prescription_deviations, com `field` fora dos CAMPOS_META) aparecem aqui,
+// por extenso. Antes só existiam como número na fila ("2 mudanças"), e
+// qualquer set_patient_goals dava baixa neles sem o nutricionista ter visto
+// o que mudou. `desvios` é a mesma consulta da fila e da Alimentação.
+export async function Treino({
+  uid,
+  nutriId,
+  sexo,
+  desvios: desviosAbertos,
+}: {
+  uid: string;
+  nutriId: string;
+  sexo: string | null;
+  desvios: Promise<{ data: Desvio[]; error: unknown }>;
+}) {
   const supabase = await createClient();
   const hoje = todayISO();
   // 28 dias contando hoje para a adesão, e 30 para o histórico. A aba antiga
@@ -37,7 +58,7 @@ export async function Treino({ uid, nutriId }: { uid: string; nutriId: string })
   const desde28 = addDaysISO(hoje, -27);
   const desde30 = addDaysISO(hoje, -29);
 
-  const [planoRes, rotinasRes, exsRes, checksRes, treinosRes] = await Promise.all([
+  const [planoRes, rotinasRes, exsRes, checksRes, treinosRes, desviosRes] = await Promise.all([
     supabase
       .from("workout_plan")
       .select("id, day_of_week, sport, title, routine_id, prescribed_by")
@@ -70,6 +91,7 @@ export async function Treino({ uid, nutriId }: { uid: string; nutriId: string })
       .lte("date", hoje)
       .order("date", { ascending: false })
       .limit(30),
+    desviosAbertos,
   ]);
 
   const treinos = (treinosRes.data ?? []) as any[];
@@ -91,7 +113,8 @@ export async function Treino({ uid, nutriId }: { uid: string; nutriId: string })
     exsRes.error ||
     checksRes.error ||
     treinosRes.error ||
-    exsTreinosRes.error
+    exsTreinosRes.error ||
+    desviosRes.error
   ) {
     return (
       <Secao id="treino" titulo="Treino">
@@ -119,11 +142,13 @@ export async function Treino({ uid, nutriId }: { uid: string; nutriId: string })
     hoje
   );
   const semana = estadosDaSemana(plano, checks, hoje);
+  const mudancas = separarDesvios(desviosRes.data).plano;
 
   return (
     <Secao id="treino" titulo="Treino">
       <Editavel
         secao="treino"
+        titulo={<h3 className={TITULO_BLOCO}>Semana</h3>}
         rotuloBotao={plano.length ? "Editar plano" : "Prescrever plano"}
         editor={
           <EditorTreino
@@ -187,6 +212,27 @@ export async function Treino({ uid, nutriId }: { uid: string; nutriId: string })
               })}
             </dl>
           </>
+        )}
+
+        {mudancas.length > 0 && (
+          // Fora do `plano.length`: o paciente pode ter tirado a única sessão,
+          // e o aviso é justamente o que explica o plano vazio. `texto`,
+          // `atencao` e `atencao-texto-2` sobre `atencao-fundo`: pares
+          // testados (lib/temaClinico.ts).
+          <ul className="mt-4 space-y-1 rounded-md bg-clin-atencao-fundo px-3 py-2.5">
+            {mudancas.map((d) => (
+              <li key={d.id} className="text-[14px] leading-snug text-clin-texto">
+                <span className="font-semibold text-clin-atencao">
+                  Plano de treino:
+                </span>{" "}
+                {textoDoDesvioDoPlano(d, sexo)}
+                <span className="tabular-nums text-clin-atencao-texto-2">
+                  {" "}
+                  · {formatDate(dataNoBrasil(d.created_at))}
+                </span>
+              </li>
+            ))}
+          </ul>
         )}
 
         {rotinas.length > 0 && (

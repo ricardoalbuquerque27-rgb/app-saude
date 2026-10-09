@@ -7,11 +7,20 @@
 //   2. confere na tela o que só a tela mostra: cada verificação ACUSA (sai com
 //      código 1) em vez de só escrever no terminal.
 //
+// Sem OUT, os PNGs vão para uma pasta "prints-nutri" no diretório temporário
+// do sistema.
+//
 // Larguras: celular 390 px; computador 1440 px, que é onde as duas colunas
 // existem (começam em `xl`, 1280 px); e 1100 px, uma coluna só.
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
 const { chromium } = require("playwright");
 
-const OUT = process.env.OUT || ".";
+// Sem OUT, numa pasta temporária: o padrão antigo (".") despejava uns 27 PNGs
+// na raiz do repositório.
+const OUT = process.env.OUT || path.join(os.tmpdir(), "prints-nutri");
+fs.mkdirSync(OUT, { recursive: true });
 const APP = process.env.APP || "http://localhost:3000";
 const MOCK = process.env.MOCK || "http://localhost:54321";
 const CHROME = process.env.CHROME || "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
@@ -125,6 +134,10 @@ async function pronto(loc) {
 async function clicar(loc) {
   await pronto(loc);
   await loc.click();
+}
+/** Espera o elemento ficar visível; devolve se ficou, para a verificação acusar em vez de quebrar. */
+async function apareceu(loc, timeout = 10000) {
+  return loc.waitFor({ state: "visible", timeout }).then(() => true, () => false);
 }
 
 const textoDe = (loc) => loc.innerText();
@@ -292,7 +305,9 @@ async function transbordo(page) {
       page.waitForResponse((r) => r.request().method() === "GET" && r.url().includes("_rsc=") && daPagina(r), { timeout: 30000 }),
       clicar(page.locator("#conversa").getByRole("button", { name: "Enviar" })),
     ]);
-    await page.waitForTimeout(1500); // deixa o React aplicar o que o servidor devolveu
+    // O botão diz "Enviando…" até a página nova estar na tela (useRecarregar);
+    // a volta do "Enviar" é o sinal de que o React aplicou o que veio.
+    await page.locator("#conversa").getByRole("button", { name: "Enviar", exact: true }).waitFor({ state: "visible", timeout: 30000 });
     ok(post.ok() && patch.ok(), `a mensagem foi enviada e marcada como lida (POST ${post.status()}, PATCH ${patch.status()})`);
     ok(rsc.ok(), `o servidor refez a página (GET ?_rsc=, ${rsc.status()})`);
     ok((await caixa.inputValue()) === "", "a caixa da mensagem esvaziou (o envio terminou)");
@@ -384,7 +399,9 @@ async function transbordo(page) {
     const quatro = { p_patient: P.beatriz, p_calories: 1800, p_protein: 110, p_water: 2500, p_weight: 65, p_notes: null };
     ok(JSON.stringify(corpo) === JSON.stringify(quatro), "a RPC set_patient_goals leva as QUATRO metas da última prescrição", JSON.stringify(corpo));
     ok(res.status() === 200 && JSON.stringify(await res.json()) === JSON.stringify({ ok: true }), `e o mock responde { ok: true } (${res.status()})`);
-    await page.waitForTimeout(1500);
+    // "Reaplicando…" até a página nova chegar; o mock não guarda nada, então
+    // o aviso continua aberto e o botão volta com o rótulo de antes.
+    await page.getByRole("button", { name: "Reaplicar 1.800 kcal" }).waitFor({ state: "visible", timeout: 30000 });
     ok(!(await textoDe(page.locator("body"))).includes("Não foi possível reaplicar"), "nenhum erro de Reaplicar na tela");
     await page.close();
   }
@@ -429,6 +446,187 @@ async function transbordo(page) {
     ok(/dias com registro 6\/7/.test(numeros) && /treinos \(7 dias\) 3 de 4/.test(numeros), `números do topo: 6/7 dias, 3 de 4 treinos (${numeros})`);
     ok((await page.getByRole("link", { name: /Mensagem.*2 não lidas/ }).count()) === 1, "o botão Mensagem traz as 2 não lidas");
     await page.close();
+  }
+
+  console.log("\nVerificação 9: a mudança do plano de treino aparece (R19)");
+  etapa = "Verificação 9";
+  {
+    const page = await abrir(pc, rota("beatriz"));
+    const treino = page.locator("#treino");
+    const itens = treino.locator("ul.bg-clin-atencao-fundo > li");
+    ok((await itens.count()) === 1, `Treino lista 1 mudança do plano (achadas ${await itens.count()})`);
+    const txt = (await textoDe(itens.first())).replace(/\s+/g, " ");
+    ok(/Plano de treino: você definiu Treino B — Inferiores; ela está sem essa sessão · \d{2}\/\d{2}\/\d{4}/.test(txt),
+      `e é a do Treino B, por extenso: "${txt}"`);
+    ok(!/workout_plan|undefined|daily_|Calorias/.test(await textoDe(treino)), "sem nome cru de coluna nem aviso de meta no Treino");
+    const botao = page.getByRole("button", { name: "Reaplicar 1.800 kcal" });
+    const idObs = await botao.getAttribute("aria-describedby");
+    const obs = idObs ? page.locator(`[id="${idObs}"]`) : null;
+    const textoObs = obs ? await textoDe(obs) : "";
+    ok(textoObs === "Também dá baixa na mudança do plano de treino.",
+      'com os dois avisos abertos, embaixo do Reaplicar: "Também dá baixa na mudança do plano de treino." (e o botão aponta para ela)', textoObs);
+    if (obs) {
+      const b = await botao.boundingBox();
+      const o = await obs.boundingBox();
+      ok(o.y >= b.y + b.height - 1, `a linha fica embaixo do botão (botão termina em ${Math.round(b.y + b.height)}, linha começa em ${Math.round(o.y)})`);
+      const cor = await obs.evaluate((el) => getComputedStyle(el).color);
+      const esperada = await obs.evaluate((el) => {
+        const t = document.createElement("span");
+        t.style.color = "var(--clin-atencao-texto-2)";
+        el.appendChild(t);
+        const c = getComputedStyle(t).color;
+        t.remove();
+        return c;
+      });
+      ok(cor === esperada, `em atencao-texto-2 (${cor})`);
+    }
+    await page.close();
+    for (const k of ["carlos", "luiza"]) {
+      const outra = await abrir(pc, rota(k));
+      ok(!(await textoDe(outra.locator("body"))).includes("Também dá baixa"), `${k}: sem a linha "Também dá baixa"`);
+      ok((await outra.locator("#treino ul.bg-clin-atencao-fundo").count()) === 0, `${k}: o Treino não lista mudança nenhuma`);
+      await outra.close();
+    }
+  }
+
+  console.log("\nVerificação 10: Aplicar metas espera a página nova");
+  etapa = "Verificação 10";
+  {
+    const page = await abrir(pc, rota("beatriz"));
+    await abrirMetas(page);
+    let rpcs = 0;
+    page.on("request", (r) => {
+      if (r.method() === "POST" && r.url().includes("/rest/v1/rpc/set_patient_goals")) rpcs++;
+    });
+    // Segura a página nova (o GET ?_rsc= do router.refresh) para olhar o meio
+    // do caminho: a RPC já voltou e a tela ainda tem o dado velho.
+    let soltar;
+    const segura = new Promise((r) => (soltar = r));
+    const daPagina = (u) => u.pathname === rota("beatriz") && u.searchParams.has("_rsc");
+    await page.route((u) => daPagina(u), async (route) => {
+      await segura;
+      await route.continue();
+    });
+    const pedidoDaPagina = page.waitForRequest((r) => daPagina(new URL(r.url())), { timeout: 30000 });
+    await Promise.all([
+      page.waitForResponse((r) => r.url().includes("/rest/v1/rpc/set_patient_goals") && r.request().method() === "POST", { timeout: 30000 }),
+      clicar(page.getByRole("button", { name: "Aplicar metas" })),
+    ]);
+    await pedidoDaPagina;
+    const andamento = page.getByRole("button", { name: "Aplicando…" });
+    ok((await apareceu(andamento)) && (await andamento.isDisabled()),
+      'RPC de volta e página nova a caminho: o botão diz "Aplicando…" e está desligado');
+    const cancelar = page.locator("form").filter({ has: page.getByRole("button", { name: /Aplica/ }) })
+      .getByRole("button", { name: "Cancelar" });
+    ok((await cancelar.count()) === 1 && (await cancelar.isDisabled()), "o Cancelar também");
+    // Um segundo clique agora gravaria outra prescrição.
+    await andamento.click({ force: true, timeout: 2000 }).catch(() => {});
+    soltar();
+    ok(await apareceu(page.getByRole("button", { name: "Editar metas" }), 30000),
+      "quando a página nova chega, o editor fecha sozinho");
+    ok(rpcs === 1, `uma RPC só, mesmo com o segundo clique (${rpcs})`);
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+    await page.close();
+  }
+
+  console.log("\nVerificação 11: Fechar edição com a RPC em voo");
+  etapa = "Verificação 11";
+  {
+    const page = await abrir(pc, rota("beatriz"));
+    await abrirMetas(page);
+    const kcal = campo(page, "Calorias/dia").locator("input");
+    await kcal.fill("1950");
+    // Segura a RPC e depois responde com a recusa da própria função
+    // ({ ok: false }), que não suja o console como um 500 sujaria.
+    let soltar;
+    const segura = new Promise((r) => (soltar = r));
+    await page.route((u) => u.pathname.endsWith("/rest/v1/rpc/set_patient_goals"), async (route) => {
+      if (route.request().method() !== "POST") return route.continue();
+      await segura;
+      await route.fulfill({
+        status: 200,
+        headers: { "content-type": "application/json", "access-control-allow-origin": "*" },
+        body: JSON.stringify({ ok: false, error: "Recusa simulada pelo script." }),
+      });
+    });
+    await Promise.all([
+      page.waitForRequest((r) => r.method() === "POST" && r.url().includes("/rest/v1/rpc/set_patient_goals"), { timeout: 30000 }),
+      clicar(page.getByRole("button", { name: "Aplicar metas" })),
+    ]);
+    const fechar = page.getByRole("button", { name: "Fechar edição" });
+    await page.waitForFunction(
+      () => [...document.querySelectorAll("button")].some((b) => b.textContent.trim() === "Fechar edição" && b.disabled),
+      null, { timeout: 10000 }
+    ).catch(() => {});
+    ok(await fechar.isDisabled(), '"Fechar edição" fica desligado com a RPC em voo');
+    soltar();
+    ok((await apareceu(page.getByText("Recusa simulada pelo script."), 30000)) &&
+      (await page.getByRole("button", { name: "Aplicar metas" }).count()) === 1,
+      "a recusa aparece embaixo do formulário, que continua aberto");
+    ok(!(await fechar.isDisabled()), 'e "Fechar edição" volta a funcionar');
+    ok((await kcal.inputValue()) === "1950", `o valor digitado continua lá (${await kcal.inputValue()})`);
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+    await page.close();
+  }
+
+  console.log("\nVerificação 12: o rascunho do cardápio trava as outras seções");
+  etapa = "Verificação 12";
+  {
+    const page = await abrir(pc, rota("beatriz"));
+    const bloqueio = page.getByRole("button", { name: "Salve ou cancele a edição de Cardápio" });
+    await clicar(page.getByRole("button", { name: "Editar cardápio" }));
+    const nome = page.getByPlaceholder("Nome do plano (ex.: Plano de outubro)");
+    await nome.waitFor({ state: "visible", timeout: 30000 });
+    ok((await page.getByRole("button", { name: "Editar metas" }).count()) === 1, 'cardápio aberto sem rascunho: "Editar metas" continua livre');
+    await nome.fill("Plano alimentar — fase 2");
+    await apareceu(bloqueio.first());
+    ok((await page.getByRole("button", { name: "Editar metas" }).count()) === 0 &&
+      (await page.getByRole("button", { name: "Editar plano" }).count()) === 0 &&
+      (await bloqueio.count()) === 2,
+      'com o nome do plano digitado, metas e treino dizem "Salve ou cancele a edição de Cardápio"');
+    await Promise.all([
+      page.waitForResponse((r) => r.request().method() === "PATCH" && r.url().includes("/rest/v1/meal_plans"), { timeout: 30000 }),
+      clicar(page.getByRole("button", { name: "Salvar nome e orientação" })),
+    ]);
+    await apareceu(page.getByRole("button", { name: "Editar metas" }));
+    ok((await bloqueio.count()) === 0, 'salvou o nome: "Editar metas" e "Editar plano" voltam');
+    // A opção nova de uma refeição também é rascunho; descartá-la solta.
+    await clicar(page.locator("#alimentacao").getByRole("button", { name: /^(Adicionar|Outra opção)$/ }).first());
+    await page.getByPlaceholder(/2 ovos mexidos/).fill("Iogurte natural com aveia");
+    await apareceu(bloqueio.first());
+    ok((await bloqueio.count()) === 2, "a opção nova digitada também trava as outras seções");
+    await clicar(page.getByRole("button", { name: "Descartar esta opção" }));
+    await apareceu(page.getByRole("button", { name: "Editar metas" }));
+    ok((await bloqueio.count()) === 0, "descartar a opção nova solta a trava");
+    await page.close();
+  }
+  {
+    // No escuro, a cópia `.dark :where(.tema-clinico) .btn-ghost` tem duas
+    // classes e vencia o `text-clin-texto-2` do aviso de bloqueio.
+    const escuro = await contexto(browser, COMPUTADOR, true, estado);
+    const page = await abrir(escuro, rota("beatriz"));
+    await clicar(page.getByRole("button", { name: "Editar cardápio" }));
+    await page.getByPlaceholder("Nome do plano (ex.: Plano de outubro)").fill("Plano alimentar — fase 2");
+    const aviso = page.getByRole("button", { name: "Salve ou cancele a edição de Cardápio" }).first();
+    if (await apareceu(aviso)) {
+      // O React reaproveita o <button> do "Editar metas", e o `.btn` tem
+      // `transition`: a cor anda de `texto` para `texto-2` por uns 150 ms.
+      // Mede depois de a transição acabar.
+      await aviso.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+      const [cor, esperada] = await aviso.evaluate((el) => {
+        const t = document.createElement("span");
+        t.style.color = "var(--clin-texto-2)";
+        el.appendChild(t);
+        const c = getComputedStyle(t).color;
+        t.remove();
+        return [getComputedStyle(el).color, c];
+      });
+      ok(cor === esperada, `no escuro, o aviso de bloqueio sai em texto-2 (${cor}, esperado ${esperada})`);
+    } else {
+      ok(false, "no escuro, o aviso de bloqueio aparece");
+    }
+    await page.close();
+    await escuro.close();
   }
 
   console.log("\nConsole e rede");

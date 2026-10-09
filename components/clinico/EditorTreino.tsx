@@ -13,7 +13,9 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import TemplateBar from "@/components/TemplateBar";
 import { useEdicao } from "./Edicao";
+import { useGravacaoNaSecao } from "./Editavel";
 import { ErroInline } from "./ErroInline";
+import { useRecarregar } from "./useRecarregar";
 import type { ExercicioRotina, PlanoItem, Rotina } from "./tipos";
 
 const DIAS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
@@ -48,7 +50,9 @@ const LINHA_VAZIA: LinhaExercicio = {
 
 // Rotinas com exercícios e o encaixe nos dias da semana, movidos da antiga aba
 // Prescrição com as mesmas chamadas ao banco. Cada ação grava na
-// hora, por isso não há Cancelar: a saída é o "Fechar edição" do <Editavel>.
+// hora, por isso não há Cancelar: a saída é o "Fechar edição" do <Editavel>,
+// desligado enquanto alguma gravação daqui está em voo (cada uma passa por
+// `gravacao`), para o erro dela não cair num editor já fechado.
 export function EditorTreino({
   pacienteId,
   nutriId,
@@ -65,6 +69,11 @@ export function EditorTreino({
   const supabase = createClient();
   const router = useRouter();
   const { marcarSuja, marcarLimpa } = useEdicao("treino");
+  const gravacao = useGravacaoNaSecao();
+  // Só o encaixe espera a página nova: até ela chegar, a lista da semana
+  // ainda não tem a sessão, e um segundo clique inseria outra linha igual em
+  // workout_plan, que o paciente vê.
+  const [atualizandoSemana, recarregarSemana] = useRecarregar();
   // Um erro por bloco, cada um embaixo do que falhou: o das rotinas fica
   // entre o formulário de nova rotina e a lista, o da semana embaixo do
   // encaixe. Um só no fim do editor ficaria longe de quem acabou de clicar.
@@ -247,10 +256,15 @@ export function EditorTreino({
       routine_id: rotinaId || null,
       prescribed_by: nutriId,
     });
+    if (error) {
+      setEncaixando(false);
+      setErroSemana("Não foi possível encaixar no plano.");
+      return;
+    }
+    recarregarSemana();
     setEncaixando(false);
-    if (error) setErroSemana("Não foi possível encaixar no plano.");
-    else router.refresh();
   }
+  const ocupadoEncaixe = encaixando || atualizandoSemana;
 
   async function removerDoDia(id: string) {
     const { error } = await supabase.from("workout_plan").delete().eq("id", id);
@@ -264,7 +278,7 @@ export function EditorTreino({
         kind="treino"
         nutriId={nutriId}
         capturarAtual={capturarModelo}
-        aplicar={aplicarModelo}
+        aplicar={(conteudo) => gravacao(() => aplicarModelo(conteudo))}
         rotulo="treino"
       />
 
@@ -360,7 +374,7 @@ export function EditorTreino({
             </button>
 
             <div className="mt-3 flex gap-2">
-              <button onClick={salvarRotina} disabled={salvando} className="btn-primary flex-1 py-2 text-sm">
+              <button onClick={() => gravacao(salvarRotina)} disabled={salvando} className="btn-primary flex-1 py-2 text-sm">
                 {salvando && <Loader2 className="h-4 w-4 animate-spin" />}
                 Salvar rotina
               </button>
@@ -400,7 +414,7 @@ export function EditorTreino({
                       </p>
                     </div>
                     <button
-                      onClick={() => excluirRotina(r.id)}
+                      onClick={() => gravacao(() => excluirRotina(r.id))}
                       className="tappable inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg p-1.5 text-slate-500 hover:text-rose-600"
                       aria-label="Excluir rotina"
                     >
@@ -463,7 +477,7 @@ export function EditorTreino({
                   </p>
                 </div>
                 <button
-                  onClick={() => removerDoDia(p.id)}
+                  onClick={() => gravacao(() => removerDoDia(p.id))}
                   className="tappable inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg p-1.5 text-slate-500 hover:text-rose-600"
                   aria-label="Remover do plano"
                 >
@@ -498,9 +512,9 @@ export function EditorTreino({
               ))}
             </select>
           </div>
-          <button onClick={encaixarNoDia} disabled={encaixando} className="btn-ghost mt-2 w-full py-2 text-sm">
-            {encaixando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-            Encaixar no plano
+          <button onClick={() => gravacao(encaixarNoDia)} disabled={ocupadoEncaixe} className="btn-ghost mt-2 w-full py-2 text-sm">
+            {ocupadoEncaixe ? <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+            {ocupadoEncaixe ? "Encaixando…" : "Encaixar no plano"}
           </button>
           <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
             Com uma rotina ligada, o paciente vê o botão “Iniciar treino” e faz a

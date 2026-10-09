@@ -84,9 +84,14 @@ metas" aberto, a conversa em tela cheia no celular e Beatriz em 1100 px) e
 **acusa**, com código de saída 1, quando alguma coisa não bate: transbordo de
 largura, seção com erro, a fila de cada paciente, o rascunho de metas que
 sobrevive ao envio de uma mensagem, o Voltar da conversa, o tratamento mais
-recente, "Sem acesso", o Reaplicar e o que o editor de metas mostra. Ele
-descobre os ids dos pacientes perguntando ao mock (`/__cenario`), e recusa
-rodar se o mock subiu com outro cenário.
+recente, "Sem acesso", o Reaplicar e o que o editor de metas mostra, a
+mudança do plano de treino no Treino (com a linha "Também dá baixa…" embaixo
+do Reaplicar), o "Aplicando…" que segura o botão até a página nova chegar, o
+"Fechar edição" desligado com a gravação em voo e a trava que o rascunho do
+cardápio põe nas outras seções. Ele descobre os ids dos pacientes perguntando
+ao mock (`/__cenario`), e recusa rodar se o mock subiu com outro cenário.
+Sem `OUT`, os PNGs vão para `prints-nutri` no diretório temporário do
+sistema.
 
 O mock aceita `PATCH` e `DELETE` no CORS; sem isso o navegador recusava o
 `PATCH` que marca a conversa como lida e o console enchia de erro. Ele não

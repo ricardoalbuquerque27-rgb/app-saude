@@ -887,10 +887,11 @@ export async function getUltimaPrescricao(
 /**
  * Os campos de META que `set_patient_goals` grava. A tabela
  * prescription_deviations recebe também avisos do plano de treino (o gatilho
- * de workout_plan), e esses não são metas: Reaplicar não dá baixa neles, e
- * mostrá-los em Alimentação poria uma sessão de treino apagada entre as
- * metas, com o nome cru da coluna. Tudo o que é "desvio de meta" filtra por
- * esta lista.
+ * de workout_plan), e esses não são metas: mostrá-los em Alimentação poria
+ * uma sessão de treino apagada entre as metas, com o nome cru da coluna.
+ * Mesmo assim, qualquer `set_patient_goals` (Reaplicar ou Aplicar metas) dá
+ * baixa neles também, pelo gatilho prescriptions_ack_deviations. Tudo o que
+ * é "desvio de meta" filtra por esta lista.
  */
 export const CAMPOS_META = [
   "daily_calorie_goal",
@@ -932,7 +933,7 @@ export function textoDoDesvio(
   d: { field: string; current_value: string | null },
   sexo: string | null
 ): string {
-  const quem = sexo === "F" ? "ela" : sexo === "M" ? "ele" : "o paciente";
+  const quem = pronome(sexo);
   if (d.current_value == null || d.current_value === "") {
     return `${quem} está sem meta`;
   }
@@ -943,31 +944,78 @@ export function textoDoDesvio(
   return `${quem} está usando ${valor}`;
 }
 
-/** Um aviso aberto de meta mudada pelo paciente (prescription_deviations). */
-export type DesvioDeMeta = {
+/** "ela", "ele" ou, sem sexo no perfil, "o paciente": a frase não adivinha. */
+function pronome(sexo: string | null): string {
+  return sexo === "F" ? "ela" : sexo === "M" ? "ele" : "o paciente";
+}
+
+/**
+ * Um aviso de mudança no plano de treino, como o aviso antigo da Prescrição
+ * o escrevia ("você definiu X, está Y"), lendo as mesmas colunas: `prescribed`
+ * é a sessão que o nutricionista pôs no plano e `current_value` o que há no
+ * lugar dela agora. Sem valor atual, a sessão saiu do plano, do mesmo jeito
+ * que meta sem valor é meta apagada (textoDoDesvio). Sem o prescrito, um
+ * traço, como no aviso antigo.
+ */
+export function textoDoDesvioDoPlano(
+  d: { prescribed: string | null; current_value: string | null },
+  sexo: string | null
+): string {
+  const quem = pronome(sexo);
+  const antes = d.prescribed?.trim() || "—";
+  const agora = d.current_value?.trim();
+  return agora
+    ? `você definiu ${antes}; ${quem} está com ${agora}`
+    : `você definiu ${antes}; ${quem} está sem essa sessão`;
+}
+
+/** Um aviso aberto em prescription_deviations: de meta ou do plano de treino. */
+export type Desvio = {
   id: string;
-  field: CampoMeta;
+  field: string;
   prescribed: string | null;
   current_value: string | null;
   created_at: string;
 };
 
+const ehCampoMeta = (field: string): field is CampoMeta =>
+  (CAMPOS_META as readonly string[]).includes(field);
+
 /**
- * Os avisos de meta ainda abertos do paciente, só dos quatro campos de meta
- * (ver CAMPOS_META). Devolve `{ data, error }` sem engolir o erro, e é
- * `async` pelo mesmo motivo de getUltimaPrescricao: a página divide a
- * promessa entre a fila e a Alimentação.
+ * Os avisos abertos, separados: os de META (Alimentação, e o que decide se
+ * Reaplicar aparece na fila) e os do PLANO de treino (o Treino os lista, e a
+ * fila avisa que Reaplicar também dá baixa neles). O que não é campo de meta
+ * vai para o plano: o gatilho do workout_plan é a outra fonte da tabela, e um
+ * aviso que não coubesse em nenhum lado sumiria calado.
  */
-export async function getDesviosDeMeta(
+export function separarDesvios<T extends { field: string }>(
+  desvios: T[]
+): { meta: (T & { field: CampoMeta })[]; plano: T[] } {
+  const meta: (T & { field: CampoMeta })[] = [];
+  const plano: T[] = [];
+  for (const d of desvios) {
+    if (ehCampoMeta(d.field)) meta.push(d as T & { field: CampoMeta });
+    else plano.push(d);
+  }
+  return { meta, plano };
+}
+
+/**
+ * Os avisos ainda abertos do paciente, de meta e do plano de treino, numa
+ * consulta só: quem precisa de um lado filtra com separarDesvios. Devolve
+ * `{ data, error }` sem engolir o erro, e é `async` pelo mesmo motivo de
+ * getUltimaPrescricao: a página divide a promessa entre a fila, a
+ * Alimentação e o Treino.
+ */
+export async function getDesviosAbertos(
   supabase: any,
   uid: string
-): Promise<{ data: DesvioDeMeta[]; error: unknown }> {
+): Promise<{ data: Desvio[]; error: unknown }> {
   const { data, error } = await supabase
     .from("prescription_deviations")
     .select("id, field, prescribed, current_value, created_at")
     .eq("patient_id", uid)
-    .in("field", CAMPOS_META as unknown as string[])
     .is("acknowledged_at", null)
     .order("created_at", { ascending: false });
-  return { data: (data as DesvioDeMeta[] | null) ?? [], error };
+  return { data: (data as Desvio[] | null) ?? [], error };
 }

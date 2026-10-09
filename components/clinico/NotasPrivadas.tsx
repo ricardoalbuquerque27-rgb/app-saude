@@ -65,6 +65,7 @@ export function NotasPrivadas({
 
       <form onSubmit={salvar} className="mb-4">
         <textarea
+          aria-label="Nota privada"
           className="input min-h-[90px] resize-y"
           value={texto}
           onChange={(e) => setTexto(e.target.value)}

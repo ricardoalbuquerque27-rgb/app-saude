@@ -11,6 +11,8 @@ import {
   ultimoDesvioPorCampo,
   textoDaMeta,
   textoDoDesvio,
+  separarDesvios,
+  textoDoDesvioDoPlano,
   type DadosResumo,
   type DadosAtividade,
   type DailySeries,
@@ -685,6 +687,63 @@ describe("textoDoDesvio", () => {
   it("valor que não é número sai como veio", () => {
     expect(textoDoDesvio(d("daily_calorie_goal", "muito"), "F")).toBe(
       "ela está usando muito"
+    );
+  });
+});
+
+describe("separarDesvios", () => {
+  // Uma consulta só traz os avisos abertos do paciente; a Alimentação e a
+  // fila olham os de META, o Treino e a fila os do PLANO. O gatilho do
+  // workout_plan grava na mesma tabela, com o nome da tabela no `field`.
+  const d = (id: string, field: string) => ({
+    id,
+    field,
+    prescribed: null,
+    current_value: null,
+    created_at: "2026-10-05T10:00:00Z",
+  });
+  it("os quatro campos de meta de um lado, o resto do outro", () => {
+    const r = separarDesvios([
+      d("kcal", "daily_calorie_goal"),
+      d("plano", "workout_plan"),
+      d("agua", "daily_water_goal_ml"),
+      d("prot", "protein_goal_g"),
+      d("peso", "weight_goal_kg"),
+    ]);
+    expect(r.meta.map((x) => x.id)).toEqual(["kcal", "agua", "prot", "peso"]);
+    expect(r.plano.map((x) => x.id)).toEqual(["plano"]);
+  });
+  it("campo que não é meta nenhuma cai no plano, não some", () => {
+    const r = separarDesvios([d("x", "day_of_week")]);
+    expect(r.meta).toEqual([]);
+    expect(r.plano.map((x) => x.id)).toEqual(["x"]);
+  });
+  it("sem aviso, os dois lados vazios", () => {
+    expect(separarDesvios([])).toEqual({ meta: [], plano: [] });
+  });
+});
+
+describe("textoDoDesvioDoPlano", () => {
+  const d = (prescribed: string | null, current_value: string | null) => ({
+    prescribed,
+    current_value,
+  });
+  it("sessão que saiu do plano", () => {
+    expect(textoDoDesvioDoPlano(d("Treino B — Inferiores", null), "F")).toBe(
+      "você definiu Treino B — Inferiores; ela está sem essa sessão"
+    );
+    expect(textoDoDesvioDoPlano(d("Treino B — Inferiores", ""), "M")).toBe(
+      "você definiu Treino B — Inferiores; ele está sem essa sessão"
+    );
+  });
+  it("sessão trocada por outra", () => {
+    expect(textoDoDesvioDoPlano(d("Treino B — Inferiores", "Corrida"), null)).toBe(
+      "você definiu Treino B — Inferiores; o paciente está com Corrida"
+    );
+  });
+  it("sem o prescrito, um traço no lugar, como o aviso antigo", () => {
+    expect(textoDoDesvioDoPlano(d(null, "Corrida"), "F")).toBe(
+      "você definiu —; ela está com Corrida"
     );
   });
 });

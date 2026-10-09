@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import {
-  getDesviosDeMeta,
+  getDesviosAbertos,
   getUltimaPrescricao,
   resumirPacientes,
 } from "@/lib/nutri";
@@ -92,13 +92,15 @@ export default async function PacienteDetalhe({
   // Começam aqui e cada seção espera a sua parte. O resumo é o mesmo que a
   // Início usa (fila e números do topo, variação de peso do Corpo), só que
   // dizendo se alguma consulta falhou; a última prescrição é a "meta" da
-  // Alimentação e do Corpo e o valor de "Reaplicar"; os avisos de meta são
-  // os da Alimentação e o que decide se "Reaplicar" aparece na fila. Uma
-  // consulta para todos, em vez de uma por seção, para os números da página
-  // não discordarem entre si.
+  // Alimentação e do Corpo e o valor de "Reaplicar"; os avisos abertos vêm
+  // juntos e cada seção separa o seu lado (separarDesvios): os de meta são os
+  // da Alimentação e o que decide se "Reaplicar" aparece na fila, os do plano
+  // de treino são os do Treino e a linha embaixo do Reaplicar. Uma consulta
+  // para todos, em vez de uma por seção, para os números da página não
+  // discordarem entre si.
   const resumo = resumirPacientes(supabase, [uid], { [uid]: nome });
   const prescricao = getUltimaPrescricao(supabase, uid);
-  const desviosDeMeta = getDesviosDeMeta(supabase, uid);
+  const desvios = getDesviosAbertos(supabase, uid);
 
   // Com `?conversa=1` ou `?notas=1`, abaixo de `lg` só aquela parte aparece,
   // em tela cheia. As outras seções continuam montadas, só escondidas: a
@@ -148,7 +150,7 @@ export default async function PacienteDetalhe({
               uid={uid}
               resumo={resumo}
               prescricao={prescricao}
-              desviosDeMeta={desviosDeMeta}
+              desvios={desvios}
             />
           </Suspense>
           <Suspense fallback={<SkelCard />}>
@@ -163,11 +165,11 @@ export default async function PacienteDetalhe({
                 sex: profile.sex,
               }}
               prescricao={prescricao}
-              desviosDeMeta={desviosDeMeta}
+              desvios={desvios}
             />
           </Suspense>
           <Suspense fallback={<SkelCard />}>
-            <Treino uid={uid} nutriId={nutriId} />
+            <Treino uid={uid} nutriId={nutriId} sexo={profile.sex} desvios={desvios} />
           </Suspense>
           <Suspense fallback={<SkelCard />}>
             <Corpo

@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Loader2, Send, Eye } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { dataNoBrasil, formatDate } from "@/lib/date";
 import { ErroInline } from "./ErroInline";
+import { useRecarregar } from "./useRecarregar";
 import type { Mensagem } from "./tipos";
 
 // Conversa de mão dupla com o paciente (visibility "shared"), movida da antiga
@@ -20,10 +20,14 @@ export function Conversa({
   mensagens: Mensagem[];
 }) {
   const supabase = createClient();
-  const router = useRouter();
   const [texto, setTexto] = useState("");
   const [enviando, setEnviando] = useState(false);
+  const [recarregando, recarregar] = useRecarregar();
   const [erro, setErro] = useState<string | null>(null);
+  // Do envio até a mensagem aparecer na lista, desligado. Antes o Enviar
+  // voltava logo depois do insert, com o texto ainda na caixa enquanto o
+  // read_at rodava, e um segundo clique mandava a mesma mensagem de novo.
+  const ocupado = enviando || recarregando;
 
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
@@ -38,8 +42,8 @@ export function Conversa({
       body,
       visibility: "shared",
     });
-    setEnviando(false);
     if (error) {
+      setEnviando(false);
       setErro("Não foi possível enviar a mensagem.");
       return;
     }
@@ -53,7 +57,8 @@ export function Conversa({
       .is("read_at", null)
       .neq("author_id", nutriId);
     setTexto("");
-    router.refresh();
+    recarregar();
+    setEnviando(false);
   }
 
   const ordenadas = [...mensagens].sort((a, b) =>
@@ -107,15 +112,20 @@ export function Conversa({
 
       <form onSubmit={enviar}>
         <textarea
+          aria-label="Mensagem para o paciente"
           className="input min-h-[72px] resize-y"
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
           placeholder="Escreva para o paciente…"
           maxLength={4000}
         />
-        <button type="submit" disabled={enviando || !texto.trim()} className="btn-primary mt-2 w-full py-2.5">
-          {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          Enviar
+        <button type="submit" disabled={ocupado || !texto.trim()} className="btn-primary mt-2 w-full py-2.5">
+          {ocupado ? (
+            <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
+          ) : (
+            <Send aria-hidden="true" className="h-4 w-4" />
+          )}
+          {ocupado ? "Enviando…" : "Enviar"}
         </button>
         <ErroInline mensagem={erro} />
       </form>
