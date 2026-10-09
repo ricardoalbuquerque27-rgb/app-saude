@@ -340,8 +340,6 @@ async function TabGeral({
     .filter((s: any) => s.weight != null)
     .map((s: any) => ({ label: dayLabel(s.date), value: s.weight }));
 
-  const adherence = Math.round((summary.daysLogged7 / 7) * 100);
-
   return (
     <>
       <div className="pf-stagger mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -355,14 +353,15 @@ async function TabGeral({
           }
           icon={<Scale className="h-4 w-4" />}
         />
+        {/* Estes dois ficavam lado a lado dizendo "Adesão (7 dias): 100%" e
+            "Plano cumprido: 0/6" — um elogiando e o outro cobrando. Mediam
+            coisas diferentes (abriu o app x confirmou o treino), mas só um
+            dizia o que media, e "adesão" puxa para adesão AO PLANO. No
+            resto do produto adesão já significa plano (computeAdherence,
+            "Adesão ao plano (4 semanas)"), então aqui o nome muda e o
+            percentual sai: % convida a ler como cumprimento. */}
         <Stat
-          label="Adesão (7 dias)"
-          value={`${adherence}%`}
-          sub={`${summary.daysLogged7} de 7 dias`}
-          icon={<CalendarCheck className="h-4 w-4" />}
-        />
-        <Stat
-          label="Plano cumprido (7d)"
+          label="Treinos confirmados (7d)"
           value={
             summary.planPrevistas7
               ? `${summary.planConfirmadas7}/${summary.planPrevistas7}`
@@ -381,6 +380,12 @@ async function TabGeral({
               : `${summary.workouts7} treinos livres`
           }
           icon={<Dumbbell className="h-4 w-4" />}
+        />
+        <Stat
+          label="Dias com registro (7d)"
+          value={`${summary.daysLogged7}/7`}
+          sub="dias em que usou o app"
+          icon={<CalendarCheck className="h-4 w-4" />}
         />
         <Stat
           label="Último registro"

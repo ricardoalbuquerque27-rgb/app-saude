@@ -3,13 +3,10 @@
 import { useEffect, useState, useCallback } from "react";
 import {
   Droplets,
-  Moon,
-  Footprints,
   Smile,
   Loader2,
   Plus,
   Minus,
-  Gauge,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { DailyLog, Profile } from "@/lib/types";
@@ -201,17 +198,15 @@ export default function HabitosPage() {
         </div>
       </div>
 
-      {/* Sono, passos, humor */}
-      <div className="mb-4 grid gap-4 sm:grid-cols-2">
-        <div className="card">
-          <div className="mb-3 flex items-center gap-2">
-            <Moon className="h-5 w-5 text-violet-500" />
-            <h2 className="font-semibold text-slate-900 dark:text-white">Sono</h2>
-          </div>
-          <Field label="Horas dormidas">
+      {/* Dois números não precisam de dois cartões com ícone e título cada.
+          Lado a lado também no celular: os campos são curtos. */}
+      <div className="card mb-4">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Sono (horas)">
             <input
               type="number"
               step="0.5"
+              inputMode="decimal"
               className="input"
               value={log.sleep_hours ?? ""}
               onChange={(e) =>
@@ -224,16 +219,10 @@ export default function HabitosPage() {
               placeholder="8"
             />
           </Field>
-        </div>
-
-        <div className="card">
-          <div className="mb-3 flex items-center gap-2">
-            <Footprints className="h-5 w-5 text-brand-700 dark:text-brand-400" />
-            <h2 className="font-semibold text-slate-900 dark:text-white">Passos</h2>
-          </div>
           <Field label="Passos no dia">
             <input
               type="number"
+              inputMode="numeric"
               className="input"
               value={log.steps ?? ""}
               onChange={(e) =>
@@ -249,11 +238,14 @@ export default function HabitosPage() {
         </div>
       </div>
 
+      {/* Humor e bem-estar respondem à mesma pergunta — "como você está
+          hoje?" — e estavam em dois cartões, com dois títulos e dois
+          ícones. Viraram um. */}
       <div className="card mb-4">
         <div className="mb-3 flex items-center gap-2">
           <Smile className="h-5 w-5 text-amber-600 dark:text-amber-400" />
           <h2 className="font-semibold text-slate-900 dark:text-white">
-            Como você se sente?
+            Como você está hoje?
           </h2>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -271,17 +263,9 @@ export default function HabitosPage() {
             </button>
           ))}
         </div>
-      </div>
 
-      {/* Bem-estar */}
-      <div className="card mb-4">
-        <div className="mb-3 flex items-center gap-2">
-          <Gauge className="h-5 w-5 text-rose-500" />
-          <h2 className="font-semibold text-slate-900 dark:text-white">
-            Bem-estar
-          </h2>
-        </div>
-        <div className="space-y-4">
+
+        <div className="mt-4 space-y-3 border-t border-slate-100 pt-4 dark:border-slate-800">
           <div>
             <label className="label">Energia (1 = baixa · 5 = alta)</label>
             <ScalePicker

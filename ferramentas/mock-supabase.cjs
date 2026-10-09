@@ -7,9 +7,16 @@ const http = require("http");
 
 const PAC = "af4a1f42-349f-40bd-92d5-b86f133ecbee";
 const NUT = "cac02088-df37-4b0d-88f2-c37cf45c5096";
-const HOJE = new Date().toISOString().slice(0, 10);
-const dias = (n) =>
-  new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+// Mesmo fuso que lib/date.ts usa. Com UTC, entre 21h e meia-noite no
+// Brasil o mock gerava registros com data de AMANHÃ para o app, e os
+// contadores de 7 dias apareciam como "8 de 7" — o que parece bug do app.
+const TZ = "America/Sao_Paulo";
+const diaDe = (ms) =>
+  new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(new Date(ms));
+const HOJE = diaDe(Date.now());
+const dias = (n) => diaDe(Date.now() - n * 86400000);
 
 // ---------- dados ----------
 const medidas = [65.8, 66.2, 66.6, 66.9, 67.3, 67.7, 68.0, 68.4].map((w, i) => ({

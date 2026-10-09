@@ -21,7 +21,7 @@ import { createClient } from "@/lib/supabase/server";
 import { TrendChart } from "@/components/charts";
 import OpenChatButton from "@/components/OpenChatButton";
 import { ProgressRing } from "@/components/ProgressRing";
-import { todayISO, addDaysISO, formatDate } from "@/lib/date";
+import { todayISO, addDaysISO, formatDate, hojeLongo } from "@/lib/date";
 import { computeHealthScore } from "@/lib/healthScore";
 import { getPending } from "@/lib/pending";
 import NutriHome from "@/components/NutriHome";
@@ -283,11 +283,7 @@ export default async function DashboardPage() {
     value: m.weight_kg,
   }));
 
-  const dataLonga = new Date().toLocaleDateString("pt-BR", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  });
+  const dataLonga = hojeLongo();
 
   // O dia só está resolvido quando não há treino previsto sem check-in, nem
   // pendência de cadastro, nem dose vencendo.

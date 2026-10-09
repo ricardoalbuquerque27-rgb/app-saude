@@ -145,7 +145,10 @@ export async function getPatientsSummary(
     const lastActivity = sortedDays.length
       ? sortedDays[sortedDays.length - 1]
       : null;
-    const daysLogged7 = sortedDays.filter((d) => d >= d7).length;
+    // Com teto: sem ele, um registro com data FUTURA entra na conta e o
+    // painel mostra "8 de 7 dias". Os seletores de data da Dieta e dos
+    // Hábitos deixam escolher um dia à frente, então isso não é hipótese.
+    const daysLogged7 = sortedDays.filter((d) => d >= d7 && d <= today).length;
 
     const todayMeals = myMeals.filter((m) => m.date === today);
     const caloriesToday = todayMeals.reduce(
@@ -203,7 +206,7 @@ export async function getPatientsSummary(
       caloriesToday,
       proteinToday,
       waterToday,
-      workouts7: myWk.filter((w) => w.date >= d7).length,
+      workouts7: myWk.filter((w) => w.date >= d7 && w.date <= today).length,
       weightLast,
       weightDelta30,
       alteredExams: exams.filter((e) => e.user_id === id).length,

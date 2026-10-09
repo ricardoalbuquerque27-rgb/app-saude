@@ -394,8 +394,11 @@ export default function AppShell({
         </div>
       )}
 
-      {/* Assistente flutuante */}
-      <ChatWidget />
+      {/* Assistente flutuante — só para o PACIENTE. A Gaia registra treino,
+          refeição, água e peso "por você": no painel do profissional ela é
+          ruído, e pior, responderia sobre os registros do próprio
+          nutricionista se ele perguntasse "como está minha dieta hoje?". */}
+      {!isNutri && <ChatWidget />}
 
       {/* Onboarding (novos usuários) */}
       {needsOnboarding && (

@@ -17,7 +17,15 @@ const OUT = process.env.OUT;
   const conta = (re) => (txt.match(re) || []).length;
   const ok = (b, m) => console.log(`${b ? "  OK  " : "  FALHA"}  ${m}`);
 
-  ok(/Quinta-feira, 8 de outubro/.test(txt), '(2) data: "Quinta-feira, 8 de outubro"  — achado: ' + (txt.match(/\w+-\w+, \d+ \w+ \w+/) || ["?"])[0]);
+  // A data é calculada, não fixa: o teste foi escrito num dia e roda em
+  // outro. O que se verifica é a FORMA — só a primeira letra maiúscula,
+  // no fuso do Brasil, que é o que o app usa.
+  const esperada = new Date().toLocaleDateString("pt-BR", {
+    timeZone: "America/Sao_Paulo", weekday: "long", day: "numeric", month: "long",
+  });
+  const comMaiuscula = esperada.charAt(0).toUpperCase() + esperada.slice(1);
+  const achada = (txt.match(/\S+-feira, \d+ de \S+|\S+, \d+ de \S+/) || ["?"])[0];
+  ok(achada === comMaiuscula, `(2) data: esperado "${comMaiuscula}" — achado "${achada}"`);
   ok(conta(/Seu nutricionista vê essa confirmação/g) === 1, `(5) nota do check-in aparece ${conta(/Seu nutricionista vê essa confirmação/g)}× (esperado 1)`);
   // innerText devolve o texto JÁ com o text-transform aplicado, então
   // "Recado" chega como "RECADO" — comparar sem distinguir maiúsculas.
