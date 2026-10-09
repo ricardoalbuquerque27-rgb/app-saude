@@ -7,6 +7,7 @@ import {
   hojeLongo,
   diasNaJanela,
   naJanela,
+  avancarDia,
 } from "./date";
 
 afterEach(() => vi.useRealTimers());
@@ -142,5 +143,46 @@ describe("naJanela", () => {
   it("exclui o dia anterior à janela e qualquer futuro", () => {
     expect(naJanela("2026-10-01", hoje, 7)).toBe(false);
     expect(naJanela("2026-10-09", hoje, 7)).toBe(false);
+  });
+});
+
+describe("avancarDia", () => {
+  // Ainda não existe. Nasce para resolver duas coisas de uma vez:
+  //
+  //   1. A seta "›" da Dieta usava toISOString(), que converte para UTC —
+  //      a leste de Greenwich a meia-noite local cai no dia ANTERIOR e a
+  //      seta anda errado.
+  //   2. Nada impedia navegar para o futuro. Registro com data futura foi a
+  //      causa de quatro correções de "teto" espalhadas pelo app; o certo é
+  //      não deixar criar.
+  const hoje = "2026-10-08";
+
+  it("anda para frente e para trás", () => {
+    expect(avancarDia("2026-10-08", 1, "2026-12-31")).toBe("2026-10-09");
+    expect(avancarDia("2026-10-08", -1, hoje)).toBe("2026-10-07");
+  });
+
+  it("atravessa o fim do mês sem pedir ajuda ao fuso", () => {
+    expect(avancarDia("2026-01-31", 1, "2026-12-31")).toBe("2026-02-01");
+    expect(avancarDia("2026-03-01", -1, hoje)).toBe("2026-02-28");
+  });
+
+  it("não passa do máximo", () => {
+    expect(avancarDia(hoje, 1, hoje)).toBe(hoje);
+    expect(avancarDia("2026-10-07", 5, hoje)).toBe(hoje);
+  });
+
+  it("não limita para trás", () => {
+    expect(avancarDia("2026-10-08", -30, hoje)).toBe("2026-09-08");
+  });
+
+  it("sem máximo, anda livre", () => {
+    expect(avancarDia("2026-10-08", 10)).toBe("2026-10-18");
+  });
+
+  it("puxa de volta uma data que já estava no futuro", () => {
+    // Já existe dado gravado à frente: navegar dali não deve seguir em
+    // frente, deve voltar para o limite.
+    expect(avancarDia("2026-12-25", 1, hoje)).toBe(hoje);
   });
 });

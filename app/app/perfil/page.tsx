@@ -8,6 +8,7 @@ import type { Profile } from "@/lib/types";
 import { PageHeader, Field } from "@/components/ui";
 import PwaSettings from "@/components/PwaSettings";
 import { meuPerfil } from "@/lib/perfil";
+import { todayISO } from "@/lib/date";
 
 function onlyDigits(s: string) {
   return s.replace(/\D/g, "");
@@ -268,6 +269,7 @@ export default function PerfilPage() {
               className="input"
               value={birthDate}
               onChange={(e) => setBirthDate(e.target.value)}
+              max={todayISO()}
             />
           </Field>
         </div>

@@ -1414,6 +1414,7 @@ export default function TreinosPage() {
                 className="input"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
+                max={todayISO()}
                 required
               />
             </Field>

@@ -575,6 +575,7 @@ export default function ExamesPage() {
                 className="input"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
+                max={todayISO()}
                 required
               />
             </Field>

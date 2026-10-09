@@ -254,6 +254,7 @@ export default function Onboarding({ initialName }: { initialName?: string }) {
                     className="input"
                     value={birthDate}
                     onChange={(e) => setBirthDate(e.target.value)}
+                    max={todayISO()}
                   />
                 </div>
               </div>

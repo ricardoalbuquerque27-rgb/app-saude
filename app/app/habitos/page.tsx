@@ -150,6 +150,7 @@ export default function HabitosPage() {
             className="input max-w-[170px]"
             value={date}
             onChange={(e) => setDate(e.target.value)}
+            max={todayISO()}
           />
         }
       />

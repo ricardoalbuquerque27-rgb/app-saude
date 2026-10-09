@@ -18,7 +18,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { Meal } from "@/lib/types";
 import { PageHeader, Modal, Field, EmptyState } from "@/components/ui";
 import { ProgressRing } from "@/components/ProgressRing";
-import { todayISO } from "@/lib/date";
+import { todayISO, avancarDia } from "@/lib/date";
 import { useLiveRefresh } from "@/lib/useLiveRefresh";
 import FoodSearch from "@/components/FoodSearch";
 import { meuPerfil } from "@/lib/perfil";
@@ -148,9 +148,11 @@ export default function DietaPage() {
   const todayStr = todayISO();
   const isToday = date === todayStr;
   function shiftDate(days: number) {
-    const d = new Date(date + "T00:00:00");
-    d.setDate(d.getDate() + days);
-    setDate(d.toISOString().slice(0, 10));
+    // Era new Date(...).toISOString().slice(0,10): toISOString converte
+    // para UTC, e a leste de Greenwich a meia-noite local cai no dia
+    // ANTERIOR — a seta andava errado. avancarDia tem teste e também
+    // segura o limite de hoje, caso o botão desabilitado escape.
+    setDate(avancarDia(date, days, todayStr));
   }
   const dateLabel = new Date(date + "T00:00:00").toLocaleDateString("pt-BR", {
     weekday: "short",

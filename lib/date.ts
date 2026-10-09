@@ -87,3 +87,24 @@ export function diasNaJanela(
 export function naJanela(data: string, hoje: string, dias: number): boolean {
   return data >= addDaysISO(hoje, -(dias - 1)) && data <= hoje;
 }
+
+/**
+ * Anda `dias` a partir de `iso`, sem passar de `maximo`.
+ *
+ * Substitui o `new Date(...).toISOString().slice(0,10)` que a navegação de
+ * data usava: `toISOString` converte para UTC, e a leste de Greenwich a
+ * meia-noite local cai no dia ANTERIOR — a seta andava errado.
+ *
+ * O limite existe porque data futura foi a causa de quatro correções de
+ * "teto" espalhadas pelo app (contador de treinos, dias com registro, Score,
+ * adesão). Barrar na entrada é mais barato que remendar em cada leitura.
+ */
+export function avancarDia(
+  iso: string,
+  dias: number,
+  maximo?: string
+): string {
+  const destino = addDaysISO(iso, dias);
+  if (maximo && destino > maximo) return maximo;
+  return destino;
+}
