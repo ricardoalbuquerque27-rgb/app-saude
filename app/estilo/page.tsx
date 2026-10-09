@@ -1,6 +1,13 @@
 import { notFound } from "next/navigation";
 import colors from "tailwindcss/colors";
 import config from "@/tailwind.config";
+import { razaoContraste } from "@/lib/contraste";
+import {
+  TEMA_CLINICO,
+  PARES_TEXTO,
+  PARES_GRAFICO,
+  type NomeCor,
+} from "@/lib/temaClinico";
 
 // Guia de estilo — SÓ desenvolvimento.
 //
@@ -17,22 +24,6 @@ export const dynamic = "force-static";
 
 const brand = (config.theme?.extend?.colors as any).brand as Record<string, string>;
 
-// ---------- contraste WCAG ----------
-function rgb(hex: string): [number, number, number] {
-  const h = hex.replace("#", "");
-  return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)) as any;
-}
-function lum(c: [number, number, number]) {
-  const [r, g, b] = c.map((v) => {
-    const x = v / 255;
-    return x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
-  });
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-}
-function razao(a: string, b: string) {
-  const [la, lb] = [lum(rgb(a)), lum(rgb(b))];
-  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
-}
 /** Superfície dos cards: branco no claro, slate-900/50 sobre o fundo escuro. */
 const FUNDO_CLARO = "#ffffff";
 const FUNDO_ESCURO = "#0b111e";
@@ -81,12 +72,58 @@ function Cores({ escuro }: { escuro: boolean }) {
                       <p className="mt-0.5 text-[10px] text-slate-500 dark:text-slate-400">
                         {tom}
                       </p>
-                      <Nota r={razao(hex, fundo)} />
+                      <Nota r={razaoContraste(hex, fundo)} />
                     </div>
                   );
                 }
               )}
             </div>
+          </div>
+        ))}
+      </div>
+    </Secao>
+  );
+}
+
+function TemaClinico() {
+  // Lista os mesmos pares que lib/temaClinico.test.ts reprova abaixo do
+  // mínimo, com a razão já calculada nos dois temas. Se um hex mudar, o
+  // teste quebra e esta tabela mostra qual par e por quanto. Fica fora dos
+  // dois painéis porque já mostra os dois temas lado a lado: dentro de um
+  // painel apareceria duas vezes.
+  const grupos: [string, [NomeCor, NomeCor][]][] = [
+    ["Texto (mínimo 4,5:1)", PARES_TEXTO],
+    ["Gráfico (mínimo 3:1)", PARES_GRAFICO],
+  ];
+  const razaoEm = (tema: "claro" | "escuro", f: NomeCor, b: NomeCor) =>
+    razaoContraste(TEMA_CLINICO[tema][f], TEMA_CLINICO[tema][b]);
+  return (
+    <Secao
+      titulo="Tema clínico (piloto)"
+      nota="Paleta da página do paciente, de lib/temaClinico.ts. Cada par com a razão de contraste no tema claro e no escuro."
+    >
+      <div className="space-y-4">
+        {grupos.map(([titulo, pares]) => (
+          <div key={titulo}>
+            <p className="eyebrow mb-1.5">{titulo}</p>
+            <ul className="space-y-1.5">
+              {pares.map(([f, b]) => (
+                <li
+                  key={`${f}/${b}`}
+                  className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-slate-100 pb-1.5 text-xs text-slate-700"
+                >
+                  <code className="w-52 shrink-0 text-[11px]">
+                    {f} sobre {b}
+                  </code>
+                  <span className="flex items-center gap-1">
+                    claro <Nota r={razaoEm("claro", f, b)} />
+                  </span>
+                  <span className="flex items-center gap-1">
+                    escuro <Nota r={razaoEm("escuro", f, b)} />
+                  </span>
+                </li>
+              ))}
+            </ul>
           </div>
         ))}
       </div>
@@ -276,6 +313,9 @@ export default function GuiaDeEstilo() {
       <div className="grid lg:grid-cols-2">
         <Painel escuro={false} />
         <Painel escuro={true} />
+      </div>
+      <div className="border-t border-slate-200 p-5">
+        <TemaClinico />
       </div>
     </main>
   );

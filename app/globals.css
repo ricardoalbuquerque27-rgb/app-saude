@@ -334,3 +334,94 @@ input[type="number"] {
       text-slate-600 dark:text-slate-300;
   }
 }
+
+/* ===================================================================
+   Tema clínico (piloto na página do paciente do nutricionista)
+
+   A página do paciente recebe formulários movidos SEM reescrita de um
+   componente antigo, e eles usam as classes globais (.card, .input,
+   .label, .btn-primary, .btn-ghost, .section-title, .icon-badge). Em vez
+   de reescrever cada formulário, estas regras refazem essas classes SÓ
+   dentro de .tema-clinico, com as variáveis --clin-* (lib/temaClinico.ts).
+   As regras globais acima não mudam: o resto do app fica como estava.
+
+   As variáveis já trocam de valor no tema escuro, então um bloco bastaria.
+   O seletor `.dark .tema-clinico` repetido existe para vencer, por
+   especificidade, as variantes dark: das regras globais (`.dark .input`
+   etc.) sem depender da ordem do arquivo. Fica fora de @layer de
+   propósito, pelo mesmo motivo.
+   =================================================================== */
+
+.tema-clinico .card,
+.dark .tema-clinico .card {
+  background-color: var(--clin-chao);
+  border-color: var(--clin-linha);
+  box-shadow: none;
+}
+
+.tema-clinico .input,
+.dark .tema-clinico .input {
+  background-color: var(--clin-chao);
+  border-color: var(--clin-linha);
+  color: var(--clin-texto);
+}
+.tema-clinico .input::placeholder,
+.dark .tema-clinico .input::placeholder {
+  color: var(--clin-texto-2);
+}
+/* O foco do .input troca a borda e usa um anel; sem refazer aqui, a regra
+   de borda acima apagaria a borda verde do foco. */
+.tema-clinico .input:focus,
+.dark .tema-clinico .input:focus {
+  border-color: var(--clin-primaria);
+  --tw-ring-color: var(--clin-primaria-fundo);
+}
+
+.tema-clinico .label,
+.dark .tema-clinico .label {
+  color: var(--clin-texto-2);
+}
+
+.tema-clinico .section-title,
+.dark .tema-clinico .section-title {
+  color: var(--clin-texto);
+}
+
+.tema-clinico .icon-badge,
+.dark .tema-clinico .icon-badge {
+  background-color: var(--clin-primaria-fundo);
+  color: var(--clin-primaria);
+}
+
+/* `background` (e não background-color) zera o gradiente do botão global;
+   sem gradiente, o hover dele (que só troca as cores do gradiente) não
+   faria nada, então o hover escurece por filtro. */
+.tema-clinico .btn-primary,
+.tema-clinico .btn-primary:hover {
+  background: var(--clin-primaria);
+  color: var(--clin-sobre-primaria);
+  box-shadow: none;
+}
+.tema-clinico .btn-primary:hover {
+  filter: brightness(0.94);
+}
+
+.tema-clinico .btn-ghost,
+.dark .tema-clinico .btn-ghost {
+  background-color: var(--clin-chao);
+  border-color: var(--clin-linha);
+  color: var(--clin-texto);
+}
+.tema-clinico .btn-ghost:hover,
+.dark .tema-clinico .btn-ghost:hover {
+  background-color: var(--clin-primaria-fundo);
+}
+
+/* Foco por teclado nos botões: o anel global é brand-500 a 25%, fora da
+   paleta e fraco. Contorno sólido na cor primária, com folga. */
+.tema-clinico .btn-primary:focus-visible,
+.tema-clinico .btn-ghost:focus-visible {
+  outline: 2px solid var(--clin-primaria);
+  outline-offset: 2px;
+  --tw-ring-color: transparent;
+}
