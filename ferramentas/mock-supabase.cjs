@@ -382,13 +382,19 @@ function carteira() {
           prescricao(k, uid, prescrita, 21),
         ],
         // Os avisos: o de caloria e o do plano de treino estão abertos; o de
-        // água já teve baixa e não pode aparecer nem contar.
+        // água já teve baixa e não pode aparecer nem contar. Do jeito que os
+        // gatilhos do banco gravam: `kind` 'meta' com a coluna no `field`, e
+        // `kind` 'plano' com o NOME DA SESSÃO no `field` e no `prescribed`
+        // (detect_plan_deviation) e o literal 'removido pelo paciente' quando
+        // ela apaga a sessão. Aqui ela apagou um Treino B de outro dia; o da
+        // terça continua no plano.
         prescription_deviations: [
-          { id: "dv-be-1", patient_id: uid, field: "daily_calorie_goal", prescribed: "1800",
+          { id: "dv-be-1", patient_id: uid, kind: "meta", field: "daily_calorie_goal", prescribed: "1800",
             current_value: "2200", created_at: em(2, "14:10"), acknowledged_at: null },
-          { id: "dv-be-2", patient_id: uid, field: "workout_plan", prescribed: "Treino B — Inferiores",
-            current_value: null, created_at: em(1, "09:30"), acknowledged_at: null },
-          { id: "dv-be-0", patient_id: uid, field: "daily_water_goal_ml", prescribed: "2500",
+          { id: "dv-be-2", patient_id: uid, kind: "plano", field: "Treino B — Inferiores",
+            prescribed: "Treino B — Inferiores", current_value: "removido pelo paciente",
+            created_at: em(1, "09:30"), acknowledged_at: null },
+          { id: "dv-be-0", patient_id: uid, kind: "meta", field: "daily_water_goal_ml", prescribed: "2500",
             current_value: "2000", created_at: em(40, "10:00"), acknowledged_at: em(21, "12:00") },
         ],
         // Come bem acima da meta (2.200 contra 1.800), a proteína é quase a da

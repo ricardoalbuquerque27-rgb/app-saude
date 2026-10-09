@@ -71,6 +71,11 @@ alerta de exame sumia calado. Na página, `resumirPacientes`,
 **Avisos de meta e de plano.** A Alimentação mostra só os quatro campos de
 meta de `prescription_deviations` (`CAMPOS_META`); o aviso de mudança no
 plano de treino cai na mesma tabela, mas não é meta, e aparece no Treino.
+Os gatilhos gravam `kind`: 'meta' com a coluna no `field`; 'plano' com o
+nome da sessão no `field` e no `prescribed`, e `current_value` igual a
+'removido pelo paciente' quando a sessão é apagada (ou o nome novo, quando
+muda). Mostrado cru, saía "ela está com removido pelo paciente":
+`separarDesvios` divide pelo `kind` e `textoDoDesvioDoPlano` escreve o aviso.
 O gatilho `prescriptions_ack_deviations` dá baixa em **todos** os avisos
 abertos do paciente a cada insert em `prescriptions`, então qualquer
 `set_patient_goals` ("Reaplicar" ou "Aplicar metas") também limpa um aviso
@@ -82,7 +87,7 @@ quatro valores da última prescrição, nunca só o campo que mudou.
 
 ```bash
 npm run dev      # desenvolvimento
-npm test         # 153 testes unitários (vitest)
+npm test         # 156 testes unitários (vitest)
 npm run build    # produção
 ```
 

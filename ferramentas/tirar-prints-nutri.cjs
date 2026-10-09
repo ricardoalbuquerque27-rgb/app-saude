@@ -456,9 +456,12 @@ async function transbordo(page) {
     const itens = treino.locator("ul.bg-clin-atencao-fundo > li");
     ok((await itens.count()) === 1, `Treino lista 1 mudança do plano (achadas ${await itens.count()})`);
     const txt = (await textoDe(itens.first())).replace(/\s+/g, " ");
-    ok(/Plano de treino: você definiu Treino B — Inferiores; ela está sem essa sessão · \d{2}\/\d{2}\/\d{4}/.test(txt),
+    // O mock grava como o gatilho do banco: `field` com o nome da sessão e
+    // `current_value` 'removido pelo paciente'.
+    ok(/^Treino B — Inferiores: ela tirou do plano · \d{2}\/\d{2}\/\d{4}$/.test(txt.trim()),
       `e é a do Treino B, por extenso: "${txt}"`);
-    ok(!/workout_plan|undefined|daily_|Calorias/.test(await textoDe(treino)), "sem nome cru de coluna nem aviso de meta no Treino");
+    ok(!/workout_plan|removido pelo paciente|undefined|daily_|Calorias/.test(await textoDe(treino)),
+      "sem o valor cru do gatilho, nome de coluna nem aviso de meta no Treino");
     const botao = page.getByRole("button", { name: "Reaplicar 1.800 kcal" });
     const idObs = await botao.getAttribute("aria-describedby");
     const obs = idObs ? page.locator(`[id="${idObs}"]`) : null;
@@ -627,6 +630,44 @@ async function transbordo(page) {
     }
     await page.close();
     await escuro.close();
+  }
+
+  console.log("\nVerificação 13: Criar plano espera a página nova (R23)");
+  etapa = "Verificação 13";
+  {
+    // Pedro não tem cardápio: o botão do cabeçalho é "Criar plano".
+    const page = await abrir(pc, rota("pedro"));
+    await clicar(page.getByRole("button", { name: "Montar cardápio" }));
+    const criar = page.getByRole("button", { name: "Criar plano" });
+    await pronto(criar);
+    let inserts = 0;
+    page.on("request", (r) => {
+      if (r.method() === "POST" && new URL(r.url()).pathname === "/rest/v1/meal_plans") inserts++;
+    });
+    let soltar;
+    const segura = new Promise((r) => (soltar = r));
+    const daPagina = (u) => u.pathname === rota("pedro") && u.searchParams.has("_rsc");
+    await page.route((u) => daPagina(u), async (route) => {
+      await segura;
+      await route.continue();
+    });
+    const pedidoDaPagina = page.waitForRequest((r) => daPagina(new URL(r.url())), { timeout: 30000 });
+    await Promise.all([
+      page.waitForResponse((r) => r.request().method() === "POST" && new URL(r.url()).pathname === "/rest/v1/meal_plans", { timeout: 30000 }),
+      criar.click(),
+    ]);
+    await pedidoDaPagina;
+    const andamento = page.getByRole("button", { name: "Criando…" });
+    ok((await apareceu(andamento)) && (await andamento.isDisabled()),
+      'plano inserido e página nova a caminho: o botão diz "Criando…" e está desligado');
+    await andamento.click({ force: true, timeout: 2000 }).catch(() => {});
+    soltar();
+    // O mock não guarda nada: a página nova volta sem plano e o botão volta a
+    // ser "Criar plano". É o sinal de que a transição acabou.
+    ok(await apareceu(page.getByRole("button", { name: "Criar plano" }), 30000), "quando a página nova chega, o botão volta");
+    ok(inserts === 1, `um insert em meal_plans só, mesmo com o segundo clique (${inserts})`);
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+    await page.close();
   }
 
   console.log("\nConsole e rede");

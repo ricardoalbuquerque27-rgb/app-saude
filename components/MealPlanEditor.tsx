@@ -13,6 +13,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import FoodSearch from "@/components/FoodSearch";
 import TemplateBar from "@/components/TemplateBar";
+import { useRecarregar } from "@/components/clinico/useRecarregar";
 import { MEAL_TYPES } from "@/lib/cardapio";
 
 export type PlanoAlimentar = {
@@ -128,6 +129,12 @@ export default function MealPlanEditor({
     return (data as any).id;
   }
 
+  // "Criar plano" espera a página nova (R23): até ela chegar o `plano` ainda é
+  // nulo e o botão diria "Criar plano" de novo, e um segundo clique inseria
+  // outro meal_plans ativo. Mesmo padrão dos botões da página (useRecarregar).
+  const [recarregandoCabecalho, recarregarCabecalho] = useRecarregar();
+  const ocupadoCabecalho = busy === "cabecalho" || recarregandoCabecalho;
+
   async function salvarCabecalho() {
     setBusy("cabecalho");
     setErro(null);
@@ -145,8 +152,9 @@ export default function MealPlanEditor({
       if (error) setErro("Não foi possível salvar.");
       else marcarRascunho("cabecalho", false);
     }
+    // A transição começa antes de soltar o `busy`: o botão não acende no meio.
+    recarregarCabecalho();
     setBusy(null);
-    router.refresh();
   }
 
   async function addOpcao(tipo: string) {
@@ -296,15 +304,21 @@ export default function MealPlanEditor({
         </div>
         <button
           onClick={() => gravacao(salvarCabecalho)}
-          disabled={busy === "cabecalho"}
+          disabled={ocupadoCabecalho}
           className="btn-ghost mt-2 w-full py-2 text-sm"
         >
-          {busy === "cabecalho" ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+          {ocupadoCabecalho ? (
+            <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
           ) : (
             <Check className="h-4 w-4" />
           )}
-          {plano ? "Salvar nome e orientação" : "Criar plano"}
+          {plano
+            ? ocupadoCabecalho
+              ? "Salvando…"
+              : "Salvar nome e orientação"
+            : ocupadoCabecalho
+              ? "Criando…"
+              : "Criar plano"}
         </button>
 
         {principais.length > 0 && (

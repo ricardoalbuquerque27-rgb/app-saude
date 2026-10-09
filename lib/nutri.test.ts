@@ -693,30 +693,40 @@ describe("textoDoDesvio", () => {
 
 describe("separarDesvios", () => {
   // Uma consulta só traz os avisos abertos do paciente; a Alimentação e a
-  // fila olham os de META, o Treino e a fila os do PLANO. O gatilho do
-  // workout_plan grava na mesma tabela, com o nome da tabela no `field`.
-  const d = (id: string, field: string) => ({
+  // fila olham os de META, o Treino e a fila os do PLANO. No banco, o gatilho
+  // de metas grava `kind = 'meta'` com a coluna no `field`, e o do plano de
+  // treino grava `kind = 'plano'` com o NOME DA SESSÃO no `field`.
+  const d = (id: string, field: string, kind?: string) => ({
     id,
     field,
+    ...(kind ? { kind } : {}),
     prescribed: null,
     current_value: null,
     created_at: "2026-10-05T10:00:00Z",
   });
-  it("os quatro campos de meta de um lado, o resto do outro", () => {
+  it("pelo kind: 'meta' de um lado, 'plano' do outro", () => {
+    const r = separarDesvios([
+      d("kcal", "daily_calorie_goal", "meta"),
+      d("treino-b", "Treino B — Inferiores", "plano"),
+      d("agua", "daily_water_goal_ml", "meta"),
+    ]);
+    expect(r.meta.map((x) => x.id)).toEqual(["kcal", "agua"]);
+    expect(r.plano.map((x) => x.id)).toEqual(["treino-b"]);
+  });
+  it("o kind decide, mesmo com uma sessão que tenha nome de coluna de meta", () => {
+    const r = separarDesvios([d("x", "daily_calorie_goal", "plano")]);
+    expect(r.meta).toEqual([]);
+    expect(r.plano.map((x) => x.id)).toEqual(["x"]);
+  });
+  it("sem kind, vale o campo: os quatro de meta de um lado, o resto do outro", () => {
     const r = separarDesvios([
       d("kcal", "daily_calorie_goal"),
-      d("plano", "workout_plan"),
-      d("agua", "daily_water_goal_ml"),
+      d("sessao", "Corrida leve"),
       d("prot", "protein_goal_g"),
       d("peso", "weight_goal_kg"),
     ]);
-    expect(r.meta.map((x) => x.id)).toEqual(["kcal", "agua", "prot", "peso"]);
-    expect(r.plano.map((x) => x.id)).toEqual(["plano"]);
-  });
-  it("campo que não é meta nenhuma cai no plano, não some", () => {
-    const r = separarDesvios([d("x", "day_of_week")]);
-    expect(r.meta).toEqual([]);
-    expect(r.plano.map((x) => x.id)).toEqual(["x"]);
+    expect(r.meta.map((x) => x.id)).toEqual(["kcal", "prot", "peso"]);
+    expect(r.plano.map((x) => x.id)).toEqual(["sessao"]);
   });
   it("sem aviso, os dois lados vazios", () => {
     expect(separarDesvios([])).toEqual({ meta: [], plano: [] });
@@ -724,26 +734,38 @@ describe("separarDesvios", () => {
 });
 
 describe("textoDoDesvioDoPlano", () => {
-  const d = (prescribed: string | null, current_value: string | null) => ({
+  // Como o gatilho grava: `field` e `prescribed` com o nome da sessão;
+  // `current_value` é 'removido pelo paciente' quando ela sai do plano, ou o
+  // nome novo quando ela muda.
+  const d = (current_value: string | null, prescribed: string | null = "Treino B — Inferiores") => ({
+    field: "Treino B — Inferiores",
     prescribed,
     current_value,
   });
   it("sessão que saiu do plano", () => {
-    expect(textoDoDesvioDoPlano(d("Treino B — Inferiores", null), "F")).toBe(
-      "você definiu Treino B — Inferiores; ela está sem essa sessão"
-    );
-    expect(textoDoDesvioDoPlano(d("Treino B — Inferiores", ""), "M")).toBe(
-      "você definiu Treino B — Inferiores; ele está sem essa sessão"
-    );
+    expect(textoDoDesvioDoPlano(d("removido pelo paciente"), "F")).toEqual({
+      sessao: "Treino B — Inferiores",
+      mudanca: "ela tirou do plano",
+    });
   });
   it("sessão trocada por outra", () => {
-    expect(textoDoDesvioDoPlano(d("Treino B — Inferiores", "Corrida"), null)).toBe(
-      "você definiu Treino B — Inferiores; o paciente está com Corrida"
+    expect(textoDoDesvioDoPlano(d("Corrida"), "M")).toEqual({
+      sessao: "Treino B — Inferiores",
+      mudanca: "ele trocou por Corrida",
+    });
+  });
+  it("mesmo nome depois da mudança (outro dia, por exemplo): não diz que trocou", () => {
+    expect(textoDoDesvioDoPlano(d("Treino B — Inferiores"), null).mudanca).toBe(
+      "o paciente mudou esta sessão"
     );
   });
-  it("sem o prescrito, um traço no lugar, como o aviso antigo", () => {
-    expect(textoDoDesvioDoPlano(d(null, "Corrida"), "F")).toBe(
-      "você definiu —; ela está com Corrida"
+  it("sem valor atual, uma frase neutra", () => {
+    expect(textoDoDesvioDoPlano(d(null), "F").mudanca).toBe("ela mudou esta sessão");
+    expect(textoDoDesvioDoPlano(d(""), "F").mudanca).toBe("ela mudou esta sessão");
+  });
+  it("sem o prescrito, o nome vem do campo", () => {
+    expect(textoDoDesvioDoPlano(d("removido pelo paciente", null), "F").sessao).toBe(
+      "Treino B — Inferiores"
     );
   });
 });

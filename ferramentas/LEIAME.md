@@ -64,7 +64,9 @@ qualquer dia:
 
 - **Carlos Mendes**: dose atrasada, e mais nada.
 - **Beatriz Rocha**: usa 2.200 kcal onde a prescrição diz 1.800 (aviso de meta
-  aberto), mudou o plano de treino (aviso de plano aberto, que não é meta),
+  aberto, `kind` 'meta'), apagou uma sessão "Treino B — Inferiores" do plano
+  (aviso de plano aberto, `kind` 'plano', com o nome da sessão no `field` e
+  `current_value` 'removido pelo paciente', como o gatilho do banco grava),
   faltou a um treino, deixou 2 mensagens sem resposta e tem **dois**
   tratamentos ativos: o antigo com a dose vencida e o novo em dia.
 - **Joana Ferreira**: 12 dias sem registrar, com um exame alterado.

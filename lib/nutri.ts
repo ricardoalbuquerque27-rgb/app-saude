@@ -949,29 +949,39 @@ function pronome(sexo: string | null): string {
   return sexo === "F" ? "ela" : sexo === "M" ? "ele" : "o paciente";
 }
 
+/** O que o gatilho do plano grava em `current_value` quando a sessão é apagada. */
+const SESSAO_REMOVIDA = "removido pelo paciente";
+
 /**
- * Um aviso de mudança no plano de treino, como o aviso antigo da Prescrição
- * o escrevia ("você definiu X, está Y"), lendo as mesmas colunas: `prescribed`
- * é a sessão que o nutricionista pôs no plano e `current_value` o que há no
- * lugar dela agora. Sem valor atual, a sessão saiu do plano, do mesmo jeito
- * que meta sem valor é meta apagada (textoDoDesvio). Sem o prescrito, um
- * traço, como no aviso antigo.
+ * Um aviso de mudança no plano de treino, do jeito que o gatilho
+ * detect_plan_deviation o grava: `field` e `prescribed` com o nome da sessão
+ * (título, ou o esporte sem título) e `current_value` com o literal
+ * 'removido pelo paciente' quando ela é apagada, ou o nome novo quando ela
+ * muda. Mostrado cru, o apagamento saía "ela está com removido pelo
+ * paciente". `sessao` vai em destaque e `mudanca` diz o que houve. Sem valor
+ * atual (não acontece no banco hoje), uma frase neutra em vez de adivinhar.
  */
 export function textoDoDesvioDoPlano(
-  d: { prescribed: string | null; current_value: string | null },
+  d: { field: string; prescribed: string | null; current_value: string | null },
   sexo: string | null
-): string {
+): { sessao: string; mudanca: string } {
   const quem = pronome(sexo);
-  const antes = d.prescribed?.trim() || "—";
+  const sessao = d.prescribed?.trim() || d.field?.trim() || "Sessão do plano";
   const agora = d.current_value?.trim();
-  return agora
-    ? `você definiu ${antes}; ${quem} está com ${agora}`
-    : `você definiu ${antes}; ${quem} está sem essa sessão`;
+  if (agora === SESSAO_REMOVIDA) return { sessao, mudanca: `${quem} tirou do plano` };
+  // Mesmo nome depois da mudança: mexeu em outra coisa (o dia, por exemplo).
+  if (!agora || agora === sessao) return { sessao, mudanca: `${quem} mudou esta sessão` };
+  return { sessao, mudanca: `${quem} trocou por ${agora}` };
 }
 
-/** Um aviso aberto em prescription_deviations: de meta ou do plano de treino. */
+/**
+ * Um aviso aberto em prescription_deviations. `kind` é 'meta' (gatilho das
+ * metas do perfil, com a coluna no `field`) ou 'plano' (gatilho do
+ * workout_plan, com o nome da sessão no `field`).
+ */
 export type Desvio = {
   id: string;
+  kind?: string | null;
   field: string;
   prescribed: string | null;
   current_value: string | null;
@@ -984,17 +994,20 @@ const ehCampoMeta = (field: string): field is CampoMeta =>
 /**
  * Os avisos abertos, separados: os de META (Alimentação, e o que decide se
  * Reaplicar aparece na fila) e os do PLANO de treino (o Treino os lista, e a
- * fila avisa que Reaplicar também dá baixa neles). O que não é campo de meta
- * vai para o plano: o gatilho do workout_plan é a outra fonte da tabela, e um
- * aviso que não coubesse em nenhum lado sumiria calado.
+ * fila avisa que Reaplicar também dá baixa neles). Quem decide é o `kind`:
+ * 'plano' vai para o plano mesmo que a sessão tenha nome de coluna. Sem ele,
+ * vale o campo, como antes: um dos CAMPOS_META é meta. O que não é campo de
+ * meta vai para o plano, inclusive um 'meta' com campo desconhecido (não
+ * acontece no banco): um aviso que não coubesse em nenhum lado sumiria
+ * calado, e a Alimentação só sabe mostrar os quatro campos.
  */
-export function separarDesvios<T extends { field: string }>(
+export function separarDesvios<T extends { field: string; kind?: string | null }>(
   desvios: T[]
 ): { meta: (T & { field: CampoMeta })[]; plano: T[] } {
   const meta: (T & { field: CampoMeta })[] = [];
   const plano: T[] = [];
   for (const d of desvios) {
-    if (ehCampoMeta(d.field)) meta.push(d as T & { field: CampoMeta });
+    if (d.kind !== "plano" && ehCampoMeta(d.field)) meta.push(d as T & { field: CampoMeta });
     else plano.push(d);
   }
   return { meta, plano };
@@ -1013,7 +1026,7 @@ export async function getDesviosAbertos(
 ): Promise<{ data: Desvio[]; error: unknown }> {
   const { data, error } = await supabase
     .from("prescription_deviations")
-    .select("id, field, prescribed, current_value, created_at")
+    .select("id, kind, field, prescribed, current_value, created_at")
     .eq("patient_id", uid)
     .is("acknowledged_at", null)
     .order("created_at", { ascending: false });

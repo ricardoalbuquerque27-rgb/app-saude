@@ -36,8 +36,8 @@ const ehDescanso = (sport: string | null) =>
 // histórico.
 //
 // Os avisos de mudança no plano de treino (o gatilho de workout_plan grava em
-// prescription_deviations, com `field` fora dos CAMPOS_META) aparecem aqui,
-// por extenso. Antes só existiam como número na fila ("2 mudanças"), e
+// prescription_deviations com `kind = 'plano'` e o nome da sessão no `field`)
+// aparecem aqui, por extenso. Antes só existiam como número na fila ("2 mudanças"), e
 // qualquer set_patient_goals dava baixa neles sem o nutricionista ter visto
 // o que mudou. `desvios` é a mesma consulta da fila e da Alimentação.
 export async function Treino({
@@ -220,18 +220,21 @@ export async function Treino({
           // `atencao` e `atencao-texto-2` sobre `atencao-fundo`: pares
           // testados (lib/temaClinico.ts).
           <ul className="mt-4 space-y-1 rounded-md bg-clin-atencao-fundo px-3 py-2.5">
-            {mudancas.map((d) => (
-              <li key={d.id} className="text-[14px] leading-snug text-clin-texto">
-                <span className="font-semibold text-clin-atencao">
-                  Plano de treino:
-                </span>{" "}
-                {textoDoDesvioDoPlano(d, sexo)}
-                <span className="tabular-nums text-clin-atencao-texto-2">
-                  {" "}
-                  · {formatDate(dataNoBrasil(d.created_at))}
-                </span>
-              </li>
-            ))}
+            {mudancas.map((d) => {
+              // Como os avisos de meta na Alimentação: o que mudou em
+              // destaque ("Treino B — Inferiores:") e, depois, o que houve.
+              const { sessao, mudanca } = textoDoDesvioDoPlano(d, sexo);
+              return (
+                <li key={d.id} className="text-[14px] leading-snug text-clin-texto">
+                  <span className="font-semibold text-clin-atencao">{sessao}:</span>{" "}
+                  {mudanca}
+                  <span className="tabular-nums text-clin-atencao-texto-2">
+                    {" "}
+                    · {formatDate(dataNoBrasil(d.created_at))}
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         )}
 
