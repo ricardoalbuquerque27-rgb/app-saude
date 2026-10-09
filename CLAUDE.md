@@ -21,9 +21,9 @@ Isso não é óbvio lendo a árvore de arquivos.
   age — as outras são leitura.
 - **Lógica testada:** `lib/date.ts` (datas e janelas), `lib/planCheckIn.ts`
   (adesão), `lib/foods.ts` (tabela TACO) e, em `lib/nutri.ts`, a conta do
-  resumo e da linha do tempo do nutri (`montarResumos`,
-  `montarLinhaDoTempo`). As consultas ao banco não têm teste, nem
-  `lib/perfil.ts`, que é só uma consulta.
+  resumo, da fila de triagem e da linha do tempo do nutri
+  (`montarResumos`, `filaDeTriagem`, `montarLinhaDoTempo`). As consultas
+  ao banco não têm teste, nem `lib/perfil.ts`, que é só uma consulta.
 
 Toda segurança é por **RLS no Postgres**, nunca por service role no app.
 Ao mexer em política, teste com `BEGIN ... ROLLBACK` e
@@ -34,7 +34,7 @@ authenticated` — nessa ordem.
 
 ```bash
 npm run dev      # desenvolvimento
-npm test         # 68 testes unitários (vitest)
+npm test         # 75 testes unitários (vitest)
 npm run build    # produção
 ```
 
@@ -92,7 +92,6 @@ remove ele. `MODULE_NOT_FOUND` nos scripts de `ferramentas/` é isso.
 
 - **Nenhum nutricionista real usou o produto.** É a maior incerteza, e
   nenhuma ferramenta resolve.
-- Visão geral do nutri repete os indicadores e as listas logo abaixo.
 - A landing fala com consumidor final, não com nutricionista.
 - Sem Web Push (falta VAPID) e sem cobrança.
 - Conta de teste (`Maria Souza (teste)`) e a rota `/estilo` precisam sair

@@ -3,58 +3,39 @@ import {
   Users,
   UserPlus,
   AlertTriangle,
-  Activity,
   ChevronRight,
   CheckCircle2,
   Clock,
   Syringe,
   FileText,
   CalendarOff,
+  ClipboardList,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { EmptyState } from "@/components/ui";
-import { getPatientsSummary, idleDays, type PatientSummary } from "@/lib/nutri";
+import {
+  getPatientsSummary,
+  filaDeTriagem,
+  type PatientSummary,
+} from "@/lib/nutri";
 
 export const dynamic = "force-dynamic";
 
-// Visão macro da carteira do nutricionista: números do dia, quem precisa de
-// atenção e quem se movimentou. É a home de quem tem role = nutritionist.
+// Home de quem tem role = nutritionist: uma fila de triagem, não um painel.
+// A versão anterior tinha quatro números e, logo abaixo, as listas dos
+// mesmos pacientes ("Precisam de atenção", "Movimento de hoje", "Em dia"),
+// que somadas davam a carteira inteira, com gente repetida — e a página
+// Pacientes já filtra por atenção e por hoje. Aqui cada paciente aparece
+// uma vez, e só se precisar do nutricionista.
 
 function alertIcon(alert: string) {
   if (alert.includes("Dose")) return <Syringe className="h-3.5 w-3.5" />;
+  if (alert.includes("prescrição")) return <ClipboardList className="h-3.5 w-3.5" />;
   if (alert.includes("exame")) return <FileText className="h-3.5 w-3.5" />;
   return <CalendarOff className="h-3.5 w-3.5" />;
 }
 
-function Kpi({
-  label,
-  value,
-  icon,
-  tone = "slate",
-}: {
-  label: string;
-  value: string | number;
-  icon: React.ReactNode;
-  tone?: "slate" | "brand" | "amber";
-}) {
-  const tones: Record<string, string> = {
-    slate: "text-slate-500 dark:text-slate-400",
-    brand: "text-brand-700 dark:text-brand-400",
-    amber: "text-amber-600 dark:text-amber-400",
-  };
-  return (
-    <div className="card">
-      <div className={tones[tone]}>{icon}</div>
-      <p className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">
-        {value}
-      </p>
-      <p className="text-xs text-slate-500 dark:text-slate-400">{label}</p>
-    </div>
-  );
-}
-
-function PatientRow({ s, today }: { s: PatientSummary; today: string }) {
-  const idle = idleDays(s, today);
+function PatientRow({ s }: { s: PatientSummary }) {
   return (
     <Link
       href={`/app/pacientes/${s.id}`}
@@ -68,27 +49,15 @@ function PatientRow({ s, today }: { s: PatientSummary; today: string }) {
           {s.name}
         </p>
         <div className="mt-0.5 flex flex-wrap gap-x-2 gap-y-1">
-          {s.alerts.length > 0 ? (
-            s.alerts.slice(0, 2).map((a) => (
-              <span
-                key={a}
-                className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 dark:text-amber-400"
-              >
-                {alertIcon(a)}
-                {a}
-              </span>
-            ))
-          ) : (
-            <span className="text-[11px] text-slate-500 dark:text-slate-400">
-              {idle === 0
-                ? "Registrou hoje"
-                : idle != null
-                  ? `Último registro há ${idle} d`
-                  : "Sem registros"}
-              {" · "}
-              {s.daysLogged7}/7 dias na semana
+          {s.alerts.slice(0, 2).map((a) => (
+            <span
+              key={a}
+              className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 dark:text-amber-400"
+            >
+              {alertIcon(a)}
+              {a}
             </span>
-          )}
+          ))}
         </div>
       </div>
       <ChevronRight className="h-4 w-4 shrink-0 text-slate-300 dark:text-slate-400" />
@@ -128,12 +97,8 @@ export default async function NutriHome({
   }
 
   const summaries = await getPatientsSummary(supabase, activeIds, names);
-
-  const needAttention = summaries
-    .filter((s) => s.alerts.length > 0)
-    .sort((a, b) => b.alerts.length - a.alerts.length);
-  const loggedToday = summaries.filter((s) => s.lastActivity === today);
-  const onTrack = summaries.filter((s) => s.alerts.length === 0);
+  const fila = filaDeTriagem(summaries, today);
+  const emDia = summaries.length - fila.length;
 
   if (activeIds.length === 0 && pendingCount === 0) {
     return (
@@ -158,120 +123,65 @@ export default async function NutriHome({
 
   return (
     <div>
-      <div className="mb-5 flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-            Olá, {firstName}
-          </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            Visão geral dos seus pacientes.
-          </p>
-        </div>
+      <div className="mb-5 flex items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+          Olá, {firstName}
+        </h1>
         <Link href="/app/pacientes" className="btn-primary shrink-0">
           <UserPlus className="h-4 w-4" /> Convidar
         </Link>
       </div>
 
-      <div className="pf-stagger mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Kpi
-          label="Pacientes ativos"
-          value={activeIds.length}
-          icon={<Users className="h-4 w-4" />}
-          tone="brand"
-        />
-        <Kpi
-          label="Registraram hoje"
-          value={loggedToday.length}
-          icon={<Activity className="h-4 w-4" />}
-          tone="brand"
-        />
-        <Kpi
-          label="Precisam de atenção"
-          value={needAttention.length}
-          icon={<AlertTriangle className="h-4 w-4" />}
-          tone="amber"
-        />
-        <Kpi
-          label="Convites pendentes"
-          value={pendingCount}
-          icon={<Clock className="h-4 w-4" />}
-        />
-      </div>
-
-      {needAttention.length > 0 && (
-        <div className="card mb-4 p-3">
-          <h2 className="section-title mb-1 px-2 pt-1">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
-              <AlertTriangle className="h-4 w-4" />
-            </span>
-            Precisam de atenção
-          </h2>
-          <div className="pf-stagger divide-y divide-slate-100 dark:divide-slate-800">
-            {needAttention.map((s) => (
-              <PatientRow key={s.id} s={s} today={today} />
-            ))}
+      {activeIds.length > 0 &&
+        (fila.length > 0 ? (
+          <div className="card mb-4 p-3">
+            <h2 className="section-title mb-1 px-2 pt-1">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
+                <AlertTriangle className="h-4 w-4" />
+              </span>
+              <span>
+                Precisam de você{" "}
+                <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
+                  ({fila.length} de {summaries.length})
+                </span>
+              </span>
+            </h2>
+            <div className="pf-stagger divide-y divide-slate-100 dark:divide-slate-800">
+              {fila.map((s) => (
+                <PatientRow key={s.id} s={s} />
+              ))}
+            </div>
           </div>
-        </div>
-      )}
-
-      {loggedToday.length > 0 && (
-        <div className="card mb-4 p-3">
-          <h2 className="section-title mb-1 px-2 pt-1">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand-100 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">
-              <Activity className="h-4 w-4" />
-            </span>
-            Movimento de hoje
-          </h2>
-          <div className="pf-stagger divide-y divide-slate-100 dark:divide-slate-800">
-            {loggedToday.map((s) => (
-              <Link
-                key={s.id}
-                href={`/app/pacientes/${s.id}`}
-                className="tappable flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/60"
-              >
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-100 text-sm font-semibold text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">
-                  {s.name.slice(0, 1).toUpperCase()}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
-                    {s.name}
-                  </p>
-                  <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">
-                    {[
-                      s.caloriesToday
-                        ? `${Math.round(s.caloriesToday)} kcal`
-                        : null,
-                      s.waterToday
-                        ? `${(s.waterToday / 1000).toFixed(1)} L`
-                        : null,
-                      s.workouts7 ? `${s.workouts7} treinos/7d` : null,
-                      s.weightLast ? `${s.weightLast} kg` : null,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ") || "Registrou hoje"}
-                  </p>
-                </div>
-                <ChevronRight className="h-4 w-4 shrink-0 text-slate-300 dark:text-slate-400" />
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {onTrack.length > 0 && (
-        <div className="card mb-4 p-3">
-          <h2 className="section-title mb-1 px-2 pt-1">
+        ) : (
+          <div className="card mb-4 flex items-center gap-3">
             <span className="icon-badge">
               <CheckCircle2 className="h-4 w-4" />
             </span>
-            Em dia ({onTrack.length})
-          </h2>
-          <div className="pf-stagger divide-y divide-slate-100 dark:divide-slate-800">
-            {onTrack.map((s) => (
-              <PatientRow key={s.id} s={s} today={today} />
-            ))}
+            <div>
+              <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                Ninguém precisa de você agora
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                {emDia} {emDia === 1 ? "paciente em dia" : "pacientes em dia"}
+              </p>
+            </div>
           </div>
-        </div>
+        ))}
+
+      {pendingCount > 0 && (
+        <Link
+          href="/app/pacientes"
+          className="tappable mb-4 flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800/60"
+        >
+          <Clock className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" />
+          <span className="flex-1">
+            {pendingCount}{" "}
+            {pendingCount === 1
+              ? "convite aguardando o paciente"
+              : "convites aguardando o paciente"}
+          </span>
+          <ChevronRight className="h-4 w-4 shrink-0 text-slate-300 dark:text-slate-400" />
+        </Link>
       )}
 
       <Link
