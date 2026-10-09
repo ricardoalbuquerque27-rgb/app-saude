@@ -47,7 +47,7 @@ const ESTADOS: Record<
   hoje: {
     glifo: "hoje",
     fala: "hoje",
-    caixa: "border border-clin-primaria text-clin-primaria text-xs font-semibold",
+    caixa: "border border-clin-primaria text-clin-primaria text-[13px] font-semibold",
   },
   previsto: {
     glifo: "•",
@@ -57,7 +57,7 @@ const ESTADOS: Record<
   descanso: {
     glifo: "desc.",
     fala: "descanso",
-    caixa: "text-clin-texto-2 text-xs",
+    caixa: "text-clin-texto-2 text-[13px]",
   },
   livre: {
     glifo: "",
