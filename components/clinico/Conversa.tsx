@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Send, Eye } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { formatDate } from "@/lib/date";
+import { dataNoBrasil, formatDate } from "@/lib/date";
 import { ErroInline } from "./ErroInline";
 import type { Mensagem } from "./tipos";
 
@@ -88,7 +88,7 @@ export function Conversa({
                       meu ? "text-brand-100" : "text-slate-600 dark:text-slate-400"
                     }`}
                   >
-                    {formatDate(m.created_at.slice(0, 10))}
+                    {formatDate(dataNoBrasil(m.created_at))}
                     {meu &&
                       (m.read_at ? (
                         <>

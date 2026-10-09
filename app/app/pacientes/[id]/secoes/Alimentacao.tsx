@@ -7,7 +7,11 @@ import {
   mediasDaSemana,
   notaDasMedias,
   notaMedia,
+  textoDaMeta,
+  textoDoDesvio,
   ultimoDesvioPorCampo,
+  type CampoMeta,
+  type DesvioDeMeta,
   type ItemMeta,
   type Media,
   type MetasPrescritas,
@@ -18,33 +22,21 @@ import { EditorMetas } from "@/components/clinico/EditorMetas";
 import { BarraMeta } from "@/components/clinico/BarraMeta";
 import { TabelaRealMeta } from "@/components/clinico/TabelaRealMeta";
 import { VerHistorico } from "@/components/clinico/VerHistorico";
-import type { Desvio } from "@/components/clinico/tipos";
 import MealPlanEditor, {
   type ItemCardapio,
   type PlanoAlimentar,
 } from "@/components/MealPlanEditor";
 import { ErroSecao } from "./ErroSecao";
 
-const ROTULO_CAMPO: Record<string, string> = {
+const ROTULO_CAMPO: Record<CampoMeta, string> = {
   daily_calorie_goal: "Calorias",
   protein_goal_g: "Proteína",
   daily_water_goal_ml: "Água",
   weight_goal_kg: "Peso alvo",
 };
-const UNIDADE_CAMPO: Record<string, string> = {
-  daily_calorie_goal: "kcal",
-  protein_goal_g: "g",
-  daily_water_goal_ml: "ml",
-  weight_goal_kg: "kg",
-};
 
-const kcal = (n: number) => `${Math.round(n).toLocaleString("pt-BR")} kcal`;
-const gramas = (n: number) => `${Math.round(n).toLocaleString("pt-BR")} g`;
-const litros = (ml: number) =>
-  `${(ml / 1000).toLocaleString("pt-BR", {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
-  })} L`;
+const kcal = (n: number) => textoDaMeta("daily_calorie_goal", n);
+const gramas = (n: number) => textoDaMeta("protein_goal_g", n);
 
 const TITULO_BLOCO = "text-[15px] font-semibold leading-snug text-clin-texto";
 
@@ -59,17 +51,23 @@ export type PerfilAlimentacao = MetasPrescritas & { sex: string | null };
 // está usando 2.200 kcal"). Sem prescrição nenhuma, vale a meta do perfil,
 // que é a que o app do paciente usa.
 //
-// O editor abre com as metas do perfil, como a aba Prescrição fazia.
+// O editor abre com a mesma "Meta" da tabela, e cada campo com aviso aberto
+// mostra embaixo o que o paciente está usando.
+//
+// Só os avisos de META entram aqui (getDesviosDeMeta filtra os quatro
+// campos): os do plano de treino caem na mesma tabela, mas não são metas.
 export async function Alimentacao({
   uid,
   nutriId,
   perfil,
   prescricao,
+  desviosDeMeta,
 }: {
   uid: string;
   nutriId: string;
   perfil: PerfilAlimentacao;
   prescricao: Promise<{ data: MetasPrescritas | null; error: unknown }>;
+  desviosDeMeta: Promise<{ data: DesvioDeMeta[]; error: unknown }>;
 }) {
   const supabase = await createClient();
   const hoje = todayISO();
@@ -78,16 +76,10 @@ export async function Alimentacao({
   // histórico.
   const desde = addDaysISO(hoje, -13);
 
-  const [serie, presc, desviosRes, cardapioRes, refeicoesRes] = await Promise.all([
+  const [serieRes, presc, desviosRes, cardapioRes, refeicoesRes] = await Promise.all([
     getPatientSeries(supabase, uid, 14),
     prescricao,
-    // prescription_deviations não está nos tipos gerados (lib/types.ts).
-    (supabase as any)
-      .from("prescription_deviations")
-      .select("id, kind, field, prescribed, current_value, created_at")
-      .eq("patient_id", uid)
-      .is("acknowledged_at", null)
-      .order("created_at", { ascending: false }),
+    desviosDeMeta,
     supabase
       .from("meal_plans")
       .select("id, name, notes, created_at")
@@ -118,6 +110,7 @@ export async function Alimentacao({
     : { data: [], error: null };
 
   if (
+    serieRes.falhou ||
     presc.error ||
     desviosRes.error ||
     cardapioRes.error ||
@@ -132,9 +125,11 @@ export async function Alimentacao({
   }
 
   const meta: MetasPrescritas = presc.data ?? perfil;
-  const medias = mediasDaSemana(serie, hoje);
+  const medias = mediasDaSemana(serieRes.serie, hoje);
   const itens = (itensRes.data ?? []) as ItemCardapio[];
-  const desvios = ultimoDesvioPorCampo((desviosRes.data ?? []) as Desvio[]);
+  const desvios = ultimoDesvioPorCampo(desviosRes.data);
+  const usando: Partial<Record<CampoMeta, string>> = {};
+  for (const d of desvios) usando[d.field] = textoDoDesvio(d, perfil.sex);
   const refeicoes = (refeicoesRes.data ?? []) as any[];
   const temMetas = [
     meta.daily_calorie_goal,
@@ -142,22 +137,21 @@ export async function Alimentacao({
     meta.daily_water_goal_ml,
     meta.weight_goal_kg,
   ].some((v) => v != null);
-  const pronome =
-    perfil.sex === "F" ? "ela" : perfil.sex === "M" ? "ele" : "o paciente";
 
   const linhas = (
     [
-      ["Calorias", "calorias", medias.calorias, meta.daily_calorie_goal, kcal],
-      ["Proteína", "proteina", medias.proteina, meta.protein_goal_g, gramas],
-      ["Água", "agua", medias.agua, meta.daily_water_goal_ml, litros],
-    ] as [string, ItemMeta, Media, number | null, (n: number) => string][]
-  ).map(([item, chave, media, valorMeta, fmt]) => {
+      ["calorias", "daily_calorie_goal", medias.calorias],
+      ["proteina", "protein_goal_g", medias.proteina],
+      ["agua", "daily_water_goal_ml", medias.agua],
+    ] as [ItemMeta, CampoMeta, Media][]
+  ).map(([chave, campo, media]) => {
+    const valorMeta = meta[campo];
     const m = valorMeta == null ? null : Number(valorMeta);
     return {
-      item,
+      item: ROTULO_CAMPO[campo],
       media,
-      real: media.valor == null ? "—" : fmt(media.valor),
-      meta: m == null ? null : fmt(m),
+      real: media.valor == null ? "—" : textoDaMeta(campo, media.valor),
+      meta: m == null ? null : textoDaMeta(campo, m),
       proporcao: media.valor != null && m ? media.valor / m : null,
       comparacao: compararComMeta(chave, media.valor, m),
     };
@@ -189,11 +183,12 @@ export async function Alimentacao({
           <EditorMetas
             pacienteId={uid}
             metas={{
-              daily_calorie_goal: perfil.daily_calorie_goal,
-              protein_goal_g: perfil.protein_goal_g,
-              daily_water_goal_ml: perfil.daily_water_goal_ml,
-              weight_goal_kg: perfil.weight_goal_kg,
+              daily_calorie_goal: meta.daily_calorie_goal,
+              protein_goal_g: meta.protein_goal_g,
+              daily_water_goal_ml: meta.daily_water_goal_ml,
+              weight_goal_kg: meta.weight_goal_kg,
             }}
+            usando={usando}
           />
         }
       >
@@ -233,11 +228,9 @@ export async function Alimentacao({
             {desvios.map((d) => (
               <li key={d.id} className="text-[14px] leading-snug text-clin-texto">
                 <span className="font-semibold text-clin-atencao">
-                  {ROTULO_CAMPO[d.field] ?? d.field}:
+                  {ROTULO_CAMPO[d.field]}:
                 </span>{" "}
-                {d.current_value == null || d.current_value === ""
-                  ? `${pronome} está sem meta`
-                  : `${pronome} está usando ${valorDoDesvio(d)}`}
+                {usando[d.field]}
               </li>
             ))}
           </ul>
@@ -354,12 +347,4 @@ export async function Alimentacao({
       </VerHistorico>
     </Secao>
   );
-}
-
-/** "2.200 kcal" a partir do texto que o gatilho gravou ("2200"). */
-function valorDoDesvio(d: Desvio): string {
-  const n = Number(d.current_value);
-  const unidade = UNIDADE_CAMPO[d.field];
-  if (!Number.isFinite(n)) return String(d.current_value);
-  return `${n.toLocaleString("pt-BR")}${unidade ? ` ${unidade}` : ""}`;
 }

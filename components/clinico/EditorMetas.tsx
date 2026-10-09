@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import type { CampoMeta } from "@/lib/nutri";
 import { Field } from "@/components/ui";
 import { useEdicao } from "./Edicao";
 import { ErroInline } from "./ErroInline";
@@ -13,9 +14,17 @@ import { ErroInline } from "./ErroInline";
 // perfil numa transação só. Muda o que cerca a chamada: o erro fica num estado
 // local, embaixo do formulário, e salvar fecha a edição (a leitura volta com
 // os valores novos pelo router.refresh()).
+//
+// `metas` é o que o formulário mostra ao abrir, e quem chama manda a ÚLTIMA
+// PRESCRIÇÃO, a mesma "Meta" da tabela. Abrir com o perfil fazia a tabela
+// dizer 1.800 e o formulário 2.200 quando o paciente tinha mudado a meta, e
+// salvar só a água adotava calado as calorias dele (a função grava as quatro
+// juntas e dá baixa no aviso). `usando` traz, por campo com aviso aberto, a
+// frase do que o paciente está usando, para a escolha ser à vista.
 export function EditorMetas({
   pacienteId,
   metas,
+  usando = {},
 }: {
   pacienteId: string;
   metas: {
@@ -24,6 +33,7 @@ export function EditorMetas({
     daily_water_goal_ml: number | null;
     weight_goal_kg: number | null;
   };
+  usando?: Partial<Record<CampoMeta, string>>;
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -78,15 +88,19 @@ export function EditorMetas({
       <div className="grid grid-cols-2 gap-3">
         <Field label="Calorias/dia">
           <input type="number" className="input" value={kcal} onChange={(e) => { setKcal(e.target.value); alterou(); }} placeholder="1800" />
+          <Usando texto={usando.daily_calorie_goal} />
         </Field>
         <Field label="Proteína/dia (g)">
           <input type="number" className="input" value={prot} onChange={(e) => { setProt(e.target.value); alterou(); }} placeholder="110" />
+          <Usando texto={usando.protein_goal_g} />
         </Field>
         <Field label="Água/dia (ml)">
           <input type="number" className="input" value={agua} onChange={(e) => { setAgua(e.target.value); alterou(); }} placeholder="2500" />
+          <Usando texto={usando.daily_water_goal_ml} />
         </Field>
         <Field label="Peso alvo (kg)">
           <input type="number" step="0.1" className="input" value={peso} onChange={(e) => { setPeso(e.target.value); alterou(); }} placeholder="62" />
+          <Usando texto={usando.weight_goal_kg} />
         </Field>
       </div>
       <Field label="Observação da prescrição (opcional)">
@@ -106,5 +120,16 @@ export function EditorMetas({
       </div>
       <ErroInline mensagem={erro} />
     </form>
+  );
+}
+
+// O que o paciente está usando no lugar da meta, embaixo do campo. `texto`
+// sobre `atencao-fundo` é um par com contraste testado (lib/temaClinico.ts).
+function Usando({ texto }: { texto?: string }) {
+  if (!texto) return null;
+  return (
+    <p className="mt-1 inline-block rounded bg-clin-atencao-fundo px-1.5 text-[13px] leading-snug text-clin-texto">
+      {texto}
+    </p>
   );
 }

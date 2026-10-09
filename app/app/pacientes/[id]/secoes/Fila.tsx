@@ -5,6 +5,7 @@ import { ReaplicarMetas } from "@/components/clinico/ReaplicarMetas";
 import {
   textoVariacaoPeso,
   type Alerta,
+  type DesvioDeMeta,
   type MetasPrescritas,
   type PatientSummary,
 } from "@/lib/nutri";
@@ -20,7 +21,7 @@ import { ErroSecao } from "./ErroSecao";
 const ACAO_NA_FILA =
   "min-h-[44px] shrink-0 items-center justify-center whitespace-nowrap rounded-md border border-clin-atencao px-4 text-[14px] font-semibold text-clin-atencao hover:bg-clin-atencao hover:text-clin-atencao-fundo focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clin-atencao";
 
-/** Conversar: tela cheia no celular, rolar até a coluna no computador. */
+/** Conversar: tela cheia no celular; de `lg` para cima, rola até a conversa. */
 function Conversar({ uid }: { uid: string }) {
   return (
     <>
@@ -38,19 +39,33 @@ function Conversar({ uid }: { uid: string }) {
 }
 
 // "Por que está na sua fila" e os três números de relance. Os dois vêm do
-// mesmo resumo que a Início usa (getPatientsSummary), para a fila e o detalhe
+// mesmo resumo que a Início usa (resumirPacientes), para a fila e o detalhe
 // nunca discordarem sobre o mesmo paciente. A ação de cada alerta sai do
 // TIPO, nunca do texto (spec, Seção 4).
+//
+// Se alguma consulta do resumo falhou, a seção inteira diz que não carregou:
+// sem as refeições o resumo diria "Nunca registrou nada" e "—" nos números,
+// e sem os exames o alerta de exame sumiria calado.
 export async function Fila({
   uid,
   resumo,
   prescricao,
+  desviosDeMeta,
 }: {
   uid: string;
-  resumo: Promise<PatientSummary[]>;
+  resumo: Promise<{ resumos: PatientSummary[]; falhou: boolean }>;
   prescricao: Promise<{ data: MetasPrescritas | null; error: unknown }>;
+  desviosDeMeta: Promise<{ data: DesvioDeMeta[]; error: unknown }>;
 }) {
-  const [[s], presc] = await Promise.all([resumo, prescricao]);
+  const [r, presc, desvios] = await Promise.all([resumo, prescricao, desviosDeMeta]);
+  if (r.falhou) {
+    return (
+      <div className="pb-6">
+        <ErroSecao secao="os alertas e os números" />
+      </div>
+    );
+  }
+  const [s] = r.resumos;
 
   function acoes(a: Alerta) {
     switch (a.tipo) {
@@ -58,14 +73,17 @@ export async function Fila({
       case "parado":
         return <Conversar uid={uid} />;
       case "prescricao":
+        // O alerta conta também os avisos do plano de treino, e Reaplicar
+        // não dá baixa neles: o botão só aparece com um aviso de META aberto,
+        // senão o nutricionista reaplicaria e o alerta continuaria ali. Sem
+        // prescrição não há o que reaplicar. Nos dois casos sobra o Conversar.
         return (
           <>
-            {presc.error ? (
+            {presc.error || desvios.error ? (
               <ErroSecao secao="a última prescrição" />
-            ) : presc.data ? (
+            ) : presc.data && desvios.data.length > 0 ? (
               // As quatro metas da última prescrição, do jeito que vieram
-              // (o porquê está no ReaplicarMetas). Sem prescrição não há o
-              // que reaplicar, e sobra só o Conversar.
+              // (o porquê está no ReaplicarMetas).
               <ReaplicarMetas pacienteId={uid} prescricao={presc.data} />
             ) : null}
             <Conversar uid={uid} />

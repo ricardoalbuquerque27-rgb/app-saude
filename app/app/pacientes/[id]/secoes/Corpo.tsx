@@ -26,7 +26,7 @@ function medida(v: unknown): string {
 // campo vazio apaga a meta (spec, Seção 2). Por isso ele se edita nas metas,
 // em Alimentação, e aqui há só o link.
 //
-// A variação é a mesma dos três números do topo (getPatientsSummary), para a
+// A variação é a mesma dos três números do topo (resumirPacientes), para a
 // página não mostrar dois "peso em 30 dias" diferentes. A meta segue a mesma
 // regra da Alimentação: a prescrita, ou a do perfil se nunca houve prescrição.
 export async function Corpo({
@@ -37,13 +37,13 @@ export async function Corpo({
 }: {
   uid: string;
   perfil: MetasPrescritas;
-  resumo: Promise<PatientSummary[]>;
+  resumo: Promise<{ resumos: PatientSummary[]; falhou: boolean }>;
   prescricao: Promise<{ data: MetasPrescritas | null; error: unknown }>;
 }) {
   const supabase = await createClient();
   const hoje = todayISO();
 
-  const [medidasRes, [s], presc] = await Promise.all([
+  const [medidasRes, r, presc] = await Promise.all([
     // Com teto em hoje: medida lançada com data futura não é o "peso atual".
     supabase
       .from("body_measurements")
@@ -56,7 +56,9 @@ export async function Corpo({
     prescricao,
   ]);
 
-  if (medidasRes.error || presc.error) {
+  // O resumo entra na conta porque a variação vem dele: com uma consulta dele
+  // falhando, "—" diria "sem variação" em vez de "não carregou".
+  if (medidasRes.error || presc.error || r.falhou) {
     return (
       <Secao id="corpo" titulo="Corpo">
         <ErroSecao secao="as medidas" />
@@ -64,6 +66,7 @@ export async function Corpo({
     );
   }
 
+  const [s] = r.resumos;
   const linhas = (medidasRes.data ?? []) as any[];
   const ultimaComPeso = linhas.find((r) => r.weight_kg != null);
   const peso = ultimaComPeso ? Number(ultimaComPeso.weight_kg) : null;

@@ -64,17 +64,35 @@ export function idleDays(s: PatientSummary, today = todayISO()): number | null {
 }
 
 /**
- * Resumo de vários pacientes de uma vez. Faz 9 consultas no total,
- * independente da quantidade de pacientes (usa .in(user_id, ids)), mais 4
- * por paciente sem registro nos últimos 30 dias. A conta em si fica em
- * `montarResumos`.
+ * Resumo de vários pacientes de uma vez, para a Início e a lista de
+ * pacientes. Consulta que falha vira lista vazia, como sempre foi ali; quem
+ * precisa saber da falha usa `resumirPacientes`.
  */
 export async function getPatientsSummary(
   supabase: any,
   ids: string[],
   names: Record<string, string> = {}
 ): Promise<PatientSummary[]> {
-  if (ids.length === 0) return [];
+  return (await resumirPacientes(supabase, ids, names)).resumos;
+}
+
+/**
+ * O resumo e se alguma consulta falhou. Faz 9 consultas no total,
+ * independente da quantidade de pacientes (usa .in(user_id, ids)), mais 4
+ * por paciente sem registro nos últimos 30 dias. A conta em si fica em
+ * `montarResumos`.
+ *
+ * `falhou` existe porque, sem ele, uma leitura que falha vira dado falso: sem
+ * as refeições o paciente aparece como "Nunca registrou nada", e sem os
+ * exames o alerta de exame some calado. O detalhe do paciente mostra "Não foi
+ * possível carregar" no lugar.
+ */
+export async function resumirPacientes(
+  supabase: any,
+  ids: string[],
+  names: Record<string, string> = {}
+): Promise<{ resumos: PatientSummary[]; falhou: boolean }> {
+  if (ids.length === 0) return { resumos: [], falhou: false };
 
   const today = todayISO();
   // -6, não -7: a comparação é >=, então de hoje-6 até hoje dá 7 dias.
@@ -116,11 +134,16 @@ export async function getPatientsSummary(
         .in("user_id", ids)
         .neq("status", "normal")
         .gte("date", d180),
+      // Mais recente primeiro: o `.find` de montarResumos fica com o primeiro
+      // tratamento ativo de cada paciente, e com dois ativos o mais antigo
+      // podia acusar "Dose atrasada" de uma dose que já não vale. É a mesma
+      // regra do Clínico no detalhe do paciente.
       supabase
         .from("treatments")
         .select("user_id, next_dose_date")
         .in("user_id", ids)
-        .eq("active", true),
+        .eq("active", true)
+        .order("created_at", { ascending: false }),
       supabase
         .from("workout_plan")
         .select("id, user_id, day_of_week, sport")
@@ -137,6 +160,10 @@ export async function getPatientsSummary(
         .is("acknowledged_at", null),
     ]);
 
+  const respostas = [
+    mealsRes, wkRes, logsRes, bodyRes, examsRes, treatRes, planRes, checksRes, desviosRes,
+  ];
+  let falhou = respostas.some((r) => r.error);
   const dados: DadosResumo = {
     meals: mealsRes.data ?? [],
     workouts: wkRes.data ?? [],
@@ -154,9 +181,11 @@ export async function getPatientsSummary(
   // começado. Só para esses vai uma consulta a mais por tabela; quem está
   // ativo não paga nada.
   const parados = resumos.filter((r) => r.lastActivity == null).map((r) => r.id);
-  if (parados.length === 0) return resumos;
-  dados.ultimoRegistro = await ultimosRegistros(supabase, parados, today);
-  return montarResumos(dados, ids, names, today);
+  if (parados.length === 0) return { resumos, falhou };
+  const ultimos = await ultimosRegistros(supabase, parados, today);
+  falhou ||= ultimos.falhou;
+  dados.ultimoRegistro = ultimos.datas;
+  return { resumos: montarResumos(dados, ids, names, today), falhou };
 }
 
 /** Último dia com registro de cada paciente, sem limite de janela. */
@@ -164,25 +193,27 @@ async function ultimosRegistros(
   supabase: any,
   ids: string[],
   today: string
-): Promise<Record<string, string>> {
-  const out: Record<string, string> = {};
+): Promise<{ datas: Record<string, string>; falhou: boolean }> {
+  const datas: Record<string, string> = {};
+  let falhou = false;
   const tabelas = ["meals", "workouts", "daily_logs", "body_measurements"];
   await Promise.all(
     ids.flatMap((id) =>
       tabelas.map(async (tabela) => {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from(tabela)
           .select("date")
           .eq("user_id", id)
           .lte("date", today)
           .order("date", { ascending: false })
           .limit(1);
+        if (error) falhou = true;
         const d = (data as any[] | null)?.[0]?.date as string | undefined;
-        if (d && (!out[id] || d > out[id])) out[id] = d;
+        if (d && (!datas[id] || d > datas[id])) datas[id] = d;
       })
     )
   );
-  return out;
+  return { datas, falhou };
 }
 
 /** As linhas que `getPatientsSummary` busca, já de todos os pacientes juntos. */
@@ -259,12 +290,16 @@ export function montarResumos(
       .filter((l) => l.date === today)
       .reduce((s, l) => s + (Number(l.water_ml) || 0), 0);
 
-    const weightLast = myBody.length
-      ? Number(myBody[myBody.length - 1].weight_kg)
+    // Peso de 30 dias contados com naJanela: a consulta traz `>= hoje-30`
+    // (31 dias) e sem teto, e uma medida lançada com data futura virava o
+    // "peso atual" e a ponta da variação.
+    const pesos30 = myBody.filter((b) => naJanela(b.date, today, 30));
+    const weightLast = pesos30.length
+      ? Number(pesos30[pesos30.length - 1].weight_kg)
       : null;
-    const weightFirst = myBody.length ? Number(myBody[0].weight_kg) : null;
+    const weightFirst = pesos30.length ? Number(pesos30[0].weight_kg) : null;
     const weightDelta30 =
-      weightLast != null && weightFirst != null && myBody.length > 1
+      weightLast != null && weightFirst != null && pesos30.length > 1
         ? Number((weightLast - weightFirst).toFixed(1))
         : null;
 
@@ -394,13 +429,18 @@ export type ActivityItem = {
   detail?: string;
 };
 
-/** Une todos os registros do paciente numa linha do tempo, mais recente primeiro. */
+/**
+ * Une todos os registros do paciente numa linha do tempo, mais recente
+ * primeiro. `falhou` diz se alguma das consultas falhou: sem ele, a página
+ * dizia "Nenhum registro nos últimos 30 dias" de quem tinha registros que só
+ * não chegaram.
+ */
 export async function getPatientActivity(
   supabase: any,
   uid: string,
   sinceDays = 30,
   limit = 80
-): Promise<ActivityItem[]> {
+): Promise<{ itens: ActivityItem[]; falhou: boolean }> {
   const since = addDaysISO(todayISO(), -(sinceDays - 1));
 
   const [meals, workouts, body, logs, exams, doses, effects, checkins, planRows] =
@@ -454,7 +494,10 @@ export async function getPatientActivity(
         .eq("user_id", uid),
     ]);
 
-  return montarLinhaDoTempo(
+  const falhou = [
+    meals, workouts, body, logs, exams, doses, effects, checkins, planRows,
+  ].some((r) => r.error);
+  const itens = montarLinhaDoTempo(
     {
       meals: meals.data ?? [],
       workouts: workouts.data ?? [],
@@ -470,6 +513,7 @@ export async function getPatientActivity(
     sinceDays,
     limit
   );
+  return { itens, falhou };
 }
 
 /** As linhas que `getPatientActivity` busca. */
@@ -611,11 +655,15 @@ export type DailySeries = {
   weight: number | null;
 };
 
+/**
+ * `falhou` diz se alguma consulta falhou: sem ele, a falha virava uma série
+ * de zeros, e a média da semana dizia "sem registro" de quem registrou.
+ */
 export async function getPatientSeries(
   supabase: any,
   uid: string,
   days = 14
-): Promise<DailySeries[]> {
+): Promise<{ serie: DailySeries[]; falhou: boolean }> {
   const today = todayISO();
   const since = addDaysISO(today, -(days - 1));
 
@@ -665,7 +713,7 @@ export async function getPatientSeries(
       weight: dayBody.length ? Number(dayBody[dayBody.length - 1].weight_kg) : null,
     });
   }
-  return out;
+  return { serie: out, falhou: [meals, logs, workouts, body].some((r) => r.error) };
 }
 
 /** Média de um item na janela. `dias` diz quantos dias entraram na conta. */
@@ -834,4 +882,92 @@ export async function getUltimaPrescricao(
     .limit(1)
     .maybeSingle();
   return { data: (data as MetasPrescritas | null) ?? null, error };
+}
+
+/**
+ * Os campos de META que `set_patient_goals` grava. A tabela
+ * prescription_deviations recebe também avisos do plano de treino (o gatilho
+ * de workout_plan), e esses não são metas: Reaplicar não dá baixa neles, e
+ * mostrá-los em Alimentação poria uma sessão de treino apagada entre as
+ * metas, com o nome cru da coluna. Tudo o que é "desvio de meta" filtra por
+ * esta lista.
+ */
+export const CAMPOS_META = [
+  "daily_calorie_goal",
+  "protein_goal_g",
+  "daily_water_goal_ml",
+  "weight_goal_kg",
+] as const;
+export type CampoMeta = (typeof CAMPOS_META)[number];
+
+/**
+ * Uma meta como a tela a mostra: "1.800 kcal", "110 g", "2,5 L", "62,5 kg".
+ * A água é gravada em ml e lida em litros, com uma casa, na tabela real ×
+ * meta; o aviso de desvio e o editor usam esta mesma função para a mesma
+ * meta não aparecer em duas unidades na mesma seção.
+ */
+export function textoDaMeta(campo: CampoMeta, valor: number): string {
+  switch (campo) {
+    case "daily_calorie_goal":
+      return `${Math.round(valor).toLocaleString("pt-BR")} kcal`;
+    case "protein_goal_g":
+      return `${Math.round(valor).toLocaleString("pt-BR")} g`;
+    case "daily_water_goal_ml":
+      return `${(valor / 1000).toLocaleString("pt-BR", {
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1,
+      })} L`;
+    case "weight_goal_kg":
+      return `${valor.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} kg`;
+  }
+}
+
+/**
+ * "ela está usando 2.200 kcal": o que o paciente pôs no lugar da meta
+ * prescrita. O gatilho grava o valor como texto ("2200"); sem valor, o
+ * paciente apagou a meta. O pronome sai do sexo do perfil, e sem ele a frase
+ * não adivinha.
+ */
+export function textoDoDesvio(
+  d: { field: string; current_value: string | null },
+  sexo: string | null
+): string {
+  const quem = sexo === "F" ? "ela" : sexo === "M" ? "ele" : "o paciente";
+  if (d.current_value == null || d.current_value === "") {
+    return `${quem} está sem meta`;
+  }
+  const n = Number(d.current_value);
+  const campo = CAMPOS_META.find((c) => c === d.field);
+  const valor =
+    campo && Number.isFinite(n) ? textoDaMeta(campo, n) : d.current_value;
+  return `${quem} está usando ${valor}`;
+}
+
+/** Um aviso aberto de meta mudada pelo paciente (prescription_deviations). */
+export type DesvioDeMeta = {
+  id: string;
+  field: CampoMeta;
+  prescribed: string | null;
+  current_value: string | null;
+  created_at: string;
+};
+
+/**
+ * Os avisos de meta ainda abertos do paciente, só dos quatro campos de meta
+ * (ver CAMPOS_META). Devolve `{ data, error }` sem engolir o erro, e é
+ * `async` pelo mesmo motivo de getUltimaPrescricao: a página divide a
+ * promessa entre a fila e a Alimentação.
+ */
+export async function getDesviosDeMeta(
+  supabase: any,
+  uid: string
+): Promise<{ data: DesvioDeMeta[]; error: unknown }> {
+  const { data, error } = await supabase
+    .from("prescription_deviations")
+    .select("id, field, prescribed, current_value, created_at")
+    .eq("patient_id", uid)
+    .in("field", CAMPOS_META as unknown as string[])
+    .is("acknowledged_at", null)
+    .order("created_at", { ascending: false });
+  return { data: (data as DesvioDeMeta[] | null) ?? [], error };
 }

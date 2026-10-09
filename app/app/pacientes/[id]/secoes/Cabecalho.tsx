@@ -16,10 +16,11 @@ export type PerfilCabecalho = {
 //
 // Mensagem e Nota privada vão para lugares diferentes conforme a largura. No
 // celular, `?conversa=1` / `?notas=1` abre só aquela parte em tela cheia, e
-// o Voltar do aparelho fecha a conversa sem sair do paciente. No computador
-// a conversa já está na coluna da direita, e o link só rola até ela. Os dois
-// links existem no HTML e o CSS mostra um de cada vez: não há como o servidor
-// saber a largura da tela.
+// o Voltar do aparelho fecha a conversa sem sair do paciente. De `lg` para
+// cima a conversa já está na página (no fim dela até `xl`, na coluna da
+// direita a partir dali), e o link só rola até ela. Os dois links existem no
+// HTML e o CSS mostra um de cada vez: não há como o servidor saber a largura
+// da tela.
 export async function Cabecalho({
   uid,
   perfil,

@@ -130,3 +130,25 @@ export function idadeEm(
     (hoje.slice(5, 10) < nascimento.slice(5, 10) ? 1 : 0);
   return anos >= 0 && anos < 130 ? anos : null;
 }
+
+/**
+ * O dia (YYYY-MM-DD) em que um instante caiu no Brasil.
+ *
+ * `created_at` vem do banco em UTC, e `created_at.slice(0, 10)` dá o dia de
+ * Greenwich: uma mensagem mandada às 22h em São Paulo aparecia com a data de
+ * amanhã na conversa. Uma data sem hora volta como veio; texto que não é
+ * data volta como os 10 primeiros caracteres, que é o que a tela mostrava.
+ */
+export function dataNoBrasil(instante: string): string {
+  // Só a data, sem hora, já é o dia: `new Date("2026-10-08")` leria como
+  // meia-noite UTC e devolveria o dia 7.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(instante)) return instante;
+  const d = new Date(instante);
+  if (Number.isNaN(d.getTime())) return instante.slice(0, 10);
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+}

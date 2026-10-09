@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Lock, Plus, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { formatDate } from "@/lib/date";
+import { dataNoBrasil, formatDate } from "@/lib/date";
 import { ErroInline } from "./ErroInline";
 import type { Mensagem } from "./tipos";
 
@@ -94,7 +94,7 @@ export function NotasPrivadas({
               </p>
               <div className="mt-1.5 flex items-center justify-between">
                 <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                  {formatDate(n.created_at.slice(0, 10))}
+                  {formatDate(dataNoBrasil(n.created_at))}
                 </span>
                 <button
                   onClick={() => excluir(n.id)}

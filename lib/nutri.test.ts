@@ -9,6 +9,8 @@ import {
   notaMedia,
   notaDasMedias,
   ultimoDesvioPorCampo,
+  textoDaMeta,
+  textoDoDesvio,
   type DadosResumo,
   type DadosAtividade,
   type DailySeries,
@@ -155,6 +157,21 @@ describe("montarResumos — peso", () => {
     });
     expect(r.weightLast).toBe(78);
     expect(r.weightDelta30).toBeNull();
+  });
+
+  it("30 dias são 30: a medida do 31º dia e a de data futura ficam fora", () => {
+    // A consulta pegava `>= hoje-30` (31 dias) e sem teto. Com 08/10 como
+    // hoje, a janela vai de 09/09 a 08/10.
+    const r = resumo({
+      body: [
+        { user_id: A, date: "2026-09-08", weight_kg: 85 },
+        { user_id: A, date: "2026-09-09", weight_kg: 80 },
+        { user_id: A, date: "2026-10-07", weight_kg: 78.4 },
+        { user_id: A, date: "2026-10-09", weight_kg: 70 },
+      ],
+    });
+    expect(r.weightLast).toBe(78.4);
+    expect(r.weightDelta30).toBe(-1.6);
   });
 });
 
@@ -631,5 +648,43 @@ describe("ultimoDesvioPorCampo", () => {
   });
   it("sem aviso, lista vazia", () => {
     expect(ultimoDesvioPorCampo([])).toEqual([]);
+  });
+});
+
+describe("textoDaMeta", () => {
+  it("cada meta na unidade em que a tela a mostra", () => {
+    expect(textoDaMeta("daily_calorie_goal", 1800)).toBe("1.800 kcal");
+    expect(textoDaMeta("protein_goal_g", 109.6)).toBe("110 g");
+    // Água entra em ml e sai em litros, como na tabela real × meta.
+    expect(textoDaMeta("daily_water_goal_ml", 2500)).toBe("2,5 L");
+    expect(textoDaMeta("daily_water_goal_ml", 2000)).toBe("2,0 L");
+    expect(textoDaMeta("weight_goal_kg", 62.5)).toBe("62,5 kg");
+    expect(textoDaMeta("weight_goal_kg", 62)).toBe("62 kg");
+  });
+});
+
+describe("textoDoDesvio", () => {
+  const d = (field: string, current_value: string | null) => ({ field, current_value });
+  it("diz o que o paciente está usando, na unidade da tabela", () => {
+    expect(textoDoDesvio(d("daily_calorie_goal", "2200"), "F")).toBe(
+      "ela está usando 2.200 kcal"
+    );
+    expect(textoDoDesvio(d("daily_water_goal_ml", "2500"), "M")).toBe(
+      "ele está usando 2,5 L"
+    );
+  });
+  it("sem sexo no perfil, não adivinha o pronome", () => {
+    expect(textoDoDesvio(d("protein_goal_g", "95"), null)).toBe(
+      "o paciente está usando 95 g"
+    );
+  });
+  it("meta apagada pelo paciente", () => {
+    expect(textoDoDesvio(d("weight_goal_kg", null), "F")).toBe("ela está sem meta");
+    expect(textoDoDesvio(d("weight_goal_kg", ""), "F")).toBe("ela está sem meta");
+  });
+  it("valor que não é número sai como veio", () => {
+    expect(textoDoDesvio(d("daily_calorie_goal", "muito"), "F")).toBe(
+      "ela está usando muito"
+    );
   });
 });

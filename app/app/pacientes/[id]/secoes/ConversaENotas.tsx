@@ -7,11 +7,11 @@ import { ErroSecao } from "./ErroSecao";
 
 export type Foco = "conversa" | "notas" | null;
 
-// Conversa com o paciente e notas privadas. No computador ficam na coluna da
-// direita, sempre à vista; no celular, no fim da página, e `?conversa=1` /
-// `?notas=1` mostra só uma delas em tela cheia (quem esconde o resto é a
-// página). Aqui só se esconde a outra parte, e só abaixo de `lg`: a partir
-// dali as duas aparecem mesmo com o parâmetro na URL.
+// Conversa com o paciente e notas privadas. A partir de `xl` ficam na coluna
+// da direita, sempre à vista; abaixo disso, no fim da página, e no celular
+// `?conversa=1` / `?notas=1` mostra só uma delas em tela cheia (quem esconde
+// o resto é a página). Aqui só se esconde a outra parte, e só abaixo de
+// `lg`: dali para cima as duas aparecem mesmo com o parâmetro na URL.
 //
 // Abrir a conversa não marca nada como lido. Só enviar marca (Conversa), e
 // assim "não lida" continua querendo dizer "ainda sem resposta".
@@ -52,10 +52,20 @@ export async function ConversaENotas({
           />
         )}
       </Secao>
+      {/* Com `?notas=1` no celular a Conversa some, mas continua sendo o
+          primeiro filho, e o `first:` do Secao não tiraria a linha de cima
+          das Notas: ela sairia colada no Voltar. `max-lg:` tira só ali; de
+          `lg` para cima as duas aparecem e a linha entre elas volta. */}
       <Secao
         id="notas"
         titulo="Notas privadas"
-        className={foco === "conversa" ? "hidden lg:block" : ""}
+        className={
+          foco === "conversa"
+            ? "hidden lg:block"
+            : foco === "notas"
+              ? "max-lg:border-t-0 max-lg:pt-0"
+              : ""
+        }
       >
         {error ? (
           <ErroSecao secao="as notas" />

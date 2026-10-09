@@ -64,7 +64,7 @@ export default async function LinhaDoTempo({
   if (!perfil) return <SemAcesso />;
 
   const nome = perfil.full_name || "Paciente";
-  const itens = await getPatientActivity(supabase, uid, 30, 80);
+  const { itens, falhou } = await getPatientActivity(supabase, uid, 30, 80);
 
   // Agrupa por dia, preservando a ordem (mais recente primeiro).
   const porDia: { data: string; itens: ActivityItem[] }[] = [];
@@ -89,7 +89,13 @@ export default async function LinhaDoTempo({
         {nome} · últimos 30 dias
       </p>
 
-      {porDia.length === 0 ? (
+      {falhou ? (
+        // Uma tabela que falha não pode virar "nenhum registro": a lista
+        // mostraria só o que chegou, como se fosse tudo.
+        <div className="mt-6">
+          <ErroSecao secao="a linha do tempo" />
+        </div>
+      ) : porDia.length === 0 ? (
         <p className="mt-6 text-[14px] text-clin-texto-2">
           Nenhum registro nos últimos 30 dias.
         </p>

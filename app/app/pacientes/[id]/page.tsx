@@ -3,7 +3,11 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { getPatientsSummary, getUltimaPrescricao } from "@/lib/nutri";
+import {
+  getDesviosDeMeta,
+  getUltimaPrescricao,
+  resumirPacientes,
+} from "@/lib/nutri";
 import { SkelCard } from "@/components/Skeleton";
 import { EdicaoProvider } from "@/components/clinico/Edicao";
 import { Cabecalho } from "./secoes/Cabecalho";
@@ -27,6 +31,14 @@ export const dynamic = "force-dynamic";
 // Cada seção é um componente de servidor com as próprias consultas, dentro
 // do próprio Suspense: as rápidas aparecem sem esperar as lentas, e uma
 // consulta que falha derruba só a sua seção.
+//
+// Duas colunas (conversa e notas à direita) só a partir de `xl` (1280 px).
+// Em `lg` a área de conteúdo do AppShell tem 720 px em qualquer largura, e
+// com a coluna de 360 px a principal ficava com 336 px, mais estreita que
+// um celular. O AppShell abre esta rota até `max-w-7xl`, e entre `lg` e `xl`
+// a página fica numa coluna só. O modo de tela cheia (`?conversa=1`) continua
+// abaixo de `lg`: dali para cima a conversa sempre está na página, e os links
+// do cabeçalho só rolam até ela.
 export default async function PacienteDetalhe({
   params,
   searchParams,
@@ -78,12 +90,15 @@ export default async function PacienteDetalhe({
   const nutriId = usuarioRes.data.user?.id ?? "";
 
   // Começam aqui e cada seção espera a sua parte. O resumo é o mesmo que a
-  // Início usa (fila e números do topo, variação de peso do Corpo); a última
-  // prescrição é a "meta" da Alimentação e do Corpo e o valor de "Reaplicar".
-  // Uma consulta para todos, em vez de uma por seção, para os números da
-  // página não discordarem entre si.
-  const resumo = getPatientsSummary(supabase, [uid], { [uid]: nome });
+  // Início usa (fila e números do topo, variação de peso do Corpo), só que
+  // dizendo se alguma consulta falhou; a última prescrição é a "meta" da
+  // Alimentação e do Corpo e o valor de "Reaplicar"; os avisos de meta são
+  // os da Alimentação e o que decide se "Reaplicar" aparece na fila. Uma
+  // consulta para todos, em vez de uma por seção, para os números da página
+  // não discordarem entre si.
+  const resumo = resumirPacientes(supabase, [uid], { [uid]: nome });
   const prescricao = getUltimaPrescricao(supabase, uid);
+  const desviosDeMeta = getDesviosDeMeta(supabase, uid);
 
   // Com `?conversa=1` ou `?notas=1`, abaixo de `lg` só aquela parte aparece,
   // em tela cheia. As outras seções continuam montadas, só escondidas: a
@@ -97,8 +112,12 @@ export default async function PacienteDetalhe({
   return (
     <EdicaoProvider>
       {foco && (
+        // `replace`: o Voltar troca a entrada do histórico em vez de empilhar
+        // outra. Com push, o Voltar do aparelho depois disso reabria a
+        // conversa que a pessoa tinha acabado de fechar.
         <Link
           href={`/app/pacientes/${uid}`}
+          replace
           className={`mb-2 inline-flex min-h-[44px] items-center gap-1 rounded-md text-[15px] font-medium text-clin-primaria lg:hidden ${FOCO}`}
         >
           <ArrowLeft aria-hidden="true" className="h-4 w-4" /> Voltar
@@ -122,10 +141,15 @@ export default async function PacienteDetalhe({
         </div>
       </div>
 
-      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-6">
+      <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_360px] xl:gap-6">
         <div className={`min-w-0 ${foraDoFoco}`}>
           <Suspense fallback={<SkelCard className="mb-6" />}>
-            <Fila uid={uid} resumo={resumo} prescricao={prescricao} />
+            <Fila
+              uid={uid}
+              resumo={resumo}
+              prescricao={prescricao}
+              desviosDeMeta={desviosDeMeta}
+            />
           </Suspense>
           <Suspense fallback={<SkelCard />}>
             <Alimentacao
@@ -139,6 +163,7 @@ export default async function PacienteDetalhe({
                 sex: profile.sex,
               }}
               prescricao={prescricao}
+              desviosDeMeta={desviosDeMeta}
             />
           </Suspense>
           <Suspense fallback={<SkelCard />}>
@@ -162,14 +187,18 @@ export default async function PacienteDetalhe({
           </Suspense>
         </div>
 
-        {/* No celular, no fim da página (com uma linha separando do
-            Clínico, que a primeira seção daqui não tem); no computador, a
-            coluna da direita, presa no alto enquanto o resto rola. */}
+        {/* Numa coluna (até `xl`), no fim da página, com uma linha
+            separando do Clínico, que a primeira seção daqui não tem. Em tela
+            cheia no celular essa linha sairia colada no Voltar, por isso com
+            foco ela só começa em `lg`. A partir de `xl`, a coluna da direita,
+            presa no alto enquanto o resto rola. */}
         <aside
           aria-label="Conversa e notas privadas"
           className={`${
-            foco ? "" : "border-t border-clin-linha pt-6"
-          } lg:sticky lg:top-6 lg:max-h-[calc(100dvh-3rem)] lg:self-start lg:overflow-y-auto lg:border-t-0 lg:pt-0`}
+            foco
+              ? "lg:border-t lg:border-clin-linha lg:pt-6"
+              : "border-t border-clin-linha pt-6"
+          } xl:sticky xl:top-6 xl:max-h-[calc(100dvh-3rem)] xl:self-start xl:overflow-y-auto xl:border-t-0 xl:pt-0`}
         >
           <Suspense fallback={<SkelCard />}>
             <ConversaENotas uid={uid} nutriId={nutriId} foco={foco} />

@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Utensils,
   Plus,
   Trash2,
   Loader2,
@@ -239,13 +238,6 @@ export default function MealPlanEditor({
       />
 
       <div className="card mb-4">
-        <h3 className="section-title mb-3">
-          <span className="icon-badge">
-            <Utensils className="h-4 w-4" />
-          </span>
-          Cardápio prescrito
-        </h3>
-
         <div className="grid gap-2 sm:grid-cols-2">
           <input
             className="input"

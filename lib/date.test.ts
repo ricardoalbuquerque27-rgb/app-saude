@@ -9,6 +9,7 @@ import {
   naJanela,
   avancarDia,
   idadeEm,
+  dataNoBrasil,
 } from "./date";
 
 afterEach(() => vi.useRealTimers());
@@ -213,5 +214,19 @@ describe("idadeEm", () => {
     expect(idadeEm("12/06/1991", "2026-10-09")).toBeNull();
     expect(idadeEm("2027-01-01", "2026-10-09")).toBeNull();
     expect(idadeEm("1880-01-01", "2026-10-09")).toBeNull();
+  });
+});
+
+describe("dataNoBrasil", () => {
+  it("o dia de um instante é o do Brasil, não o de Greenwich", () => {
+    // Mensagem enviada às 22h30 de 8/out em São Paulo: em UTC já é dia 9, e
+    // `created_at.slice(0, 10)` mostrava a data de amanhã.
+    expect(dataNoBrasil("2026-10-09T01:30:00+00:00")).toBe("2026-10-08");
+    expect(dataNoBrasil("2026-10-09T03:00:00Z")).toBe("2026-10-09");
+    expect(dataNoBrasil("2026-10-08T22:30:00-03:00")).toBe("2026-10-08");
+  });
+  it("texto que não é instante volta como os 10 primeiros caracteres", () => {
+    expect(dataNoBrasil("2026-10-08")).toBe("2026-10-08");
+    expect(dataNoBrasil("lixo")).toBe("lixo");
   });
 });

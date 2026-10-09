@@ -28,15 +28,6 @@ export type PlanoItem = {
   prescribed_by: string | null;
 };
 
-export type Desvio = {
-  id: string;
-  kind: string;
-  field: string;
-  prescribed: string | null;
-  current_value: string | null;
-  created_at: string;
-};
-
 export type Mensagem = {
   id: string;
   body: string;
