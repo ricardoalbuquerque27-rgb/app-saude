@@ -188,6 +188,29 @@ describe("montarResumos — alertas", () => {
     expect(resumo({}).alerts).toContain("Nunca registrou nada");
   });
 
+  it("quem parou há mais de 30 dias não vira 'nunca registrou'", () => {
+    // As consultas só trazem 30 dias. Sem o último registro anterior, quem
+    // abandonou há 45 dias aparecia como quem nunca começou — e são
+    // conversas diferentes para o nutricionista.
+    const r = resumo({ ultimoRegistro: { [A]: "2026-08-24" } });
+    expect(r.lastActivity).toBe("2026-08-24");
+    expect(r.alerts).toContain("45 dias sem registrar");
+    expect(r.alerts).not.toContain("Nunca registrou nada");
+  });
+
+  it("registro com data futura não conta como o último", () => {
+    // Sem teto, uma refeição lançada em 12/10 fazia o paciente aparecer
+    // como "Registrou hoje" e escondia que ele está parado desde 03/10.
+    const r = resumo({
+      meals: [
+        { user_id: A, date: "2026-10-03", calories: 0, protein_g: 0 },
+        { user_id: A, date: "2026-10-12", calories: 0, protein_g: 0 },
+      ],
+    });
+    expect(r.lastActivity).toBe("2026-10-03");
+    expect(r.alerts).toContain("5 dias sem registrar");
+  });
+
   it("dose de ontem está atrasada; dose de hoje não", () => {
     const ontem = resumo({
       treatments: [{ user_id: A, next_dose_date: "2026-10-07" }],

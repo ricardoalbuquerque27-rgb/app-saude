@@ -46,8 +46,9 @@ export function idleDays(s: PatientSummary, today = todayISO()): number | null {
 
 /**
  * Resumo de vários pacientes de uma vez. Faz 9 consultas no total,
- * independente da quantidade de pacientes (usa .in(user_id, ids)). A conta
- * em si fica em `montarResumos`.
+ * independente da quantidade de pacientes (usa .in(user_id, ids)), mais 4
+ * por paciente sem registro nos últimos 30 dias. A conta em si fica em
+ * `montarResumos`.
  */
 export async function getPatientsSummary(
   supabase: any,
@@ -117,22 +118,52 @@ export async function getPatientsSummary(
         .is("acknowledged_at", null),
     ]);
 
-  return montarResumos(
-    {
-      meals: mealsRes.data ?? [],
-      workouts: wkRes.data ?? [],
-      logs: logsRes.data ?? [],
-      body: bodyRes.data ?? [],
-      exams: examsRes.data ?? [],
-      treatments: treatRes.data ?? [],
-      plan: planRes.data ?? [],
-      checks: checksRes.data ?? [],
-      desvios: desviosRes.data ?? [],
-    },
-    ids,
-    names,
-    today
+  const dados: DadosResumo = {
+    meals: mealsRes.data ?? [],
+    workouts: wkRes.data ?? [],
+    logs: logsRes.data ?? [],
+    body: bodyRes.data ?? [],
+    exams: examsRes.data ?? [],
+    treatments: treatRes.data ?? [],
+    plan: planRes.data ?? [],
+    checks: checksRes.data ?? [],
+    desvios: desviosRes.data ?? [],
+  };
+  const resumos = montarResumos(dados, ids, names, today);
+
+  // Quem não tem nada nos 30 dias pode ter parado há 45 ou nunca ter
+  // começado. Só para esses vai uma consulta a mais por tabela; quem está
+  // ativo não paga nada.
+  const parados = resumos.filter((r) => r.lastActivity == null).map((r) => r.id);
+  if (parados.length === 0) return resumos;
+  dados.ultimoRegistro = await ultimosRegistros(supabase, parados, today);
+  return montarResumos(dados, ids, names, today);
+}
+
+/** Último dia com registro de cada paciente, sem limite de janela. */
+async function ultimosRegistros(
+  supabase: any,
+  ids: string[],
+  today: string
+): Promise<Record<string, string>> {
+  const out: Record<string, string> = {};
+  const tabelas = ["meals", "workouts", "daily_logs", "body_measurements"];
+  await Promise.all(
+    ids.flatMap((id) =>
+      tabelas.map(async (tabela) => {
+        const { data } = await supabase
+          .from(tabela)
+          .select("date")
+          .eq("user_id", id)
+          .lte("date", today)
+          .order("date", { ascending: false })
+          .limit(1);
+        const d = (data as any[] | null)?.[0]?.date as string | undefined;
+        if (d && (!out[id] || d > out[id])) out[id] = d;
+      })
+    )
   );
+  return out;
 }
 
 /** As linhas que `getPatientsSummary` busca, já de todos os pacientes juntos. */
@@ -149,6 +180,12 @@ export type DadosResumo = {
   plan: any[];
   checks: any[];
   desvios: any[];
+  /**
+   * Último dia com registro de quem não tem nenhum nos 30 dias que as
+   * consultas trazem. Sem isto, quem parou há 45 dias virava "Nunca
+   * registrou nada".
+   */
+  ultimoRegistro?: Record<string, string>;
 };
 
 /**
@@ -175,15 +212,16 @@ export function montarResumos(
     const myLogs = logs.filter((l) => l.user_id === id);
     const myBody = body.filter((b) => b.user_id === id);
 
-    // Dias com atividade — união das quatro fontes.
+    // Dias com atividade — união das quatro fontes. Data futura fica de
+    // fora: com ela, quem está parado aparecia como "Registrou hoje".
     const activeDays = new Set<string>();
     for (const r of [...myMeals, ...myWk, ...myLogs, ...myBody]) {
-      if (r.date) activeDays.add(r.date as string);
+      if (r.date && r.date <= today) activeDays.add(r.date as string);
     }
     const sortedDays = Array.from(activeDays).sort();
     const lastActivity = sortedDays.length
       ? sortedDays[sortedDays.length - 1]
-      : null;
+      : dados.ultimoRegistro?.[id] ?? null;
     // A janela mora em lib/date.ts e tem teste. Escrita à mão aqui, ela já
     // errou de duas formas: abrangendo oito dias e deixando entrar data
     // futura.
