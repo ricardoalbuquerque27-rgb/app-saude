@@ -345,83 +345,105 @@ input[type="number"] {
    dentro de .tema-clinico, com as variáveis --clin-* (lib/temaClinico.ts).
    As regras globais acima não mudam: o resto do app fica como estava.
 
-   As variáveis já trocam de valor no tema escuro, então um bloco bastaria.
-   O seletor `.dark .tema-clinico` repetido existe para vencer, por
-   especificidade, as variantes dark: das regras globais (`.dark .input`
-   etc.) sem depender da ordem do arquivo. Fica fora de @layer de
-   propósito, pelo mesmo motivo.
+   Dentro de `@layer components`, no FIM da camada, e com o escopo em
+   `:where(.tema-clinico)` (especificidade zero). Isso faz duas coisas:
+   vence a regra global do componente por ORDEM, e perde para qualquer
+   utilitário na mesma tag. Fora da camada, ou com o escopo contando
+   especificidade, `card border-rose-200 bg-rose-50` (o banner de erro do
+   PrescricaoClient) virava um card comum aqui dentro, em silêncio.
+
+   O seletor `.dark :where(.tema-clinico)` repetido existe porque as
+   regras globais têm variantes dark: (`.dark .input` etc., especificidade
+   maior); as variáveis já trocam de valor sozinhas, mas é preciso empatar
+   com elas para a ordem decidir.
    =================================================================== */
+@layer components {
+  :where(.tema-clinico) .card,
+  .dark :where(.tema-clinico) .card {
+    background-color: var(--clin-chao);
+    border-color: var(--clin-linha);
+    box-shadow: none;
+  }
 
-.tema-clinico .card,
-.dark .tema-clinico .card {
-  background-color: var(--clin-chao);
-  border-color: var(--clin-linha);
-  box-shadow: none;
-}
+  /* A borda do campo é `campo`, não `linha`: `linha` dá 1,24:1 sobre o
+     chão e o WCAG 1.4.11 pede 3:1 para o limite de um campo. */
+  :where(.tema-clinico) .input,
+  .dark :where(.tema-clinico) .input {
+    background-color: var(--clin-chao);
+    border-color: var(--clin-campo);
+    color: var(--clin-texto);
+  }
+  :where(.tema-clinico) .input::placeholder,
+  .dark :where(.tema-clinico) .input::placeholder {
+    color: var(--clin-texto-2);
+  }
+  /* O foco do .input troca a borda e usa um anel; sem refazer aqui, a
+     regra de borda acima apagaria a borda verde do foco. */
+  :where(.tema-clinico) .input:focus,
+  .dark :where(.tema-clinico) .input:focus {
+    border-color: var(--clin-primaria);
+    --tw-ring-color: var(--clin-primaria-fundo);
+  }
 
-.tema-clinico .input,
-.dark .tema-clinico .input {
-  background-color: var(--clin-chao);
-  border-color: var(--clin-linha);
-  color: var(--clin-texto);
-}
-.tema-clinico .input::placeholder,
-.dark .tema-clinico .input::placeholder {
-  color: var(--clin-texto-2);
-}
-/* O foco do .input troca a borda e usa um anel; sem refazer aqui, a regra
-   de borda acima apagaria a borda verde do foco. */
-.tema-clinico .input:focus,
-.dark .tema-clinico .input:focus {
-  border-color: var(--clin-primaria);
-  --tw-ring-color: var(--clin-primaria-fundo);
-}
+  :where(.tema-clinico) .label,
+  .dark :where(.tema-clinico) .label {
+    color: var(--clin-texto-2);
+  }
 
-.tema-clinico .label,
-.dark .tema-clinico .label {
-  color: var(--clin-texto-2);
-}
+  :where(.tema-clinico) .section-title,
+  .dark :where(.tema-clinico) .section-title {
+    color: var(--clin-texto);
+  }
 
-.tema-clinico .section-title,
-.dark .tema-clinico .section-title {
-  color: var(--clin-texto);
-}
+  :where(.tema-clinico) .icon-badge,
+  .dark :where(.tema-clinico) .icon-badge {
+    background-color: var(--clin-primaria-fundo);
+    color: var(--clin-primaria);
+  }
 
-.tema-clinico .icon-badge,
-.dark .tema-clinico .icon-badge {
-  background-color: var(--clin-primaria-fundo);
-  color: var(--clin-primaria);
-}
+  /* `background` (e não background-color) zera o gradiente do botão
+     global; sem gradiente, o hover dele (que só troca as cores do
+     gradiente) não faria nada, então o hover escurece por filtro. */
+  :where(.tema-clinico) .btn-primary,
+  :where(.tema-clinico) .btn-primary:hover {
+    background: var(--clin-primaria);
+    color: var(--clin-sobre-primaria);
+    box-shadow: none;
+  }
+  :where(.tema-clinico) .btn-primary:hover {
+    filter: brightness(0.94);
+  }
 
-/* `background` (e não background-color) zera o gradiente do botão global;
-   sem gradiente, o hover dele (que só troca as cores do gradiente) não
-   faria nada, então o hover escurece por filtro. */
-.tema-clinico .btn-primary,
-.tema-clinico .btn-primary:hover {
-  background: var(--clin-primaria);
-  color: var(--clin-sobre-primaria);
-  box-shadow: none;
-}
-.tema-clinico .btn-primary:hover {
-  filter: brightness(0.94);
-}
+  :where(.tema-clinico) .btn-ghost,
+  .dark :where(.tema-clinico) .btn-ghost {
+    background-color: var(--clin-chao);
+    border-color: var(--clin-linha);
+    color: var(--clin-texto);
+  }
+  :where(.tema-clinico) .btn-ghost:hover,
+  .dark :where(.tema-clinico) .btn-ghost:hover {
+    background-color: var(--clin-primaria-fundo);
+  }
 
-.tema-clinico .btn-ghost,
-.dark .tema-clinico .btn-ghost {
-  background-color: var(--clin-chao);
-  border-color: var(--clin-linha);
-  color: var(--clin-texto);
-}
-.tema-clinico .btn-ghost:hover,
-.dark .tema-clinico .btn-ghost:hover {
-  background-color: var(--clin-primaria-fundo);
-}
+  /* Foco por teclado nos botões: o anel global é brand-500 a 25%, fora da
+     paleta e fraco. Contorno sólido na cor primária, com folga. */
+  :where(.tema-clinico) .btn-primary:focus-visible,
+  :where(.tema-clinico) .btn-ghost:focus-visible {
+    outline: 2px solid var(--clin-primaria);
+    outline-offset: 2px;
+    --tw-ring-color: transparent;
+  }
 
-/* Foco por teclado nos botões: o anel global é brand-500 a 25%, fora da
-   paleta e fraco. Contorno sólido na cor primária, com folga. */
-.tema-clinico .btn-primary:focus-visible,
-.tema-clinico .btn-ghost:focus-visible {
-  outline: 2px solid var(--clin-primaria);
-  outline-offset: 2px;
-  --tw-ring-color: transparent;
+  /* Os títulos globais (h1, h2, h3, em @layer base) usam a fonte de
+     exibição, e ela vencia o font-clinico herdado do wrapper: "Instrument
+     Sans em tudo" só valia para o texto corrido. Os ajustes de glifo e
+     espaçamento do base são da Sora; aqui voltam ao normal, com um aperto
+     leve só nos títulos. A classe `font-display` fica de fora de
+     propósito: é utilitário do Tailwind, pedido explícito de Sora, e
+     utilitário vence esta regra (como deve). */
+  :where(.tema-clinico) :is(h1, h2, h3) {
+    font-family: var(--font-clinico), system-ui, sans-serif;
+    font-feature-settings: normal;
+    letter-spacing: -0.01em;
+  }
 }

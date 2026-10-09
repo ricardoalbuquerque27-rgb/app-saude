@@ -17,6 +17,7 @@ export type NomeCor =
   | "texto"
   | "texto-2"
   | "linha"
+  | "campo"
   | "primaria"
   | "sobre-primaria"
   | "primaria-fundo"
@@ -32,6 +33,7 @@ export const NOMES_COR: NomeCor[] = [
   "texto",
   "texto-2",
   "linha",
+  "campo",
   "primaria",
   "sobre-primaria",
   "primaria-fundo",
@@ -47,12 +49,19 @@ export const NOMES_COR: NomeCor[] = [
 // ela clareia (#3fd27b) para ler sobre quase-preto. `atencao-texto-2` é o
 // texto secundário DENTRO do aviso: no escuro ele tem o tom quente do fundo
 // âmbar, em vez do cinza-esverdeado do `texto-2`, que destoaria ali.
+//
+// `linha` separa (borda de card, divisória) e é de propósito quase
+// invisível: 1,24:1 no claro. Isso NÃO serve de borda de campo de
+// formulário, que o WCAG 1.4.11 exige com 3:1 sobre o fundo. Para isso
+// existe `campo` (3,35:1 no claro, 3,31:1 no escuro): mais suave que o
+// `texto-2`, mas que ainda mostra onde digitar.
 export const TEMA_CLINICO: Record<"claro" | "escuro", Record<NomeCor, string>> = {
   claro: {
     chao: "#ffffff",
     texto: "#111827",
     "texto-2": "#4b5563",
     linha: "#e5e7eb",
+    campo: "#858d99",
     primaria: "#0e5d34",
     "sobre-primaria": "#ffffff",
     "primaria-fundo": "#e7f3ec",
@@ -67,6 +76,7 @@ export const TEMA_CLINICO: Record<"claro" | "escuro", Record<NomeCor, string>> =
     texto: "#e7ece9",
     "texto-2": "#a3b1aa",
     linha: "#24302b",
+    campo: "#5a6a62",
     primaria: "#3fd27b",
     "sobre-primaria": "#062e1a",
     "primaria-fundo": "#16291f",
@@ -96,6 +106,7 @@ export const PARES_TEXTO: [NomeCor, NomeCor][] = [
 export const PARES_GRAFICO: [NomeCor, NomeCor][] = [
   ["primaria", "linha"],
   ["atencao", "linha"],
+  ["campo", "chao"],
 ];
 
 function bloco(tema: Record<NomeCor, string>): string {
