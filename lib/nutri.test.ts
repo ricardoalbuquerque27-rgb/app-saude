@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   montarResumos,
   montarLinhaDoTempo,
+  filaDeTriagem,
   type DadosResumo,
   type DadosAtividade,
 } from "./nutri";
@@ -267,6 +268,94 @@ describe("montarResumos — alertas", () => {
       "2 treinos sem confirmação (7d)",
       "1 exame fora da referência",
     ]);
+  });
+});
+
+describe("filaDeTriagem", () => {
+  /** Monta os resumos pelo caminho real e devolve a fila como lista de ids. */
+  function fila(parcial: Partial<DadosResumo>, nomes: Record<string, string> = {}) {
+    const ids = ["a", "b"];
+    const resumos = montarResumos(dados(parcial), ids, nomes, HOJE);
+    return filaDeTriagem(resumos, HOJE).map((r) => r.id);
+  }
+  const parado = (user_id: string, date: string) => ({ user_id, date });
+  const ativoHoje = (user_id: string) => ({ user_id, date: HOJE });
+
+  it("só entra quem tem alerta", () => {
+    expect(
+      fila({
+        workouts: [ativoHoje("a"), parado("b", "2026-10-05")],
+      })
+    ).toEqual(["b"]);
+  });
+
+  it("dose atrasada passa à frente de quem tem mais alertas", () => {
+    // Era a ordem antiga: "exame fora + 3 dias parado" ficava acima de
+    // "dose atrasada" só por ter dois alertas.
+    expect(
+      fila({
+        workouts: [parado("a", "2026-10-05"), ativoHoje("b")],
+        exams: [{ user_id: "a", status: "alterado" }],
+        treatments: [{ user_id: "b", next_dose_date: "2026-10-01" }],
+      })
+    ).toEqual(["b", "a"]);
+  });
+
+  it("segue a escala: dose, prescrição, parado, faltas, exame", () => {
+    // Um alerta por paciente, na ordem inversa da esperada.
+    const ids = ["exame", "faltou", "parado", "desvio", "dose"];
+    const hoje = (user_id: string) => ({ user_id, date: HOJE });
+    const resumos = montarResumos(
+      dados({
+        workouts: [
+          hoje("exame"), hoje("faltou"), parado("parado", "2026-10-05"),
+          hoje("desvio"), hoje("dose"),
+        ],
+        exams: [{ user_id: "exame", status: "alterado" }],
+        plan: [{ id: "p-seg", user_id: "faltou", day_of_week: SEG, sport: "Corrida" }],
+        checks: [{ user_id: "faltou", plan_id: "p-seg", date: "2026-10-05", status: "skipped" }],
+        desvios: [{ patient_id: "desvio" }],
+        treatments: [{ user_id: "dose", next_dose_date: "2026-10-01" }],
+      }),
+      ids,
+      {},
+      HOJE
+    );
+    expect(filaDeTriagem(resumos, HOJE).map((r) => r.id)).toEqual([
+      "dose", "desvio", "parado", "faltou", "exame",
+    ]);
+  });
+
+  it("mesma gravidade: mais alertas antes de mais dias parado", () => {
+    expect(
+      fila({
+        workouts: [parado("a", "2026-09-28"), parado("b", "2026-10-05")],
+        exams: [{ user_id: "b", status: "alterado" }],
+      })
+    ).toEqual(["b", "a"]);
+  });
+
+  it("mesma gravidade e mesmos alertas: quem está parado há mais tempo", () => {
+    expect(
+      fila({
+        workouts: [parado("a", "2026-10-05"), parado("b", "2026-09-28")],
+      })
+    ).toEqual(["b", "a"]);
+  });
+
+  it("nunca registrou fica depois de quem parou há 40 dias", () => {
+    // "Nunca registrou" pode ser alguém convidado ontem; quem registrava e
+    // parou há 40 dias é o abandono que o nutricionista ainda pode reverter.
+    expect(fila({ ultimoRegistro: { b: "2026-08-29" } })).toEqual(["b", "a"]);
+  });
+
+  it("empate completo: ordem alfabética, para a fila não embaralhar", () => {
+    expect(
+      fila(
+        { workouts: [parado("a", "2026-10-05"), parado("b", "2026-10-05")] },
+        { a: "Bruno", b: "Ana" }
+      )
+    ).toEqual(["b", "a"]);
   });
 });
 

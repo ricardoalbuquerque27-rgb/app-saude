@@ -30,6 +30,12 @@ export type PatientSummary = {
   desvios: number;
   /** Motivos de atenção, já em texto pronto para exibir. */
   alerts: string[];
+  /**
+   * Nível do alerta mais grave, de 1 (dose atrasada) a 5 (exame fora).
+   * null = nenhum alerta. Mora aqui, e não é deduzido dos campos acima,
+   * para os limiares (3 dias, 2 treinos) existirem num lugar só.
+   */
+  gravidade: number | null;
 };
 
 function daysBetween(a: string, b: string): number {
@@ -286,35 +292,66 @@ export function montarResumos(
       planSemResposta7: adesao.semResposta,
       desvios: desvios.filter((d) => d.patient_id === id).length,
       alerts: [],
+      gravidade: null,
+    };
+    const alertar = (nivel: number, texto: string) => {
+      summary.alerts.push(texto);
+      summary.gravidade = Math.min(summary.gravidade ?? nivel, nivel);
     };
 
     // Do mais grave para o menos grave: a Início e a lista de pacientes só
     // mostram os dois primeiros. Exame fica por último porque o alerta dura
     // 180 dias e não some quando o exame é refeito.
-    if (doseOverdue) summary.alerts.push("Dose atrasada");
+    if (doseOverdue) alertar(1, "Dose atrasada");
     if (summary.desvios > 0)
-      summary.alerts.push(
+      alertar(
+        2,
         `${summary.desvios} ${summary.desvios > 1 ? "mudanças" : "mudança"} na sua prescrição`
       );
 
     const idle = idleDays(summary, today);
-    if (idle == null) summary.alerts.push("Nunca registrou nada");
-    else if (idle >= 3) summary.alerts.push(`${idle} dias sem registrar`);
+    if (idle == null) alertar(3, "Nunca registrou nada");
+    else if (idle >= 3) alertar(3, `${idle} dias sem registrar`);
     if (summary.planFaltas7 > 0)
-      summary.alerts.push(
+      alertar(
+        4,
         `Faltou a ${summary.planFaltas7} treino${summary.planFaltas7 > 1 ? "s" : ""} (7d)`
       );
     if (summary.planSemResposta7 >= 2)
-      summary.alerts.push(
-        `${summary.planSemResposta7} treinos sem confirmação (7d)`
-      );
+      alertar(4, `${summary.planSemResposta7} treinos sem confirmação (7d)`);
     if (summary.alteredExams > 0)
-      summary.alerts.push(
+      alertar(
+        5,
         `${summary.alteredExams} exame${summary.alteredExams > 1 ? "s" : ""} fora da referência`
       );
 
     return summary;
   });
+}
+
+/**
+ * A fila da Início do nutricionista: só quem tem alerta, do mais grave para
+ * o menos grave. A ordem antiga, por quantidade de alertas, punha "exame
+ * fora + 3 dias parado" acima de "dose atrasada".
+ *
+ * Desempate: mais alertas, depois mais dias parado, depois o nome, para a
+ * fila não embaralhar entre uma visita e outra. Quem nunca registrou fica
+ * depois de quem parou: pode ter sido convidado ontem.
+ */
+export function filaDeTriagem(
+  resumos: PatientSummary[],
+  today: string
+): PatientSummary[] {
+  const parado = (r: PatientSummary) => idleDays(r, today) ?? -1;
+  return resumos
+    .filter((r) => r.gravidade != null)
+    .sort(
+      (a, b) =>
+        a.gravidade! - b.gravidade! ||
+        b.alerts.length - a.alerts.length ||
+        parado(b) - parado(a) ||
+        a.name.localeCompare(b.name, "pt-BR")
+    );
 }
 
 // ---------------------------------------------------------------------------
