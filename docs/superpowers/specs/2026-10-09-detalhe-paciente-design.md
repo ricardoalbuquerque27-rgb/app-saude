@@ -262,12 +262,19 @@ mostra "Não foi possível carregar <seção>" com um botão de tentar de novo.
 
 ## Riscos e o que confirmar primeiro
 
-1. **`set_patient_goals`:** o código da função não está no repositório. Antes
-   de construir "Reaplicar", confirmar no banco (painel do Supabase ou
-   leitura autorizada pela conexão desta sessão) o que ela faz com campo
-   nulo e se dá baixa em `prescription_deviations`. A suposição de que dá
-   vem só do texto da tela atual ("Reaplicar as metas abaixo resolve estes
-   avisos").
+1. **`set_patient_goals` — confirmado no banco em 2026-10-09** (leitura
+   autorizada, só `pg_get_functiondef` e `pg_policies`):
+   - A função confere `is_active_nutri_of(p_patient)`, **insere uma linha em
+     `prescriptions`** e grava as quatro metas em `profiles`.
+   - **Campo nulo apaga a meta:** o `update` grava o valor recebido, inclusive
+     nulo. Por isso "Reaplicar" manda os quatro valores da última prescrição,
+     nunca só o campo que mudou.
+   - **A baixa nos avisos é feita por gatilho:** `prescriptions_ack_deviations`
+     (`AFTER INSERT ON prescriptions`) preenche `acknowledged_at` em todos os
+     avisos abertos do paciente. "Reaplicar" não precisa de outra gravação.
+   - **Reaplicar não gera aviso novo:** `detect_goal_deviation`
+     (`AFTER UPDATE ON profiles`) só registra quando quem mudou foi o
+     próprio paciente (`auth.uid() = new.id`).
 2. **~30 consultas por abertura:** o `Suspense` esconde a espera, mas não
    reduz a carga. Se ficar lento com pacientes reais, juntar consultas por
    seção.
