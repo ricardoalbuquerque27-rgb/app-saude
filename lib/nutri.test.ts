@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { montarResumos, type DadosResumo } from "./nutri";
+import {
+  montarResumos,
+  montarLinhaDoTempo,
+  type DadosResumo,
+  type DadosAtividade,
+} from "./nutri";
 
 /** 2026-10-08 é uma quinta. A janela de 7 dias vai de 02 (sexta) a 08. */
 const HOJE = "2026-10-08";
@@ -246,5 +251,128 @@ describe("montarResumos — alertas", () => {
     });
     expect(r.alerts[0]).toBe("2 mudanças na sua prescrição");
     expect(r.alerts).toContain("Dose atrasada");
+  });
+});
+
+function atividade(parcial: Partial<DadosAtividade> = {}): DadosAtividade {
+  return {
+    meals: [],
+    workouts: [],
+    body: [],
+    logs: [],
+    exams: [],
+    doses: [],
+    effects: [],
+    checkins: [],
+    plan: [],
+    ...parcial,
+  };
+}
+
+describe("montarLinhaDoTempo", () => {
+  it("rotula o check-in com o nome da sessão do plano", () => {
+    const itens = montarLinhaDoTempo(
+      atividade({
+        plan: [
+          { id: "p1", title: "Treino A", sport: "Musculação" },
+          { id: "p2", title: null, sport: "Corrida" },
+        ],
+        checkins: [
+          { date: "2026-10-07", created_at: "2026-10-07T20:00:00Z", status: "done", plan_id: "p1" },
+          { date: "2026-10-06", created_at: "2026-10-06T20:00:00Z", status: "skipped", plan_id: "p2" },
+          { date: "2026-10-05", created_at: "2026-10-05T20:00:00Z", status: "done", plan_id: "apagado" },
+        ],
+      }),
+      HOJE
+    );
+    expect(itens.map((i) => i.title)).toEqual([
+      "Confirmou o Treino A",
+      "Avisou que não foi ao Corrida",
+      "Confirmou o treino do plano",
+    ]);
+  });
+
+  it("registro do dia vazio não vira item; água sai em litros", () => {
+    const itens = montarLinhaDoTempo(
+      atividade({
+        logs: [
+          { date: "2026-10-07", created_at: "2026-10-07T22:00:00Z", water_ml: 1750 },
+          { date: "2026-10-06", created_at: "2026-10-06T22:00:00Z" },
+        ],
+      }),
+      HOJE
+    );
+    expect(itens).toHaveLength(1);
+    expect(itens[0].detail).toBe("1.8 L de água");
+  });
+
+  it("registro retroativo fica no dia a que se refere", () => {
+    // Lançar na quinta o almoço de terça é comum (o seletor de data deixa).
+    // Ordenando só pela hora em que foi lançado, o almoço de terça subia
+    // para o topo e a tela, que agrupa itens seguidos do mesmo dia, mostrava
+    // "06/10" acima de "08/10" e o cabeçalho de um dia duas vezes.
+    const itens = montarLinhaDoTempo(
+      atividade({
+        meals: [
+          { date: "2026-10-06", created_at: "2026-10-08T15:00:00Z", description: "Almoço de terça" },
+          { date: "2026-10-07", created_at: "2026-10-07T12:00:00Z", description: "Almoço de quarta" },
+        ],
+        workouts: [
+          { date: "2026-10-08", created_at: "2026-10-08T11:00:00Z", name: "Corrida" },
+        ],
+      }),
+      HOJE
+    );
+    expect(itens.map((i) => i.date)).toEqual([
+      "2026-10-08",
+      "2026-10-07",
+      "2026-10-06",
+    ]);
+  });
+
+  it("dentro do mesmo dia, o lançado por último vem primeiro", () => {
+    const itens = montarLinhaDoTempo(
+      atividade({
+        meals: [
+          { date: HOJE, created_at: "2026-10-08T11:00:00Z", description: "Café" },
+          { date: HOJE, created_at: "2026-10-08T23:30:00Z", description: "Jantar" },
+        ],
+      }),
+      HOJE
+    );
+    expect(itens.map((i) => i.title)).toEqual(["Jantar", "Café"]);
+  });
+
+  it("30 dias são 30: nem o 31º nem data futura", () => {
+    // De 09/09 a 08/10 são 30 dias. 08/09 é o 31º; 09/10 é amanhã — e,
+    // ordenado por data, um registro futuro iria parar no topo.
+    const itens = montarLinhaDoTempo(
+      atividade({
+        workouts: [
+          { date: "2026-10-09", created_at: "2026-10-01T10:00:00Z", name: "Futuro" },
+          { date: "2026-09-09", created_at: "2026-09-09T10:00:00Z", name: "Primeiro dia" },
+          { date: "2026-09-08", created_at: "2026-09-08T10:00:00Z", name: "Fora" },
+        ],
+      }),
+      HOJE,
+      30
+    );
+    expect(itens.map((i) => i.title)).toEqual(["Primeiro dia"]);
+  });
+
+  it("o limite corta os mais antigos", () => {
+    const itens = montarLinhaDoTempo(
+      atividade({
+        workouts: ["2026-10-05", "2026-10-08", "2026-10-06"].map((date) => ({
+          date,
+          created_at: date + "T10:00:00Z",
+          name: date,
+        })),
+      }),
+      HOJE,
+      30,
+      2
+    );
+    expect(itens.map((i) => i.date)).toEqual(["2026-10-08", "2026-10-06"]);
   });
 });

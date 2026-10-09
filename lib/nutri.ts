@@ -343,7 +343,7 @@ export async function getPatientActivity(
   sinceDays = 30,
   limit = 80
 ): Promise<ActivityItem[]> {
-  const since = addDaysISO(todayISO(), -sinceDays);
+  const since = addDaysISO(todayISO(), -(sinceDays - 1));
 
   const [meals, workouts, body, logs, exams, doses, effects, checkins, planRows] =
     await Promise.all([
@@ -396,6 +396,47 @@ export async function getPatientActivity(
         .eq("user_id", uid),
     ]);
 
+  return montarLinhaDoTempo(
+    {
+      meals: meals.data ?? [],
+      workouts: workouts.data ?? [],
+      body: body.data ?? [],
+      logs: logs.data ?? [],
+      exams: exams.data ?? [],
+      doses: doses.data ?? [],
+      effects: effects.data ?? [],
+      checkins: checkins.data ?? [],
+      plan: planRows.data ?? [],
+    },
+    todayISO(),
+    sinceDays,
+    limit
+  );
+}
+
+/** As linhas que `getPatientActivity` busca. */
+export type DadosAtividade = {
+  meals: any[];
+  workouts: any[];
+  body: any[];
+  logs: any[];
+  exams: any[];
+  doses: any[];
+  effects: any[];
+  checkins: any[];
+  /** Sessões do plano, só para dar nome aos check-ins. */
+  plan: any[];
+};
+
+/** A linha do tempo a partir das linhas, sem banco. */
+export function montarLinhaDoTempo(
+  dados: DadosAtividade,
+  today: string,
+  dias = 30,
+  limit = 80
+): ActivityItem[] {
+  const { meals, workouts, body, logs, exams, doses, effects, checkins, plan } =
+    dados;
   const items: ActivityItem[] = [];
   const push = (
     kind: ActivityKind,
@@ -403,6 +444,9 @@ export async function getPatientActivity(
     title: string,
     detail?: string
   ) => {
+    // A consulta só tem piso. Sem o teto, um registro com data futura
+    // iria para o topo da linha do tempo.
+    if (!naJanela(r.date, today, dias)) return;
     items.push({
       kind,
       date: r.date,
@@ -412,7 +456,7 @@ export async function getPatientActivity(
     });
   };
 
-  for (const m of meals.data ?? []) {
+  for (const m of meals) {
     const macros = [
       m.calories ? `${Math.round(Number(m.calories))} kcal` : null,
       m.protein_g ? `${Math.round(Number(m.protein_g))} g proteína` : null,
@@ -421,13 +465,13 @@ export async function getPatientActivity(
       .join(" · ");
     push("refeicao", m, m.description || m.meal_type || "Refeição", macros);
   }
-  for (const w of workouts.data ?? []) {
+  for (const w of workouts) {
     const d = [w.category, w.duration_min ? `${w.duration_min} min` : null]
       .filter(Boolean)
       .join(" · ");
     push("treino", w, w.name || "Treino", d);
   }
-  for (const b of body.data ?? []) {
+  for (const b of body) {
     const d = [
       b.body_fat_pct ? `${b.body_fat_pct}% gordura` : null,
       b.waist_cm ? `cintura ${b.waist_cm} cm` : null,
@@ -436,7 +480,7 @@ export async function getPatientActivity(
       .join(" · ");
     push("peso", b, b.weight_kg ? `Peso ${b.weight_kg} kg` : "Medidas", d);
   }
-  for (const l of logs.data ?? []) {
+  for (const l of logs) {
     const parts = [
       l.water_ml ? `${(Number(l.water_ml) / 1000).toFixed(1)} L de água` : null,
       l.sleep_hours ? `${l.sleep_hours} h de sono` : null,
@@ -445,7 +489,7 @@ export async function getPatientActivity(
     ].filter(Boolean);
     if (parts.length) push("diario", l, "Registro do dia", parts.join(" · "));
   }
-  for (const e of exams.data ?? []) {
+  for (const e of exams) {
     push(
       "exame",
       e,
@@ -458,10 +502,10 @@ export async function getPatientActivity(
         .join(" · ")
     );
   }
-  for (const d of doses.data ?? []) {
+  for (const d of doses) {
     push("dose", d, "Dose aplicada", d.dose || undefined);
   }
-  for (const s of effects.data ?? []) {
+  for (const s of effects) {
     const parts = [
       s.nausea ? `náusea ${s.nausea}/5` : null,
       s.appetite ? `apetite ${s.appetite}/5` : null,
@@ -472,10 +516,10 @@ export async function getPatientActivity(
   }
 
   const planNames = new Map<string, string>();
-  for (const p of (planRows.data ?? []) as any[]) {
+  for (const p of plan) {
     planNames.set(p.id, p.title || p.sport || "treino do plano");
   }
-  for (const c of checkins.data ?? []) {
+  for (const c of checkins) {
     const nome = planNames.get((c as any).plan_id) || "treino do plano";
     push(
       "checkin",
@@ -486,7 +530,15 @@ export async function getPatientActivity(
     );
   }
 
-  items.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
+  // Primeiro pelo dia a que o registro se refere, depois pela hora em que
+  // foi lançado. Só pela hora, o almoço de terça lançado na quinta subia
+  // para o topo, e a tela, que agrupa itens seguidos do mesmo dia,
+  // repetia o cabeçalho de terça.
+  items.sort((a, b) =>
+    a.date !== b.date
+      ? a.date < b.date ? 1 : -1
+      : a.at < b.at ? 1 : a.at > b.at ? -1 : 0
+  );
   return items.slice(0, limit);
 }
 
