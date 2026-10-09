@@ -321,11 +321,14 @@ export default async function DashboardPage() {
     itensCardapioPendentes.length === 0 &&
     notasNaoLidas.length === 0;
 
+  // "Refeição" e "Foto do prato" apontavam para a MESMA URL, /app/dieta, e
+  // nenhuma das duas abria nada — a pessoa chegava na página e tinha de
+  // procurar o botão. Agora cada atalho abre o que o rótulo diz.
   const atalhos = [
-    { href: "/app/dieta", icon: Flame, label: "Refeição" },
+    { href: "/app/dieta?novo=1", icon: Flame, label: "Refeição" },
+    { href: "/app/dieta?foto=1", icon: Camera, label: "Foto do prato" },
     { href: "/app/treinos", icon: Dumbbell, label: "Treino" },
     { href: "/app/medidas", icon: Scale, label: "Peso" },
-    { href: "/app/dieta", icon: Camera, label: "Foto do prato" },
   ];
 
   return (

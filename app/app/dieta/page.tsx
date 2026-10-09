@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   Salad,
   Plus,
@@ -47,6 +48,7 @@ export default function DietaPage() {
   const [calorieGoal, setCalorieGoal] = useState<number | null>(null);
   const [proteinGoal, setProteinGoal] = useState<number | null>(null);
   const [open, setOpen] = useState(false);
+  const params = useSearchParams();
   const [saving, setSaving] = useState(false);
 
   const [mealType, setMealType] = useState(MEAL_TYPES[0]);
@@ -105,6 +107,22 @@ export default function DietaPage() {
 
   // Recarrega quando a IA registra uma refeição.
   useLiveRefresh("dieta", load);
+
+  // Os atalhos da Início ("Refeição" e "Foto do prato") apontavam os dois
+  // para /app/dieta sem parâmetro: caíam na página com o formulário
+  // FECHADO, e o da foto nem abria a câmera. O chip prometia uma coisa e
+  // entregava outra. Agora cada um diz para onde vai.
+  const atalhoJaAberto = useRef(false);
+  useEffect(() => {
+    if (atalhoJaAberto.current) return;
+    const quer = params.get("novo") === "1";
+    const querFoto = params.get("foto") === "1";
+    if (!quer && !querFoto) return;
+    atalhoJaAberto.current = true;
+    setOpen(true);
+    // A câmera só pode ser aberta depois que o modal montou o input.
+    if (querFoto) setTimeout(() => cameraInputRef.current?.click(), 250);
+  }, [params]);
 
   useEffect(() => {
     (async () => {
