@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useReducer,
   type ReactNode,
@@ -29,8 +30,8 @@ const ROTULOS: Record<SecaoEditavel, string> = {
 type Contexto = {
   estado: EstadoEdicao;
   abrir(secao: SecaoEditavel): void;
-  fechar(): void;
-  marcarSuja(): void;
+  fechar(secao?: SecaoEditavel): void;
+  marcarSuja(secao?: SecaoEditavel): void;
 };
 
 const EdicaoContext = createContext<Contexto | null>(null);
@@ -45,8 +46,14 @@ export function EdicaoProvider({ children }: { children: ReactNode }) {
     (secao: SecaoEditavel) => dispatch({ tipo: "abrir", secao }),
     []
   );
-  const fechar = useCallback(() => dispatch({ tipo: "fechar" }), []);
-  const marcarSuja = useCallback(() => dispatch({ tipo: "sujar" }), []);
+  const fechar = useCallback(
+    (secao?: SecaoEditavel) => dispatch({ tipo: "fechar", secao }),
+    []
+  );
+  const marcarSuja = useCallback(
+    (secao?: SecaoEditavel) => dispatch({ tipo: "sujar", secao }),
+    []
+  );
 
   const valor = useMemo(
     () => ({ estado, abrir, fechar, marcarSuja }),
@@ -76,15 +83,20 @@ export function useEdicao(secao: SecaoEditavel): {
   const bloqueadaPor =
     !podeAbrir(estado, secao) && estado.aberta ? ROTULOS[estado.aberta] : null;
 
-  // Sem guarda de "só quem está editando": `editando` vem do último render,
-  // então `abrir()` seguido de `marcarSuja()` no mesmo evento teria o segundo
-  // descartado. As seções só mostram o formulário (e seus botões) quando
-  // `editando` é verdadeiro, então a guarda também não faria falta.
+  // Solta a trava ao desmontar: uma seção suja que sai da tela sem chamar
+  // fechar() deixaria as outras bloqueadas por algo que ninguém vê. É seguro
+  // mesmo quando a seção já cedeu o lugar, porque o reducer ignora fechar de
+  // quem não é a seção aberta.
+  useEffect(() => () => fechar(secao), [fechar, secao]);
+
+  // Quem chama vai identificado (`secao`) e o reducer decide. Uma guarda aqui
+  // com `editando` não serviria: ele vem do último render e está velho dentro
+  // do mesmo evento (`abrir()` seguido de `marcarSuja()` perderia o segundo).
   return {
     editando,
     bloqueadaPor,
     abrir: () => abrir(secao),
-    fechar,
-    marcarSuja,
+    fechar: () => fechar(secao),
+    marcarSuja: () => marcarSuja(secao),
   };
 }

@@ -9,10 +9,15 @@ export type SecaoEditavel = "metas" | "cardapio" | "treino";
 
 export type EstadoEdicao = { aberta: SecaoEditavel | null; suja: boolean };
 
+// `secao` em "sujar"/"fechar" diz QUEM está pedindo. Sem ele a ação vale para
+// a seção aberta, seja ela qual for; com ele, só vale se for a própria.
+// Motivo: uma seção limpa cede o lugar a outra enquanto ainda salva; quando o
+// salvar termina e chama fechar(), a seção aberta já é a outra, e fechá-la
+// jogaria fora o rascunho dela.
 export type AcaoEdicao =
   | { tipo: "abrir"; secao: SecaoEditavel }
-  | { tipo: "sujar" }
-  | { tipo: "fechar" };
+  | { tipo: "sujar"; secao?: SecaoEditavel }
+  | { tipo: "fechar"; secao?: SecaoEditavel };
 
 /**
  * Uma seção pode abrir se nada está aberto, se é ela mesma que está aberta,
@@ -30,9 +35,12 @@ export function reduzirEdicao(e: EstadoEdicao, a: AcaoEdicao): EstadoEdicao {
       if (e.aberta === a.secao) return e;
       return { aberta: a.secao, suja: false };
     case "sujar":
-      // Sem seção aberta não há o que sujar.
-      return e.aberta === null ? e : { ...e, suja: true };
+      // Sem seção aberta não há o que sujar; de outra seção, não é comigo.
+      if (e.aberta === null) return e;
+      if (a.secao && a.secao !== e.aberta) return e;
+      return { ...e, suja: true };
     case "fechar":
+      if (a.secao && a.secao !== e.aberta) return e;
       return { aberta: null, suja: false };
   }
 }
