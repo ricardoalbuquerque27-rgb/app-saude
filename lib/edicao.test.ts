@@ -60,3 +60,47 @@ describe("fechar/sujar com a seção de quem chama", () => {
     expect(reduzirEdicao({ aberta: "cardapio", suja: true }, { tipo: "fechar" })).toEqual(vazio);
   });
 });
+
+describe("limpar", () => {
+  // Seção que grava a cada ação (treino) continua aberta depois de salvar;
+  // sem "limpar", o aviso de alteração não salva sobrevivia ao que o motivou
+  // e travava as outras seções por nada.
+  it("na seção aberta e suja, tira a marca e mantém a seção aberta", () => {
+    expect(reduzirEdicao({ aberta: "treino", suja: true }, { tipo: "limpar" }))
+      .toEqual({ aberta: "treino", suja: false });
+    expect(reduzirEdicao({ aberta: "treino", suja: true }, { tipo: "limpar", secao: "treino" }))
+      .toEqual({ aberta: "treino", suja: false });
+  });
+
+  it("com a guarda de outra seção, devolve o mesmo estado", () => {
+    const e = { aberta: "treino" as const, suja: true };
+    expect(reduzirEdicao(e, { tipo: "limpar", secao: "metas" })).toBe(e);
+  });
+
+  it("sem seção aberta, devolve o mesmo estado", () => {
+    expect(reduzirEdicao(vazio, { tipo: "limpar" })).toBe(vazio);
+    expect(reduzirEdicao(vazio, { tipo: "limpar", secao: "treino" })).toBe(vazio);
+  });
+
+  it("seção que já está limpa devolve o mesmo estado", () => {
+    const e = { aberta: "treino" as const, suja: false };
+    expect(reduzirEdicao(e, { tipo: "limpar", secao: "treino" })).toBe(e);
+  });
+
+  it("depois de limpar, as outras seções podem abrir", () => {
+    const suja = { aberta: "treino" as const, suja: true };
+    expect(podeAbrir(suja, "metas")).toBe(false);
+    const limpa = reduzirEdicao(suja, { tipo: "limpar", secao: "treino" });
+    expect(podeAbrir(limpa, "metas")).toBe(true);
+    expect(reduzirEdicao(limpa, { tipo: "abrir", secao: "metas" }))
+      .toEqual({ aberta: "metas", suja: false });
+  });
+
+  it("limpar tardio de seção que cedeu o lugar não limpa a nova", () => {
+    let e = reduzirEdicao(vazio, { tipo: "abrir", secao: "treino" });
+    e = reduzirEdicao(e, { tipo: "abrir", secao: "metas" }); // treino estava limpa
+    e = reduzirEdicao(e, { tipo: "sujar", secao: "metas" });
+    e = reduzirEdicao(e, { tipo: "limpar", secao: "treino" }); // gravação do treino terminou
+    expect(e).toEqual({ aberta: "metas", suja: true });
+  });
+});

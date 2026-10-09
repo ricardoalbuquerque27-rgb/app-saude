@@ -31,6 +31,7 @@ type Contexto = {
   abrir(secao: SecaoEditavel): void;
   fechar(secao?: SecaoEditavel): void;
   marcarSuja(secao?: SecaoEditavel): void;
+  marcarLimpa(secao?: SecaoEditavel): void;
 };
 
 const EdicaoContext = createContext<Contexto | null>(null);
@@ -54,9 +55,14 @@ export function EdicaoProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  const marcarLimpa = useCallback(
+    (secao?: SecaoEditavel) => dispatch({ tipo: "limpar", secao }),
+    []
+  );
+
   const valor = useMemo(
-    () => ({ estado, abrir, fechar, marcarSuja }),
-    [estado, abrir, fechar, marcarSuja]
+    () => ({ estado, abrir, fechar, marcarSuja, marcarLimpa }),
+    [estado, abrir, fechar, marcarSuja, marcarLimpa]
   );
 
   return <EdicaoContext.Provider value={valor}>{children}</EdicaoContext.Provider>;
@@ -69,6 +75,8 @@ export function useEdicao(secao: SecaoEditavel): {
   abrir(): void;
   fechar(): void;
   marcarSuja(): void;
+  /** Tira a marca de alteração não salva, mantendo a seção aberta. */
+  marcarLimpa(): void;
 } {
   const ctx = useContext(EdicaoContext);
   if (!ctx) {
@@ -76,7 +84,7 @@ export function useEdicao(secao: SecaoEditavel): {
       "useEdicao precisa estar dentro de <EdicaoProvider>. Envolva a página do paciente com ele."
     );
   }
-  const { estado, abrir, fechar, marcarSuja } = ctx;
+  const { estado, abrir, fechar, marcarSuja, marcarLimpa } = ctx;
 
   const editando = estado.aberta === secao;
   const bloqueadaPor =
@@ -99,5 +107,6 @@ export function useEdicao(secao: SecaoEditavel): {
     abrir: () => abrir(secao),
     fechar: () => fechar(secao),
     marcarSuja: () => marcarSuja(secao),
+    marcarLimpa: () => marcarLimpa(secao),
   };
 }

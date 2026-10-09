@@ -87,9 +87,13 @@ export function Conversa({
                   }`}
                 >
                   <p className="whitespace-pre-wrap text-sm">{m.body}</p>
+                  {/* Carimbo de hora em cor OPACA: `text-white/70` sobre
+                      brand-700 compõe #b6d6c5, 3,65:1; brand-100 dá 5,06:1
+                      (lib/contraste.ts). No balão do paciente, slate-500 sobre
+                      slate-100 dava 4,34:1; slate-600 dá 6,92:1. */}
                   <p
                     className={`mt-1 flex items-center gap-1 text-[11px] ${
-                      meu ? "text-white/70" : "text-slate-500 dark:text-slate-400"
+                      meu ? "text-brand-100" : "text-slate-600 dark:text-slate-400"
                     }`}
                   >
                     {formatDate(m.created_at.slice(0, 10))}

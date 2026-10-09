@@ -64,7 +64,7 @@ export function EditorTreino({
 }) {
   const supabase = createClient();
   const router = useRouter();
-  const { marcarSuja } = useEdicao("treino");
+  const { marcarSuja, marcarLimpa } = useEdicao("treino");
   // Um erro por bloco, cada um embaixo do que falhou: o das rotinas fica
   // entre o formulário de nova rotina e a lista, o da semana embaixo do
   // encaixe. Um só no fim do editor ficaria longe de quem acabou de clicar.
@@ -75,11 +75,23 @@ export function EditorTreino({
   // ação. A primeira alteração nele avisa a página (para ela não deixar outra
   // seção abrir por cima e perder o que foi digitado). Vem do onChange, não de
   // um useEffect, e a ref evita repetir a ação a cada tecla.
+  //
+  // A marca é DO RASCUNHO e some com ele: o treino continua aberto depois de
+  // salvar a rotina, e uma marca que sobrevivesse ao rascunho trancaria as
+  // outras seções ("Salve ou cancele a edição de Treino") sem nada a salvar.
+  // Por isso `sujou` é exatamente "há rascunho com alteração", e só salvar ou
+  // cancelar o rascunho a solta. Encaixar, excluir e remover não mexem nela:
+  // com rascunho aberto ele continua pendente, e sem rascunho ela já está solta.
   const sujou = useRef(false);
   function alterouRascunho() {
     if (sujou.current) return;
     sujou.current = true;
     marcarSuja();
+  }
+  function soltarMarca() {
+    if (!sujou.current) return;
+    sujou.current = false;
+    marcarLimpa();
   }
 
   const [criando, setCriando] = useState(false);
@@ -144,11 +156,19 @@ export function EditorTreino({
       setErroRotinas("A rotina foi criada, mas os exercícios falharam. Tente editar.");
       return;
     }
+    descartarRascunho();
+    router.refresh();
+  }
+
+  // Salvou ou cancelou: o rascunho some por inteiro. Antes o Cancelar só
+  // escondia o formulário e o texto voltava ao reabrir; com a marca de
+  // alteração solta, o rascunho escondido seria trabalho a perder sem aviso.
+  function descartarRascunho() {
     setNome("");
     setObsRotina("");
     setLinhas([{ ...LINHA_VAZIA }]);
     setCriando(false);
-    router.refresh();
+    soltarMarca();
   }
 
   // Modelo de treino = as rotinas com seus exercícios, sem ids.
@@ -301,7 +321,7 @@ export function EditorTreino({
                     {linhas.length > 1 && (
                       <button
                         onClick={() => setLinhas((p) => p.filter((_, k) => k !== i))}
-                        className="tappable rounded-lg px-2 text-slate-500 hover:text-rose-600"
+                        className="tappable inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg px-2 text-slate-500 hover:text-rose-600"
                         aria-label="Remover exercício"
                       >
                         <X className="h-4 w-4" />
@@ -344,7 +364,13 @@ export function EditorTreino({
                 {salvando && <Loader2 className="h-4 w-4 animate-spin" />}
                 Salvar rotina
               </button>
-              <button onClick={() => setCriando(false)} className="btn-ghost px-4 py-2 text-sm">
+              <button
+                onClick={() => {
+                  descartarRascunho();
+                  setErroRotinas(null);
+                }}
+                className="btn-ghost px-4 py-2 text-sm"
+              >
                 Cancelar
               </button>
             </div>
@@ -375,7 +401,7 @@ export function EditorTreino({
                     </div>
                     <button
                       onClick={() => excluirRotina(r.id)}
-                      className="tappable rounded-lg p-1.5 text-slate-500 hover:text-rose-600"
+                      className="tappable inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg p-1.5 text-slate-500 hover:text-rose-600"
                       aria-label="Excluir rotina"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -438,7 +464,7 @@ export function EditorTreino({
                 </div>
                 <button
                   onClick={() => removerDoDia(p.id)}
-                  className="tappable rounded-lg p-1.5 text-slate-500 hover:text-rose-600"
+                  className="tappable inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg p-1.5 text-slate-500 hover:text-rose-600"
                   aria-label="Remover do plano"
                 >
                   <Trash2 className="h-4 w-4" />

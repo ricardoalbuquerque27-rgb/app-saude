@@ -425,6 +425,19 @@ input[type="number"] {
     background-color: var(--clin-primaria-fundo);
   }
 
+  /* Alvo de toque: ação principal com 44 px e secundária com 40 px, no
+     mínimo. Os formulários movidos usam `.btn-primary py-2 text-sm` (36 px)
+     e `.btn-ghost py-1.5 text-xs` (30 px), e reescrevê-los fugiria do R3.
+     Vai em `min-height` (e não `height`) para o botão crescer com o texto
+     quebrado em duas linhas, e no mesmo escopo `:where` em camada: um
+     utilitário na própria tag (`min-h-[48px]`) continua vencendo. */
+  :where(.tema-clinico) .btn-primary {
+    min-height: 44px;
+  }
+  :where(.tema-clinico) .btn-ghost {
+    min-height: 40px;
+  }
+
   /* Foco por teclado nos botões: o anel global é brand-500 a 25%, fora da
      paleta e fraco. Contorno sólido na cor primária, com folga. */
   :where(.tema-clinico) .btn-primary:focus-visible,

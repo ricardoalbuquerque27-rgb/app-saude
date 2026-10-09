@@ -104,7 +104,7 @@ export function NotasPrivadas({
                 </span>
                 <button
                   onClick={() => excluir(n.id)}
-                  className="tappable rounded-lg p-1 text-slate-500 hover:text-rose-600"
+                  className="tappable inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg p-1 text-slate-500 hover:text-rose-600"
                   aria-label="Excluir nota"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
