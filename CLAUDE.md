@@ -20,8 +20,10 @@ Isso não é óbvio lendo a árvore de arquivos.
   detalhe em `pacientes/[id]`, cuja aba **Prescrição** é a única onde ele
   age — as outras são leitura.
 - **Lógica testada:** `lib/date.ts` (datas e janelas), `lib/planCheckIn.ts`
-  (adesão), `lib/perfil.ts`, `lib/foods.ts` (tabela TACO), `lib/nutri.ts`
-  (leitura do lado profissional).
+  (adesão), `lib/foods.ts` (tabela TACO) e, em `lib/nutri.ts`, a conta do
+  resumo e da linha do tempo do nutri (`montarResumos`,
+  `montarLinhaDoTempo`). As consultas ao banco não têm teste, nem
+  `lib/perfil.ts`, que é só uma consulta.
 
 Toda segurança é por **RLS no Postgres**, nunca por service role no app.
 Ao mexer em política, teste com `BEGIN ... ROLLBACK` e
@@ -32,7 +34,7 @@ authenticated` — nessa ordem.
 
 ```bash
 npm run dev      # desenvolvimento
-npm test         # 44 testes unitários (vitest)
+npm test         # 68 testes unitários (vitest)
 npm run build    # produção
 ```
 
