@@ -108,3 +108,25 @@ export function avancarDia(
   if (maximo && destino > maximo) return maximo;
   return destino;
 }
+
+/**
+ * Idade em anos completos na data `hoje` (YYYY-MM-DD), ou null quando a data
+ * de nascimento falta, não é YYYY-MM-DD ou dá uma idade impossível.
+ *
+ * Substitui a conta do detalhe do paciente que dividia `Date.now()` menos o
+ * nascimento por 365,25 dias: ela errava em um ano perto do aniversário e
+ * usava o relógio do servidor (UTC na Vercel) em vez do dia do Brasil. Aqui
+ * a comparação é só de texto ("MM-DD"), sem fuso: quem nasceu em 29/02 faz
+ * aniversário em 01/03 nos anos que não são bissextos.
+ */
+export function idadeEm(
+  nascimento: string | null | undefined,
+  hoje: string
+): number | null {
+  if (!nascimento || !/^\d{4}-\d{2}-\d{2}/.test(nascimento)) return null;
+  const anos =
+    Number(hoje.slice(0, 4)) -
+    Number(nascimento.slice(0, 4)) -
+    (hoje.slice(5, 10) < nascimento.slice(5, 10) ? 1 : 0);
+  return anos >= 0 && anos < 130 ? anos : null;
+}

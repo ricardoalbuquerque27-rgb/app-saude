@@ -12,14 +12,21 @@ import { useEdicao } from "./Edicao";
 // O MealPlanEditor e o EditorTreino gravam a cada ação e não têm Cancelar
 // próprio, então "Fechar edição" é a saída deles. O EditorMetas tem formulário
 // com Aplicar/Cancelar e usa o mesmo fechar() por conta própria.
+//
+// `titulo` (opcional) é o subtítulo do bloco, na mesma linha do botão: na
+// Alimentação, "Metas" e "Cardápio" são dois blocos editáveis dentro da mesma
+// seção, e com o título numa linha e o botão em outra cada bloco gastava uma
+// linha vazia. Fica nos dois modos, para o leitor saber o que está editando.
 export function Editavel({
   secao,
   rotuloBotao,
+  titulo,
   children,
   editor,
 }: {
   secao: SecaoEditavel;
   rotuloBotao: string;
+  titulo?: React.ReactNode;
   children: React.ReactNode;
   editor: React.ReactNode;
 }) {
@@ -42,14 +49,19 @@ export function Editavel({
   });
   useEffect(() => () => fecharRef.current(), []);
 
+  // flex-wrap + ml-auto: o aviso de bloqueio é longo e, sem espaço ao lado
+  // do título, desce para a linha de baixo em vez de espremer o título.
+  const linha = "mb-3 flex min-h-[40px] flex-wrap items-center gap-x-3 gap-y-2";
+
   if (editando) {
     return (
       <div>
-        <div className="mb-3 flex justify-end">
+        <div className={linha}>
+          {titulo}
           <button
             type="button"
             onClick={fechar}
-            className="btn-ghost min-h-[40px] px-4"
+            className="btn-ghost ml-auto min-h-[40px] px-4"
           >
             Fechar edição
           </button>
@@ -61,7 +73,8 @@ export function Editavel({
 
   return (
     <div>
-      <div className="mb-3 flex justify-end">
+      <div className={linha}>
+        {titulo}
         {bloqueadaPor ? (
           // O aviso é o próprio texto do botão, visível, e não um tooltip:
           // botão desativado não recebe foco nem hover, e quem usa toque ou
@@ -71,7 +84,7 @@ export function Editavel({
             type="button"
             disabled
             aria-disabled="true"
-            className="btn-ghost min-h-[40px] border-dashed px-4 text-left text-clin-texto-2 disabled:opacity-100"
+            className="btn-ghost ml-auto min-h-[40px] border-dashed px-4 text-left text-clin-texto-2 disabled:opacity-100"
           >
             Salve ou cancele a edição de {bloqueadaPor}
           </button>
@@ -79,7 +92,7 @@ export function Editavel({
           <button
             type="button"
             onClick={abrir}
-            className="btn-ghost min-h-[40px] px-4"
+            className="btn-ghost ml-auto min-h-[40px] px-4"
           >
             {rotuloBotao}
           </button>

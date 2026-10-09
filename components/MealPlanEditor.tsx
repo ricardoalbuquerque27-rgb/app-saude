@@ -14,15 +14,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import FoodSearch from "@/components/FoodSearch";
 import TemplateBar from "@/components/TemplateBar";
-
-export const MEAL_TYPES = [
-  "Café da manhã",
-  "Lanche da manhã",
-  "Almoço",
-  "Lanche da tarde",
-  "Jantar",
-  "Ceia",
-];
+import { MEAL_TYPES } from "@/lib/cardapio";
 
 export type PlanoAlimentar = {
   id: string;
@@ -247,12 +239,12 @@ export default function MealPlanEditor({
       />
 
       <div className="card mb-4">
-        <h2 className="section-title mb-3">
+        <h3 className="section-title mb-3">
           <span className="icon-badge">
             <Utensils className="h-4 w-4" />
           </span>
           Cardápio prescrito
-        </h2>
+        </h3>
 
         <div className="grid gap-2 sm:grid-cols-2">
           <input

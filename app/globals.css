@@ -350,7 +350,7 @@ input[type="number"] {
    vence a regra global do componente por ORDEM, e perde para qualquer
    utilitário na mesma tag. Fora da camada, ou com o escopo contando
    especificidade, `card border-rose-200 bg-rose-50` (o banner de erro do
-   PrescricaoClient) virava um card comum aqui dentro, em silêncio.
+   MealPlanEditor) virava um card comum aqui dentro, em silêncio.
 
    O seletor `.dark :where(.tema-clinico)` repetido existe porque as
    regras globais têm variantes dark: (`.dark .input` etc., especificidade

@@ -739,3 +739,99 @@ export function compararComMeta(
       : delta < LIMITE_ATENCAO[item];
   return { delta, status: atencao ? "atencao" : "ok" };
 }
+
+/**
+ * Variação de peso como a tela mostra: "−1,4 kg", "+0,6 kg", "0,0 kg". Usa o
+ * sinal de menos de verdade (U+2212), como o Δ de `textoDelta`: o hífen é
+ * mais curto que o "+" e desalinha números `tabular-nums` um embaixo do
+ * outro. O que arredonda para zero sai sem sinal: "−0,0 kg" diria que o peso
+ * caiu. Sem variação medida (uma medida só, ou nenhuma), "—".
+ */
+export function textoVariacaoPeso(delta: number | null): string {
+  if (delta == null || !Number.isFinite(delta)) return "—";
+  const arredondado = Math.round(delta * 10) / 10;
+  const numero = Math.abs(arredondado).toLocaleString("pt-BR", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  });
+  if (arredondado === 0) return `${numero} kg`;
+  return `${arredondado > 0 ? "+" : "−"}${numero} kg`;
+}
+
+/**
+ * De quantos dias saiu a média de um item (ver `mediasDaSemana`). A tela
+ * precisa dizer: "1.650 kcal" de 2 dias e de 7 dias são coisas diferentes, e
+ * o dia sem registro não entra na conta.
+ */
+export function notaMedia(dias: number): string {
+  if (dias <= 0) return "sem registro nos últimos 7 dias";
+  return `média de ${dias} ${dias === 1 ? "dia" : "dias"} com registro`;
+}
+
+/**
+ * A mesma nota para a tabela do computador, que tem uma linha por item e
+ * nenhum lugar para uma nota por linha. Calorias e proteína vêm das mesmas
+ * refeições e quase sempre empatam; a água vem do registro do dia e pode
+ * diferir, e aí cada item diz o seu número.
+ */
+export function notaDasMedias(m: MediasDaSemana): string {
+  const { calorias, proteina, agua } = m;
+  if (calorias.dias === 0 && proteina.dias === 0 && agua.dias === 0) {
+    return "Sem registro nos últimos 7 dias.";
+  }
+  if (calorias.dias === proteina.dias && proteina.dias === agua.dias) {
+    return `Real: ${notaMedia(calorias.dias)}.`;
+  }
+  return (
+    "Real: média dos dias com registro nos últimos 7 dias — " +
+    `calorias em ${calorias.dias}, proteína em ${proteina.dias}, água em ${agua.dias}.`
+  );
+}
+
+/**
+ * Um aviso por meta: o mais recente de cada campo, do mais novo para o mais
+ * velho. O paciente que muda as calorias duas vezes antes de o nutricionista
+ * olhar fica com dois avisos abertos, e só o último diz o que ele está usando
+ * agora. Não depende da ordem em que a consulta trouxe as linhas.
+ */
+export function ultimoDesvioPorCampo<
+  T extends { field: string; created_at: string },
+>(desvios: T[]): T[] {
+  const porCampo = new Map<string, T>();
+  for (const d of desvios) {
+    const atual = porCampo.get(d.field);
+    if (!atual || d.created_at > atual.created_at) porCampo.set(d.field, d);
+  }
+  return Array.from(porCampo.values()).sort((a, b) =>
+    a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0
+  );
+}
+
+/** As quatro metas de uma prescrição, como `set_patient_goals` as grava. */
+export type MetasPrescritas = {
+  daily_calorie_goal: number | null;
+  protein_goal_g: number | null;
+  daily_water_goal_ml: number | null;
+  weight_goal_kg: number | null;
+};
+
+/**
+ * A prescrição mais recente do paciente, ou `data` nulo se o nutricionista
+ * nunca definiu metas. Devolve `{ data, error }` sem engolir o erro: a tela
+ * precisa separar "não tem" de "falhou". É `async` de propósito: o construtor
+ * do supabase-js é um thenable que refaz a consulta a cada `await`, e a
+ * página divide esta mesma promessa entre a fila, a Alimentação e o Corpo.
+ */
+export async function getUltimaPrescricao(
+  supabase: any,
+  uid: string
+): Promise<{ data: MetasPrescritas | null; error: unknown }> {
+  const { data, error } = await supabase
+    .from("prescriptions")
+    .select("daily_calorie_goal, protein_goal_g, daily_water_goal_ml, weight_goal_kg")
+    .eq("patient_id", uid)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return { data: (data as MetasPrescritas | null) ?? null, error };
+}

@@ -8,8 +8,8 @@ import { formatDate } from "@/lib/date";
 import { ErroInline } from "./ErroInline";
 import type { Mensagem } from "./tipos";
 
-// Notas que o paciente nunca vê (visibility "private"), movidas de AbaNotas
-// (PrescricaoClient.tsx) sem mudar as chamadas ao banco. O erro de salvar e o
+// Notas que o paciente nunca vê (visibility "private"), movidas da antiga aba
+// Prescrição sem mudar as chamadas ao banco. O erro de salvar e o
 // de excluir aparecem no mesmo lugar, embaixo do campo de texto.
 export function NotasPrivadas({
   pacienteId,
@@ -57,12 +57,6 @@ export function NotasPrivadas({
 
   return (
     <div className="card">
-      <h2 className="section-title mb-2">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200">
-          <Lock className="h-4 w-4" />
-        </span>
-        Notas privadas
-      </h2>
       <p className="mb-4 flex items-start gap-1.5 rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-600 dark:bg-slate-800/60 dark:text-slate-300">
         <Lock className="mt-0.5 h-3 w-3 shrink-0" />
         Só você vê. Use para anamnese, conduta e o que observar no próximo

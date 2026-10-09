@@ -5,6 +5,10 @@ import {
   filaDeTriagem,
   mediasDaSemana,
   compararComMeta,
+  textoVariacaoPeso,
+  notaMedia,
+  notaDasMedias,
+  ultimoDesvioPorCampo,
   type DadosResumo,
   type DadosAtividade,
   type DailySeries,
@@ -551,5 +555,81 @@ describe("compararComMeta", () => {
   });
   it("meta zero conta como sem meta", () => {
     expect(compararComMeta("calorias", 2000, 0)).toEqual({ delta: null, status: "sem-meta" });
+  });
+});
+
+describe("textoVariacaoPeso", () => {
+  it("sinal de menos de verdade, vírgula e uma casa", () => {
+    // "−" (U+2212), como o Δ da tabela: o hífen é mais curto que o "+" e
+    // desalinha a coluna.
+    expect(textoVariacaoPeso(-1.4)).toBe("−1,4 kg");
+    expect(textoVariacaoPeso(0.6)).toBe("+0,6 kg");
+    expect(textoVariacaoPeso(2)).toBe("+2,0 kg");
+  });
+  it("zero não leva sinal, nem o zero negativo da subtração", () => {
+    expect(textoVariacaoPeso(0)).toBe("0,0 kg");
+    expect(textoVariacaoPeso(-0)).toBe("0,0 kg");
+    expect(textoVariacaoPeso(-0.04)).toBe("0,0 kg");
+  });
+  it("sem variação medida, traço", () => {
+    expect(textoVariacaoPeso(null)).toBe("—");
+    expect(textoVariacaoPeso(Number.NaN)).toBe("—");
+  });
+});
+
+describe("notaMedia", () => {
+  it("diz quantos dias entraram na média, no singular e no plural", () => {
+    expect(notaMedia(5)).toBe("média de 5 dias com registro");
+    expect(notaMedia(1)).toBe("média de 1 dia com registro");
+  });
+  it("sem dia com registro, não fala em média", () => {
+    expect(notaMedia(0)).toBe("sem registro nos últimos 7 dias");
+  });
+});
+
+describe("notaDasMedias", () => {
+  const m = (c: number, p: number, a: number) => ({
+    calorias: { valor: c ? 1 : null, dias: c },
+    proteina: { valor: p ? 1 : null, dias: p },
+    agua: { valor: a ? 1 : null, dias: a },
+  });
+  it("mesmo número de dias nos três itens: uma frase só", () => {
+    expect(notaDasMedias(m(5, 5, 5))).toBe("Real: média de 5 dias com registro.");
+  });
+  it("números diferentes: diz o de cada item", () => {
+    expect(notaDasMedias(m(5, 5, 6))).toBe(
+      "Real: média dos dias com registro nos últimos 7 dias — calorias em 5, proteína em 5, água em 6."
+    );
+  });
+  it("nenhum registro nos três: sem média", () => {
+    expect(notaDasMedias(m(0, 0, 0))).toBe("Sem registro nos últimos 7 dias.");
+  });
+});
+
+describe("ultimoDesvioPorCampo", () => {
+  const d = (id: string, field: string, created_at: string) => ({
+    id,
+    field,
+    created_at,
+  });
+  it("de dois avisos do mesmo campo, fica o mais recente", () => {
+    // Paciente que mudou 1800 → 2000 → 2200 tem dois avisos abertos. "Está
+    // usando 2000" seria mentira: quem vale é o último.
+    const r = ultimoDesvioPorCampo([
+      d("velho", "daily_calorie_goal", "2026-10-01T10:00:00Z"),
+      d("novo", "daily_calorie_goal", "2026-10-05T10:00:00Z"),
+    ]);
+    expect(r.map((x) => x.id)).toEqual(["novo"]);
+  });
+  it("campos diferentes ficam todos, do mais recente para o mais antigo", () => {
+    const r = ultimoDesvioPorCampo([
+      d("agua", "daily_water_goal_ml", "2026-10-02T10:00:00Z"),
+      d("kcal", "daily_calorie_goal", "2026-10-06T10:00:00Z"),
+      d("kcal-velho", "daily_calorie_goal", "2026-10-01T10:00:00Z"),
+    ]);
+    expect(r.map((x) => x.id)).toEqual(["kcal", "agua"]);
+  });
+  it("sem aviso, lista vazia", () => {
+    expect(ultimoDesvioPorCampo([])).toEqual([]);
   });
 });

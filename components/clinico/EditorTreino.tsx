@@ -46,8 +46,8 @@ const LINHA_VAZIA: LinhaExercicio = {
   descanso: "60",
 };
 
-// Rotinas com exercícios e o encaixe nos dias da semana, movidos de AbaTreino
-// (PrescricaoClient.tsx) com as mesmas chamadas ao banco. Cada ação grava na
+// Rotinas com exercícios e o encaixe nos dias da semana, movidos da antiga aba
+// Prescrição com as mesmas chamadas ao banco. Cada ação grava na
 // hora, por isso não há Cancelar: a saída é o "Fechar edição" do <Editavel>.
 export function EditorTreino({
   pacienteId,
@@ -271,12 +271,12 @@ export function EditorTreino({
       {/* ---- Rotinas com exercícios ---- */}
       <div className="card mb-4">
         <div className="mb-3 flex items-center justify-between gap-2">
-          <h2 className="section-title">
+          <h3 className="section-title">
             <span className="icon-badge">
               <Dumbbell className="h-4 w-4" />
             </span>
             Rotinas
-          </h2>
+          </h3>
           {!criando && (
             <button onClick={() => setCriando(true)} className="btn-ghost px-3 py-1.5 text-xs">
               <Plus className="h-3.5 w-3.5" /> Nova rotina
@@ -434,12 +434,12 @@ export function EditorTreino({
 
       {/* ---- Encaixe na semana ---- */}
       <div className="card">
-        <h2 className="section-title mb-3">
+        <h3 className="section-title mb-3">
           <span className="icon-badge">
             <CalendarPlus className="h-4 w-4" />
           </span>
           Semana do paciente
-        </h2>
+        </h3>
 
         {plano.length === 0 ? (
           <p className="mb-3 text-sm text-slate-500 dark:text-slate-400">

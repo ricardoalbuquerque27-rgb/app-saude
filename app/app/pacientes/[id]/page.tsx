@@ -1,1283 +1,181 @@
+import { Suspense } from "react";
 import Link from "next/link";
-import {
-  ArrowLeft,
-  Scale,
-  Flame,
-  Droplets,
-  Dumbbell,
-  FileText,
-  Syringe,
-  Activity,
-  Utensils,
-  Ruler,
-  Target,
-  CalendarCheck,
-  AlertTriangle,
-  HeartPulse,
-} from "lucide-react";
+import { redirect } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { todayISO, addDaysISO, formatDate } from "@/lib/date";
-import { computeHealthScore } from "@/lib/healthScore";
-import { TrendChart, BarsChart } from "@/components/charts";
-import { computeAdherence, type Completion } from "@/lib/planCheckIn";
-import PrescricaoClient from "@/components/PrescricaoClient";
-import {
-  getPatientsSummary,
-  getPatientActivity,
-  getPatientSeries,
-  idleDays,
-  type ActivityItem,
-} from "@/lib/nutri";
+import { getPatientsSummary, getUltimaPrescricao } from "@/lib/nutri";
+import { SkelCard } from "@/components/Skeleton";
+import { EdicaoProvider } from "@/components/clinico/Edicao";
+import { Cabecalho } from "./secoes/Cabecalho";
+import { Fila } from "./secoes/Fila";
+import { Alimentacao } from "./secoes/Alimentacao";
+import { Treino } from "./secoes/Treino";
+import { Corpo } from "./secoes/Corpo";
+import { Clinico } from "./secoes/Clinico";
+import { ConversaENotas, type Foco } from "./secoes/ConversaENotas";
+import { ErroSecao } from "./secoes/ErroSecao";
+import { LinkPacientes, SemAcesso } from "./secoes/SemAcesso";
+import { FOCO } from "./secoes/estilos";
 
 export const dynamic = "force-dynamic";
 
-// Prescrição vem em segundo porque é a única aba onde o nutricionista AGE
-// — as outras são leitura. Era a sétima, fora da tela em 390px, e o rodapé
-// da própria página mandava usá-la.
-const TABS = [
-  { key: "geral", label: "Visão geral" },
-  { key: "prescricao", label: "Prescrição" },
-  { key: "atividade", label: "Atividade" },
-  { key: "nutricao", label: "Nutrição" },
-  { key: "treino", label: "Treino" },
-  { key: "corpo", label: "Corpo" },
-  { key: "clinico", label: "Clínico" },
-] as const;
-
-type TabKey = (typeof TABS)[number]["key"];
-
-function ageFrom(birth?: string | null): number | null {
-  if (!birth) return null;
-  const d = new Date(birth + "T12:00:00");
-  if (isNaN(d.getTime())) return null;
-  const a = Math.floor((Date.now() - d.getTime()) / (365.25 * 24 * 3600 * 1000));
-  return a >= 0 && a < 130 ? a : null;
-}
-
-function dayLabel(iso: string) {
-  return iso.slice(8, 10) + "/" + iso.slice(5, 7);
-}
-
-function Card({
-  title,
-  icon,
-  children,
-  className = "",
-}: {
-  title?: string;
-  icon?: React.ReactNode;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <div className={`card mb-4 ${className}`}>
-      {title && (
-        <h2 className="section-title mb-3">
-          {icon && <span className="icon-badge">{icon}</span>}
-          {title}
-        </h2>
-      )}
-      {children}
-    </div>
-  );
-}
-
-function Stat({
-  label,
-  value,
-  sub,
-  icon,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  icon: React.ReactNode;
-}) {
-  return (
-    <div className="card">
-      <div className="text-slate-500">{icon}</div>
-      <p className="mt-2 text-xl font-bold text-slate-900 dark:text-white">
-        {value}
-      </p>
-      <p className="text-xs text-slate-500 dark:text-slate-400">{label}</p>
-      {sub && (
-        <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
-          {sub}
-        </p>
-      )}
-    </div>
-  );
-}
-
-function Empty({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="py-2 text-sm text-slate-500 dark:text-slate-400">{children}</p>
-  );
-}
-
-const ACTIVITY_STYLE: Record<
-  ActivityItem["kind"],
-  { icon: React.ReactNode; cls: string }
-> = {
-  refeicao: {
-    icon: <Utensils className="h-3.5 w-3.5" />,
-    cls: "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300",
-  },
-  treino: {
-    icon: <Dumbbell className="h-3.5 w-3.5" />,
-    cls: "bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300",
-  },
-  peso: {
-    icon: <Scale className="h-3.5 w-3.5" />,
-    cls: "bg-sky-100 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300",
-  },
-  diario: {
-    icon: <Droplets className="h-3.5 w-3.5" />,
-    cls: "bg-cyan-100 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-300",
-  },
-  exame: {
-    icon: <FileText className="h-3.5 w-3.5" />,
-    cls: "bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300",
-  },
-  dose: {
-    icon: <Syringe className="h-3.5 w-3.5" />,
-    cls: "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300",
-  },
-  efeito: {
-    icon: <AlertTriangle className="h-3.5 w-3.5" />,
-    cls: "bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300",
-  },
-  checkin: {
-    icon: <CalendarCheck className="h-3.5 w-3.5" />,
-    cls: "bg-brand-100 text-brand-700 dark:bg-brand-950/40 dark:text-brand-300",
-  },
-};
-
+// O detalhe do paciente numa página só, por assunto: o que o nutricionista
+// lê e o que ele edita moram na mesma seção. Substitui as 7 abas (e as 5
+// abas internas da Prescrição), em que metas, plano e peso apareciam em duas
+// abas e a conversa com mensagem não lida ficava a dois níveis da entrada.
+//
+// Cada seção é um componente de servidor com as próprias consultas, dentro
+// do próprio Suspense: as rápidas aparecem sem esperar as lentas, e uma
+// consulta que falha derruba só a sua seção.
 export default async function PacienteDetalhe({
   params,
   searchParams,
 }: {
   params: { id: string };
-  searchParams: { t?: string };
+  searchParams: { [chave: string]: string | string[] | undefined };
 }) {
-  const supabase = await createClient();
   const uid = params.id;
-  const today = todayISO();
-  const tab: TabKey = (TABS.find((t) => t.key === searchParams?.t)?.key ??
-    "geral") as TabKey;
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select(
-      "full_name, sex, birth_date, height_cm, weight_goal_kg, daily_calorie_goal, protein_goal_g, daily_water_goal_ml, created_at"
-    )
-    .eq("id", uid)
-    .maybeSingle();
+  // ?t= era a aba aberta. A Atividade virou a página da linha do tempo; as
+  // outras abas viraram seções desta página, e o parâmetro é ignorado.
+  if (searchParams?.t === "atividade") {
+    redirect(`/app/pacientes/${uid}/linha-do-tempo`);
+  }
+  const foco: Foco =
+    searchParams?.conversa === "1"
+      ? "conversa"
+      : searchParams?.notas === "1"
+        ? "notas"
+        : null;
 
-  // Sem vínculo ativo → a RLS devolve nulo.
-  if (!profile) {
+  const supabase = await createClient();
+  const [perfilRes, usuarioRes] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select(
+        "full_name, sex, birth_date, height_cm, weight_goal_kg, daily_calorie_goal, protein_goal_g, daily_water_goal_ml"
+      )
+      .eq("id", uid)
+      .maybeSingle(),
+    supabase.auth.getUser(),
+  ]);
+  const profile = perfilRes.data;
+
+  if (perfilRes.error) {
     return (
       <div className="max-w-2xl">
+        <LinkPacientes />
+        <div className="mt-4">
+          <ErroSecao secao="este paciente" />
+        </div>
+      </div>
+    );
+  }
+  // Sem vínculo ativo → a RLS devolve nulo, e nenhuma seção roda.
+  if (!profile) return <SemAcesso />;
+
+  const nome = profile.full_name || "Paciente";
+  const nutriId = usuarioRes.data.user?.id ?? "";
+
+  // Começam aqui e cada seção espera a sua parte. O resumo é o mesmo que a
+  // Início usa (fila e números do topo, variação de peso do Corpo); a última
+  // prescrição é a "meta" da Alimentação e do Corpo e o valor de "Reaplicar".
+  // Uma consulta para todos, em vez de uma por seção, para os números da
+  // página não discordarem entre si.
+  const resumo = getPatientsSummary(supabase, [uid], { [uid]: nome });
+  const prescricao = getUltimaPrescricao(supabase, uid);
+
+  // Com `?conversa=1` ou `?notas=1`, abaixo de `lg` só aquela parte aparece,
+  // em tela cheia. As outras seções continuam montadas, só escondidas: a
+  // árvore é a mesma com e sem o parâmetro, então abrir a conversa e voltar
+  // não desmonta um rascunho de metas aberto. Pelo mesmo motivo o
+  // EdicaoProvider fica em volta de tudo, e nada aqui tem `key` que mude
+  // quando os dados mudam: um router.refresh() (enviar mensagem, Reaplicar)
+  // refaz as consultas sem perder o que está sendo editado.
+  const foraDoFoco = foco ? "hidden lg:block" : "";
+
+  return (
+    <EdicaoProvider>
+      {foco && (
         <Link
-          href="/app/pacientes"
-          className="mb-4 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-700"
+          href={`/app/pacientes/${uid}`}
+          className={`mb-2 inline-flex min-h-[44px] items-center gap-1 rounded-md text-[15px] font-medium text-clin-primaria lg:hidden ${FOCO}`}
         >
-          <ArrowLeft className="h-4 w-4" /> Pacientes
+          <ArrowLeft aria-hidden="true" className="h-4 w-4" /> Voltar
         </Link>
-        <div className="card">
-          <p className="text-sm text-slate-600 dark:text-slate-300">
-            Sem acesso a este paciente. O vínculo pode ter sido revogado ou ainda
-            não foi aceito.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  const name = profile.full_name || "Paciente";
-  const age = ageFrom(profile.birth_date);
-  const sexo =
-    profile.sex === "F" ? "Feminino" : profile.sex === "M" ? "Masculino" : null;
-
-  const [summary] = await getPatientsSummary(supabase, [uid], { [uid]: name });
-  const idle = idleDays(summary, today);
-
-  return (
-    <div className="max-w-3xl">
-      <Link
-        href="/app/pacientes"
-        className="mb-4 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-700"
-      >
-        <ArrowLeft className="h-4 w-4" /> Pacientes
-      </Link>
-
-      {/* Cabeçalho do paciente */}
-      <div className="mb-4 flex items-center gap-3">
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600 text-xl font-bold text-white shadow">
-          {name.slice(0, 1).toUpperCase()}
-        </div>
-        <div className="min-w-0">
-          <h1 className="truncate text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-            {name}
-          </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            {[
-              sexo,
-              age ? `${age} anos` : null,
-              profile.height_cm ? `${profile.height_cm} cm` : null,
-            ]
-              .filter(Boolean)
-              .join(" · ") || "Perfil incompleto"}
-          </p>
-        </div>
-      </div>
-
-      {summary.alerts.length > 0 && (
-        <div className="mb-4 flex flex-wrap gap-2">
-          {summary.alerts.map((a) => (
-            <span
-              key={a}
-              className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
-            >
-              <AlertTriangle className="h-3 w-3" /> {a}
-            </span>
-          ))}
-        </div>
       )}
 
-      {/* Abas */}
-      <div className="mb-5 -mx-1 flex gap-1 overflow-x-auto pb-1">
-        {TABS.map((t) => (
-          <Link
-            key={t.key}
-            href={`/app/pacientes/${uid}?t=${t.key}`}
-            scroll={false}
-            className={`tappable shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium ${
-              tab === t.key
-                ? "bg-brand-700 text-white"
-                : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
-            }`}
-          >
-            {t.label}
-          </Link>
-        ))}
-      </div>
-
-      {tab === "geral" && (
-        <TabGeral
-          supabase={supabase}
-          uid={uid}
-          profile={profile}
-          summary={summary}
-          idle={idle}
-          today={today}
-        />
-      )}
-      {tab === "atividade" && <TabAtividade supabase={supabase} uid={uid} />}
-      {tab === "nutricao" && (
-        <TabNutricao supabase={supabase} uid={uid} profile={profile} />
-      )}
-      {tab === "treino" && <TabTreino supabase={supabase} uid={uid} />}
-      {tab === "corpo" && (
-        <TabCorpo supabase={supabase} uid={uid} profile={profile} />
-      )}
-      {tab === "clinico" && <TabClinico supabase={supabase} uid={uid} />}
-      {tab === "prescricao" && (
-        <TabPrescricao supabase={supabase} uid={uid} profile={profile} />
-      )}
-
-      <p className="mt-6 text-center text-xs text-slate-500 dark:text-slate-400">
-        As demais abas são somente leitura. Para alterar metas, plano ou enviar
-        um recado, use a aba Prescrição.
-      </p>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Visão geral
-// ---------------------------------------------------------------------------
-
-async function TabGeral({
-  supabase,
-  uid,
-  profile,
-  summary,
-  idle,
-  today,
-}: any) {
-  const [series, dailyRes, mealsTodayRes] = await Promise.all([
-    getPatientSeries(supabase, uid, 14),
-    supabase
-      .from("daily_logs")
-      .select("sleep_hours, mood, energy")
-      .eq("user_id", uid)
-      .eq("date", today)
-      .maybeSingle(),
-    supabase
-      .from("meals")
-      .select("calories, protein_g")
-      .eq("user_id", uid)
-      .eq("date", today),
-  ]);
-
-  const health = computeHealthScore({
-    sleepHours: dailyRes.data?.sleep_hours ?? null,
-    trainedToday: (series[series.length - 1]?.workouts ?? 0) > 0,
-    workoutsWeek: summary.workouts7,
-    mealsLoggedToday: (mealsTodayRes.data ?? []).length,
-    proteinToday: summary.proteinToday,
-    proteinGoal: profile.protein_goal_g,
-    caloriesToday: summary.caloriesToday,
-    calorieGoal: profile.daily_calorie_goal,
-    waterToday: summary.waterToday,
-    waterGoal: profile.daily_water_goal_ml ?? 2500,
-    mood: (dailyRes.data as any)?.mood ?? null,
-    energy: (dailyRes.data as any)?.energy ?? null,
-  });
-
-  const weightPoints = series
-    .filter((s: any) => s.weight != null)
-    .map((s: any) => ({ label: dayLabel(s.date), value: s.weight }));
-
-  return (
-    <>
-      <div className="pf-stagger mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat
-          label="Peso atual"
-          value={summary.weightLast != null ? `${summary.weightLast} kg` : "—"}
-          sub={
-            summary.weightDelta30 != null
-              ? `${summary.weightDelta30 > 0 ? "+" : ""}${summary.weightDelta30} kg em 30d`
-              : undefined
-          }
-          icon={<Scale className="h-4 w-4" />}
-        />
-        {/* Estes dois ficavam lado a lado dizendo "Adesão (7 dias): 100%" e
-            "Plano cumprido: 0/6" — um elogiando e o outro cobrando. Mediam
-            coisas diferentes (abriu o app x confirmou o treino), mas só um
-            dizia o que media, e "adesão" puxa para adesão AO PLANO. No
-            resto do produto adesão já significa plano (computeAdherence,
-            "Adesão ao plano (4 semanas)"), então aqui o nome muda e o
-            percentual sai: % convida a ler como cumprimento. */}
-        <Stat
-          label="Treinos confirmados (7d)"
-          value={
-            summary.planPrevistas7
-              ? `${summary.planConfirmadas7}/${summary.planPrevistas7}`
-              : "—"
-          }
-          sub={
-            summary.planPrevistas7
-              ? [
-                  summary.planFaltas7 ? `${summary.planFaltas7} falta(s)` : null,
-                  summary.planSemResposta7
-                    ? `${summary.planSemResposta7} sem resposta`
-                    : null,
-                ]
-                  .filter(Boolean)
-                  .join(" · ") || "tudo confirmado"
-              : `${summary.workouts7} treinos livres`
-          }
-          icon={<Dumbbell className="h-4 w-4" />}
-        />
-        <Stat
-          label="Dias com registro (7d)"
-          value={`${summary.daysLogged7}/7`}
-          sub="dias em que usou o app"
-          icon={<CalendarCheck className="h-4 w-4" />}
-        />
-        <Stat
-          label="Último registro"
-          value={idle == null ? "—" : idle === 0 ? "Hoje" : `${idle} d`}
-          sub={summary.lastActivity ? formatDate(summary.lastActivity) : "Nunca"}
-          icon={<Activity className="h-4 w-4" />}
-        />
-      </div>
-
-      {health.hasData && (
-        <Card
-          title="Score de Saúde de hoje"
-          icon={<HeartPulse className="h-4 w-4" />}
-        >
-          <div className="flex items-center gap-4">
-            <div className="text-center">
-              <p className="text-3xl font-bold text-brand-700 dark:text-brand-400">
-                {health.score}
-              </p>
-              <p className="text-[11px] uppercase tracking-wide text-slate-500">
-                {health.label}
-              </p>
-            </div>
-            <p className="text-sm text-slate-600 dark:text-slate-300">
-              {health.topTip}
-            </p>
-          </div>
-        </Card>
-      )}
-
-      <Card
-        title="Perfil e metas"
-        icon={<Target className="h-4 w-4" />}
-      >
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-3">
-          {[
-            ["Sexo", sexLabel(profile.sex)],
-            ["Idade", age2(profile.birth_date)],
-            ["Altura", profile.height_cm ? `${profile.height_cm} cm` : "—"],
-            [
-              "Peso alvo",
-              profile.weight_goal_kg ? `${profile.weight_goal_kg} kg` : "—",
-            ],
-            [
-              "Calorias/dia",
-              profile.daily_calorie_goal
-                ? `${profile.daily_calorie_goal} kcal`
-                : "—",
-            ],
-            [
-              "Proteína/dia",
-              profile.protein_goal_g ? `${profile.protein_goal_g} g` : "—",
-            ],
-            [
-              "Água/dia",
-              profile.daily_water_goal_ml
-                ? `${(profile.daily_water_goal_ml / 1000).toFixed(1)} L`
-                : "—",
-            ],
-            ["No app desde", profile.created_at ? formatDate(profile.created_at.slice(0, 10)) : "—"],
-          ].map(([k, v]) => (
-            <div key={k as string}>
-              <dt className="text-xs text-slate-500 dark:text-slate-400">{k}</dt>
-              <dd className="font-medium text-slate-800 dark:text-slate-200">
-                {v}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      </Card>
-
-      {weightPoints.length > 1 && (
-        <Card
-          title="Peso (14 dias)"
-          icon={<Scale className="h-4 w-4" />}
-        >
-          <TrendChart data={weightPoints} unit=" kg" />
-        </Card>
-      )}
-
-      <Card
-        title="Registros por dia (14 dias)"
-        icon={<CalendarCheck className="h-4 w-4" />}
-      >
-        <div className="flex items-end gap-1">
-          {series.map((s: any) => {
-            const has =
-              s.calories > 0 || s.water > 0 || s.workouts > 0 || s.weight != null;
-            return (
-              <div key={s.date} className="flex flex-1 flex-col items-center gap-1">
-                <div
-                  className={`h-10 w-full rounded ${
-                    has
-                      ? "bg-brand-500"
-                      : "bg-slate-200 dark:bg-slate-700"
-                  }`}
-                  title={`${s.date}: ${has ? "registrou" : "sem registro"}`}
-                />
-                <span className="text-[11px] text-slate-500">
-                  {s.date.slice(8, 10)}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-        <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-          Verde = houve algum registro no dia.
-        </p>
-      </Card>
-    </>
-  );
-}
-
-function sexLabel(s?: string | null) {
-  return s === "F" ? "Feminino" : s === "M" ? "Masculino" : "—";
-}
-function age2(b?: string | null) {
-  const a = ageFrom(b);
-  return a != null ? `${a} anos` : "—";
-}
-
-// ---------------------------------------------------------------------------
-// Atividade (linha do tempo)
-// ---------------------------------------------------------------------------
-
-async function TabAtividade({ supabase, uid }: any) {
-  const items = await getPatientActivity(supabase, uid, 30, 80);
-
-  if (items.length === 0) {
-    return (
-      <Card title="Atividade" icon={<Activity className="h-4 w-4" />}>
-        <Empty>Nenhum registro nos últimos 30 dias.</Empty>
-      </Card>
-    );
-  }
-
-  // Agrupa por dia, preservando a ordem (mais recente primeiro).
-  const byDay: { date: string; items: ActivityItem[] }[] = [];
-  for (const it of items) {
-    const last = byDay[byDay.length - 1];
-    if (last && last.date === it.date) last.items.push(it);
-    else byDay.push({ date: it.date, items: [it] });
-  }
-
-  return (
-    <Card
-      title="Linha do tempo (30 dias)"
-      icon={<Activity className="h-4 w-4" />}
-    >
-      <div className="space-y-5">
-        {byDay.map((g) => (
-          <div key={g.date}>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              {formatDate(g.date)}
-            </p>
-            <ul className="space-y-2">
-              {g.items.map((it, i) => {
-                const st = ACTIVITY_STYLE[it.kind];
-                return (
-                  <li key={i} className="flex items-start gap-2.5">
-                    <span
-                      className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg ${st.cls}`}
-                    >
-                      {st.icon}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
-                        {it.title}
-                      </p>
-                      {it.detail && (
-                        <p className="text-xs text-slate-500 dark:text-slate-400">
-                          {it.detail}
-                        </p>
-                      )}
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))}
-      </div>
-    </Card>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Nutrição
-// ---------------------------------------------------------------------------
-
-async function TabNutricao({ supabase, uid, profile }: any) {
-  const series = await getPatientSeries(supabase, uid, 14);
-  const since = addDaysISO(todayISO(), -14);
-  const { data: meals } = await supabase
-    .from("meals")
-    .select("date, meal_type, description, calories, protein_g, carbs_g, fat_g")
-    .eq("user_id", uid)
-    .gte("date", since)
-    .order("date", { ascending: false })
-    .limit(60);
-
-  const withData = series.filter((s: any) => s.calories > 0);
-  const avgCal = withData.length
-    ? Math.round(
-        withData.reduce((s: number, d: any) => s + d.calories, 0) / withData.length
-      )
-    : 0;
-  const avgProt = withData.length
-    ? Math.round(
-        withData.reduce((s: number, d: any) => s + d.protein, 0) / withData.length
-      )
-    : 0;
-
-  return (
-    <>
-      <div className="pf-stagger mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat
-          label="Média de calorias"
-          value={avgCal ? `${avgCal}` : "—"}
-          sub={
-            profile.daily_calorie_goal
-              ? `meta ${profile.daily_calorie_goal} kcal`
-              : "sem meta definida"
-          }
-          icon={<Flame className="h-4 w-4" />}
-        />
-        <Stat
-          label="Média de proteína"
-          value={avgProt ? `${avgProt} g` : "—"}
-          sub={
-            profile.protein_goal_g
-              ? `meta ${profile.protein_goal_g} g`
-              : "sem meta definida"
-          }
-          icon={<Utensils className="h-4 w-4" />}
-        />
-        <Stat
-          label="Dias com registro"
-          value={`${withData.length}/14`}
-          icon={<CalendarCheck className="h-4 w-4" />}
-        />
-        <Stat
-          label="Refeições (14d)"
-          value={`${(meals ?? []).length}`}
-          icon={<Utensils className="h-4 w-4" />}
-        />
-      </div>
-
-      {withData.length > 0 && (
-        <>
-          <Card title="Calorias por dia (14 dias)" icon={<Flame className="h-4 w-4" />}>
-            <BarsChart
-              data={series.map((s: any) => ({
-                label: dayLabel(s.date),
-                value: s.calories || null,
-              }))}
-              unit=" kcal"
+      <div className={foraDoFoco}>
+        <LinkPacientes />
+        <div className="mt-2">
+          <Suspense fallback={<SkelCard className="mb-6" />}>
+            <Cabecalho
+              uid={uid}
+              perfil={{
+                full_name: profile.full_name,
+                sex: profile.sex,
+                birth_date: profile.birth_date,
+                height_cm: profile.height_cm,
+              }}
             />
-          </Card>
-          <Card title="Proteína por dia (14 dias)" icon={<Utensils className="h-4 w-4" />}>
-            <BarsChart
-              data={series.map((s: any) => ({
-                label: dayLabel(s.date),
-                value: s.protein || null,
-              }))}
-              color="#7c3aed"
-              unit=" g"
+          </Suspense>
+        </div>
+      </div>
+
+      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-6">
+        <div className={`min-w-0 ${foraDoFoco}`}>
+          <Suspense fallback={<SkelCard className="mb-6" />}>
+            <Fila uid={uid} resumo={resumo} prescricao={prescricao} />
+          </Suspense>
+          <Suspense fallback={<SkelCard />}>
+            <Alimentacao
+              uid={uid}
+              nutriId={nutriId}
+              perfil={{
+                daily_calorie_goal: profile.daily_calorie_goal,
+                protein_goal_g: profile.protein_goal_g,
+                daily_water_goal_ml: profile.daily_water_goal_ml,
+                weight_goal_kg: profile.weight_goal_kg,
+                sex: profile.sex,
+              }}
+              prescricao={prescricao}
             />
-          </Card>
-        </>
-      )}
+          </Suspense>
+          <Suspense fallback={<SkelCard />}>
+            <Treino uid={uid} nutriId={nutriId} />
+          </Suspense>
+          <Suspense fallback={<SkelCard />}>
+            <Corpo
+              uid={uid}
+              perfil={{
+                daily_calorie_goal: profile.daily_calorie_goal,
+                protein_goal_g: profile.protein_goal_g,
+                daily_water_goal_ml: profile.daily_water_goal_ml,
+                weight_goal_kg: profile.weight_goal_kg,
+              }}
+              resumo={resumo}
+              prescricao={prescricao}
+            />
+          </Suspense>
+          <Suspense fallback={<SkelCard />}>
+            <Clinico uid={uid} />
+          </Suspense>
+        </div>
 
-      <Card title="Refeições recentes" icon={<Utensils className="h-4 w-4" />}>
-        {(meals ?? []).length === 0 ? (
-          <Empty>Nenhuma refeição registrada nos últimos 14 dias.</Empty>
-        ) : (
-          <ul className="divide-y divide-slate-100 dark:divide-slate-800">
-            {(meals ?? []).map((m: any, i: number) => (
-              <li key={i} className="flex items-start justify-between gap-3 py-2">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-200">
-                    {m.description || m.meal_type || "Refeição"}
-                  </p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    {formatDate(m.date)}
-                    {m.meal_type ? ` · ${m.meal_type}` : ""}
-                  </p>
-                </div>
-                <div className="shrink-0 text-right text-xs">
-                  <p className="font-semibold text-slate-700 dark:text-slate-300">
-                    {m.calories ? `${Math.round(Number(m.calories))} kcal` : "—"}
-                  </p>
-                  <p className="text-slate-500">
-                    {[
-                      m.protein_g ? `P ${Math.round(Number(m.protein_g))}` : null,
-                      m.carbs_g ? `C ${Math.round(Number(m.carbs_g))}` : null,
-                      m.fat_g ? `G ${Math.round(Number(m.fat_g))}` : null,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
-    </>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Treino
-// ---------------------------------------------------------------------------
-
-const DOW = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
-
-async function TabTreino({ supabase, uid }: any) {
-  const since = addDaysISO(todayISO(), -30);
-  const desde28 = addDaysISO(todayISO(), -27);
-  const [wkRes, planRes, routinesRes, checksRes] = await Promise.all([
-    supabase
-      .from("workouts")
-      .select("id, date, name, category, duration_min")
-      .eq("user_id", uid)
-      .gte("date", since)
-      .order("date", { ascending: false })
-      .limit(30),
-    supabase
-      .from("workout_plan")
-      .select("day_of_week, sport, title")
-      .eq("user_id", uid)
-      .order("day_of_week", { ascending: true })
-      .order("position", { ascending: true }),
-    supabase
-      .from("routines")
-      .select("id, name, notes")
-      .eq("user_id", uid)
-      .order("position", { ascending: true }),
-    supabase
-      .from("plan_completions")
-      .select("id, plan_id, date, status, workout_id")
-      .eq("user_id", uid)
-      .gte("date", desde28),
-  ]);
-
-  const workouts = (wkRes.data ?? []) as any[];
-  const plan = (planRes.data ?? []) as any[];
-  const routines = (routinesRes.data ?? []) as any[];
-  const checks = (checksRes.data ?? []) as Completion[];
-
-  // Adesão ao plano nas últimas 4 semanas. O plano é um molde por dia da
-  // semana, então cruzamos com as datas reais; dias futuros não entram.
-  const hoje = todayISO();
-  const dias28: string[] = [];
-  for (let i = 27; i >= 0; i--) dias28.push(addDaysISO(hoje, -i));
-  const planoTreinavel = plan.filter(
-    (x: any) => !String(x.sport ?? "").toLowerCase().includes("descanso")
-  );
-  const adesao = computeAdherence(planoTreinavel as any, checks, dias28, hoje);
-  const checkIdx = new Map(checks.map((c) => [`${c.plan_id}|${c.date}`, c.status]));
-
-  // Exercícios dos treinos listados, numa única consulta.
-  let exByWorkout: Record<string, any[]> = {};
-  if (workouts.length) {
-    const { data: exs } = await supabase
-      .from("exercises")
-      .select("workout_id, name, sets, reps, weight_kg")
-      .in(
-        "workout_id",
-        workouts.map((w) => w.id)
-      )
-      .order("position", { ascending: true });
-    for (const e of (exs ?? []) as any[]) {
-      (exByWorkout[e.workout_id] ||= []).push(e);
-    }
-  }
-
-  return (
-    <>
-      {adesao.previstas > 0 && (
-        <Card
-          title="Adesão ao plano (4 semanas)"
-          icon={<CalendarCheck className="h-4 w-4" />}
+        {/* No celular, no fim da página (com uma linha separando do
+            Clínico, que a primeira seção daqui não tem); no computador, a
+            coluna da direita, presa no alto enquanto o resto rola. */}
+        <aside
+          aria-label="Conversa e notas privadas"
+          className={`${
+            foco ? "" : "border-t border-clin-linha pt-6"
+          } lg:sticky lg:top-6 lg:max-h-[calc(100dvh-3rem)] lg:self-start lg:overflow-y-auto lg:border-t-0 lg:pt-0`}
         >
-          <div className="mb-3 flex items-baseline gap-3">
-            <p className="text-3xl font-bold text-brand-700 dark:text-brand-400">
-              {adesao.percentual}%
-            </p>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              {adesao.confirmadas} de {adesao.previstas} treinos previstos
-              confirmados
-            </p>
-          </div>
-          <div className="mb-3 grid grid-cols-3 gap-2 text-center">
-            <div className="rounded-lg bg-brand-50 py-2 dark:bg-brand-950/30">
-              <p className="text-lg font-bold text-brand-700 dark:text-brand-300">
-                {adesao.confirmadas}
-              </p>
-              <p className="text-[11px] text-brand-700/80 dark:text-brand-400/80">
-                confirmou
-              </p>
-            </div>
-            <div className="rounded-lg bg-rose-50 py-2 dark:bg-rose-950/30">
-              <p className="text-lg font-bold text-rose-700 dark:text-rose-300">
-                {adesao.faltas}
-              </p>
-              <p className="text-[11px] text-rose-700/80 dark:text-rose-400/80">
-                disse que faltou
-              </p>
-            </div>
-            <div className="rounded-lg bg-slate-100 py-2 dark:bg-slate-800">
-              <p className="text-lg font-bold text-slate-600 dark:text-slate-300">
-                {adesao.semResposta}
-              </p>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                não respondeu
-              </p>
-            </div>
-          </div>
-
-          {/* Uma coluna por dia; só dias com treino previsto ganham cor. */}
-          <div className="flex items-end gap-[3px]">
-            {dias28.map((date) => {
-              const dow = (new Date(date + "T12:00:00").getDay() + 6) % 7;
-              const previstos = planoTreinavel.filter(
-                (x: any) => x.day_of_week === dow
-              );
-              let cls = "bg-slate-100 dark:bg-slate-800";
-              let titulo = `${date}: sem treino previsto`;
-              if (previstos.length > 0) {
-                const estados = previstos.map(
-                  (x: any) => checkIdx.get(`${x.id}|${date}`) ?? "sem"
-                );
-                if (estados.every((e) => e === "done")) {
-                  cls = "bg-brand-500";
-                  titulo = `${date}: confirmou`;
-                } else if (estados.some((e) => e === "skipped")) {
-                  cls = "bg-rose-500";
-                  titulo = `${date}: disse que faltou`;
-                } else if (estados.some((e) => e === "done")) {
-                  cls = "bg-brand-300";
-                  titulo = `${date}: confirmou em parte`;
-                } else {
-                  cls = "bg-amber-300 dark:bg-amber-600";
-                  titulo = `${date}: previsto, sem resposta`;
-                }
-              }
-              return (
-                <div
-                  key={date}
-                  title={titulo}
-                  className={`h-8 flex-1 rounded-sm ${cls}`}
-                />
-              );
-            })}
-          </div>
-          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-500 dark:text-slate-400">
-            <span>🟩 confirmou</span>
-            <span>🟥 faltou</span>
-            <span>🟨 sem resposta</span>
-            <span>⬜ sem treino previsto</span>
-          </div>
-        </Card>
-      )}
-
-      <Card title="Plano semanal" icon={<CalendarCheck className="h-4 w-4" />}>
-        {plan.length === 0 ? (
-          <Empty>Sem plano semanal montado.</Empty>
-        ) : (
-          <div className="grid grid-cols-7 gap-1.5">
-            {DOW.map((d, i) => {
-              const items = plan.filter((p) => p.day_of_week === i);
-              return (
-                <div key={d} className="text-center">
-                  <p className="mb-1 text-[11px] font-semibold uppercase text-slate-500">
-                    {d}
-                  </p>
-                  {items.length === 0 ? (
-                    <div className="rounded-lg bg-slate-100 py-2 text-[11px] text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                      —
-                    </div>
-                  ) : (
-                    items.map((p, k) => (
-                      <div
-                        key={k}
-                        className="mb-1 rounded-lg bg-brand-100 px-1 py-1.5 text-[11px] font-medium leading-tight text-brand-800 dark:bg-brand-900/40 dark:text-brand-300"
-                        title={p.title || p.sport}
-                      >
-                        {p.sport || p.title}
-                      </div>
-                    ))
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </Card>
-
-      {routines.length > 0 && (
-        <Card title="Rotinas salvas" icon={<Dumbbell className="h-4 w-4" />}>
-          <ul className="space-y-1.5">
-            {routines.map((r) => (
-              <li key={r.id} className="text-sm text-slate-700 dark:text-slate-300">
-                <span className="font-medium">{r.name}</span>
-                {r.notes && (
-                  <span className="text-slate-500"> — {r.notes}</span>
-                )}
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
-
-      <Card title="Treinos (30 dias)" icon={<Dumbbell className="h-4 w-4" />}>
-        {workouts.length === 0 ? (
-          <Empty>Nenhum treino registrado nos últimos 30 dias.</Empty>
-        ) : (
-          <ul className="divide-y divide-slate-100 dark:divide-slate-800">
-            {workouts.map((w) => (
-              <li key={w.id} className="py-2.5">
-                <div className="flex items-baseline justify-between gap-2">
-                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-                    {w.name || "Treino"}
-                  </p>
-                  <p className="shrink-0 text-xs text-slate-500">
-                    {formatDate(w.date)}
-                  </p>
-                </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {[w.category, w.duration_min ? `${w.duration_min} min` : null]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
-                {(exByWorkout[w.id] ?? []).length > 0 && (
-                  <ul className="mt-1.5 space-y-0.5">
-                    {exByWorkout[w.id].map((e: any, i: number) => (
-                      <li
-                        key={i}
-                        className="flex justify-between gap-2 text-xs text-slate-500 dark:text-slate-400"
-                      >
-                        <span className="truncate">{e.name}</span>
-                        <span className="shrink-0 font-mono">
-                          {[
-                            e.sets && e.reps ? `${e.sets}×${e.reps}` : null,
-                            e.weight_kg ? `${e.weight_kg} kg` : null,
-                          ]
-                            .filter(Boolean)
-                            .join(" · ")}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
-    </>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Corpo
-// ---------------------------------------------------------------------------
-
-async function TabCorpo({ supabase, uid, profile }: any) {
-  const { data } = await supabase
-    .from("body_measurements")
-    .select(
-      "date, weight_kg, body_fat_pct, waist_cm, hip_cm, chest_cm, arm_cm, thigh_cm"
-    )
-    .eq("user_id", uid)
-    .order("date", { ascending: false })
-    .limit(60);
-  const rows = (data ?? []) as any[];
-  const withWeight = [...rows]
-    .filter((r) => r.weight_kg != null)
-    .reverse();
-
-  return (
-    <>
-      {withWeight.length > 1 && (
-        <Card title="Evolução do peso" icon={<Scale className="h-4 w-4" />}>
-          <TrendChart
-            data={withWeight.map((r) => ({
-              label: dayLabel(r.date),
-              value: Number(r.weight_kg),
-            }))}
-            unit=" kg"
-          />
-          {profile.weight_goal_kg && (
-            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-              Meta: {profile.weight_goal_kg} kg · faltam{" "}
-              {Math.abs(
-                Number(withWeight[withWeight.length - 1].weight_kg) -
-                  Number(profile.weight_goal_kg)
-              ).toFixed(1)}{" "}
-              kg
-            </p>
-          )}
-        </Card>
-      )}
-
-      <Card title="Medidas registradas" icon={<Ruler className="h-4 w-4" />}>
-        {rows.length === 0 ? (
-          <Empty>Nenhuma medida registrada.</Empty>
-        ) : (
-          <div className="-mx-2 overflow-x-auto">
-            <table className="w-full min-w-[480px] text-sm">
-              <thead>
-                <tr className="text-left text-xs text-slate-500">
-                  <th className="px-2 pb-2 font-medium">Data</th>
-                  <th className="px-2 pb-2 font-medium">Peso</th>
-                  <th className="px-2 pb-2 font-medium">%GC</th>
-                  <th className="px-2 pb-2 font-medium">Cintura</th>
-                  <th className="px-2 pb-2 font-medium">Quadril</th>
-                  <th className="px-2 pb-2 font-medium">Peito</th>
-                  <th className="px-2 pb-2 font-medium">Braço</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {rows.map((r, i) => (
-                  <tr key={i} className="text-slate-700 dark:text-slate-300">
-                    <td className="whitespace-nowrap px-2 py-1.5 text-xs text-slate-500">
-                      {formatDate(r.date)}
-                    </td>
-                    <td className="px-2 py-1.5">{r.weight_kg ?? "—"}</td>
-                    <td className="px-2 py-1.5">{r.body_fat_pct ?? "—"}</td>
-                    <td className="px-2 py-1.5">{r.waist_cm ?? "—"}</td>
-                    <td className="px-2 py-1.5">{r.hip_cm ?? "—"}</td>
-                    <td className="px-2 py-1.5">{r.chest_cm ?? "—"}</td>
-                    <td className="px-2 py-1.5">{r.arm_cm ?? "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
-    </>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Clínico (exames + tratamento)
-// ---------------------------------------------------------------------------
-
-const STATUS_CLS: Record<string, string> = {
-  alterado: "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300",
-  atencao: "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300",
-  atenção: "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300",
-  normal:
-    "bg-brand-100 text-brand-700 dark:bg-brand-950/40 dark:text-brand-300",
-};
-
-async function TabClinico({ supabase, uid }: any) {
-  const [examsRes, treatRes, dosesRes, effectsRes] = await Promise.all([
-    supabase
-      .from("exams")
-      .select("date, title, result_value, unit, reference_range, status, notes")
-      .eq("user_id", uid)
-      .order("date", { ascending: false })
-      .limit(40),
-    supabase
-      .from("treatments")
-      .select("medication, dose, frequency_days, start_date, next_dose_date, notes")
-      .eq("user_id", uid)
-      .eq("active", true)
-      .maybeSingle(),
-    supabase
-      .from("dose_logs")
-      .select("date, dose")
-      .eq("user_id", uid)
-      .order("date", { ascending: false })
-      .limit(12),
-    supabase
-      .from("side_effects")
-      .select("date, nausea, appetite, fatigue, other, notes")
-      .eq("user_id", uid)
-      .order("date", { ascending: false })
-      .limit(12),
-  ]);
-
-  const exams = (examsRes.data ?? []) as any[];
-  const treat = treatRes.data as any;
-  const doses = (dosesRes.data ?? []) as any[];
-  const effects = (effectsRes.data ?? []) as any[];
-
-  return (
-    <>
-      <Card title="Tratamento" icon={<Syringe className="h-4 w-4" />}>
-        {!treat ? (
-          <Empty>Nenhum tratamento ativo cadastrado.</Empty>
-        ) : (
-          <>
-            <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-              {treat.medication}
-              {treat.dose ? ` · ${treat.dose}` : ""}
-            </p>
-            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-              {[
-                treat.frequency_days ? `a cada ${treat.frequency_days} dias` : null,
-                treat.start_date ? `início ${formatDate(treat.start_date)}` : null,
-                treat.next_dose_date
-                  ? `próxima dose ${formatDate(treat.next_dose_date)}`
-                  : null,
-              ]
-                .filter(Boolean)
-                .join(" · ")}
-            </p>
-            {treat.notes && (
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                {treat.notes}
-              </p>
-            )}
-            {doses.length > 0 && (
-              <div className="mt-3">
-                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Últimas aplicações
-                </p>
-                <ul className="flex flex-wrap gap-1.5">
-                  {doses.map((d, i) => (
-                    <li
-                      key={i}
-                      className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600 dark:bg-slate-800 dark:text-slate-300"
-                    >
-                      {formatDate(d.date)}
-                      {d.dose ? ` · ${d.dose}` : ""}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </>
-        )}
-      </Card>
-
-      {effects.length > 0 && (
-        <Card
-          title="Efeitos colaterais relatados"
-          icon={<AlertTriangle className="h-4 w-4" />}
-        >
-          <ul className="divide-y divide-slate-100 dark:divide-slate-800">
-            {effects.map((e, i) => (
-              <li key={i} className="py-2">
-                <p className="text-xs text-slate-500">{formatDate(e.date)}</p>
-                <p className="text-sm text-slate-700 dark:text-slate-300">
-                  {[
-                    e.nausea ? `náusea ${e.nausea}/5` : null,
-                    e.appetite ? `apetite ${e.appetite}/5` : null,
-                    e.fatigue ? `cansaço ${e.fatigue}/5` : null,
-                    e.other || null,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ") || "Sem detalhes"}
-                </p>
-                {e.notes && (
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    {e.notes}
-                  </p>
-                )}
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
-
-      <Card title="Exames" icon={<FileText className="h-4 w-4" />}>
-        {exams.length === 0 ? (
-          <Empty>Nenhum exame registrado.</Empty>
-        ) : (
-          <ul className="divide-y divide-slate-100 dark:divide-slate-800">
-            {exams.map((e, i) => (
-              <li key={i} className="py-2.5">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-200">
-                      {e.title}
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      {formatDate(e.date)}
-                      {e.reference_range ? ` · ref. ${e.reference_range}` : ""}
-                    </p>
-                  </div>
-                  <span
-                    className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                      STATUS_CLS[e.status] ??
-                      "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
-                    }`}
-                  >
-                    {e.result_value ?? ""}
-                    {e.unit ? ` ${e.unit}` : ""}
-                  </span>
-                </div>
-                {e.notes && (
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    {e.notes}
-                  </p>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
-    </>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Prescrição (a única aba que ESCREVE)
-// ---------------------------------------------------------------------------
-
-async function TabPrescricao({ supabase, uid, profile }: any) {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const [planoRes, rotinasRes, exsRes, msgsRes, desviosRes, cardapioRes] =
-    await Promise.all([
-    supabase
-      .from("workout_plan")
-      .select("id, day_of_week, sport, title, routine_id, prescribed_by")
-      .eq("user_id", uid)
-      .order("day_of_week", { ascending: true })
-      .order("position", { ascending: true }),
-    supabase
-      .from("routines")
-      .select("id, name, notes, prescribed_by")
-      .eq("user_id", uid)
-      .order("position", { ascending: true })
-      .order("created_at", { ascending: true }),
-    supabase
-      .from("routine_exercises")
-      .select("id, routine_id, name, target_sets, target_reps, target_weight_kg, rest_seconds, position")
-      .eq("user_id", uid)
-      .order("position", { ascending: true }),
-    // Conversa e notas privadas vêm juntas; a RLS já garante que o paciente
-    // nunca enxerga as privadas, e aqui separamos por visibility.
-    supabase
-      .from("patient_notes")
-      .select("id, body, created_at, read_at, author_id, visibility")
-      .eq("patient_id", uid)
-      .order("created_at", { ascending: false })
-      .limit(100),
-    supabase
-      .from("prescription_deviations")
-      .select("id, kind, field, prescribed, current_value, created_at")
-      .eq("patient_id", uid)
-      .is("acknowledged_at", null)
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("meal_plans")
-      .select("id, name, notes, created_at")
-      .eq("patient_id", uid)
-      .eq("active", true)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-  ]);
-
-  const cardapio = cardapioRes.data as any;
-  const { data: itensCardapio } = cardapio
-    ? await supabase
-        .from("meal_plan_items")
-        .select("id, meal_plan_id, meal_type, position, description, calories, protein_g, carbs_g, fat_g")
-        .eq("meal_plan_id", cardapio.id)
-        .order("position", { ascending: true })
-    : { data: [] as any[] };
-
-  const todas = (msgsRes.data ?? []) as any[];
-
-  return (
-    <PrescricaoClient
-      patientId={uid}
-      nutriId={user?.id ?? ""}
-      metas={{
-        daily_calorie_goal: profile.daily_calorie_goal ?? null,
-        protein_goal_g: profile.protein_goal_g ?? null,
-        daily_water_goal_ml: profile.daily_water_goal_ml ?? null,
-        weight_goal_kg: profile.weight_goal_kg ?? null,
-      }}
-      rotinas={(rotinasRes.data ?? []) as any}
-      exercicios={(exsRes.data ?? []) as any}
-      plano={(planoRes.data ?? []) as any}
-      mensagens={todas.filter((m) => m.visibility === "shared")}
-      notasPrivadas={todas.filter((m) => m.visibility === "private")}
-      desvios={(desviosRes.data ?? []) as any}
-      planoAlimentar={cardapio ?? null}
-      itensCardapio={(itensCardapio ?? []) as any}
-    />
+          <Suspense fallback={<SkelCard />}>
+            <ConversaENotas uid={uid} nutriId={nutriId} foco={foco} />
+          </Suspense>
+        </aside>
+      </div>
+    </EdicaoProvider>
   );
 }

@@ -2,14 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, MessageSquare, Send, Eye } from "lucide-react";
+import { Loader2, Send, Eye } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatDate } from "@/lib/date";
 import { ErroInline } from "./ErroInline";
 import type { Mensagem } from "./tipos";
 
-// Conversa de mão dupla com o paciente (visibility "shared"), movida de
-// AbaConversa (PrescricaoClient.tsx) sem mudar as chamadas ao banco.
+// Conversa de mão dupla com o paciente (visibility "shared"), movida da antiga
+// aba Prescrição sem mudar as chamadas ao banco.
 export function Conversa({
   pacienteId,
   nutriId,
@@ -62,18 +62,10 @@ export function Conversa({
 
   return (
     <div className="card">
-      <h2 className="section-title mb-3">
-        <span className="icon-badge">
-          <MessageSquare className="h-4 w-4" />
-        </span>
-        Conversa com o paciente
-      </h2>
-
-      {ordenadas.length === 0 ? (
-        <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
-          Nenhuma mensagem ainda. O paciente pode responder aqui pelo app dele.
-        </p>
-      ) : (
+      {/* Conversa vazia mostra só a caixa de escrever: o título da seção já
+          diz o que é, e um aviso de "nenhuma mensagem" empurrava o campo
+          para baixo sem acrescentar nada. */}
+      {ordenadas.length > 0 && (
         <ul className="mb-4 space-y-2">
           {ordenadas.map((m: Mensagem) => {
             const meu = m.author_id === nutriId;

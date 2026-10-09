@@ -2,14 +2,14 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Target, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Field } from "@/components/ui";
 import { useEdicao } from "./Edicao";
 import { ErroInline } from "./ErroInline";
 
-// Formulário de metas, movido de AbaMetas (PrescricaoClient.tsx) com a mesma
-// chamada ao banco: set_patient_goals grava a prescrição e as quatro metas do
+// Formulário de metas, movido da antiga aba Prescrição com a mesma chamada ao
+// banco: set_patient_goals grava a prescrição e as quatro metas do
 // perfil numa transação só. Muda o que cerca a chamada: o erro fica num estado
 // local, embaixo do formulário, e salvar fecha a edição (a leitura volta com
 // os valores novos pelo router.refresh()).
@@ -71,12 +71,6 @@ export function EditorMetas({
 
   return (
     <form onSubmit={salvar} className="card">
-      <h2 className="section-title mb-3">
-        <span className="icon-badge">
-          <Target className="h-4 w-4" />
-        </span>
-        Metas do paciente
-      </h2>
       <p className="mb-4 text-sm text-slate-600 dark:text-slate-300">
         O que você definir aqui passa a valer no app do paciente — anéis do dia,
         Score de Saúde e contexto da Gaia.

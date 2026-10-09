@@ -1,6 +1,5 @@
 // Formas das linhas que a página do paciente lê do banco e passa para os
-// editores. Moram aqui, e não em PrescricaoClient.tsx, para os componentes
-// de components/clinico/ não dependerem de um arquivo que a Tarefa 8 apaga.
+// editores e para as seções (app/app/pacientes/[id]/secoes/).
 
 export type ExercicioRotina = {
   id: string;
