@@ -18,7 +18,8 @@ Isso não é óbvio lendo a árvore de arquivos.
   `medidas/`, `exames/`, `tratamento/`, `treino/[id]` (leitura do treino).
 - **Nutricionista:** `components/NutriHome.tsx`, `app/app/pacientes/` e o
   detalhe em `pacientes/[id]`: uma página só, por assunto. Ele prescreve ali
-  mesmo, em Alimentação (metas, cardápio) e Treino; o resto é leitura, fora
+  mesmo, em Alimentação (metas, cardápio) e Treino; a fila tem o atalho
+  Reaplicar, que grava de novo a última prescrição; o resto é leitura, fora
   a conversa e as notas. Não há mais aba Prescrição. Veja "A página do
   paciente" abaixo.
 - **Lógica testada:** `lib/date.ts` (datas e janelas, `dataNoBrasil`),
@@ -28,9 +29,10 @@ Isso não é óbvio lendo a árvore de arquivos.
   e, em `lib/nutri.ts`, a conta do resumo, da fila de triagem e da linha do
   tempo do nutri (`montarResumos`, `filaDeTriagem`, `montarLinhaDoTempo`),
   as médias da semana e a comparação com a meta (`mediasDaSemana`,
-  `compararComMeta`) e os textos de meta e de desvio (`textoDaMeta`,
-  `textoDoDesvio`). As consultas ao banco não têm teste, nem
-  `lib/perfil.ts`, que é só uma consulta.
+  `compararComMeta`), os textos de meta e de desvio (`textoDaMeta`,
+  `textoDoDesvio`, `textoDoDesvioDoPlano`) e a divisão dos avisos entre meta
+  e plano de treino (`separarDesvios`). As consultas ao banco não têm teste,
+  nem `lib/perfil.ts`, que é só uma consulta.
 
 Toda segurança é por **RLS no Postgres**, nunca por service role no app.
 Ao mexer em política, teste com `BEGIN ... ROLLBACK` e
@@ -42,19 +44,22 @@ authenticated` — nessa ordem.
 `pacientes/[id]/page.tsx` monta as seções de `secoes/` (Cabecalho, Fila,
 Alimentacao, Treino, Corpo, Clinico, ConversaENotas). Cada uma é um
 componente de servidor no próprio `Suspense` e mostra `ErroSecao` se a
-leitura falha. Fazem as próprias consultas, menos o resumo, a última
-prescrição e os avisos de meta: a página pede esses três uma vez e reparte,
-para os números não discordarem entre seções. A prescrição só se edita em
-Alimentação e Treino, uma seção por vez (`components/clinico/Edicao.tsx`,
-regra em `lib/edicao.ts`). As abas e o `PrescricaoClient` não existem mais;
-`?t=atividade` redireciona para `pacientes/[id]/linha-do-tempo`.
+leitura falha. Fazem as próprias consultas, menos o perfil do paciente, o
+resumo, a última prescrição e os avisos abertos (de meta e do plano de
+treino): a página pede esses quatro uma vez e reparte, para os números não
+discordarem entre seções. A trava de uma edição por vez
+(`components/clinico/Edicao.tsx`, regra em `lib/edicao.ts`) vale para
+metas, cardápio e treino; o Reaplicar da fila grava fora dela. As abas e o
+`PrescricaoClient` não existem mais; `?t=atividade` redireciona para
+`pacientes/[id]/linha-do-tempo`.
 
-**Largura.** A área de conteúdo do `AppShell` tem 720 px em qualquer largura
-de janela (`max-w-5xl` menos o menu lateral e as margens). Com a coluna de
-conversa de 360 px a partir de `lg`, sobravam ~336 px para a principal, menos
-que um celular. Por isso as duas colunas só começam em `xl:` (1280 px), e o
-`AppShell` abre para `max-w-7xl` apenas em `/app/pacientes/<id>`. Para
-encaixar algo ao lado do conteúdo, meça a área do conteúdo, não a janela.
+**Largura.** A partir de `lg`, a área de conteúdo do `AppShell` tem 720 px
+seja qual for a largura da janela (`max-w-5xl` menos o menu lateral e as
+margens). Com a coluna de conversa de 360 px a partir de `lg`, sobravam
+~336 px para a principal, menos que um celular. Por isso as duas colunas só
+começam em `xl:` (1280 px), e o `AppShell` abre para `max-w-7xl` apenas em
+`/app/pacientes/<id>`. Para encaixar algo ao lado do conteúdo, meça a área
+do conteúdo, não a janela.
 
 **Leitura que falha não é "não tem".** O supabase-js devolve
 `{ data: null, error }` sem lançar, e `data ?? []` esconde a falha: sem as
@@ -63,20 +68,21 @@ alerta de exame sumia calado. Na página, `resumirPacientes`,
 `getPatientSeries` e `getPatientActivity` devolvem `falhou` junto dos dados.
 `getPatientsSummary` manteve a assinatura antiga (Início e lista).
 
-**Avisos de meta.** A página mostra só os quatro campos de meta de
-`prescription_deviations` (`CAMPOS_META`); o aviso de mudança no plano de
-treino cai na mesma tabela, mas não é meta. O gatilho
-`prescriptions_ack_deviations` dá baixa em **todos** os avisos abertos do
-paciente a cada insert em `prescriptions`, então "Reaplicar" também limpa um
-aviso de plano de treino. E `set_patient_goals` trata nulo como "apagar a
-meta": "Reaplicar" manda os quatro valores da última prescrição, nunca só o
-campo que mudou.
+**Avisos de meta e de plano.** A Alimentação mostra só os quatro campos de
+meta de `prescription_deviations` (`CAMPOS_META`); o aviso de mudança no
+plano de treino cai na mesma tabela, mas não é meta, e aparece no Treino.
+O gatilho `prescriptions_ack_deviations` dá baixa em **todos** os avisos
+abertos do paciente a cada insert em `prescriptions`, então qualquer
+`set_patient_goals` ("Reaplicar" ou "Aplicar metas") também limpa um aviso
+de plano de treino; com os dois abertos, a fila avisa embaixo do Reaplicar.
+E `set_patient_goals` trata nulo como "apagar a meta": "Reaplicar" manda os
+quatro valores da última prescrição, nunca só o campo que mudou.
 
 ## Comandos
 
 ```bash
 npm run dev      # desenvolvimento
-npm test         # 147 testes unitários (vitest)
+npm test         # 153 testes unitários (vitest)
 npm run build    # produção
 ```
 
@@ -137,8 +143,11 @@ remove ele. `MODULE_NOT_FOUND` nos scripts de `ferramentas/` é isso.
   que não passa quebra o teste, não a tela. As classes `clin-*` do Tailwind
   só dentro de `.tema-clinico`, porque as variáveis `--clin-*` só existem ali.
   `.card`, `.input` e `.btn-*` são refeitos nesse escopo em `app/globals.css`,
-  sob `:where(.tema-clinico)` (especificidade zero), para um utilitário na
-  mesma tag continuar vencendo. A `/estilo` mostra também esta paleta.
+  sob `:where(.tema-clinico)`, que não soma especificidade: no claro, um
+  utilitário na mesma tag continua vencendo. No escuro, não: a cópia
+  `.dark :where(.tema-clinico) .x` tem duas classes e vence um utilitário sem
+  `dark:`; repita a variante (`text-clin-texto-2 dark:text-clin-texto-2`).
+  A `/estilo` mostra também esta paleta.
 - Campo de data que registra algo já acontecido leva `max={todayISO()}`. A
   exceção é "próxima aplicação", que é futura por definição.
 

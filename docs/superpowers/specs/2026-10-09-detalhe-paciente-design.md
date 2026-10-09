@@ -1,7 +1,8 @@
 # Detalhe do paciente (lado do nutricionista): estrutura nova e piloto visual
 
 **Data:** 2026-10-09
-**Situação:** aguardando revisão
+**Situação:** implementada em 2026-10-09
+**Rulings que mudaram esta spec:** R11 (duas colunas só a partir de `xl`, 1280 px, e não de `lg`), R15 (o editor de metas abre com a última prescrição, a mesma "Meta" da tabela) e R16/R19 (Alimentação mostra só os avisos de meta; os do plano de treino aparecem no Treino, e a fila avisa que Reaplicar também dá baixa neles).
 **Subprojeto:** A de 4 (A: detalhe do paciente · B: navegação do paciente · C: identidade visual no app inteiro · D: landing para nutricionista)
 
 ## Por que
