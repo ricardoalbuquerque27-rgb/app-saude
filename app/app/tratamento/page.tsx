@@ -19,7 +19,7 @@ import { createClient } from "@/lib/supabase/client";
 import { PageHeader, Field } from "@/components/ui";
 import type { Treatment, SideEffect } from "@/lib/types";
 import { ensurePushSubscription } from "@/lib/pushClient";
-import { todayISO } from "@/lib/date";
+import { todayISO, addDaysISO } from "@/lib/date";
 import { useLiveRefresh } from "@/lib/useLiveRefresh";
 
 const MEDS = [
@@ -46,11 +46,6 @@ const SEV_COLOR = [
   "bg-rose-500",
 ];
 
-function addDays(iso: string, days: number) {
-  const d = new Date(iso + "T00:00:00");
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
-}
 function daysBetween(fromISO: string, toISO: string) {
   return Math.round(
     (new Date(toISO + "T00:00:00").getTime() -
@@ -65,7 +60,7 @@ function computeNextDose(startISO: string, freq: number) {
   if (freq <= 0) return next;
   let guard = 0;
   while (daysBetween(next, today) > 0 && guard < 1000) {
-    next = addDays(next, freq);
+    next = addDaysISO(next, freq);
     guard++;
   }
   return next;
@@ -494,7 +489,7 @@ function ApplyButton({
     });
     await supabase
       .from("treatments")
-      .update({ next_dose_date: addDays(today, treatment.frequency_days) })
+      .update({ next_dose_date: addDaysISO(today, treatment.frequency_days) })
       .eq("id", treatment.id);
     setSaving(false);
     onChange();

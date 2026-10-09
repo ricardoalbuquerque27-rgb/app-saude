@@ -87,7 +87,7 @@ quatro valores da última prescrição, nunca só o campo que mudou.
 
 ```bash
 npm run dev      # desenvolvimento
-npm test         # 156 testes unitários (vitest)
+npm test         # 158 testes unitários (vitest)
 npm run build    # produção
 ```
 
@@ -104,7 +104,8 @@ Cada uma destas quebrou em produção. Estão listadas porque voltam.
 abrange **oito** dias, não sete. E sem teto, um registro com data futura
 entra na conta. Isso apareceu em **quatro** lugares diferentes e produziu
 "Adesão: 114% — 8 de 7 dias". Use `naJanela` / `diasNaJanela` de
-`lib/date.ts`, que têm teste. Não escreva a conta à mão.
+`lib/date.ts`, que têm teste, e, na consulta ao banco, `limitesDaJanela`
+(`.gte("date", desde).lte("date", ate)`). Não escreva a conta à mão.
 
 **Fuso horário.** O app conta datas em `America/Sao_Paulo` (`lib/date.ts`),
 mas o servidor da Vercel roda em UTC. `toLocaleDateString` **sem**

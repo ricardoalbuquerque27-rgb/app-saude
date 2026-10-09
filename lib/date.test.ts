@@ -7,6 +7,7 @@ import {
   hojeLongo,
   diasNaJanela,
   naJanela,
+  limitesDaJanela,
   avancarDia,
   idadeEm,
   dataNoBrasil,
@@ -145,6 +146,33 @@ describe("naJanela", () => {
   it("exclui o dia anterior à janela e qualquer futuro", () => {
     expect(naJanela("2026-10-01", hoje, 7)).toBe(false);
     expect(naJanela("2026-10-09", hoje, 7)).toBe(false);
+  });
+});
+
+describe("limitesDaJanela", () => {
+  // Ainda não existe. Os relatórios de IA (api/report e api/insights)
+  // pediam ao banco `date >= isoDaysAgo(30)`, com isoDaysAgo feito por
+  // toISOString no servidor em UTC: depois das 21h em São Paulo o "hoje"
+  // já era amanhã, a janela de "30 dias" tinha 31 e não tinha teto.
+  it("dá o primeiro e o último dia da janela de N dias, contando hoje", () => {
+    // De 10/09 a 30/09 são 21 dias; de 01/10 a 09/10, mais 9: 30.
+    expect(limitesDaJanela("2026-10-09", 30)).toEqual({
+      desde: "2026-09-10",
+      ate: "2026-10-09",
+    });
+    // Atravessa fevereiro de 2026 (28 dias): 23 a 28/02 e 01/03 são 7.
+    expect(limitesDaJanela("2026-03-01", 7)).toEqual({
+      desde: "2026-02-23",
+      ate: "2026-03-01",
+    });
+  });
+
+  it("é a mesma janela de naJanela, nas duas bordas", () => {
+    const { desde, ate } = limitesDaJanela("2026-10-08", 7);
+    expect(naJanela(desde, "2026-10-08", 7)).toBe(true);
+    expect(naJanela(addDaysISO(desde, -1), "2026-10-08", 7)).toBe(false);
+    expect(naJanela(ate, "2026-10-08", 7)).toBe(true);
+    expect(naJanela(addDaysISO(ate, 1), "2026-10-08", 7)).toBe(false);
   });
 });
 

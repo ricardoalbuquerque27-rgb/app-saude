@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui";
-import { todayISO, formatDate } from "@/lib/date";
+import { todayISO, formatDate, dataNoBrasil } from "@/lib/date";
 import NutriNotes, { type Nota } from "@/components/NutriNotes";
 import MealPlanView from "@/components/MealPlanView";
 import ConectarNutri from "@/components/ConectarNutri";
@@ -180,7 +180,7 @@ export default async function MeuNutricionistaPage({
             {nutriNome}
           </p>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Desde {formatDate(String(link.accepted_at || link.created_at).slice(0, 10))}
+            Desde {formatDate(dataNoBrasil(String(link.accepted_at || link.created_at)))}
           </p>
         </div>
         {/* "Revogar acesso" roubava largura do nome, que truncava em
@@ -257,7 +257,7 @@ export default async function MeuNutricionistaPage({
               </dl>
               <p className="mt-3 border-t border-slate-100 pt-3 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
                 Definidas por {nutriNome} em{" "}
-                {formatDate(String(presc.created_at).slice(0, 10))}. O
+                {formatDate(dataNoBrasil(String(presc.created_at)))}. O
                 acompanhamento do dia contra estas metas aparece em{" "}
                 <Link href="/app" className="font-medium text-brand-700 hover:underline dark:text-brand-400">
                   Início

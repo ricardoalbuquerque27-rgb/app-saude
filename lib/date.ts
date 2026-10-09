@@ -89,6 +89,21 @@ export function naJanela(data: string, hoje: string, dias: number): boolean {
 }
 
 /**
+ * As bordas da mesma janela, para a consulta ao banco:
+ * `.gte("date", desde).lte("date", ate)`.
+ *
+ * Os relatórios de IA pediam `date >= isoDaysAgo(30)`, com o dia tirado de
+ * `toISOString()` no servidor em UTC: depois das 21h em São Paulo o "hoje"
+ * já era amanhã, os "30 dias" eram 31 e um registro com data futura entrava.
+ */
+export function limitesDaJanela(
+  hoje: string,
+  dias: number
+): { desde: string; ate: string } {
+  return { desde: addDaysISO(hoje, -(dias - 1)), ate: hoje };
+}
+
+/**
  * Anda `dias` a partir de `iso`, sem passar de `maximo`.
  *
  * Substitui o `new Date(...).toISOString().slice(0,10)` que a navegação de
