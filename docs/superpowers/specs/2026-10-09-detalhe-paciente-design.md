@@ -146,8 +146,10 @@ se mandar um campo vazio apaga a meta ou mantém a anterior.
 
 **Conversa e notas no celular** abrem em tela cheia por parâmetro de URL
 (`?conversa=1`, `?notas=1`), para o Voltar do celular fechar a conversa e
-não sair da página. Abrir a conversa marca as mensagens como lidas, como
-hoje.
+não sair da página. As mensagens do paciente continuam contando como não
+lidas até o nutricionista **responder**, como hoje: o código atual marca
+como lidas ao enviar, não ao abrir. Assim "não lida" quer dizer "ainda não
+respondida", que é o que importa para a fila.
 
 **Erro ao salvar:** o formulário continua aberto com os valores digitados e
 a mensagem aparece embaixo dele, na própria seção. Hoje há um único aviso
