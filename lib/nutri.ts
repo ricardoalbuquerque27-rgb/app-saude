@@ -1,4 +1,4 @@
-import { todayISO, addDaysISO } from "@/lib/date";
+import { todayISO, addDaysISO, diasNaJanela, naJanela } from "@/lib/date";
 
 // Camada de dados do lado do nutricionista. Todas as consultas rodam com o
 // cliente autenticado do nutri — a RLS ("nutri reads patient") é quem libera
@@ -145,10 +145,10 @@ export async function getPatientsSummary(
     const lastActivity = sortedDays.length
       ? sortedDays[sortedDays.length - 1]
       : null;
-    // Com teto: sem ele, um registro com data FUTURA entra na conta e o
-    // painel mostra "8 de 7 dias". Os seletores de data da Dieta e dos
-    // Hábitos deixam escolher um dia à frente, então isso não é hipótese.
-    const daysLogged7 = sortedDays.filter((d) => d >= d7 && d <= today).length;
+    // A janela mora em lib/date.ts e tem teste. Escrita à mão aqui, ela já
+    // errou de duas formas: abrangendo oito dias e deixando entrar data
+    // futura.
+    const daysLogged7 = diasNaJanela(sortedDays, today, 7);
 
     const todayMeals = myMeals.filter((m) => m.date === today);
     const caloriesToday = todayMeals.reduce(
@@ -206,7 +206,7 @@ export async function getPatientsSummary(
       caloriesToday,
       proteinToday,
       waterToday,
-      workouts7: myWk.filter((w) => w.date >= d7 && w.date <= today).length,
+      workouts7: myWk.filter((w) => naJanela(w.date, today, 7)).length,
       weightLast,
       weightDelta30,
       alteredExams: exams.filter((e) => e.user_id === id).length,

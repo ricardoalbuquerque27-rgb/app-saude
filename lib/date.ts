@@ -58,3 +58,32 @@ export function hojeLongo(): string {
     month: "long",
   });
 }
+
+/**
+ * Quantos dias DISTINTOS da lista caem na janela dos últimos `dias` dias,
+ * contando hoje e nada do futuro.
+ *
+ * Existe porque a mesma conta, escrita à mão em dois lugares, errou de duas
+ * formas diferentes no painel do nutricionista:
+ *
+ *   - `data >= addDaysISO(hoje, -7)` abrange OITO dias, não sete;
+ *   - sem teto, um registro com data futura entra na conta.
+ *
+ * O resultado era "Adesão (7 dias): 114% — 8 de 7 dias". Os seletores de
+ * data da Dieta e dos Hábitos deixam escolher um dia à frente, então a
+ * segunda não é hipótese.
+ */
+export function diasNaJanela(
+  datas: string[],
+  hoje: string,
+  dias: number
+): number {
+  const dentro = new Set<string>();
+  for (const d of datas) if (naJanela(d, hoje, dias)) dentro.add(d);
+  return dentro.size;
+}
+
+/** A mesma janela, para contar LINHAS em vez de dias distintos. */
+export function naJanela(data: string, hoje: string, dias: number): boolean {
+  return data >= addDaysISO(hoje, -(dias - 1)) && data <= hoje;
+}
