@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { andar, tituloDoPeriodo, type Consulta, type Vista } from "@/lib/consultas";
@@ -51,7 +51,8 @@ export function Agenda({
   nomes: Record<string, string>;
   pacientes: { id: string; nome: string }[];
   desde: Record<string, { titulo: string; texto: string }>;
-  falhou: boolean;
+  /** Que leitura falhou: cada uma mostra o erro no lugar do que não carregou. */
+  falhou: { periodo: boolean; pendencias: boolean; pacientes: boolean };
 }) {
   const [aberta, setAberta] = useState<string | null>(null);
 
@@ -61,7 +62,14 @@ export function Agenda({
 
   const todas = new Map<string, Consulta>();
   for (const c of [...consultas, ...pendencias]) todas.set(c.id, c);
-  const consulta = aberta ? todas.get(aberta) : undefined;
+  // A consulta aberta pode sair das listas depois de uma ação: a sem desfecho
+  // de outro dia, aberta pela linha de aviso, deixa de ser pendência quando é
+  // marcada como realizada, e a janela fecharia no meio do "Marcar retorno".
+  // Fica a última versão vista dela.
+  const lembrada = useRef<Consulta | undefined>(undefined);
+  const achada = aberta ? todas.get(aberta) : undefined;
+  if (achada) lembrada.current = achada;
+  const consulta = aberta ? achada ?? (lembrada.current?.id === aberta ? lembrada.current : undefined) : undefined;
 
   const props = { consultas, nomes, agora, hoje, data, abrir: setAberta, desde };
 
@@ -118,17 +126,31 @@ export function Agenda({
         </div>
       </header>
 
-      {falhou && (
+      {/* Cada leitura que falha mostra o erro no lugar dela: com a lista
+          vazia, a vista diria "Nenhuma consulta neste dia" sem saber
+          (CLAUDE.md, leitura que falha não é "não tem"). */}
+      {falhou.pacientes && (
         <div className="mb-6">
-          <ErroSecao secao="todas as consultas" />
+          <ErroSecao secao="a lista de pacientes (para marcar consulta e os nomes)" />
         </div>
       )}
+      {falhou.pendencias ? (
+        <div className="mb-6">
+          <ErroSecao secao="os pedidos e as consultas sem desfecho" />
+        </div>
+      ) : (
+        <Pendencias pendencias={pendencias} nomes={nomes} agora={agora} abrir={setAberta} />
+      )}
 
-      <Pendencias pendencias={pendencias} nomes={nomes} agora={agora} abrir={setAberta} />
-
-      {vista === "dia" && <VistaDia {...props} />}
-      {vista === "semana" && <VistaSemana {...props} />}
-      {vista === "mes" && <VistaMes {...props} />}
+      {falhou.periodo ? (
+        <ErroSecao secao="as consultas deste período" />
+      ) : (
+        <>
+          {vista === "dia" && <VistaDia {...props} />}
+          {vista === "semana" && <VistaSemana {...props} />}
+          {vista === "mes" && <VistaMes {...props} />}
+        </>
+      )}
 
       <Dialogo aberto={!!consulta} aoFechar={() => setAberta(null)} titulo="Consulta">
         {consulta && (

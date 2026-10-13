@@ -115,11 +115,17 @@ export async function getPacientesAtivos(
 }
 
 /**
- * "Desde a última consulta" de vários pacientes de uma vez. `consultas` são
- * as consultas de cada um (para achar a última realizada); quem não tem
- * nenhuma realizada fica de fora (null).
+ * "Desde a última consulta" de vários pacientes. `consultas` são as consultas
+ * de cada um (para achar a última realizada); quem não tem nenhuma realizada
+ * fica de fora (null).
  *
- * Sete consultas no total, qualquer que seja o número de pacientes.
+ * Uma leva de consultas POR PACIENTE, cada uma só na janela dele. Juntando
+ * todos num `.in(ids)`, três retornos no dia com um paciente de 90 dias atrás
+ * já davam mais de 1.000 refeições, e o Supabase corta em 1.000 linhas sem
+ * erro: o "dias com registro" saía baixo, ou "Nenhum registro", para quem
+ * registra todo dia. Por paciente, 90 dias de refeições ficam bem abaixo
+ * disso, e a ordem decrescente faz um corte, se houver, cair nos dias mais
+ * antigos.
  */
 export async function getDesdeUltimaConsulta(
   supabase: any,
@@ -127,68 +133,65 @@ export async function getDesdeUltimaConsulta(
   agora = new Date().toISOString(),
   hoje = todayISO()
 ): Promise<Res<Record<string, ResumoDesde | null>>> {
-  const desde: Record<string, string> = {};
-  for (const [id, lista] of Object.entries(consultasPorPaciente)) {
-    const u = ultimaRealizada(lista, agora);
-    if (u) desde[id] = diaDaConsulta(u);
-  }
-  const ids = Object.keys(desde);
   const out: Record<string, ResumoDesde | null> = {};
-  for (const id of Object.keys(consultasPorPaciente)) out[id] = null;
-  if (ids.length === 0) return { data: out, falhou: false };
-
-  // A janela mais longa entre os pacientes, até 90 dias; o peso da base pode
-  // ser mais antigo, então as medidas vêm de um ano antes.
-  const maisAntigo = ids.map((id) => desde[id]).sort()[0];
-  const inicio = [addDaysISO(hoje, -(MAX_DIAS_DESDE - 1)), addDaysISO(maisAntigo, 1)].sort().pop()!;
-  const inicioPeso = addDaysISO(inicio, -365);
-
-  const datas = (tabela: string) =>
-    supabase.from(tabela).select("user_id, date").in("user_id", ids).gte("date", inicio).lte("date", hoje);
-  const [refeicoes, treinos, diarios, medidas, plano, checks, desvios] = await Promise.all([
-    datas("meals"),
-    datas("workouts"),
-    datas("daily_logs"),
-    supabase
-      .from("body_measurements")
-      .select("user_id, date, weight_kg")
-      .in("user_id", ids)
-      .not("weight_kg", "is", null)
-      .gte("date", inicioPeso)
-      .lte("date", hoje),
-    supabase.from("workout_plan").select("id, user_id, day_of_week, sport").in("user_id", ids),
-    supabase
-      .from("plan_completions")
-      .select("id, user_id, plan_id, date, status, workout_id")
-      .in("user_id", ids)
-      .gte("date", inicio)
-      .lte("date", hoje),
-    supabase
-      .from("prescription_deviations")
-      .select("patient_id, created_at")
-      .in("patient_id", ids)
-      .gte("created_at", instanteEmSaoPaulo(inicio, "00:00")),
-  ]);
-  const falhou = [refeicoes, treinos, diarios, medidas, plano, checks, desvios].some((r) => r.error);
-  const de = (r: any, campo = "user_id") => (id: string) =>
-    ((r.data ?? []) as any[]).filter((x) => x[campo] === id);
-
-  for (const id of ids) {
-    out[id] = resumoDesdeUltima({
-      desde: desde[id],
-      hoje,
-      diasComRegistro: [
-        ...de(refeicoes)(id),
-        ...de(treinos)(id),
-        ...de(diarios)(id),
-        ...de(medidas)(id),
-      ].map((x) => x.date),
-      pesos: de(medidas)(id),
-      plano: de(plano)(id),
-      checks: de(checks)(id),
-      desvios: de(desvios, "patient_id")(id),
-    });
-  }
+  let falhou = false;
+  await Promise.all(
+    Object.entries(consultasPorPaciente).map(async ([id, lista]) => {
+      out[id] = null;
+      const u = ultimaRealizada(lista, agora);
+      if (!u) return;
+      const desde = diaDaConsulta(u);
+      // Do dia seguinte à consulta, no máximo 90 dias; o peso da base pode
+      // ser mais antigo, então as medidas vêm de um ano antes.
+      const inicio = [addDaysISO(hoje, -(MAX_DIAS_DESDE - 1)), addDaysISO(desde, 1)].sort().pop()!;
+      const datas = (tabela: string) =>
+        supabase
+          .from(tabela)
+          .select("date")
+          .eq("user_id", id)
+          .gte("date", inicio)
+          .lte("date", hoje)
+          .order("date", { ascending: false });
+      const respostas = await Promise.all([
+        datas("meals"),
+        datas("workouts"),
+        datas("daily_logs"),
+        supabase
+          .from("body_measurements")
+          .select("date, weight_kg")
+          .eq("user_id", id)
+          .not("weight_kg", "is", null)
+          .gte("date", addDaysISO(inicio, -365))
+          .lte("date", hoje)
+          .order("date", { ascending: false }),
+        supabase.from("workout_plan").select("id, day_of_week, sport").eq("user_id", id),
+        supabase
+          .from("plan_completions")
+          .select("id, plan_id, date, status, workout_id")
+          .eq("user_id", id)
+          .gte("date", inicio)
+          .lte("date", hoje),
+        supabase
+          .from("prescription_deviations")
+          .select("created_at")
+          .eq("patient_id", id)
+          .gte("created_at", instanteEmSaoPaulo(inicio, "00:00")),
+      ]);
+      if (respostas.some((r: any) => r.error)) falhou = true;
+      const [refeicoes, treinos, diarios, medidas, plano, checks, desvios] = respostas.map(
+        (r: any) => (r.data ?? []) as any[]
+      );
+      out[id] = resumoDesdeUltima({
+        desde,
+        hoje,
+        diasComRegistro: [...refeicoes, ...treinos, ...diarios, ...medidas].map((x) => x.date),
+        pesos: medidas,
+        plano,
+        checks,
+        desvios,
+      });
+    })
+  );
   return { data: out, falhou };
 }
 
@@ -202,4 +205,28 @@ export async function getDesdeDoPaciente(
   if (c.falhou) return { data: null, falhou: true };
   const r = await getDesdeUltimaConsulta(supabase, { [pacienteId]: c.data }, agora);
   return { data: r.data[pacienteId] ?? null, falhou: r.falhou };
+}
+
+/**
+ * As consultas do cartão do paciente: pedidos abertos (de qualquer data: um
+ * pedido vencido sem resposta ainda prende o próximo pelo índice de um pedido
+ * por vez, e o paciente precisa vê-lo para cancelar), as futuras e as da
+ * última semana (para o aviso "cancelou a consulta"), da mais cedo para a
+ * mais tarde. Antes eram as 10 mais NOVAS, e com mais de 10 futuras a mais
+ * próxima ficava de fora.
+ */
+export async function getConsultasDoCartao(
+  supabase: any,
+  pacienteId: string,
+  agora = new Date().toISOString()
+): Promise<Res<Consulta[]>> {
+  const semanaPassada = new Date(Date.parse(agora) - 7 * 86_400_000).toISOString();
+  const { data, error } = await supabase
+    .from("appointments")
+    .select(COLUNAS_CONSULTA)
+    .eq("patient_id", pacienteId)
+    .or(`status.eq.pedido,starts_at.gte."${semanaPassada}"`)
+    .order("starts_at", { ascending: true })
+    .limit(50);
+  return { data: (data ?? []) as Consulta[], falhou: !!error };
 }

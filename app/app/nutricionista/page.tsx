@@ -13,7 +13,7 @@ import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui";
 import { todayISO, formatDate, dataNoBrasil } from "@/lib/date";
 import { CartaoConsulta } from "@/components/CartaoConsulta";
-import { COLUNAS_CONSULTA, type Consulta } from "@/lib/consultas";
+import { getConsultasDoCartao } from "@/lib/consultasDb";
 import NutriNotes, { type Nota } from "@/components/NutriNotes";
 import MealPlanView from "@/components/MealPlanView";
 import ConectarNutri from "@/components/ConectarNutri";
@@ -116,12 +116,7 @@ export default async function MeuNutricionistaPage({
         .not("prescribed_by", "is", null)
         .order("day_of_week", { ascending: true })
         .order("position", { ascending: true }),
-      supabase
-        .from("appointments")
-        .select(COLUNAS_CONSULTA)
-        .eq("patient_id", uid)
-        .order("starts_at", { ascending: false })
-        .limit(10),
+      getConsultasDoCartao(supabase, uid),
     ]);
 
   const nutriNome = (profRes.data as any)?.full_name || "Seu nutricionista";
@@ -198,10 +193,10 @@ export default async function MeuNutricionistaPage({
 
       <div className="mb-5">
         <CartaoConsulta
-          consultas={(consultasRes.data ?? []) as Consulta[]}
+          consultas={consultasRes.data.filter((c) => c.nutritionist_id === nutriId)}
           agora={new Date().toISOString()}
           nutriNome={(profRes.data as any)?.full_name || undefined}
-          falhou={!!consultasRes.error}
+          falhou={consultasRes.falhou}
         />
       </div>
 

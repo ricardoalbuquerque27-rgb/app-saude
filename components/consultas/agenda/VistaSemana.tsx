@@ -16,7 +16,10 @@ import { FOCO } from "@/components/clinico/estilos";
 import { CLASSE_SELO, SELO } from "../aparencia";
 import { hrefDaAgenda, type PropsDaVista } from "./tipos";
 
-const ALTURA_HORA = 56; // px por hora na grade
+// px por hora: uma consulta de 30 min fica com 32 px. Abaixo dos 44 px de
+// toque, mas um bloco mais alto que a duração cobriria o horário seguinte; no
+// tablet o caminho de toque confortável é o nome do dia, que abre a lista.
+const ALTURA_HORA = 64;
 
 /** Minutos desde a meia-noite de São Paulo. */
 function minutoDoDia(instante: string): number {
@@ -59,7 +62,10 @@ export function VistaSemana({ consultas, nomes, agora, hoje, data, abrir }: Prop
   const bloco = (c: Consulta, faixa: number, faixas: number) => {
     const s = situacao(c, agora);
     const topo = ((minutoDoDia(c.starts_at) - ini) / 60) * ALTURA_HORA;
-    const altura = Math.max(26, (c.duration_min / 60) * ALTURA_HORA - 2);
+    // Até o fim da grade: uma consulta das 23:30 de 60 min passaria do
+    // fundo (a grade vai no máximo até meia-noite).
+    const ateOFim = ((fim - minutoDoDia(c.starts_at)) / 60) * ALTURA_HORA - 2;
+    const altura = Math.min(ateOFim, Math.max(30, (c.duration_min / 60) * ALTURA_HORA - 2));
     const pendente = s === "pedido" || s === "remarcar" || s === "sem-desfecho";
     const estilo = pendente
       ? "border border-dashed border-clin-atencao bg-clin-chao text-clin-atencao"

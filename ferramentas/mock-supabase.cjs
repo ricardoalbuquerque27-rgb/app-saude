@@ -527,9 +527,11 @@ function carteira() {
 
   // Consultas: uma situação por paciente, sem mexer nos alertas que as
   // verificações de ferramentas/ já esperam de cada um.
-  //   Luiza    realizada há 14 dias (tem "desde a última consulta") e a
-  //            próxima daqui a 2 dias; sem alerta
-  //   Beatriz  pediu consulta online daqui a 3 dias → "Pediu uma consulta"
+  //   Luiza    realizada há 14 dias (tem "desde a última consulta"), uma em
+  //            andamento agora (começou há 10 min) e a próxima daqui a 2
+  //            dias às 10:00; sem alerta
+  //   Beatriz  pediu consulta online daqui a 2 dias às 10:15, em cima da da
+  //            Luiza (o aviso de choque do "Aceitar") → "Pediu uma consulta"
   //   Carlos   agendada amanhã, pediu para remarcar → alerta de remarcação
   //   Joana    agendada há 5 dias e nunca fechada → "sem desfecho"
   //   Pedro    1ª consulta amanhã; sem alerta
@@ -540,8 +542,9 @@ function carteira() {
     c(2, P.luiza, 28, "10:00", { status: "realizada" }),
     c(3, P.luiza, 14, "10:00", { status: "realizada" }),
     c(4, P.luiza, -2, "10:00", { mode: "online" }),
+    { ...c(13, P.luiza, 0, "12:00"), starts_at: new Date(Date.now() - 10 * 60000).toISOString(), duration_min: 60 },
     c(5, P.beatriz, 30, "16:30", { status: "realizada", kind: "primeira", duration_min: 60 }),
-    c(6, P.beatriz, -3, "18:00", { status: "pedido", mode: "online",
+    c(6, P.beatriz, -2, "10:15", { status: "pedido", mode: "online",
       patient_message: "Pode ser online? Saio tarde do trabalho." }),
     c(7, P.carlos, 21, "09:00", { status: "realizada", kind: "primeira", duration_min: 60 }),
     c(8, P.carlos, -1, "09:00", { reschedule_requested_at: naHora(1, "20:00"),
@@ -630,6 +633,8 @@ function rpcConsulta(nome, a, quem) {
       if (!x) return erro("Consulta não encontrada.");
       if (a.p_desfecho !== "cancelada") {
         if (x.status === "pedido") return erro("Aceite o pedido antes de fechar a consulta.");
+        if (x.status === "cancelada")
+          return erro("Consulta cancelada não pode virar realizada nem falta. Marque outra.");
         if (Date.parse(x.starts_at) > agora) return erro("A consulta ainda não começou.");
       }
       toque(x, { status: a.p_desfecho, cancelled_by: a.p_desfecho === "cancelada" ? "nutri" : null,

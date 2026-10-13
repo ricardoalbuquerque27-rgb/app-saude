@@ -76,9 +76,11 @@ qualquer dia:
 E as consultas (`appointments`), uma situação por paciente sem mudar os
 alertas acima:
 
-- **Luiza**: realizada há 14 dias (tem "desde a última consulta") e a próxima
-  daqui a 2 dias, às 10:00, online.
-- **Beatriz**: pediu consulta online daqui a 3 dias, às 18:00, com recado.
+- **Luiza**: realizada há 14 dias (tem "desde a última consulta"), uma em
+  andamento agora (começou há 10 minutos) e a próxima daqui a 2 dias, às 10:00,
+  online.
+- **Beatriz**: pediu consulta online daqui a 2 dias, às 10:15, com recado, em
+  cima da consulta da Luiza (para o aviso de choque do "Aceitar").
 - **Carlos**: agendada amanhã às 09:00, com pedido de remarcação.
 - **Joana**: agendada há 5 dias e nunca fechada (sem desfecho).
 - **Pedro**: 1ª consulta amanhã às 11:00.
@@ -111,9 +113,11 @@ pela barra de abas, a troca segurada com gravação em voo
 e a aba que a tela cheia do celular guarda). Também fotografa a agenda nas três
 vistas e confere as consultas (Verificação 15): a vista padrão e a última
 usada, a linha de aviso, o pedido tracejado na semana, a pendência no mês,
-aceitar o pedido da Beatriz, "Manter horário" do Carlos, fechar a da Joana
-como realizada, o aviso de choque ao marcar em cima da Luiza e a seta que
-mostra a sexta aba no celular. Ele descobre os ids dos pacientes perguntando
+o aviso de choque e o "Aceitar" do pedido da Beatriz, "Manter horário" do
+Carlos, Realizada e Faltou já na consulta em andamento da Luiza, fechar a da
+Joana como realizada (e o "Sem retorno marcado" que aparece), o aviso de
+choque ao marcar em cima da Luiza e a seta que mostra a sexta aba no
+celular. Ele descobre os ids dos pacientes perguntando
 ao mock (`/__cenario`), e recusa rodar se o mock subiu com outro cenário.
 Sem `OUT`, os PNGs vão para `prints-nutri` no diretório temporário do
 sistema.

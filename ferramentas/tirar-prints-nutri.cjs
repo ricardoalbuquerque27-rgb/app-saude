@@ -936,9 +936,13 @@ async function transbordo(page) {
 
     // c) a semana põe cada consulta no dia certo, e o pedido tracejado
     {
-      const page = await abrirAgenda(pc, `?vista=semana&data=${diaSP(3)}`);
-      const bloco = page.locator('button[title^="18:00 Beatriz"]');
-      ok((await bloco.count()) === 1, "Semana: o pedido da Beatriz (daqui a 3 dias, 18:00) aparece na grade");
+      const page = await abrirAgenda(pc, `?vista=semana&data=${diaSP(2)}`);
+      const bloco = page.locator('button[title^="10:15 Beatriz"]');
+      ok((await bloco.count()) === 1, "Semana: o pedido da Beatriz (daqui a 2 dias, 10:15) aparece na grade");
+      const luiza = await page.locator('button[title^="10:00 Luiza"]').boundingBox();
+      const bea = await bloco.first().boundingBox();
+      ok(!!luiza && !!bea && bea.x >= luiza.x + luiza.width - 4,
+        "Semana: Luiza 10:00 e Beatriz 10:15, que se sobrepõem, ficam lado a lado");
       const borda = await bloco.first().evaluate((el) => getComputedStyle(el).borderTopStyle).catch(() => "");
       ok(borda === "dashed", `Semana: pedido é tracejado (${borda})`);
       await page.close();
@@ -958,6 +962,9 @@ async function transbordo(page) {
       await clicar(aviso(page).getByRole("button", { name: /Beatriz Rocha pediu consulta/ }));
       await janela(page).waitFor({ timeout: 30000 });
       ok((await textoDe(janela(page))).includes("Pode ser online?"), "o painel mostra o recado do pedido");
+      await page.waitForFunction(() => document.querySelector("dialog[open]")?.textContent?.includes("Bate com"), null, { timeout: 30000 }).catch(() => {});
+      ok((await textoDe(janela(page))).includes("Bate com 10:00 Luiza Prado"),
+        "o painel do pedido avisa que o horário pedido bate com a consulta da Luiza", await textoDe(janela(page)));
       await clicar(janela(page).getByRole("button", { name: "Aceitar" }));
       await page.waitForFunction(() => !document.querySelector("dialog[open]"), null, { timeout: 30000 });
       await page.waitForFunction(
@@ -991,11 +998,25 @@ async function transbordo(page) {
       await clicar(page.locator("#consultas").getByRole("button", { name: "Realizada", exact: true }));
       await page.waitForFunction(() => !document.querySelector("#consultas")?.textContent?.includes("Precisa de você"), null, { timeout: 30000 }).catch(() => {});
       ok(!(await textoDe(page.locator("#consultas"))).includes("Precisa de você"), "Realizada tira a consulta da Joana das pendências");
+      ok((await textoDe(page.locator("#consultas"))).includes("Sem retorno marcado"),
+        "sem próxima consulta, a realizada sobe como 'Sem retorno marcado', com o Marcar retorno");
+      ok((await page.locator("#consultas").getByRole("button", { name: "Marcar retorno" }).count()) >= 1,
+        "o 'Marcar retorno' está à vista depois de fechar a consulta");
       await page.close();
       const resumo = await abrir(pc, rota("joana"));
       ok(!(await textoDe(fila(resumo))).includes("sem desfecho"), "a fila da Joana não acusa mais consulta sem desfecho");
       ok(/Desde a última consulta \(\d\d\/\d\d\)/.test(await textoDe(resumo.locator("body"))), "o Resumo da Joana passa a ter 'Desde a última consulta'");
       await resumo.close();
+    }
+
+    // g2) Luiza: a consulta que está acontecendo já oferece Realizada e Faltou
+    {
+      const page = await abrir(pc, aba("luiza", "consultas"));
+      const proxima = page.locator("#consultas div:has(> h3:text-is('Próxima consulta'))");
+      ok((await proxima.getByRole("button", { name: "Realizada", exact: true }).count()) === 1 &&
+        (await proxima.getByRole("button", { name: "Faltou", exact: true }).count()) === 1,
+        "consulta em andamento: Realizada e Faltou sem esperar o fim");
+      await page.close();
     }
 
     // h) marcar consulta: sem paciente avisa; em cima da Luiza avisa o choque e salva

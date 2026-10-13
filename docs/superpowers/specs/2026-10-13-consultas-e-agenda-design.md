@@ -49,9 +49,10 @@ remarcar e pede uma consulta nova.
 | **Ruling:** duração 30, 45, 60 ou 90 min; padrão 60 na 1ª e 45 no retorno. | Meu |
 | **Ruling:** choque de horário **avisa, não impede**. O nutri pode encaixar de propósito. | Meu |
 | **Ruling:** ao marcar "Realizada", o painel oferece "Marcar retorno", com a data sugerida em +30 dias no mesmo horário. Sem alerta de "sem retorno marcado" (o dono do produto não escolheu). | Meu |
-| **Ruling:** o paciente tem no máximo um pedido aberto; não pede nem cancela no passado. | Meu |
+| **Ruling:** o paciente tem no máximo um pedido aberto e não pede no passado. Cancela uma agendada só antes do início, mas cancela um pedido mesmo com o horário pedido vencido (o nutri não respondeu, e o pedido prenderia o próximo). | Meu (revisto na revisão de código) |
 | **Ruling:** nada é apagado; cancelar guarda quem cancelou. | Meu |
-| **Ruling:** desfecho pode ser corrigido (realizada ↔ faltou ↔ cancelada); realizada e faltou só depois do início. | Meu |
+| **Ruling:** realizada e faltou desde o início da consulta (não só no fim); o desfecho se corrige entre realizada e faltou, ou para cancelada, mas cancelada não volta: um pedido recusado nunca foi consulta. | Meu (revisto na revisão de código) |
+| **Ruling:** quando o vínculo deixa de ser ativo, pedidos e consultas futuras com aquele nutri são cancelados (gatilho no banco); as passadas ficam. | Meu (achado da revisão de código) |
 
 **O que ainda não tem evidência:** nenhum nutricionista real usou. As
 durações padrão e o retorno em 30 dias são palpite.
@@ -83,6 +84,12 @@ Uma tabela nova, `appointments`, e funções no banco para todas as escritas.
 | `reschedule_requested_at` | timestamptz | não nulo = o paciente pediu para remarcar esta agendada |
 | `cancelled_by` | text | `nutri` ou `paciente`, só quando cancelada |
 | `created_at`, `updated_at` | timestamptz | |
+
+Um gatilho em `patient_links` (`patient_links_cancela_consultas`) cancela,
+quando o vínculo deixa de ser ativo (o paciente revoga, o nutri remove), os
+pedidos e as consultas futuras com aquele nutricionista. Sem isso o paciente
+via a consulta de um nutri que já não vê nada, e um pedido aberto com ele
+prendia o paciente pelo índice de um pedido por vez.
 
 "Sem desfecho" **não é um status gravado**: é uma agendada cujo fim
 (`starts_at + duration_min`) já passou. Gravar exigiria um cron, e o plano
@@ -133,10 +140,13 @@ migração `harden_function_grants`.
   cada item abrindo o painel da consulta.
 - Tocar numa consulta abre o **painel da consulta**, com as ações da
   situação dela:
-  - pedido: Aceitar · Outro horário · Recusar;
+  - pedido: Aceitar · Outro horário · Recusar, com o aviso de choque do
+    horário pedido (o paciente não vê a agenda);
   - agendada com pedido de remarcação: o recado, Remarcar · Manter horário;
   - agendada futura: Remarcar · Cancelar;
+  - agendada que já começou: Realizada · Faltou · Remarcar;
   - sem desfecho: Realizada · Faltou · Cancelada;
+  - "Realizada" leva direto ao formulário do retorno (+30 dias);
   - realizada: Marcar retorno; corrigir desfecho;
   - sempre: Abrir paciente.
 - **Formulário de marcar/remarcar:** paciente (só na nova), data, hora (passo
@@ -146,10 +156,12 @@ migração `harden_function_grants`.
 ### Página do paciente
 
 - Aba nova **Consultas**, depois de Clínico: pendência no topo (com as mesmas
-  ações do painel), próxima consulta, histórico com o desfecho de cada uma,
-  "Marcar consulta" já com o paciente escolhido.
-- Cabeçalho: "próxima consulta ter., 20/10 às 14:00" ao lado de idade e
-  altura, quando houver.
+  ações do painel), próxima consulta ou, sem nenhuma, "Sem retorno marcado"
+  com a última realizada e o "Marcar retorno", histórico com o desfecho de
+  cada uma, "Marcar consulta" já com o paciente escolhido.
+- Cabeçalho: "Próxima consulta: ter., 20/10 às 14:00 · online" embaixo de
+  idade e altura, quando houver. É texto, não link: o cabeçalho fica em todas
+  as abas, e um link para outra aba pularia a pergunta de descartar rascunho.
 - Resumo: linha "Desde a última consulta (29/9): …" embaixo dos números.
 - Fila do Resumo e da Início: alertas novos de tipo `consulta`:
   - "Pediu uma consulta" / "Pediu para remarcar" — nível 2;

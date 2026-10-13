@@ -34,7 +34,9 @@ export function CartaoConsulta({
 }) {
   const id = useId();
   const { executar, ocupado, erro, setErro } = useAcaoConsulta();
-  const [formulario, setFormulario] = useState<null | "pedir" | "remarcar">(null);
+  const [formulario, setFormulario] = useState<null | "pedir" | "remarcar">(
+    null,
+  );
   const [data, setData] = useState("");
   const [hora, setHora] = useState("");
   const [modo, setModo] = useState<ModoConsulta>("presencial");
@@ -46,10 +48,13 @@ export function CartaoConsulta({
   const proxima =
     consultas
       .filter((c) => c.status === "agendada" && fimDa(c) > t)
-      .sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at))[0] ?? null;
+      .sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at))[0] ??
+    null;
   // Sem nada marcado: se a mais recente foi cancelada pelo nutri nos
   // últimos 7 dias (ou ainda ia acontecer), o paciente fica sabendo.
-  const recente = [...consultas].sort((a, b) => Date.parse(b.starts_at) - Date.parse(a.starts_at))[0];
+  const recente = [...consultas].sort(
+    (a, b) => Date.parse(b.starts_at) - Date.parse(a.starts_at),
+  )[0];
   const canceladaPeloNutri =
     !pedido &&
     !proxima &&
@@ -73,20 +78,25 @@ export function CartaoConsulta({
     } catch {
       return setErro("Escolha a data e a hora.");
     }
-    if (Date.parse(inicio) <= Date.now()) return setErro("Escolha um horário no futuro.");
-    const ok = await executar("pedir_consulta", {
-      p_inicio: inicio,
-      p_modo: modo,
-      p_mensagem: recado.trim() || null,
-    });
-    if (ok) setFormulario(null);
+    if (Date.parse(inicio) <= Date.now())
+      return setErro("Escolha um horário no futuro.");
+    // O formulário fecha quando a página nova chega: fechando antes, o
+    // "Pedir consulta" reaparecia por um instante e convidava a pedir de novo.
+    await executar(
+      "pedir_consulta",
+      { p_inicio: inicio, p_modo: modo, p_mensagem: recado.trim() || null },
+      () => setFormulario(null),
+    );
   }
 
   async function enviarRemarcacao(e: React.FormEvent) {
     e.preventDefault();
     if (!recado.trim()) return setErro("Diga qual horário fica melhor.");
-    const ok = await executar("pedir_remarcacao", { p_id: proxima!.id, p_mensagem: recado.trim() });
-    if (ok) setFormulario(null);
+    await executar(
+      "pedir_remarcacao",
+      { p_id: proxima!.id, p_mensagem: recado.trim() },
+      () => setFormulario(null),
+    );
   }
 
   async function cancelar(c: Consulta, pergunta: string) {
@@ -108,45 +118,36 @@ export function CartaoConsulta({
       <section className="card" aria-label="Consulta">
         {titulo}
         <p className="text-sm text-slate-600 dark:text-slate-300">
-          Não foi possível carregar suas consultas. Atualize a página para tentar de novo.
+          Não foi possível carregar suas consultas. Atualize a página para
+          tentar de novo.
         </p>
       </section>
     );
   }
 
   const mensagemDeErro = erro && (
-    <p role="alert" className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:bg-rose-500/10 dark:text-rose-200">
+    <p
+      role="alert"
+      className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:bg-rose-500/10 dark:text-rose-200"
+    >
       {erro}
     </p>
   );
-  const girando = ocupado && <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />;
+  const girando = ocupado && (
+    <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
+  );
 
   return (
     <section className="card" aria-label="Consulta">
       {titulo}
 
-      {pedido ? (
+      {/* A próxima consulta e um pedido aberto podem existir juntos (o nutri
+          marcou uma consulta sem responder ao pedido): os dois aparecem. */}
+      {proxima && (
         <div>
-          <p className="text-sm text-slate-900 dark:text-white">
-            Pedido enviado para <strong className="font-semibold">{rotuloDaConsulta(pedido)}</strong>{" "}
-            · {ROTULO_MODO[pedido.mode]}
+          <p className="text-sm text-slate-600 dark:text-slate-300">
+            Próxima consulta
           </p>
-          <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-300">Aguardando resposta de {quem}.</p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={ocupado}
-              onClick={() => cancelar(pedido, "Cancelar o pedido de consulta?")}
-              className="btn-ghost"
-            >
-              {girando}
-              Cancelar pedido
-            </button>
-          </div>
-        </div>
-      ) : proxima ? (
-        <div>
-          <p className="text-sm text-slate-600 dark:text-slate-300">Próxima consulta</p>
           <p className="text-base font-semibold text-slate-900 dark:text-white">
             {rotuloDaConsulta(proxima)} · {ROTULO_MODO[proxima.mode]}
           </p>
@@ -157,13 +158,23 @@ export function CartaoConsulta({
           ) : formulario === "remarcar" ? null : (
             Date.parse(proxima.starts_at) > t && (
               <div className="mt-3 flex flex-wrap gap-2">
-                <button type="button" disabled={ocupado} onClick={() => abrir("remarcar")} className="btn-ghost">
+                <button
+                  type="button"
+                  disabled={ocupado}
+                  onClick={() => abrir("remarcar")}
+                  className="btn-ghost"
+                >
                   Pedir para remarcar
                 </button>
                 <button
                   type="button"
                   disabled={ocupado}
-                  onClick={() => cancelar(proxima, `Cancelar a consulta de ${rotuloDaConsulta(proxima)}?`)}
+                  onClick={() =>
+                    cancelar(
+                      proxima,
+                      `Cancelar a consulta de ${rotuloDaConsulta(proxima)}?`,
+                    )
+                  }
                   className="btn-ghost"
                 >
                   {girando}
@@ -173,7 +184,11 @@ export function CartaoConsulta({
             )
           )}
           {formulario === "remarcar" && (
-            <form onSubmit={enviarRemarcacao} noValidate className="mt-3 space-y-3">
+            <form
+              onSubmit={enviarRemarcacao}
+              noValidate
+              className="mt-3 space-y-3"
+            >
               <div>
                 <label htmlFor={`${id}-remarcar`} className="label">
                   Qual horário fica melhor?
@@ -189,115 +204,174 @@ export function CartaoConsulta({
                 />
               </div>
               <div className="flex flex-wrap gap-2">
-                <button type="submit" disabled={ocupado} className="btn-primary">
+                <button
+                  type="submit"
+                  disabled={ocupado}
+                  className="btn-primary"
+                >
                   {girando}
                   Enviar pedido
                 </button>
-                <button type="button" disabled={ocupado} onClick={() => setFormulario(null)} className="btn-ghost">
+                <button
+                  type="button"
+                  disabled={ocupado}
+                  onClick={() => setFormulario(null)}
+                  className="btn-ghost"
+                >
                   Voltar
                 </button>
               </div>
             </form>
           )}
         </div>
-      ) : formulario === "pedir" ? (
-        <form onSubmit={enviarPedido} noValidate className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label htmlFor={`${id}-data`} className="label">
-                Data
-              </label>
-              <input
-                id={`${id}-data`}
-                type="date"
-                min={todayISO()}
-                value={data}
-                onChange={(e) => setData(e.target.value)}
-                className="input"
-                required
-              />
-            </div>
-            <div>
-              <label htmlFor={`${id}-hora`} className="label">
-                Hora
-              </label>
-              <input
-                id={`${id}-hora`}
-                type="time"
-                step={900}
-                value={hora}
-                onChange={(e) => setHora(e.target.value)}
-                className="input"
-                required
-              />
-            </div>
-          </div>
-          <fieldset>
-            <legend className="label">Como prefere</legend>
-            <div className="flex gap-2">
-              {(["presencial", "online"] as const).map((m) => (
-                <label
-                  key={m}
-                  className={`flex min-h-[44px] flex-1 cursor-pointer items-center justify-center rounded-xl border px-3 text-sm has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-brand-500/30 ${
-                    modo === m
-                      ? "border-brand-700 bg-brand-50 font-semibold text-brand-800 dark:border-brand-400 dark:bg-brand-500/10 dark:text-brand-300"
-                      : "border-slate-300 text-slate-700 dark:border-slate-700 dark:text-slate-200"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name={`${id}-modo`}
-                    value={m}
-                    checked={modo === m}
-                    onChange={() => setModo(m)}
-                    className="sr-only"
-                  />
-                  {m === "presencial" ? "Presencial" : "Online"}
-                </label>
-              ))}
-            </div>
-          </fieldset>
+      )}
+      {pedido && (
+        <div
+          className={
+            proxima
+              ? "mt-4 border-t border-slate-200 pt-4 dark:border-slate-800"
+              : ""
+          }
+        >
           <div>
-            <label htmlFor={`${id}-recado`} className="label">
-              Recado (opcional)
-            </label>
-            <textarea
-              id={`${id}-recado`}
-              value={recado}
-              onChange={(e) => setRecado(e.target.value)}
-              maxLength={500}
-              rows={2}
-              className="input"
-              placeholder="Ex.: prefiro de manhã"
-            />
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button type="submit" disabled={ocupado} className="btn-primary">
-              {girando}
-              Enviar pedido
-            </button>
-            <button type="button" disabled={ocupado} onClick={() => setFormulario(null)} className="btn-ghost">
-              Voltar
-            </button>
-          </div>
-        </form>
-      ) : (
-        <div>
-          {canceladaPeloNutri ? (
-            <p className="text-sm text-slate-600 dark:text-slate-300">
-              {nutriNome ? quem : "Seu nutricionista"} cancelou a consulta de{" "}
-              {rotuloDaConsulta(canceladaPeloNutri)}. Peça outro horário ou mande uma mensagem pela conversa.
+            <p className="text-sm text-slate-900 dark:text-white">
+              Pedido enviado para{" "}
+              <strong className="font-semibold">
+                {rotuloDaConsulta(pedido)}
+              </strong>{" "}
+              · {ROTULO_MODO[pedido.mode]}
             </p>
-          ) : (
-            <p className="text-sm text-slate-600 dark:text-slate-300">Nenhuma consulta marcada.</p>
-          )}
-          <div className="mt-3">
-            <button type="button" onClick={() => abrir("pedir")} className="btn-primary">
-              Pedir consulta
-            </button>
+            <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-300">
+              Aguardando resposta de {quem}.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={ocupado}
+                onClick={() =>
+                  cancelar(pedido, "Cancelar o pedido de consulta?")
+                }
+                className="btn-ghost"
+              >
+                {girando}
+                Cancelar pedido
+              </button>
+            </div>
           </div>
         </div>
       )}
+      {!proxima &&
+        !pedido &&
+        (formulario === "pedir" ? (
+          <form onSubmit={enviarPedido} noValidate className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label htmlFor={`${id}-data`} className="label">
+                  Data
+                </label>
+                <input
+                  id={`${id}-data`}
+                  type="date"
+                  min={todayISO()}
+                  value={data}
+                  onChange={(e) => setData(e.target.value)}
+                  className="input"
+                  required
+                />
+              </div>
+              <div>
+                <label htmlFor={`${id}-hora`} className="label">
+                  Hora
+                </label>
+                <input
+                  id={`${id}-hora`}
+                  type="time"
+                  step={900}
+                  value={hora}
+                  onChange={(e) => setHora(e.target.value)}
+                  className="input"
+                  required
+                />
+              </div>
+            </div>
+            <fieldset>
+              <legend className="label">Como prefere</legend>
+              <div className="flex gap-2">
+                {(["presencial", "online"] as const).map((m) => (
+                  <label
+                    key={m}
+                    className={`flex min-h-[44px] flex-1 cursor-pointer items-center justify-center rounded-xl border px-3 text-sm has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-brand-500/30 ${
+                      modo === m
+                        ? "border-brand-700 bg-brand-50 font-semibold text-brand-800 dark:border-brand-400 dark:bg-brand-500/10 dark:text-brand-300"
+                        : "border-slate-300 text-slate-700 dark:border-slate-700 dark:text-slate-200"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name={`${id}-modo`}
+                      value={m}
+                      checked={modo === m}
+                      onChange={() => setModo(m)}
+                      className="sr-only"
+                    />
+                    {m === "presencial" ? "Presencial" : "Online"}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            <div>
+              <label htmlFor={`${id}-recado`} className="label">
+                Recado (opcional)
+              </label>
+              <textarea
+                id={`${id}-recado`}
+                value={recado}
+                onChange={(e) => setRecado(e.target.value)}
+                maxLength={500}
+                rows={2}
+                className="input"
+                placeholder="Ex.: prefiro de manhã"
+              />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button type="submit" disabled={ocupado} className="btn-primary">
+                {girando}
+                Enviar pedido
+              </button>
+              <button
+                type="button"
+                disabled={ocupado}
+                onClick={() => setFormulario(null)}
+                className="btn-ghost"
+              >
+                Voltar
+              </button>
+            </div>
+          </form>
+        ) : (
+          <div>
+            {canceladaPeloNutri ? (
+              <p className="text-sm text-slate-600 dark:text-slate-300">
+                {nutriNome ? quem : "Seu nutricionista"} cancelou a consulta de{" "}
+                {rotuloDaConsulta(canceladaPeloNutri)}. Peça outro horário ou
+                mande uma mensagem pela conversa.
+              </p>
+            ) : (
+              <p className="text-sm text-slate-600 dark:text-slate-300">
+                Nenhuma consulta marcada.
+              </p>
+            )}
+            <div className="mt-3">
+              <button
+                type="button"
+                onClick={() => abrir("pedir")}
+                className="btn-primary"
+              >
+                Pedir consulta
+              </button>
+            </div>
+          </div>
+        ))}
 
       {mensagemDeErro}
     </section>

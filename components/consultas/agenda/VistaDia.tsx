@@ -14,7 +14,8 @@ import { CLASSE_SELO, SELO } from "../aparencia";
 import type { PropsDaVista } from "./tipos";
 
 // O dia em lista, por horário. A linha "desde a última consulta" aparece só
-// no retorno: na 1ª consulta não há "última".
+// no retorno: na 1ª consulta não há "última". Pendência (pedido, remarcação,
+// sem desfecho) tem a borda tracejada, como na Semana.
 export function VistaDia({ consultas, nomes, agora, data, abrir, desde }: PropsDaVista) {
   const doDia = consultas
     .filter((c) => diaDaConsulta(c) === data)
@@ -29,12 +30,15 @@ export function VistaDia({ consultas, nomes, agora, data, abrir, desde }: PropsD
       {doDia.map((c) => {
         const s = situacao(c, agora);
         const d = c.kind === "retorno" && s !== "cancelada" ? desde?.[c.patient_id] : undefined;
+        const pendente = s === "pedido" || s === "remarcar" || s === "sem-desfecho";
         return (
           <li key={c.id}>
             <button
               type="button"
               onClick={() => abrir(c.id)}
-              className={`flex w-full gap-4 py-3 text-left hover:bg-clin-primaria-fundo ${FOCO}`}
+              className={`flex w-full gap-4 py-3 text-left hover:bg-clin-primaria-fundo ${FOCO} ${
+                pendente ? "border-l-2 border-dashed border-clin-atencao pl-3" : ""
+              }`}
             >
               <span className="w-16 shrink-0 tabular-nums">
                 <span className="block text-[15px] font-semibold text-clin-texto">

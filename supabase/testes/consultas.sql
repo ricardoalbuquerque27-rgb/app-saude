@@ -189,6 +189,57 @@ select set_config('request.jwt.claims', json_build_object('sub', :'p1', 'role', 
 set local role authenticated;
 select teste.ok(public.cancelar_consulta(:'pedido1'), 'paciente cancela pedido vencido');
 
+-- ---------------------------------------------------------------- cancelada não vira realizada
+reset role;
+select set_config('request.jwt.claims', json_build_object('sub', :'n2', 'role', 'authenticated')::text, true) \gset x
+set local role authenticated;
+-- pedido2 foi recusado (cancelada) e o horário pedido já passou:
+reset role;
+update public.appointments set starts_at = now() - interval '3 hours' where id = :'pedido2';
+select set_config('request.jwt.claims', json_build_object('sub', :'n2', 'role', 'authenticated')::text, true) \gset x
+set local role authenticated;
+select teste.erro(public.fechar_consulta(:'pedido2', 'realizada'), 'cancelada',
+  'pedido recusado não é "corrigido" para realizada');
+
+-- ---------------------------------------------------------------- desvincular cancela o que vem pela frente
+reset role;
+select set_config('request.jwt.claims', json_build_object('sub', :'n1', 'role', 'authenticated')::text, true) \gset x
+set local role authenticated;
+select public.marcar_consulta(:'p1', now() + interval '10 days') as r \gset
+select :'r'::jsonb->>'id' as futura \gset
+reset role;
+select set_config('request.jwt.claims', json_build_object('sub', :'p1', 'role', 'authenticated')::text, true) \gset x
+set local role authenticated;
+select public.pedir_consulta(now() + interval '12 days') as r \gset
+select :'r'::jsonb->>'id' as pedido3 \gset
+
+-- O paciente revoga o acesso (é o que RevogarNutri faz).
+update public.patient_links set status = 'revoked' where nutritionist_id = :'n1' and patient_id = :'p1';
+select teste.esperar(
+  (select status = 'cancelada' and cancelled_by = 'paciente' from public.appointments where id = :'futura'),
+  'revogar o nutri cancela a consulta futura com ele (pelo paciente)');
+select teste.esperar(
+  (select status = 'cancelada' from public.appointments where id = :'pedido3'),
+  'revogar o nutri cancela o pedido aberto com ele');
+select teste.esperar(
+  (select status = 'realizada' from public.appointments where id = :'c2'),
+  'revogar não mexe na consulta que já aconteceu');
+
+-- Com outro nutri, o pedido antigo não bloqueia mais: o índice de um pedido
+-- aberto por paciente não prende o paciente atrás de um pedido que ninguém vê.
+reset role;
+insert into public.patient_links (nutritionist_id, patient_id, status, accepted_at)
+values (:'n2', :'p1', 'active', now());
+select set_config('request.jwt.claims', json_build_object('sub', :'p1', 'role', 'authenticated')::text, true) \gset x
+set local role authenticated;
+select teste.ok(public.pedir_consulta(now() + interval '5 days'), 'depois de trocar de nutri, o paciente pede ao novo');
+reset role;
+delete from public.patient_links where nutritionist_id = :'n2' and patient_id = :'p1';
+select teste.esperar(
+  (select count(*) = 0 from public.appointments
+    where patient_id = :'p1' and nutritionist_id = :'n2' and status = 'pedido'),
+  'apagar o vínculo também cancela o pedido aberto');
+
 -- ---------------------------------------------------------------- vínculo revogado
 reset role;
 update public.patient_links set status = 'revoked' where nutritionist_id = :'n1' and patient_id = :'p1';

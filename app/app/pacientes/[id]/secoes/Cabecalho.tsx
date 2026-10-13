@@ -100,13 +100,13 @@ export async function Cabecalho({
           <p className="mt-1 text-[14px] tabular-nums text-clin-texto-2">
             {detalhes}
           </p>
+          {/* Texto, não link: o cabeçalho fica em todas as abas, e um link
+              para a aba Consultas trocaria de aba sem a pergunta de
+              "Descartar as alterações?" da barra (AbasPaciente), perdendo um
+              rascunho de metas. A aba Consultas está logo abaixo. */}
           {proxima && (
             <p className="mt-1 text-[14px] tabular-nums text-clin-texto-2">
-              Próxima consulta:{" "}
-              <Link href={hrefDaAba(uid, "consultas")} className={`inline-flex ${LINK}`}>
-                {rotuloDaConsulta(proxima)}
-              </Link>{" "}
-              · {ROTULO_MODO[proxima.mode]}
+              Próxima consulta: {rotuloDaConsulta(proxima)} · {ROTULO_MODO[proxima.mode]}
             </p>
           )}
         </div>

@@ -29,7 +29,7 @@ import PlanCheckIn from "@/components/PlanCheckIn";
 import NutriNotes from "@/components/NutriNotes";
 import MealPlanView from "@/components/MealPlanView";
 import { CartaoConsulta } from "@/components/CartaoConsulta";
-import { COLUNAS_CONSULTA, type Consulta } from "@/lib/consultas";
+import { getConsultasDoCartao } from "@/lib/consultasDb";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -152,12 +152,7 @@ export default async function DashboardPage() {
       .limit(1)
       .maybeSingle(),
     // As consultas mais recentes (inclusive as futuras), para o cartão.
-    supabase
-      .from("appointments")
-      .select(COLUNAS_CONSULTA)
-      .eq("patient_id", uid)
-      .order("starts_at", { ascending: false })
-      .limit(10),
+    getConsultasDoCartao(supabase, uid),
   ]);
 
   const profile = profileRes.data;
@@ -574,10 +569,12 @@ export default async function DashboardPage() {
           só diz isso e oferece pedir uma. */}
       {temNutri && (
         <CartaoConsulta
-          consultas={(consultasRes.data ?? []) as Consulta[]}
+          // Só as com o nutricionista de agora: as de um vínculo antigo o
+          // banco já cancela ao desvincular, e as passadas não são assunto aqui.
+          consultas={consultasRes.data.filter((c) => c.nutritionist_id === vinculo?.nutritionist_id)}
           agora={new Date().toISOString()}
           nutriNome={nutriNome}
-          falhou={!!consultasRes.error}
+          falhou={consultasRes.falhou}
         />
       )}
 

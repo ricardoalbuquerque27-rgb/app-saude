@@ -16,11 +16,11 @@ import {
   type ModoConsulta,
   type TipoConsulta,
 } from "@/lib/consultas";
-import { getConsultasDoPeriodo, getNomesDosPacientes } from "@/lib/consultasDb";
 import { ACAO_PRIMARIA, ACAO_SECUNDARIA } from "@/components/clinico/estilos";
 import { ErroInline } from "@/components/clinico/ErroInline";
 import { useAcaoConsulta } from "./acoes";
 import { CAMPO, ROTULO_CAMPO } from "./aparencia";
+import { useConsultasDoDia } from "./useConsultasDoDia";
 
 export type ModoForm = "marcar" | "remarcar";
 
@@ -116,27 +116,7 @@ export function FormConsulta({
   }, [modo, paciente, inicial?.tipo]);
 
   // As consultas do dia escolhido, para a lista e o choque.
-  const [doDia, setDoDia] = useState<{
-    lista: Consulta[];
-    nomes: Record<string, string>;
-  } | null>(null);
-  const [diaFalhou, setDiaFalhou] = useState(false);
-  useEffect(() => {
-    if (!nutriId || !/^\d{4}-\d{2}-\d{2}$/.test(data)) return;
-    let vivo = true;
-    const supabase = createClient();
-    (async () => {
-      const r = await getConsultasDoPeriodo(supabase, nutriId, data, data);
-      const ids = Array.from(new Set(r.data.map((c) => c.patient_id)));
-      const n = await getNomesDosPacientes(supabase, ids);
-      if (!vivo) return;
-      setDiaFalhou(r.falhou);
-      setDoDia({ lista: r.data, nomes: n.data });
-    })();
-    return () => {
-      vivo = false;
-    };
-  }, [modo, nutriId, data]);
+  const { doDia, falhou: diaFalhou } = useConsultasDoDia(nutriId, data);
 
   const instante = useMemo(() => {
     try {
@@ -163,23 +143,20 @@ export function FormConsulta({
     if (modo === "marcar" && !paciente) return setErro("Escolha o paciente.");
     if (!instante) return setErro("Escolha a data e a hora.");
 
-    const ok =
-      modo === "marcar"
-        ? await executar("marcar_consulta", {
-            p_patient: paciente,
-            p_inicio: instante,
-            p_duracao: duracao,
-            p_tipo: tipo,
-            p_modo: modalidade,
-          })
-        : await executar("remarcar_consulta", {
-            p_id: consulta!.id,
-            p_inicio: instante,
-            p_duracao: duracao,
-            p_tipo: tipo,
-            p_modo: modalidade,
-          });
-    if (ok) aoTerminar();
+    // O formulário fecha quando a página nova chega (useAcaoConsulta), não
+    // quando o banco responde.
+    if (modo === "marcar")
+      await executar(
+        "marcar_consulta",
+        { p_patient: paciente, p_inicio: instante, p_duracao: duracao, p_tipo: tipo, p_modo: modalidade },
+        aoTerminar,
+      );
+    else
+      await executar(
+        "remarcar_consulta",
+        { p_id: consulta!.id, p_inicio: instante, p_duracao: duracao, p_tipo: tipo, p_modo: modalidade },
+        aoTerminar,
+      );
   }
 
   const noPassado = instante != null && Date.parse(instante) < Date.now();

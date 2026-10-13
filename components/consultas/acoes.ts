@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRecarregar } from "@/components/clinico/useRecarregar";
 import type { Database } from "@/lib/types";
@@ -40,15 +40,33 @@ export async function chamarConsulta<F extends FuncaoConsulta>(
  * Uma ação de consulta com o estado da tela: `ocupado` do clique até a
  * página nova chegar (router.refresh), para um segundo toque não gravar de
  * novo (useRecarregar), e o erro para mostrar ao lado do botão.
+ *
+ * `depois` (fechar o formulário, a janela) roda quando a página nova JÁ está
+ * na tela, não quando a função do banco responde. Fechando antes, o painel de
+ * trás voltava com o dado antigo e o botão liberado: depois de "Marcar
+ * retorno", o "Marcar retorno" reaparecia e um segundo envio criava outra
+ * consulta igual.
  */
 export function useAcaoConsulta() {
   const [gravando, setGravando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [recarregando, recarregar] = useRecarregar();
+  const depoisDaPagina = useRef<(() => void) | null>(null);
+
+  // O `recarregando` sobe na mesma renderização em que a gravação termina
+  // (startTransition marca a transição pendente na hora) e desce quando a
+  // página nova chega: é aí que `depois` roda.
+  useEffect(() => {
+    if (recarregando || !depoisDaPagina.current) return;
+    const f = depoisDaPagina.current;
+    depoisDaPagina.current = null;
+    f();
+  }, [recarregando]);
 
   async function executar<F extends FuncaoConsulta>(
     funcao: F,
     args: Args<F>,
+    depois?: () => void,
   ): Promise<boolean> {
     setGravando(true);
     setErro(null);
@@ -58,6 +76,7 @@ export function useAcaoConsulta() {
       setErro(e);
       return false;
     }
+    depoisDaPagina.current = depois ?? null;
     recarregar();
     setGravando(false);
     return true;

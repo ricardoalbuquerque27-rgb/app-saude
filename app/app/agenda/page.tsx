@@ -107,7 +107,11 @@ export default async function AgendaPage({
       nomes={nomes}
       pacientes={pacientes.data}
       desde={desdeTexto}
-      falhou={periodo.falhou || pendencias.falhou || pacientes.falhou || outros.falhou}
+      falhou={{
+        periodo: periodo.falhou,
+        pendencias: pendencias.falhou,
+        pacientes: pacientes.falhou || outros.falhou,
+      }}
     />
   );
 }

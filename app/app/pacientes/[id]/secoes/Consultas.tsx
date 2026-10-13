@@ -12,12 +12,14 @@ import {
   ROTULO_TIPO,
   situacao,
   tipoSugerido,
+  ultimaRealizada,
   type Consulta,
 } from "@/lib/consultas";
 import { FOCO } from "@/components/clinico/estilos";
 
 // A aba Consultas: o que precisa do nutri no topo (pedido, pedido de
-// remarcação, sem desfecho), a próxima consulta e o histórico. Cada consulta
+// remarcação, sem desfecho), a próxima consulta ou, sem nenhuma, a última
+// realizada com o "Marcar retorno", e o histórico. Cada consulta
 // abre o mesmo painel da agenda; no histórico ele fica fechado num
 // <details>, para a lista não virar uma parede de botões.
 export async function Consultas({
@@ -55,7 +57,16 @@ export async function Consultas({
     .sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at));
   const proxima = proximaConsulta(r.data, agora);
   const mostrarProxima = proxima && !pendentes.some((c) => c.id === proxima.id);
-  const jaMostradas = new Set([...pendentes.map((c) => c.id), proxima?.id]);
+  // Sem próxima nem pedido: a última realizada sobe para o topo com o
+  // "Marcar retorno". É o passo seguinte de fechar uma consulta (critério 4
+  // da spec); no histórico ela ficaria fechada num <details>, lá embaixo.
+  const semRetorno =
+    !proxima && !r.data.some((c) => c.status === "pedido") ? ultimaRealizada(r.data, agora) : null;
+  const jaMostradas = new Set([
+    ...pendentes.map((c) => c.id),
+    proxima?.id,
+    semRetorno?.id,
+  ]);
   // Futuras além da próxima também entram no histórico, que vai da mais nova
   // para a mais antiga.
   const historico = r.data.filter((c) => !jaMostradas.has(c.id));
@@ -87,6 +98,13 @@ export async function Consultas({
             <div>
               <h3 className="mb-2 text-[15px] font-semibold text-clin-texto">Próxima consulta</h3>
               <div className="rounded-md border border-clin-linha p-4">{painel(proxima)}</div>
+            </div>
+          )}
+
+          {semRetorno && (
+            <div>
+              <h3 className="mb-2 text-[15px] font-semibold text-clin-texto">Sem retorno marcado</h3>
+              <div className="rounded-md border border-clin-linha p-4">{painel(semRetorno)}</div>
             </div>
           )}
 

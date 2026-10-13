@@ -145,8 +145,10 @@ end;
 $$;
 
 -- O desfecho. Realizada e faltou só depois do início, e só de uma agendada
--- (ou para corrigir outro desfecho); cancelada de qualquer situação,
--- inclusive pedido, que é o "Recusar".
+-- (ou para trocar uma pela outra); cancelada de qualquer situação, inclusive
+-- pedido, que é o "Recusar". Cancelada não volta a realizada nem a falta: um
+-- pedido recusado nunca foi consulta, e "corrigi-lo" mudaria o "desde a
+-- última consulta" e o tipo sugerido da próxima.
 create or replace function public.fechar_consulta(p_id uuid, p_desfecho text)
 returns jsonb
 language plpgsql security definer set search_path to 'public'
@@ -164,6 +166,9 @@ begin
   if p_desfecho in ('realizada', 'faltou') then
     if c.status = 'pedido' then
       return jsonb_build_object('ok', false, 'error', 'Aceite o pedido antes de fechar a consulta.');
+    end if;
+    if c.status = 'cancelada' then
+      return jsonb_build_object('ok', false, 'error', 'Consulta cancelada não pode virar realizada nem falta. Marque outra.');
     end if;
     if c.starts_at > now() then
       return jsonb_build_object('ok', false, 'error', 'A consulta ainda não começou.');
@@ -300,6 +305,50 @@ begin
   return jsonb_build_object('ok', true, 'id', p_id);
 end;
 $$;
+
+-- ---------------------------------------------------------------------------
+-- Desvincular
+-- ---------------------------------------------------------------------------
+
+-- Quando o vínculo deixa de ser ativo (o paciente revoga, o nutri remove), o
+-- que vinha pela frente com aquele nutricionista é cancelado: o nutri não vê
+-- mais as consultas (a RLS exige vínculo ativo), e um pedido aberto com ele
+-- prenderia o paciente pelo índice de um pedido por vez, sem ninguém para
+-- responder. O que já aconteceu fica como histórico.
+create or replace function public.cancelar_consultas_ao_desvincular()
+returns trigger
+language plpgsql security definer set search_path to 'public'
+as $$
+declare
+  v_nutri uuid := old.nutritionist_id;
+  v_paciente uuid := old.patient_id;
+begin
+  if v_paciente is null or old.status <> 'active' then
+    return coalesce(new, old);
+  end if;
+  if tg_op = 'UPDATE' and new.status = 'active' then
+    return new;
+  end if;
+
+  update public.appointments set
+    status = 'cancelada',
+    cancelled_by = case when auth.uid() = v_paciente then 'paciente' else 'nutri' end,
+    reschedule_requested_at = null,
+    updated_at = now()
+  where patient_id = v_paciente
+    and nutritionist_id = v_nutri
+    and (status = 'pedido' or (status = 'agendada' and starts_at > now()));
+
+  return coalesce(new, old);
+end;
+$$;
+
+create trigger patient_links_cancela_consultas
+  after update of status or delete on public.patient_links
+  for each row execute function public.cancelar_consultas_ao_desvincular();
+
+-- Função de gatilho: ninguém chama direto.
+revoke execute on function public.cancelar_consultas_ao_desvincular() from public, anon, authenticated;
 
 -- Só quem está logado chama, como em harden_function_grants.
 revoke execute on function public.marcar_consulta(uuid, timestamptz, integer, text, text) from public, anon;
