@@ -100,3 +100,46 @@ export async function getObservarDosPacientes(
   }
   return { data: porPaciente, falhou: !!error };
 }
+
+/** Os adendos de um registro, do mais antigo para o mais novo (a ordem em que foram escritos). */
+export async function getAdendos(supabase: any, registroId: string): Promise<Res<Adendo[]>> {
+  const { data, error } = await supabase
+    .from("consultation_addenda")
+    .select(COLUNAS_ADENDO)
+    .eq("record_id", registroId)
+    .order("created_at", { ascending: true });
+  return { data: (data ?? []) as Adendo[], falhou: !!error };
+}
+
+/**
+ * Uma linha da série de medidas do paciente. Cada medida é `number | null`:
+ * no banco a que não foi tirada é nula (`Medidas` de lib/registro.ts é o que
+ * o editor manda, onde a medida vazia simplesmente não existe).
+ */
+export type LinhaDeMedida = {
+  date: string;
+  appointment_id: string | null;
+  measured_by: string | null;
+} & Partial<Record<CampoMedida, number | null>>;
+
+const COLUNAS_MEDIDA =
+  "date, appointment_id, measured_by, weight_kg, body_fat_pct, waist_cm, hip_cm, chest_cm, arm_cm, thigh_cm, calf_cm, neck_cm";
+
+/**
+ * A série de medidas do paciente, da mais nova para a mais antiga, as de
+ * consulta (`appointment_id`) e as que ele anotou em casa. Quem precisa só das
+ * de consulta (o "antes" do editor) filtra com `anteriores`. As 200 mais
+ * recentes: de sobra para um acompanhamento, e a lista não cresce sem teto.
+ */
+export async function getMedidasDoPaciente(
+  supabase: any,
+  pacienteId: string,
+): Promise<Res<LinhaDeMedida[]>> {
+  const { data, error } = await supabase
+    .from("body_measurements")
+    .select(COLUNAS_MEDIDA)
+    .eq("user_id", pacienteId)
+    .order("date", { ascending: false })
+    .limit(200);
+  return { data: (data ?? []) as LinhaDeMedida[], falhou: !!error };
+}
