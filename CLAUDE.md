@@ -81,9 +81,14 @@ Consultas aparecia). `ErroSecao` e os estilos de botão (`estilos.ts`) moram em
 seja qual for a largura da janela (`max-w-5xl` menos o menu lateral e as
 margens). Com a coluna de conversa de 360 px a partir de `lg`, sobravam
 ~336 px para a principal, menos que um celular. Por isso as duas colunas só
-começam em `xl:` (1280 px), e o `AppShell` abre para `max-w-7xl` apenas em
-`/app/pacientes/<id>` e na agenda (a grade da Semana tem sete colunas). Para
-encaixar algo ao lado do conteúdo, meça a área do conteúdo, não a janela.
+começam em `xl:` (1280 px). Em `/app/pacientes/<id>` e na agenda (a grade da
+Semana tem sete colunas), o `AppShell` solta o conteúdo para ocupar a área
+ao lado do menu até 1440 px: com `max-w-7xl` centrado na janela, ele parava
+em 976 px, e numa janela de 1728 px sobravam 256 px vazios entre o menu e o
+paciente. Nessas duas telas o fundo da página inteira é o chão do tema
+clínico (`body:has(.tema-clinico)`, em `cssDoTemaClinico`); sem isso a página
+parecia uma caixa solta, com a faixa de outra cor em volta. Para encaixar
+algo ao lado do conteúdo, meça a área do conteúdo, não a janela.
 
 **Leitura que falha não é "não tem".** O supabase-js devolve
 `{ data: null, error }` sem lançar, e `data ?? []` esconde a falha: sem as
@@ -141,7 +146,7 @@ app dele, e não recebe aviso fora do app (sem Web Push).
 
 ```bash
 npm run dev      # desenvolvimento
-npm test         # 226 testes unitários (vitest)
+npm test         # 227 testes unitários (vitest)
 ferramentas/testar-sql.sh   # migrações e testes SQL num Postgres local
 npm run build    # produção
 ```

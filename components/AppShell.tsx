@@ -138,6 +138,12 @@ export default function AppShell({
   const detalheDoPaciente = /^\/app\/pacientes\/[^/]+\/?$/.test(pathname);
   // A agenda abre pelo mesmo motivo: a grade da Semana tem sete colunas, e
   // em 720 px cada dia ficava com ~95 px, estreito demais para "14:30 Beatriz".
+  //
+  // Nessas duas, o conteúdo ocupa a área ao lado do menu até 1440 px. Com o
+  // max-w-7xl centrado na janela, ele parava em 976 px seja qual for a
+  // janela, e o resto virava faixa vazia dos dois lados: numa de 1728 px,
+  // 256 px entre o menu e o paciente. As outras telas são uma coluna de
+  // leitura e continuam centradas.
   const telaLarga = detalheDoPaciente || pathname.startsWith("/app/agenda");
 
   // Fecha o menu "Mais" ao trocar de página
@@ -276,11 +282,9 @@ export default function AppShell({
 
       {/* Conteúdo */}
       <main
-        className={`mx-auto px-4 pb-28 pt-6 lg:pl-64 lg:pr-8 ${
-          telaLarga ? "max-w-7xl" : "max-w-5xl"
-        }`}
+        className={`px-4 pb-28 pt-6 lg:pl-64 lg:pr-8 ${telaLarga ? "" : "mx-auto max-w-5xl"}`}
       >
-        <div className="lg:pl-4">
+        <div className={`lg:pl-4 ${telaLarga ? "mx-auto max-w-[1456px]" : ""}`}>
           <PageTransition>{children}</PageTransition>
         </div>
       </main>
