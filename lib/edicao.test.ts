@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { podeAbrir, reduzirEdicao } from "./edicao";
+import { podeAbrir, precisaConfirmarTroca, reduzirEdicao } from "./edicao";
 
 const vazio = { aberta: null, suja: false };
 
@@ -102,5 +102,22 @@ describe("limpar", () => {
     e = reduzirEdicao(e, { tipo: "sujar", secao: "metas" });
     e = reduzirEdicao(e, { tipo: "limpar", secao: "treino" }); // gravação do treino terminou
     expect(e).toEqual({ aberta: "metas", suja: true });
+  });
+});
+
+describe("precisaConfirmarTroca", () => {
+  // A página do paciente virou abas. Trocar de aba desmonta o editor aberto, e
+  // um rascunho digitado sumiria calado; só nesse caso a troca pergunta antes.
+  it("nada aberto: troca direto", () => {
+    expect(precisaConfirmarTroca({ aberta: null, suja: false })).toBe(false);
+  });
+
+  it("editor aberto sem nada digitado: troca direto", () => {
+    expect(precisaConfirmarTroca({ aberta: "metas", suja: false })).toBe(false);
+  });
+
+  it("editor com alteração não salva: pergunta", () => {
+    expect(precisaConfirmarTroca({ aberta: "metas", suja: true })).toBe(true);
+    expect(precisaConfirmarTroca({ aberta: "cardapio", suja: true })).toBe(true);
   });
 });

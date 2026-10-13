@@ -10,6 +10,7 @@ import {
 } from "react";
 import {
   podeAbrir,
+  precisaConfirmarTroca,
   reduzirEdicao,
   type EstadoEdicao,
   type SecaoEditavel,
@@ -66,6 +67,25 @@ export function EdicaoProvider({ children }: { children: ReactNode }) {
   );
 
   return <EdicaoContext.Provider value={valor}>{children}</EdicaoContext.Provider>;
+}
+
+/**
+ * Para a barra de abas. Trocar de aba desmonta o editor aberto; com
+ * alteração não salva, pergunta antes. Devolve true quando pode trocar. A
+ * trava em si se solta sozinha: o <Editavel> que desmonta chama fechar().
+ */
+export function useTrocaDeAba(): () => boolean {
+  const ctx = useContext(EdicaoContext);
+  if (!ctx) {
+    throw new Error(
+      "useTrocaDeAba precisa estar dentro de <EdicaoProvider>. Envolva a página do paciente com ele."
+    );
+  }
+  const { estado } = ctx;
+  return () =>
+    !precisaConfirmarTroca(estado) ||
+    !estado.aberta ||
+    window.confirm(`Descartar as alterações em ${ROTULOS[estado.aberta]}?`);
 }
 
 export function useEdicao(secao: SecaoEditavel): {

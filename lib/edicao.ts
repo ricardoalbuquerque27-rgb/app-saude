@@ -28,6 +28,14 @@ export function podeAbrir(e: EstadoEdicao, secao: SecaoEditavel): boolean {
   return e.aberta === null || e.aberta === secao || !e.suja;
 }
 
+/**
+ * Trocar de aba desmonta o editor aberto (página do paciente em abas). Com
+ * alteração não salva, o rascunho sumiria calado; só nesse caso pergunta.
+ */
+export function precisaConfirmarTroca(e: EstadoEdicao): boolean {
+  return e.aberta !== null && e.suja;
+}
+
 export function reduzirEdicao(e: EstadoEdicao, a: AcaoEdicao): EstadoEdicao {
   switch (a.tipo) {
     case "abrir":
