@@ -2,8 +2,10 @@ import type { Res } from "@/lib/consultasDb";
 import {
   COLUNAS_ADENDO,
   COLUNAS_REGISTRO,
+  ultimoObservarPorPaciente,
   type Adendo,
   type CampoMedida,
+  type ObservarDoPaciente,
   type Registro,
 } from "@/lib/registro";
 
@@ -66,39 +68,56 @@ export async function getRegistrosDasConsultas(
 
 /**
  * O "observar no retorno" de cada paciente: o texto do ÚLTIMO registro
- * concluído, com o dia em que foi concluído. Só concluído: o rascunho ainda é
- * do nutri e pode mudar ou sumir. Se o último concluído não tem `observar`
- * (nulo, ou só espaço e quebra de linha, como em `temAlgumaParte`), o paciente
- * fica sem entrada: nunca se cai para um registro mais antigo, porque a
- * instrução de uma consulta anterior apareceria como se fosse a de agora,
- * depois de o nutri ter registrado a consulta seguinte sem nada a observar.
+ * concluído, com o início da consulta dele em `data`. "Último" é o da consulta
+ * que começou por último, e não o concluído por último: o nutri que preenche
+ * hoje o registro de uma consulta antiga não muda qual é a mais recente, e a
+ * instrução velha não pode passar por atual. É a ordem da página do registro
+ * (consultas "anteriores a esta", por `starts_at`). Só concluído: o rascunho
+ * ainda é do nutri e pode mudar ou sumir. Se o último não tem `observar`, o
+ * paciente fica sem entrada, sem cair num mais velho (ultimoObservarPorPaciente).
+ *
+ * Duas leituras: os registros concluídos e, deles, o início de cada consulta.
+ * Não vai num select embutido porque o Supabase falso das ferramentas não
+ * entende `appointments(starts_at)`. As consultas vão em blocos de 100 ids: um
+ * `in (...)` com todas as de um paciente de anos, vezes os pacientes da agenda
+ * do mês, passaria do tamanho que o endereço aceita. A falha de qualquer uma, ou
+ * um registro cuja consulta não se leu (sem ela não há ordem), é `falhou`.
+ *
+ * Os registros vêm do concluído mais recente para o mais antigo: o Supabase
+ * corta em 1.000 linhas sem erro, e o corte, se houver, cai nos mais antigos.
  */
 export async function getObservarDosPacientes(
   supabase: any,
   pacienteIds: string[],
-): Promise<Res<Record<string, { texto: string; data: string }>>> {
+): Promise<Res<Record<string, ObservarDoPaciente>>> {
   if (pacienteIds.length === 0) return { data: {}, falhou: false };
   const { data, error } = await supabase
     .from("consultation_records")
-    .select("patient_id, observar, concluded_at")
+    .select("patient_id, appointment_id, observar")
     .eq("status", "concluido")
     .in("patient_id", pacienteIds)
     .order("concluded_at", { ascending: false });
-  const porPaciente: Record<string, { texto: string; data: string }> = {};
-  // Quem já teve o seu último concluído examinado, com texto ou sem.
-  const jaVistos = new Set<string>();
-  for (const r of (data ?? []) as {
+  if (error) return { data: {}, falhou: true };
+  const registros = (data ?? []) as {
     patient_id: string;
+    appointment_id: string;
     observar: string | null;
-    concluded_at: string | null;
-  }[]) {
-    // Concluído sempre tem data (check no banco); a guarda é só para o tipo.
-    if (r.concluded_at == null || jaVistos.has(r.patient_id)) continue;
-    jaVistos.add(r.patient_id);
-    if (r.observar == null || r.observar.trim() === "") continue;
-    porPaciente[r.patient_id] = { texto: r.observar, data: r.concluded_at };
-  }
-  return { data: porPaciente, falhou: !!error };
+  }[];
+
+  const consultaIds = Array.from(new Set(registros.map((r) => r.appointment_id)));
+  const blocos: string[][] = [];
+  for (let i = 0; i < consultaIds.length; i += 100) blocos.push(consultaIds.slice(i, i + 100));
+  const inicios: Record<string, string> = {};
+  let falhou = false;
+  await Promise.all(
+    blocos.map(async (bloco) => {
+      const r = await supabase.from("appointments").select("id, starts_at").in("id", bloco);
+      if (r.error) falhou = true;
+      for (const a of (r.data ?? []) as { id: string; starts_at: string }[]) inicios[a.id] = a.starts_at;
+    }),
+  );
+  if (registros.some((r) => !inicios[r.appointment_id])) falhou = true;
+  return { data: ultimoObservarPorPaciente(registros, inicios), falhou };
 }
 
 /** Os adendos de um registro, do mais antigo para o mais novo (a ordem em que foram escritos). */

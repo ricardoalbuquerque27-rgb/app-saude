@@ -19,7 +19,7 @@ import {
   getPendencias,
 } from "@/lib/consultasDb";
 import { textoDesdeUltima, tituloDesde } from "@/lib/desdeConsulta";
-import { comDireitoAoRegistro } from "@/lib/registro";
+import { aceitaObservar, comDireitoAoRegistro } from "@/lib/registro";
 import { getObservarDosPacientes, getRegistrosDasConsultas } from "@/lib/registroDb";
 import { Agenda } from "@/components/consultas/agenda/Agenda";
 
@@ -102,11 +102,13 @@ export default async function AgendaPage({
     return desdeTexto;
   }
 
-  // O registro e o "observar" só das consultas que têm direito a registro:
-  // são as que levam o botão. O "observar" vem por paciente, e só de quem
-  // tem uma dessas na tela. Tudo corre junto com os nomes e o "desde": as
-  // quatro leituras dependem só das consultas lidas acima.
-  const comDireito = comDireitoAoRegistro(Array.from(mostradas.values()), agora);
+  // O registro só das consultas que têm direito a ele (as que levam o botão).
+  // O "observar" vem por paciente e vale para toda consulta que não é falta
+  // nem cancelamento, a futura inclusive: é para preparar o retorno. Tudo corre
+  // junto com os nomes e o "desde": as quatro leituras dependem só das
+  // consultas lidas acima.
+  const lista = Array.from(mostradas.values());
+  const comDireito = comDireitoAoRegistro(lista, agora);
   const [outros, registros, observar, desdeTexto] = await Promise.all([
     getNomesDosPacientes(supabase, semNome),
     getRegistrosDasConsultas(
@@ -115,7 +117,7 @@ export default async function AgendaPage({
     ),
     getObservarDosPacientes(
       supabase,
-      Array.from(new Set(comDireito.map((c) => c.patient_id)))
+      Array.from(new Set(lista.filter(aceitaObservar).map((c) => c.patient_id)))
     ),
     vista === "dia" ? desdeDoDia() : ({} as DesdeDoDia),
   ]);

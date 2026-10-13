@@ -1,4 +1,4 @@
-import { situacao, type Consulta } from "@/lib/consultas";
+import { situacao, type Consulta, type Situacao } from "@/lib/consultas";
 
 // Registro da consulta (prontuário enxuto do nutricionista): faixas das
 // medidas, leitura do número digitado, IMC, a situação do registro de cada
@@ -283,6 +283,119 @@ export function situacaoDoRegistro(
  */
 export function comDireitoAoRegistro(lista: Consulta[], agora: number | string): Consulta[] {
   return lista.filter((c) => situacaoDoRegistro(c, null, agora) !== "sem-direito");
+}
+
+// ---------------------------------------------------------------------------
+// Por onde se chega: o botão e o "observar" no painel da consulta
+// ---------------------------------------------------------------------------
+
+/**
+ * O registro de uma consulta como quem montou a tela o leu: nulo = leu e não
+ * existe; "falhou" = a leitura falhou; `undefined` = ninguém leu. Os três
+ * últimos são "não sei", e o painel não pode adivinhar "Registrar consulta"
+ * com eles (CLAUDE.md, "Leitura que falha não é 'não tem'").
+ */
+export type RegistroLido = "rascunho" | "concluido" | "falhou" | null | undefined;
+
+export type EntradaDoRegistro = {
+  rotulo: "Registrar consulta" | "Continuar registro" | "Ver registro" | "Abrir registro";
+  /** Botão primário do painel (a ação principal); senão, secundário. */
+  destaque: boolean;
+  /** O selo ao lado da situação; nulo quando não se sabe o estado do registro. */
+  selo: Exclude<SituacaoRegistro, "sem-direito"> | null;
+};
+
+/**
+ * O botão do painel para a página do registro, ou nulo quando a consulta não
+ * tem direito a ele. `s` é a situação que o painel mostra agora (depois de
+ * "Realizada" ela já vale como realizada, antes de a página nova chegar).
+ *
+ * Sem saber o estado do registro, "Abrir registro": a página do registro lê o
+ * banco por conta própria. Com o estado sabido, "Registrar consulta" e
+ * "Continuar registro" são o passo principal de uma consulta ainda não fechada,
+ * e então "Realizada" deixa de ser primário (o painel não tem dois destaques).
+ * Fechada como realizada, o passo é o "Marcar retorno", e o botão do registro
+ * fica secundário, como "Ver registro" e "Abrir registro".
+ */
+export function entradaDoRegistro(
+  c: Consulta,
+  registro: RegistroLido,
+  agora: number | string,
+  s: Situacao,
+): EntradaDoRegistro | null {
+  const naoSabe = registro === undefined || registro === "falhou";
+  const lido = naoSabe ? null : registro;
+  const sit = situacaoDoRegistro(c, lido && { status: lido }, agora);
+  if (sit === "sem-direito") return null;
+  if (naoSabe) return { rotulo: "Abrir registro", destaque: false, selo: null };
+  if (sit === "registrada") return { rotulo: "Ver registro", destaque: false, selo: sit };
+  return {
+    rotulo: sit === "rascunho" ? "Continuar registro" : "Registrar consulta",
+    destaque: s !== "realizada",
+    selo: sit,
+  };
+}
+
+/** O "observar" de um paciente: o texto e o INÍCIO da consulta daquele registro (ISO). */
+export type ObservarDoPaciente = { texto: string; data: string };
+
+/**
+ * O "observar" serve para preparar o retorno, então vale para qualquer
+ * consulta que ainda pode acontecer ou já aconteceu: só a falta e o
+ * cancelamento ficam de fora. Inclui a futura e o pedido.
+ */
+export function aceitaObservar(c: Pick<Consulta, "status">): boolean {
+  return c.status !== "faltou" && c.status !== "cancelada";
+}
+
+/**
+ * O "observar" que o painel mostra numa consulta: o do último registro
+ * concluído do paciente (`ultimo`), se a consulta DELE começou antes desta.
+ * Para a própria consulta do registro e para as anteriores a ele, nada: a
+ * instrução de um registro posterior apareceria como se fosse para elas.
+ *
+ * O que decide é o início das consultas, nunca a hora em que o registro foi
+ * concluído. É a mesma ordem da página do registro ("anteriores a esta", por
+ * `starts_at`); com a hora da conclusão, preencher o registro de uma consulta
+ * antiga hoje faria a instrução antiga passar por a mais recente, e concluir
+ * no dia seguinte mudaria a data que o painel mostra.
+ */
+export function observarDaConsulta(
+  ultimo: ObservarDoPaciente | null | undefined,
+  c: Pick<Consulta, "status" | "starts_at">,
+): ObservarDoPaciente | null {
+  if (!ultimo || !aceitaObservar(c)) return null;
+  return Date.parse(ultimo.data) < Date.parse(c.starts_at) ? ultimo : null;
+}
+
+/**
+ * Por paciente, o "observar" do registro concluído cuja consulta começou por
+ * último. `inicios` é o `starts_at` de cada consulta, por id. Se o último não
+ * tem texto (nulo, ou só espaço e quebra de linha), o paciente fica sem
+ * entrada: nunca se cai para um registro mais antigo, porque a instrução de
+ * uma consulta anterior apareceria como se fosse a de agora, depois de o nutri
+ * ter registrado a consulta seguinte sem nada a observar. Registro cuja
+ * consulta não está em `inicios` não tem como entrar na ordem e é ignorado;
+ * quem chama decide se isso é uma leitura que falhou.
+ */
+export function ultimoObservarPorPaciente(
+  registros: { patient_id: string; appointment_id: string; observar: string | null }[],
+  inicios: Record<string, string>,
+): Record<string, ObservarDoPaciente> {
+  const ultimos = new Map<string, { inicio: number; data: string; observar: string | null }>();
+  for (const r of registros) {
+    const data = inicios[r.appointment_id];
+    if (!data) continue;
+    const inicio = Date.parse(data);
+    const atual = ultimos.get(r.patient_id);
+    if (!atual || inicio > atual.inicio) ultimos.set(r.patient_id, { inicio, data, observar: r.observar });
+  }
+  const porPaciente: Record<string, ObservarDoPaciente> = {};
+  ultimos.forEach((u, paciente) => {
+    if (u.observar == null || u.observar.trim() === "") return;
+    porPaciente[paciente] = { texto: u.observar, data: u.data };
+  });
+  return porPaciente;
 }
 
 /** A primeira consulta abre com a anamnese; as seguintes registram a evolução. */

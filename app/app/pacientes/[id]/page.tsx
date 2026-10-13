@@ -206,6 +206,7 @@ export default async function PacienteDetalhe({
               uid={uid}
               nutriId={nutriId}
               nome={nome}
+              agora={agora}
               consultas={consultas}
               registros={consultas.then((c) =>
                 getRegistrosDasConsultas(

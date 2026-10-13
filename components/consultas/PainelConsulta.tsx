@@ -22,8 +22,14 @@ import {
   LINK,
 } from "@/components/clinico/estilos";
 import { ErroInline } from "@/components/clinico/ErroInline";
-import { dataNoBrasil } from "@/lib/date";
-import { ROTULO_REGISTRO, situacaoDoRegistro } from "@/lib/registro";
+import {
+  aceitaObservar,
+  entradaDoRegistro,
+  observarDaConsulta,
+  ROTULO_REGISTRO,
+  type ObservarDoPaciente,
+  type RegistroLido,
+} from "@/lib/registro";
 import { useAcaoConsulta } from "./acoes";
 import { CLASSE_SELO, SELO, SELO_REGISTRO } from "./aparencia";
 import { FormConsulta } from "./FormConsulta";
@@ -45,19 +51,21 @@ import { useConsultasDoDia } from "./useConsultasDoDia";
 // A porta para a página do registro (spec do registro da consulta, "por onde
 // se chega") está aqui, e não na agenda e na aba separadas, porque as duas
 // abrem este mesmo painel. Quem monta a tela lê o registro e o "observar" e
-// passa o que leu: a leitura que FALHOU vai como "falhou", e não como nulo.
-// Nulo é "esta consulta não tem registro"; confundir os dois dizia "Registrar
-// consulta" sobre uma consulta que talvez já tivesse registro (CLAUDE.md,
-// "Leitura que falha não é 'não tem'"). Sem saber, o painel oferece só
-// "Abrir registro": a página do registro lê o banco por conta própria.
+// passa o que leu, e há três respostas diferentes: nulo é "li e esta consulta
+// não tem"; "falhou" é "a leitura falhou"; prop ausente é "ninguém leu".
+// Confundir nulo com as outras dizia "Registrar consulta" sobre uma consulta
+// que talvez já tivesse registro (CLAUDE.md, "Leitura que falha não é 'não
+// tem'"). Sem saber, o painel oferece só "Abrir registro" (a página do registro
+// lê o banco por conta própria). As regras do botão e do "observar" estão em
+// lib/registro.ts, com teste.
 export function PainelConsulta({
   consulta: c,
   nome,
   agora,
   nutriId,
   desde,
-  registro = null,
-  observar = null,
+  registro,
+  observar,
   mostrarNome = true,
   abrirPaciente = false,
   aoTerminar,
@@ -67,10 +75,10 @@ export function PainelConsulta({
   agora: string;
   nutriId: string;
   desde?: { titulo: string; texto: string } | null;
-  /** O registro desta consulta: nulo = não existe; "falhou" = a leitura falhou. */
-  registro?: "rascunho" | "concluido" | "falhou" | null;
-  /** O "observar" do último registro concluído do paciente; "falhou" = a leitura falhou. */
-  observar?: { texto: string; data: string } | "falhou" | null;
+  /** O registro desta consulta: nulo = não existe; "falhou" = a leitura falhou; ausente = não foi lido. */
+  registro?: RegistroLido;
+  /** O "observar" do último registro concluído do paciente (nulo = não há; "falhou"; ausente = não foi lido). */
+  observar?: ObservarDoPaciente | "falhou" | null;
   mostrarNome?: boolean;
   abrirPaciente?: boolean;
   /** Depois de uma ação que deu certo (a agenda fecha a janela). */
@@ -124,26 +132,8 @@ export function PainelConsulta({
   const comecou = Date.parse(c.starts_at) <= Date.parse(agora);
   const retorno = sugestaoDeRetorno(c);
 
-  // O registro. O direito a ele vem só da consulta (já começou, não é pedido,
-  // falta nem cancelamento), com a leitura do registro ou sem ela.
-  const registroLido = registro === "falhou" ? null : registro;
-  const situacaoReg = situacaoDoRegistro(c, registroLido && { status: registroLido }, agora);
-  const temDireito = situacaoReg !== "sem-direito";
-  const falhouRegistro = registro === "falhou";
-  // "Registrar consulta" e "Continuar registro" são o passo principal de uma
-  // consulta que ainda não foi fechada, e "Realizada" deixa de ser, para o
-  // painel não ter dois botões de destaque. Fechada como realizada, o passo é
-  // o "Marcar retorno"; "Ver registro" e "Abrir registro" são sempre secundários.
-  const registroEmDestaque =
-    !falhouRegistro && (situacaoReg === "sem-registro" || situacaoReg === "rascunho") && s !== "realizada";
-  // O último concluído do paciente pode ser DEPOIS desta consulta: uma
-  // consulta antiga sem registro leria a instrução de uma consulta posterior
-  // como se fosse a dela, e a própria consulta registrada, o próprio
-  // "observar". Só vale o que foi concluído antes de ela começar.
-  const observarDeAntes =
-    observar && observar !== "falhou" && Date.parse(observar.data) < Date.parse(c.starts_at)
-      ? observar
-      : null;
+  const entrada = entradaDoRegistro(c, registro, agora, s);
+  const observarDaqui = observar && observar !== "falhou" ? observarDaConsulta(observar, c) : null;
 
   // Pedido: o paciente não vê a agenda, então o horário pedido costuma bater
   // com outro. "Aceitar" avisa antes, como o formulário.
@@ -176,7 +166,7 @@ export function PainelConsulta({
         if (comecou)
           return (
             <>
-              {botao("Realizada", () => fechar("Realizada", "realizada"), !registroEmDestaque)}
+              {botao("Realizada", () => fechar("Realizada", "realizada"), !entrada?.destaque)}
               {botao("Faltou", () => fechar("Faltou", "faltou"))}
               {botao("Remarcar", () => setEditando("remarcar"))}
             </>
@@ -200,7 +190,7 @@ export function PainelConsulta({
       case "sem-desfecho":
         return (
           <>
-            {botao("Realizada", () => fechar("Realizada", "realizada"), !registroEmDestaque)}
+            {botao("Realizada", () => fechar("Realizada", "realizada"), !entrada?.destaque)}
             {botao("Faltou", () => fechar("Faltou", "faltou"))}
             {botao("Cancelada", () => fechar("Cancelada", "cancelada"))}
           </>
@@ -237,9 +227,9 @@ export function PainelConsulta({
           <span className={`${CLASSE_SELO} ${SELO[s]}`}>
             {ROTULO_SITUACAO[s]}
           </span>
-          {temDireito && !falhouRegistro && (
-            <span className={`${CLASSE_SELO} ${SELO_REGISTRO[situacaoReg]}`}>
-              {ROTULO_REGISTRO[situacaoReg]}
+          {entrada?.selo && (
+            <span className={`${CLASSE_SELO} ${SELO_REGISTRO[entrada.selo]}`}>
+              {ROTULO_REGISTRO[entrada.selo]}
             </span>
           )}
           {s === "cancelada" && c.cancelled_by && (
@@ -264,15 +254,15 @@ export function PainelConsulta({
         </p>
       )}
 
-      {temDireito && observar === "falhou" && (
+      {observar === "falhou" && aceitaObservar(c) && (
         <Aviso>Não foi possível carregar o Observar no retorno.</Aviso>
       )}
-      {temDireito && observarDeAntes && (
+      {observarDaqui && (
         <div className="rounded-md bg-clin-atencao-fundo px-3 py-2">
           <p className="text-[13px] font-semibold text-clin-atencao">
-            Observar no retorno ({dataCurta(dataNoBrasil(observarDeAntes.data))})
+            Observar no retorno ({dataCurta(diaDaConsulta({ starts_at: observarDaqui.data }))})
           </p>
-          <p className="whitespace-pre-line text-[15px] text-clin-texto">{observarDeAntes.texto}</p>
+          <p className="whitespace-pre-line text-[15px] text-clin-texto">{observarDaqui.texto}</p>
         </div>
       )}
 
@@ -286,19 +276,13 @@ export function PainelConsulta({
         </Aviso>
       )}
 
-      {temDireito && !editando && (
+      {entrada && !editando && (
         <div>
           <Link
             href={`/app/pacientes/${c.patient_id}/consultas/${c.id}`}
-            className={`inline-flex ${registroEmDestaque ? ACAO_PRIMARIA : ACAO_SECUNDARIA}`}
+            className={`inline-flex ${entrada.destaque ? ACAO_PRIMARIA : ACAO_SECUNDARIA}`}
           >
-            {falhouRegistro
-              ? "Abrir registro"
-              : situacaoReg === "registrada"
-                ? "Ver registro"
-                : situacaoReg === "rascunho"
-                  ? "Continuar registro"
-                  : "Registrar consulta"}
+            {entrada.rotulo}
           </Link>
         </div>
       )}

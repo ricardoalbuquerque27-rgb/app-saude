@@ -16,7 +16,12 @@ import {
   type Consulta,
 } from "@/lib/consultas";
 import { FOCO } from "@/components/clinico/estilos";
-import { ROTULO_REGISTRO, situacaoDoRegistro, type Registro } from "@/lib/registro";
+import {
+  ROTULO_REGISTRO,
+  situacaoDoRegistro,
+  type ObservarDoPaciente,
+  type Registro,
+} from "@/lib/registro";
 import type { Res } from "@/lib/consultasDb";
 
 type Grupo = "pendente" | "proxima" | "retorno";
@@ -41,6 +46,7 @@ export async function Consultas({
   uid,
   nutriId,
   nome,
+  agora,
   consultas,
   registros: registrosP,
   observar: observarP,
@@ -48,12 +54,16 @@ export async function Consultas({
   uid: string;
   nutriId: string;
   nome: string;
+  /**
+   * O instante da página, o mesmo com que ela escolheu quais registros ler:
+   * um `new Date()` aqui, depois das esperas, daria à aba outro "agora".
+   */
+  agora: string;
   consultas: Promise<Res<Consulta[]>>;
   registros: Promise<Res<Record<string, Registro["status"]>>>;
-  observar: Promise<Res<Record<string, { texto: string; data: string }>>>;
+  observar: Promise<Res<Record<string, ObservarDoPaciente>>>;
 }) {
   const [r, registros, observar] = await Promise.all([consultas, registrosP, observarP]);
-  const agora = new Date().toISOString();
 
   const marcar = (
     <MarcarConsulta

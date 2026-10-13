@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { Consulta } from "./consultas";
 import {
+  aceitaObservar,
   anteriores,
   CAMPOS_EXTRAS,
   CAMPOS_MEDIDA,
   CAMPOS_PRINCIPAIS,
   comDireitoAoRegistro,
+  entradaDoRegistro,
   erroDaMedida,
   errosDasMedidas,
   FAIXAS,
@@ -14,12 +16,14 @@ import {
   lerNumero,
   LIMITES,
   medidasValidas,
+  observarDaConsulta,
   ROTULO_REGISTRO,
   rotuloDaAnamnese,
   situacaoDoRegistro,
   temAlgumaParte,
   textoDaDiferenca,
   textoDaMedida,
+  ultimoObservarPorPaciente,
   valorDaMedida,
   type CampoMedida,
 } from "./registro";
@@ -251,6 +255,160 @@ describe("comDireitoAoRegistro", () => {
 
   it("lista vazia dá lista vazia", () => {
     expect(comDireitoAoRegistro([], agora)).toEqual([]);
+  });
+});
+
+describe("entradaDoRegistro", () => {
+  const agora = Date.parse("2026-10-20T17:10:00Z");
+
+  it("sem direito a registro, nenhum botão, qualquer que seja a leitura", () => {
+    const futura = consulta({ starts_at: "2026-10-21T17:00:00Z" });
+    const faltou = consulta({ status: "faltou" });
+    for (const registro of [null, undefined, "falhou", "rascunho"] as const) {
+      expect(entradaDoRegistro(futura, registro, agora, "agendada")).toBeNull();
+      expect(entradaDoRegistro(faltou, registro, agora, "faltou")).toBeNull();
+    }
+  });
+
+  it("leu e não há registro: Registrar consulta, em destaque, com o selo Sem registro", () => {
+    expect(entradaDoRegistro(consulta(), null, agora, "agendada")).toEqual({
+      rotulo: "Registrar consulta",
+      destaque: true,
+      selo: "sem-registro",
+    });
+  });
+
+  it("rascunho: Continuar registro, em destaque", () => {
+    expect(entradaDoRegistro(consulta(), "rascunho", agora, "agendada")).toEqual({
+      rotulo: "Continuar registro",
+      destaque: true,
+      selo: "rascunho",
+    });
+  });
+
+  it("concluído: Ver registro, nunca em destaque", () => {
+    expect(entradaDoRegistro(consulta({ status: "realizada" }), "concluido", agora, "realizada")).toEqual({
+      rotulo: "Ver registro",
+      destaque: false,
+      selo: "registrada",
+    });
+  });
+
+  it("já fechada como realizada, o passo principal é o retorno: o botão não fica em destaque", () => {
+    const realizada = consulta({ status: "realizada" });
+    expect(entradaDoRegistro(realizada, null, agora, "realizada")?.destaque).toBe(false);
+    expect(entradaDoRegistro(realizada, "rascunho", agora, "realizada")?.destaque).toBe(false);
+  });
+
+  it("leitura que falhou ou que ninguém fez não é 'sem registro': Abrir registro, sem selo", () => {
+    for (const registro of ["falhou", undefined] as const) {
+      expect(entradaDoRegistro(consulta(), registro, agora, "agendada")).toEqual({
+        rotulo: "Abrir registro",
+        destaque: false,
+        selo: null,
+      });
+    }
+  });
+});
+
+describe("observarDaConsulta", () => {
+  // O registro mais recente é o da consulta de 06/10 (14:00 em São Paulo).
+  const ultimo = { texto: "Reduzir o sal.", data: "2026-10-06T17:00:00Z" };
+
+  it("aparece numa consulta que começa depois da consulta do registro", () => {
+    expect(observarDaConsulta(ultimo, consulta({ starts_at: "2026-10-20T17:00:00Z" }))).toBe(ultimo);
+  });
+
+  it("não aparece na própria consulta do registro, nem nas anteriores a ele", () => {
+    expect(observarDaConsulta(ultimo, consulta({ starts_at: "2026-10-06T17:00:00Z", status: "realizada" }))).toBeNull();
+    expect(observarDaConsulta(ultimo, consulta({ starts_at: "2026-09-22T17:00:00Z", status: "realizada" }))).toBeNull();
+  });
+
+  it("vale também na consulta futura e no pedido: é para preparar o retorno", () => {
+    expect(observarDaConsulta(ultimo, consulta({ starts_at: "2026-10-27T17:00:00Z" }))).toBe(ultimo);
+    expect(observarDaConsulta(ultimo, consulta({ starts_at: "2026-10-27T17:00:00Z", status: "pedido" }))).toBe(ultimo);
+  });
+
+  it("não vale na falta nem no cancelamento", () => {
+    expect(observarDaConsulta(ultimo, consulta({ status: "faltou" }))).toBeNull();
+    expect(observarDaConsulta(ultimo, consulta({ status: "cancelada" }))).toBeNull();
+    expect(aceitaObservar({ status: "faltou" })).toBe(false);
+    expect(aceitaObservar({ status: "cancelada" })).toBe(false);
+    expect(aceitaObservar({ status: "pedido" })).toBe(true);
+  });
+
+  it("sem registro concluído, nada", () => {
+    expect(observarDaConsulta(null, consulta())).toBeNull();
+    expect(observarDaConsulta(undefined, consulta())).toBeNull();
+  });
+
+  it("a hora da conclusão não entra na conta: só o início das consultas", () => {
+    // O registro de 06/10 pode ter sido concluído em 22/10, depois de a
+    // consulta de 20/10 começar. A consulta de 20/10 ainda o vê, e a de 06/10 não.
+    const concluidoTarde = { texto: "Reduzir o sal.", data: ultimo.data };
+    expect(observarDaConsulta(concluidoTarde, consulta({ starts_at: "2026-10-20T17:00:00Z" }))).toBe(concluidoTarde);
+    expect(observarDaConsulta(concluidoTarde, consulta({ starts_at: "2026-10-06T17:00:00Z" }))).toBeNull();
+  });
+});
+
+describe("ultimoObservarPorPaciente", () => {
+  const inicios = {
+    a1: "2026-09-08T17:00:00Z",
+    a2: "2026-09-22T17:00:00Z",
+    a3: "2026-10-06T17:00:00Z",
+    b1: "2026-09-29T17:00:00Z",
+  };
+
+  it("escolhe o registro da consulta que começou por último", () => {
+    const r = [
+      { patient_id: "p1", appointment_id: "a1", observar: "do primeiro" },
+      { patient_id: "p1", appointment_id: "a2", observar: "do segundo" },
+    ];
+    expect(ultimoObservarPorPaciente(r, inicios)).toEqual({
+      p1: { texto: "do segundo", data: inicios.a2 },
+    });
+  });
+
+  it("concluir fora de ordem não muda qual é o último: vale a ordem das consultas", () => {
+    // O da consulta mais antiga (a1) foi concluído por último, e vem por último
+    // na lista (o banco entrega do concluído mais recente para o mais antigo).
+    const concluidoPrimeiro = { patient_id: "p1", appointment_id: "a2", observar: "do segundo" };
+    const concluidoDepois = { patient_id: "p1", appointment_id: "a1", observar: "do primeiro, preenchido hoje" };
+    const esperado = { p1: { texto: "do segundo", data: inicios.a2 } };
+    expect(ultimoObservarPorPaciente([concluidoDepois, concluidoPrimeiro], inicios)).toEqual(esperado);
+    expect(ultimoObservarPorPaciente([concluidoPrimeiro, concluidoDepois], inicios)).toEqual(esperado);
+  });
+
+  it("se o último não deixou nada a observar, o paciente fica sem entrada: nunca cai num mais velho", () => {
+    const r = [
+      { patient_id: "p1", appointment_id: "a1", observar: "instrução velha" },
+      { patient_id: "p1", appointment_id: "a2", observar: null },
+      { patient_id: "p2", appointment_id: "b1", observar: " \n " },
+    ];
+    expect(ultimoObservarPorPaciente(r, inicios)).toEqual({});
+  });
+
+  it("cada paciente tem o seu", () => {
+    const r = [
+      { patient_id: "p1", appointment_id: "a3", observar: "do p1" },
+      { patient_id: "p2", appointment_id: "b1", observar: "do p2" },
+    ];
+    expect(ultimoObservarPorPaciente(r, inicios)).toEqual({
+      p1: { texto: "do p1", data: inicios.a3 },
+      p2: { texto: "do p2", data: inicios.b1 },
+    });
+  });
+
+  it("registro cuja consulta não foi lida fica de fora da ordem", () => {
+    const r = [
+      { patient_id: "p1", appointment_id: "a1", observar: "do primeiro" },
+      { patient_id: "p1", appointment_id: "sumiu", observar: "sem consulta" },
+    ];
+    expect(ultimoObservarPorPaciente(r, inicios)).toEqual({ p1: { texto: "do primeiro", data: inicios.a1 } });
+  });
+
+  it("sem registros, nada", () => {
+    expect(ultimoObservarPorPaciente([], inicios)).toEqual({});
   });
 });
 

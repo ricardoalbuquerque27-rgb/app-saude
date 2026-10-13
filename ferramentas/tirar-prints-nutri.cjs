@@ -1726,6 +1726,9 @@ async function transbordo(page) {
     const SEM_DESFECHO = "ap-10";
     const OBSERVAR = "Adesão no fim de semana. Testar café da manhã com ovos.";
     const ddmm = (n) => diaBR(n).slice(0, 5);
+    const diaSP = (n) =>
+      new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" })
+        .format(new Date(Date.now() + n * 86400000));
     const destino = (k, c) => `${rota(k)}/consultas/${c}`;
     const janela = (page) => page.locator("dialog[open]");
     const aviso = (page) => page.locator('section[aria-labelledby="pendencias-agenda"]');
@@ -1771,9 +1774,13 @@ async function transbordo(page) {
       ok(!/Não foi possível/.test(txt), "agenda: sem aviso de leitura que falhou quando a leitura deu certo", txt);
       // o botão é o primário: "Realizada" deixa de ser, para não haver dois
       const fundo = (loc) => loc.evaluate((el) => getComputedStyle(el).backgroundColor, null, { timeout: 5000 }).catch(() => "");
-      const realizada = await fundo(j.getByRole("button", { name: "Realizada", exact: true }));
+      const botaoRealizada = j.getByRole("button", { name: "Realizada", exact: true });
+      const realizada = await fundo(botaoRealizada);
       const registrar = await fundo(link);
-      ok(!!registrar && realizada !== registrar, "agenda: só um botão primário no painel (o do registro)", `${realizada} / ${registrar}`);
+      // `fundo` devolve "" quando o botão não existe: sem exigir os dois, um
+      // "Realizada" que sumiu passava por "só um primário".
+      ok((await botaoRealizada.count()) === 1 && !!realizada && !!registrar && realizada !== registrar,
+        "agenda: só um botão primário no painel (o do registro), e o Realizada continua lá", `${realizada} / ${registrar}`);
       await link.click({ timeout: 5000 }).catch(() => {});
       await page.waitForURL("**" + destino("luiza", EM_ANDAMENTO), { timeout: 10000 }).catch(() => {});
       ok(page.url().endsWith(destino("luiza", EM_ANDAMENTO)) &&
@@ -1838,6 +1845,14 @@ async function transbordo(page) {
       const futura = linhaDoHistorico(page, -2);
       ok(!SELOS.test(await textoDe(futura.locator("summary"))),
         "aba Consultas: a consulta futura também fica sem selo");
+      // O observar é para preparar o retorno: vale na consulta futura, mesmo
+      // sem o botão do registro (que só vem quando ela começa).
+      await abrirHistorico(page, -2);
+      const txtFutura = await textoDe(futura);
+      ok(txtFutura.includes(`Observar no retorno (${ddmm(14)})`) && txtFutura.includes(OBSERVAR),
+        'aba Consultas: a consulta futura (ap-4, daqui a 2 dias) mostra o "Observar no retorno"', txtFutura);
+      ok((await futura.getByRole("link", { name: /registro|Registrar/i }).count()) === 0,
+        "aba Consultas: e a futura segue sem botão de registro");
 
       const m = await transbordo(page);
       ok(m.doc <= m.larg, `aba Consultas com selos sem transbordo no computador (documento ${m.doc}px, janela ${m.larg}px)`, m.vaza.join(" | "));
@@ -1858,6 +1873,63 @@ async function transbordo(page) {
       ok((await statusNoMock(SEM_DESFECHO)) === "rascunho", "e o rascunho segue no banco");
       await page.close();
     }
+
+    // d2) o "observar" é o do registro da consulta que começou por último, e
+    //     não o do concluído por último: o nutri preenche hoje o registro de
+    //     uma consulta ANTIGA (ap-2, de 28 dias atrás), concluído depois do de
+    //     ap-3 (14 dias) e até depois de ap-13 começar. A instrução que vale
+    //     segue sendo a de ap-3, com o dia da consulta dela.
+    {
+      const ANTIGO = "Observar antigo, concluído hoje.";
+      // O mock lê o usuário do payload do token; a verificação faz a chamada
+      // como o nutri, sem passar pela tela.
+      const token = "x." + Buffer.from(JSON.stringify({ sub: cen.nutri })).toString("base64url") + ".y";
+      const rpc = async (nome, args) =>
+        (await fetch(`${MOCK}/rest/v1/rpc/${nome}`, {
+          method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+          body: JSON.stringify(args),
+        })).json();
+      const salvo = await rpc("salvar_registro", {
+        p_consulta: SEM_REGISTRO_ANTIGA, p_visto_em: null,
+        p_campos: { anamnese: "Preenchido depois, de memória.", observar: ANTIGO, medidas: {} },
+      });
+      const concluido = await rpc("concluir_registro", {
+        p_consulta: SEM_REGISTRO_ANTIGA, p_visto_em: salvo.updated_at, p_crn: "CRN-3 12345",
+      });
+      ok(salvo.ok === true && concluido.ok === true && (await statusNoMock(SEM_REGISTRO_ANTIGA)) === "concluido",
+        "cenário: o registro da consulta de 28 dias atrás foi concluído agora, depois do de 14 dias", JSON.stringify([salvo, concluido]));
+
+      const page = await abrir(pc, aba("luiza", "consultas"));
+      const proxima = consultas(page).locator("li:has(> h3:text-is('Próxima consulta'))");
+      const txtProxima = await textoDe(proxima);
+      ok(txtProxima.includes(OBSERVAR) && txtProxima.includes(`Observar no retorno (${ddmm(14)})`),
+        'concluído fora de ordem: a consulta em andamento mostra o observar da consulta MAIS RECENTE (a de 14 dias), com o dia dela', txtProxima);
+      ok(!txtProxima.includes(ANTIGO), "e não o do registro concluído por último, que é de uma consulta mais velha", txtProxima);
+      await abrirHistorico(page, -2);
+      const txtFutura = await textoDe(linhaDoHistorico(page, -2));
+      ok(txtFutura.includes(OBSERVAR) && !txtFutura.includes(ANTIGO),
+        "concluído fora de ordem: a consulta futura mostra o mesmo observar", txtFutura);
+      ok((await textoDe(linhaDoHistorico(page, 28).locator("summary"))).includes("Registrada"),
+        'e a de 28 dias atrás, agora com registro, mostra "Registrada"');
+      for (const dias of [28, 14]) {
+        await abrirHistorico(page, dias);
+        ok(!(await textoDe(linhaDoHistorico(page, dias))).includes("Observar no retorno"),
+          `concluído fora de ordem: a consulta de ${dias} dias atrás não mostra o observar de uma consulta posterior ou o próprio`);
+      }
+      await page.close();
+
+      // a agenda lê o observar de quem tem consulta futura na tela (sem o
+      // botão do registro, que ela ainda não tem)
+      const agendaFutura = await abrirAgenda(pc, `?vista=dia&data=${diaSP(2)}`);
+      const j = await abrirConsultaDoDia(agendaFutura, "Luiza Prado");
+      const txtAgenda = await textoDe(j);
+      ok(txtAgenda.includes(OBSERVAR) && txtAgenda.includes(`Observar no retorno (${ddmm(14)})`) && !txtAgenda.includes(ANTIGO),
+        "agenda: a consulta da Luiza daqui a 2 dias mostra o observar da consulta mais recente", txtAgenda);
+      ok((await j.getByRole("link", { name: /registro|Registrar/i }).count()) === 0,
+        "agenda: e a consulta futura não tem botão de registro");
+      await agendaFutura.close();
+    }
+    await fetch(MOCK + "/__reset", { method: "POST" });
 
     // e) a leitura dos registros falha: a aba mostra a lista sem selos e o aviso
     await fetch(MOCK + "/__falhar", {
