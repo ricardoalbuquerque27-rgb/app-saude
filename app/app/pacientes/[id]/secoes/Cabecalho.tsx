@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { idadeEm, todayISO } from "@/lib/date";
+import { hrefDaAba, type AbaPaciente } from "@/lib/abas";
 import { ErroSecao } from "./ErroSecao";
 import { ACAO_PRIMARIA, ACAO_SECUNDARIA, LINK } from "./estilos";
 
@@ -24,9 +25,12 @@ export type PerfilCabecalho = {
 export async function Cabecalho({
   uid,
   perfil,
+  aba,
 }: {
   uid: string;
   perfil: PerfilCabecalho;
+  /** A aba aberta: a tela cheia leva ela junto, para o Voltar cair nela. */
+  aba: AbaPaciente;
 }) {
   const supabase = await createClient();
   // Não lida = mensagem DO PACIENTE com read_at nulo. Só o envio do
@@ -83,7 +87,7 @@ export async function Cabecalho({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Link
-            href={`/app/pacientes/${uid}?conversa=1`}
+            href={hrefDaAba(uid, aba, "conversa")}
             className={`inline-flex lg:hidden ${ACAO_PRIMARIA}`}
           >
             {rotuloMensagem}
@@ -92,7 +96,7 @@ export async function Cabecalho({
             {rotuloMensagem}
           </a>
           <Link
-            href={`/app/pacientes/${uid}?notas=1`}
+            href={hrefDaAba(uid, aba, "notas")}
             className={`inline-flex lg:hidden ${ACAO_SECUNDARIA}`}
           >
             Nota privada

@@ -4,11 +4,14 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useReducer,
+  useState,
   type ReactNode,
 } from "react";
 import {
+  oQueSeguraATroca,
   podeAbrir,
   reduzirEdicao,
   type EstadoEdicao,
@@ -28,6 +31,9 @@ const ROTULOS: Record<SecaoEditavel, string> = {
 
 type Contexto = {
   estado: EstadoEdicao;
+  /** Gravações em voo em toda a página (o <Editavel> de cada seção conta as suas). */
+  gravando: number;
+  contarGravacao(delta: 1 | -1): void;
   abrir(secao: SecaoEditavel): void;
   fechar(secao?: SecaoEditavel): void;
   marcarSuja(secao?: SecaoEditavel): void;
@@ -60,12 +66,87 @@ export function EdicaoProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  const [gravando, setGravando] = useState(0);
+  const contarGravacao = useCallback(
+    (delta: 1 | -1) => setGravando((n) => Math.max(0, n + delta)),
+    []
+  );
+
+  useAvisarAoSair(estado, gravando);
+
   const valor = useMemo(
-    () => ({ estado, abrir, fechar, marcarSuja, marcarLimpa }),
-    [estado, abrir, fechar, marcarSuja, marcarLimpa]
+    () => ({ estado, gravando, contarGravacao, abrir, fechar, marcarSuja, marcarLimpa }),
+    [estado, gravando, contarGravacao, abrir, fechar, marcarSuja, marcarLimpa]
   );
 
   return <EdicaoContext.Provider value={valor}>{children}</EdicaoContext.Provider>;
+}
+
+/**
+ * Pergunta (ou avisa) antes de uma troca que desmontaria o editor aberto, e
+ * devolve se pode trocar. Quem confirma descarta: a seção fecha aqui mesmo,
+ * em vez de esperar a limpeza do <Editavel> que desmonta, que só roda depois
+ * de a aba nova pintar e mostraria por um quadro "Salve ou cancele…" nela.
+ */
+function perguntarAntesDeTrocar(
+  estado: EstadoEdicao,
+  gravando: number,
+  fechar: (secao?: SecaoEditavel) => void
+): boolean {
+  const motivo = oQueSeguraATroca(estado, gravando);
+  if (motivo === null) return true;
+  if (motivo === "gravando") {
+    window.alert("Ainda salvando. Espere terminar para trocar de aba.");
+    return false;
+  }
+  if (!estado.aberta) return true;
+  const descartar = window.confirm(`Descartar as alterações em ${ROTULOS[estado.aberta]}?`);
+  if (descartar) fechar(estado.aberta);
+  return descartar;
+}
+
+/**
+ * Recarregar ou fechar a página com alteração não salva (ou gravação em voo)
+ * cai no aviso do próprio navegador.
+ *
+ * O Voltar e o Avançar do navegador NÃO perguntam: cada aba é uma entrada do
+ * histórico, e eles trocam de aba desmontando o editor. Tentou-se segurar com
+ * um ouvinte de `popstate` em captura, mas na `window` o navegador chama os
+ * ouvintes na ordem de registro, e o do Next (registrado antes) já tinha
+ * trocado a aba quando a pergunta aparecia: cancelar deixava o endereço da
+ * Alimentação com o conteúdo do Resumo. Guardar o rascunho na página, para
+ * ele sobreviver à troca, é o conserto que falta.
+ */
+function useAvisarAoSair(estado: EstadoEdicao, gravando: number) {
+  const emRisco = oQueSeguraATroca(estado, gravando) !== null;
+  useEffect(() => {
+    if (!emRisco) return;
+    function aoSair(e: BeforeUnloadEvent) {
+      e.preventDefault();
+      e.returnValue = "";
+    }
+    window.addEventListener("beforeunload", aoSair);
+    return () => window.removeEventListener("beforeunload", aoSair);
+  }, [emRisco]);
+}
+
+/** Para a barra de abas: devolve se pode trocar agora (pergunta, se preciso). */
+export function useTrocaDeAba(): () => boolean {
+  const ctx = useContext(EdicaoContext);
+  if (!ctx) {
+    throw new Error(
+      "useTrocaDeAba precisa estar dentro de <EdicaoProvider>. Envolva a página do paciente com ele."
+    );
+  }
+  const { estado, gravando, fechar } = ctx;
+  return () => perguntarAntesDeTrocar(estado, gravando, fechar);
+}
+
+/** Para o <Editavel> contar as gravações da seção dele na página toda. */
+export function useContarGravacao(): (delta: 1 | -1) => void {
+  const ctx = useContext(EdicaoContext);
+  // Fora do provider (não acontece na página) a contagem só não é feita.
+  return ctx?.contarGravacao ?? (() => {});
 }
 
 export function useEdicao(secao: SecaoEditavel): {

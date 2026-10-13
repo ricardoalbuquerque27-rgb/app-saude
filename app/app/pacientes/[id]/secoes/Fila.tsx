@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AlertaFila } from "@/components/clinico/AlertaFila";
 import { Numeros } from "@/components/clinico/Numeros";
 import { ReaplicarMetas } from "@/components/clinico/ReaplicarMetas";
+import { hrefDaAba } from "@/lib/abas";
 import {
   separarDesvios,
   textoVariacaoPeso,
@@ -27,7 +28,7 @@ function Conversar({ uid }: { uid: string }) {
   return (
     <>
       <Link
-        href={`/app/pacientes/${uid}?conversa=1`}
+        href={hrefDaAba(uid, "resumo", "conversa")}
         className={`inline-flex lg:hidden ${ACAO_NA_FILA}`}
       >
         Conversar
@@ -105,17 +106,19 @@ export async function Fila({
             <Conversar uid={uid} />
           </>
         );
+      // A semana e os exames moram em outras abas: o botão abre a aba (antes
+      // rolava até a seção, quando a página era uma só).
       case "treino":
         return (
-          <a href="#treino" className={`inline-flex ${ACAO_NA_FILA}`}>
+          <Link href={hrefDaAba(uid, "treino")} className={`inline-flex ${ACAO_NA_FILA}`}>
             Ver semana
-          </a>
+          </Link>
         );
       case "exame":
         return (
-          <a href="#clinico" className={`inline-flex ${ACAO_NA_FILA}`}>
+          <Link href={hrefDaAba(uid, "clinico")} className={`inline-flex ${ACAO_NA_FILA}`}>
             Ver clínico
-          </a>
+          </Link>
         );
     }
   }

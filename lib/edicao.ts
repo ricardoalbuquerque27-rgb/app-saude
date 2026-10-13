@@ -28,6 +28,24 @@ export function podeAbrir(e: EstadoEdicao, secao: SecaoEditavel): boolean {
   return e.aberta === null || e.aberta === secao || !e.suja;
 }
 
+/**
+ * O que impede trocar de aba pela barra (página do paciente em abas). A troca
+ * desmonta o editor aberto (o Voltar do navegador também, mas esse não passa
+ * por aqui; veja components/clinico/Edicao.tsx):
+ * - "gravando": uma gravação em voo perderia o erro se falhasse, e o
+ *   nutricionista acharia que salvou. Treino e cardápio gravam a cada ação,
+ *   sem rascunho, então só a contagem de gravações sabe disso;
+ * - "alteracao": o rascunho digitado sumiria calado; a troca pergunta antes.
+ */
+export function oQueSeguraATroca(
+  e: EstadoEdicao,
+  gravando: number
+): "gravando" | "alteracao" | null {
+  if (gravando > 0) return "gravando";
+  if (e.aberta !== null && e.suja) return "alteracao";
+  return null;
+}
+
 export function reduzirEdicao(e: EstadoEdicao, a: AcaoEdicao): EstadoEdicao {
   switch (a.tipo) {
     case "abrir":

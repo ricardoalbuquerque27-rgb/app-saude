@@ -9,7 +9,7 @@ import {
   useState,
 } from "react";
 import type { SecaoEditavel } from "@/lib/edicao";
-import { useEdicao } from "./Edicao";
+import { useContarGravacao, useEdicao } from "./Edicao";
 
 /** Envolve uma gravação do editor: a seção fica "gravando" até ela voltar. */
 export type Gravacao = <T>(acao: () => PromiseLike<T>) => Promise<T>;
@@ -61,16 +61,24 @@ export function Editavel({
   // salvado. Contador, e não sim/não: no treino dá para remover uma sessão
   // enquanto outra gravação ainda não voltou. O estado mora aqui, que fica
   // montado nos dois modos, então a gravação que termina depois de a seção
-  // ceder o lugar ainda acha quem descontar.
+  // ceder o lugar ainda acha quem descontar. A página também conta: trocar de
+  // aba no meio de uma gravação desmontaria o editor do mesmo jeito, e a
+  // barra de abas e o Voltar do navegador seguram a troca enquanto houver uma.
   const [gravacoes, setGravacoes] = useState(0);
-  const gravacao = useCallback<Gravacao>(async (acao) => {
-    setGravacoes((n) => n + 1);
-    try {
-      return await acao();
-    } finally {
-      setGravacoes((n) => n - 1);
-    }
-  }, []);
+  const contarNaPagina = useContarGravacao();
+  const gravacao = useCallback<Gravacao>(
+    async (acao) => {
+      setGravacoes((n) => n + 1);
+      contarNaPagina(1);
+      try {
+        return await acao();
+      } finally {
+        setGravacoes((n) => n - 1);
+        contarNaPagina(-1);
+      }
+    },
+    [contarNaPagina]
+  );
 
   // Solta a trava quando a seção sai da tela. Uma seção suja que desmonta sem
   // chamar fechar() deixaria as outras bloqueadas por algo que ninguém vê.

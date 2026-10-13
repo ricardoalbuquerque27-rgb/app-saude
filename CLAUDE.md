@@ -17,14 +17,15 @@ Isso não é óbvio lendo a árvore de arquivos.
   metas, cardápio, treino, conversa), `dieta/`, `treinos/`, `habitos/`,
   `medidas/`, `exames/`, `tratamento/`, `treino/[id]` (leitura do treino).
 - **Nutricionista:** `components/NutriHome.tsx`, `app/app/pacientes/` e o
-  detalhe em `pacientes/[id]`: uma página só, por assunto. Ele prescreve ali
-  mesmo, em Alimentação (metas, cardápio) e Treino; a fila tem o atalho
-  Reaplicar, que grava de novo a última prescrição; o resto é leitura, fora
-  a conversa e as notas. Não há mais aba Prescrição. Veja "A página do
-  paciente" abaixo.
+  detalhe em `pacientes/[id]`, em abas por assunto: Resumo, Alimentação,
+  Treino, Corpo e Clínico. Ele prescreve ali mesmo, nas abas Alimentação
+  (metas, cardápio) e Treino; a fila do Resumo tem o atalho Reaplicar, que
+  grava de novo a última prescrição; o resto é leitura, fora a conversa e as
+  notas. Não há aba Prescrição. Veja "A página do paciente" abaixo.
 - **Lógica testada:** `lib/date.ts` (datas e janelas, `dataNoBrasil`),
   `lib/planCheckIn.ts` (adesão, `estadosDaSemana`), `lib/foods.ts` (tabela
-  TACO), `lib/edicao.ts` (`reduzirEdicao`, a regra de uma edição por vez),
+  TACO), `lib/edicao.ts` (`reduzirEdicao`, a regra de uma edição por vez,
+  e `oQueSeguraATroca`), `lib/abas.ts` (a aba que o endereço pede),
   `lib/temaClinico.ts` com `lib/contraste.ts` (paleta e razão de contraste)
   e, em `lib/nutri.ts`, a conta do resumo, da fila de triagem e da linha do
   tempo do nutri (`montarResumos`, `filaDeTriagem`, `montarLinhaDoTempo`),
@@ -41,17 +42,30 @@ authenticated` — nessa ordem.
 
 ## A página do paciente (nutricionista)
 
-`pacientes/[id]/page.tsx` monta as seções de `secoes/` (Cabecalho, Fila,
-Alimentacao, Treino, Corpo, Clinico, ConversaENotas). Cada uma é um
-componente de servidor no próprio `Suspense` e mostra `ErroSecao` se a
-leitura falha. Fazem as próprias consultas, menos o perfil do paciente, o
-resumo, a última prescrição e os avisos abertos (de meta e do plano de
-treino): a página pede esses quatro uma vez e reparte, para os números não
-discordarem entre seções. A trava de uma edição por vez
+`pacientes/[id]/page.tsx` monta as seções de `secoes/` em abas: Resumo
+(Fila: alertas e números), Alimentação, Treino, Corpo e Clínico. A aba vem
+do endereço (`?aba=treino`; `lib/abas.ts`, que manda qualquer valor
+desconhecido para o Resumo) e **só a aba aberta é montada e consulta o
+banco**: cada aba cria ali mesmo as consultas que usa (o perfil do
+paciente vem uma vez, antes). O Cabecalho fica fora das abas; a
+ConversaENotas também, na coluna da direita no computador, embaixo da aba
+entre `lg` e `xl` e, no celular, só em tela cheia (Mensagem, Nota). Cada
+seção é um componente de servidor no próprio `Suspense` e mostra
+`ErroSecao` se a leitura falha. A trava de uma edição por vez
 (`components/clinico/Edicao.tsx`, regra em `lib/edicao.ts`) vale para
-metas, cardápio e treino; o Reaplicar da fila grava fora dela. As abas e o
-`PrescricaoClient` não existem mais; `?t=atividade` redireciona para
-`pacientes/[id]/linha-do-tempo`.
+metas, cardápio e treino; o Reaplicar da fila grava fora dela. Trocar de aba
+desmonta o editor aberto, então a barra (`AbasPaciente`) pergunta
+"Descartar as alterações em …?" quando há alteração não salva, e segura a
+troca enquanto uma gravação está em voo (`oQueSeguraATroca`); recarregar ou
+fechar a página cai no aviso do navegador. **O Voltar do navegador não
+pergunta** e perde o rascunho: um ouvinte de `popstate` não roda antes do
+Next (na `window` a ordem é a de registro, mesmo em captura), e cancelar
+deixava o endereço de uma aba com o conteúdo de outra. Sair da página por
+outro link (menu, Pacientes, Linha do tempo) também não pergunta. A tela cheia do celular (`?conversa=1`,
+`?notas=1`) leva `?aba=` junto (`hrefDaAba`): sem isso o Voltar caía no
+Resumo e desmontava o rascunho. Botões da fila que levavam a uma seção ("Ver
+semana", "Ver clínico") agora abrem a aba dela.
+`?t=atividade` redireciona para `pacientes/[id]/linha-do-tempo`.
 
 **Largura.** A partir de `lg`, a área de conteúdo do `AppShell` tem 720 px
 seja qual for a largura da janela (`max-w-5xl` menos o menu lateral e as
@@ -87,7 +101,7 @@ quatro valores da última prescrição, nunca só o campo que mudou.
 
 ```bash
 npm run dev      # desenvolvimento
-npm test         # 158 testes unitários (vitest)
+npm test         # 169 testes unitários (vitest)
 npm run build    # produção
 ```
 

@@ -40,7 +40,7 @@ export function EditorMetas({
   usando?: Partial<Record<CampoMeta, string>>;
 }) {
   const supabase = createClient();
-  const { fechar, marcarSuja } = useEdicao("metas");
+  const { fechar, marcarSuja, marcarLimpa } = useEdicao("metas");
   const gravacao = useGravacaoNaSecao();
   const [recarregando, recarregar] = useRecarregar();
   const [aplicou, setAplicou] = useState(false);
@@ -95,6 +95,12 @@ export function EditorMetas({
       setErro(res?.error ?? "Não foi possível salvar as metas.");
       return;
     }
+    // Gravado: até a página nova chegar ("Aplicando…") não há mais nada a
+    // perder. Sem soltar a marca aqui, trocar de aba nesse intervalo
+    // perguntava "Descartar as alterações em Metas?" sobre o que já estava
+    // salvo.
+    sujou.current = false;
+    marcarLimpa();
     recarregar();
     setAplicou(true);
   }

@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { hrefDaAba } from "@/lib/abas";
 import { formatDate, todayISO } from "@/lib/date";
 import {
   textoVariacaoPeso,
@@ -106,9 +108,11 @@ export async function Corpo({
             </dd>
           )}
           <dd>
-            <a href="#alimentacao" className={`inline-flex ${LINK}`}>
+            {/* A meta de peso se edita junto das outras metas, na aba
+                Alimentação. */}
+            <Link href={hrefDaAba(uid, "alimentacao")} className={`inline-flex ${LINK}`}>
               editar nas metas
-            </a>
+            </Link>
           </dd>
         </div>
       </dl>

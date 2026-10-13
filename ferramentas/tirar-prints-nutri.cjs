@@ -1,9 +1,10 @@
 // Requer: PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm i --no-save playwright
 // (ver ferramentas/LEIAME.md), o dev no ar e o mock com CENARIO=carteira.
 //
-// Entra como nutricionista e faz duas coisas com o detalhe do paciente:
-//   1. tira os prints: paciente x celular/computador x claro/escuro, e avisa se
-//      alguma página transborda a largura da janela;
+// Entra como nutricionista e faz duas coisas com o detalhe do paciente, que é
+// em abas (Resumo, Alimentação, Treino, Corpo, Clínico; ?aba=):
+//   1. tira os prints: paciente/aba x celular/computador x claro/escuro, e avisa
+//      se alguma página transborda a largura da janela;
 //   2. confere na tela o que só a tela mostra: cada verificação ACUSA (sai com
 //      código 1) em vez de só escrever no terminal.
 //
@@ -24,7 +25,18 @@ fs.mkdirSync(OUT, { recursive: true });
 const APP = process.env.APP || "http://localhost:3000";
 const MOCK = process.env.MOCK || "http://localhost:54321";
 const CHROME = process.env.CHROME || "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
+// Todas as seções com âncora. Só as da aba aberta existem na página; a
+// conversa e as notas ficam fora das abas e estão sempre lá.
 const SECOES = ["alimentacao", "treino", "corpo", "clinico", "conversa", "notas"];
+const SEMPRE = ["conversa", "notas"];
+/** O que confirma que a aba carregou: a seção dela (o Resumo não tem âncora, tem os números). */
+const SINAL_DA_ABA = {
+  resumo: 'dl:has-text("dias com registro")',
+  alimentacao: "#alimentacao",
+  treino: "#treino",
+  corpo: "#corpo",
+  clinico: "#clinico",
+};
 const TZ = "America/Sao_Paulo";
 
 const CELULAR = { nome: "mobile", w: 390, h: 844, mobile: true, escala: 2 };
@@ -102,13 +114,15 @@ async function entrar(browser) {
   return estado;
 }
 
-/** Abre uma rota do paciente e espera as seis seções streamarem. */
+/** Abre uma rota do paciente e espera a aba dela, a conversa e as notas streamarem. */
 async function abrir(ctx, caminho, { secoes = true } = {}) {
   const page = await ctx.newPage();
   espiar(page);
   await page.goto(APP + caminho, { waitUntil: "load", timeout: 120000 });
   if (secoes) {
-    for (const s of SECOES) await page.waitForSelector(`#${s}`, { state: "attached", timeout: 60000 });
+    const aba = new URL(APP + caminho).searchParams.get("aba") || "resumo";
+    await page.waitForSelector(SINAL_DA_ABA[aba], { state: "attached", timeout: 60000 });
+    for (const s of SEMPRE) await page.waitForSelector(`#${s}`, { state: "attached", timeout: 60000 });
   }
   await page.waitForLoadState("networkidle").catch(() => {});
   await page.evaluate(() => document.fonts.ready);
@@ -192,6 +206,8 @@ async function transbordo(page) {
   }
   const P = cen.pacientes;
   const rota = (k) => `/app/pacientes/${P[k]}`;
+  /** A rota de uma aba; o Resumo é a rota sem parâmetro. */
+  const aba = (k, a) => rota(k) + (a === "resumo" ? "" : `?aba=${a}`);
 
   const browser = await chromium.launch({ executablePath: CHROME, args: ["--no-sandbox"] });
   const estado = await entrar(browser);
@@ -201,18 +217,24 @@ async function transbordo(page) {
   // =====================================================================
   console.log("\nPrints");
   const TELAS = [
-    ["beatriz", "beatriz", null], // com alertas
-    ["luiza", "luiza", null], // sem alertas
-    ["pedro", "pedro", null], // recém-chegado
-    ["carlos", "carlos", null], // dose atrasada
-    ["joana", "joana", null], // parada, com exame
-    ["beatriz-metas", "beatriz", abrirMetas], // com "Editar metas" aberto
+    // Beatriz, a que tem de tudo, em todas as abas.
+    ["beatriz", "beatriz", "resumo", null],
+    ["beatriz-alimentacao", "beatriz", "alimentacao", null],
+    ["beatriz-treino", "beatriz", "treino", null],
+    ["beatriz-corpo", "beatriz", "corpo", null],
+    ["beatriz-clinico", "beatriz", "clinico", null],
+    ["beatriz-metas", "beatriz", "alimentacao", abrirMetas], // com "Editar metas" aberto
+    // Os outros, no Resumo, onde cada um é diferente.
+    ["luiza", "luiza", "resumo", null], // sem alertas
+    ["pedro", "pedro", "resumo", null], // recém-chegado
+    ["carlos", "carlos", "resumo", null], // dose atrasada
+    ["joana", "joana", "resumo", null], // parada, com exame
   ];
   for (const [tema, escuro] of [["claro", false], ["escuro", true]]) {
     for (const disp of [CELULAR, COMPUTADOR]) {
       const ctx = await contexto(browser, disp, escuro, estado);
-      for (const [nome, paciente, preparo] of TELAS) {
-        const page = await abrir(ctx, rota(paciente));
+      for (const [nome, paciente, qual, preparo] of TELAS) {
+        const page = await abrir(ctx, aba(paciente, qual));
         if (preparo) await preparo(page);
         const texto = await textoDe(page.locator("body"));
         ok(!/Não foi possível carregar/.test(texto), `nenhuma seção com erro: ${nome}/${disp.nome}/${tema}`);
@@ -234,15 +256,35 @@ async function transbordo(page) {
       await ctx.close();
     }
   }
-  // Entre `lg` e `xl` a página fica numa coluna só.
+  // Entre `lg` e `xl` a página fica numa coluna só. Na Alimentação, a aba
+  // com a tabela, que é o que mais pede largura.
   {
     const ctx = await contexto(browser, ESTREITO, false, estado);
-    const page = await abrir(ctx, rota("beatriz"));
+    const page = await abrir(ctx, aba("beatriz", "alimentacao"));
     const m = await transbordo(page);
-    const arquivo = `${OUT}/beatriz-${ESTREITO.nome}-claro.png`;
+    const arquivo = `${OUT}/beatriz-alimentacao-${ESTREITO.nome}-claro.png`;
     await fotografar(page, arquivo, ESTREITO);
     ok(m.doc <= m.larg, `sem transbordo: ${arquivo} (documento ${m.doc}px, janela ${m.larg}px)`, m.vaza.join(" | "));
     await page.close();
+    await ctx.close();
+  }
+
+  // Erro e transbordo em TODAS as abas de todos os pacientes, sem print: os
+  // prints acima só mostram as abas da Beatriz, e as abas vazias do Pedro ou
+  // o Clínico da Joana (exame fora) também precisam caber em 390 px.
+  console.log("\nTodas as abas de todos os pacientes (erro e transbordo)");
+  etapa = "todas as abas";
+  for (const disp of [CELULAR, COMPUTADOR]) {
+    const ctx = await contexto(browser, disp, false, estado);
+    for (const k of ["luiza", "pedro", "carlos", "joana"]) {
+      for (const a of ["alimentacao", "treino", "corpo", "clinico"]) {
+        const page = await abrir(ctx, aba(k, a));
+        ok(!/Não foi possível carregar/.test(await textoDe(page.locator("body"))), `nenhuma seção com erro: ${k}/${a}/${disp.nome}`);
+        const m = await transbordo(page);
+        ok(m.doc <= m.larg, `sem transbordo: ${k}/${a}/${disp.nome} (documento ${m.doc}px, janela ${m.larg}px)`, m.vaza.join(" | "));
+        await page.close();
+      }
+    }
     await ctx.close();
   }
 
@@ -280,8 +322,10 @@ async function transbordo(page) {
     const page = await abrir(pc, rota("pedro"));
     const numeros = await textoDe(page.locator('dl:has-text("dias com registro")').first());
     ok(/dias com registro\s*—/.test(numeros) && !numeros.includes("0/7"), 'pedro: "—" em dias com registro, e não "0/7"', numeros);
-    ok((await page.getByRole("button", { name: "Definir metas" }).count()) === 1, 'pedro: sem metas, o botão é "Definir metas"');
     await page.close();
+    const metas = await abrir(pc, aba("pedro", "alimentacao"));
+    ok((await metas.getByRole("button", { name: "Definir metas" }).count()) === 1, 'pedro: sem metas, o botão da Alimentação é "Definir metas"');
+    await metas.close();
   }
 
   // =====================================================================
@@ -290,7 +334,7 @@ async function transbordo(page) {
   console.log("\nVerificação 1: rascunho sobrevive (computador)");
   etapa = "Verificação 1";
   {
-    const page = await abrir(pc, rota("beatriz"));
+    const page = await abrir(pc, aba("beatriz", "alimentacao"));
     await abrirMetas(page);
     const kcal = campo(page, "Calorias/dia").locator("input");
     await kcal.fill("1900");
@@ -358,18 +402,22 @@ async function transbordo(page) {
   console.log("\nVerificação 3: dois tratamentos ativos (R12)");
   etapa = "Verificação 3";
   {
-    const page = await abrir(pc, rota("beatriz"));
+    const page = await abrir(pc, aba("beatriz", "clinico"));
     const clinico = await textoDe(page.locator("#clinico"));
     ok(clinico.includes("Ozempic") && clinico.includes("0,5 mg"), "Beatriz: o Clínico mostra o tratamento mais recente (Ozempic, 0,5 mg)", clinico);
     ok(!clinico.includes("Saxenda"), "Beatriz: o Clínico NÃO mostra o mais antigo (Saxenda)", clinico);
     ok(clinico.includes(`Próxima dose: ${diaBR(-3)}`) && !clinico.includes("atrasada"),
       `Beatriz: a próxima dose do mais novo é ${diaBR(-3)} e não está atrasada`, clinico);
-    ok(!(await textoDe(fila(page))).includes("Dose atrasada"), "Beatriz: a fila NÃO acusa dose atrasada (a vencida é a do tratamento antigo)");
     await page.close();
-    const carlos = await abrir(pc, rota("carlos"));
+    const resumo = await abrir(pc, rota("beatriz"));
+    ok(!(await textoDe(fila(resumo))).includes("Dose atrasada"), "Beatriz: a fila NÃO acusa dose atrasada (a vencida é a do tratamento antigo)");
+    await resumo.close();
+    const carlos = await abrir(pc, aba("carlos", "clinico"));
     ok((await textoDe(carlos.locator("#clinico"))).includes("atrasada"), "Carlos: o Clínico marca a dose como atrasada");
-    ok((await textoDe(fila(carlos))).includes("Dose atrasada"), "Carlos: a fila acusa dose atrasada");
     await carlos.close();
+    const carlosResumo = await abrir(pc, rota("carlos"));
+    ok((await textoDe(fila(carlosResumo))).includes("Dose atrasada"), "Carlos: a fila acusa dose atrasada");
+    await carlosResumo.close();
   }
 
   console.log("\nVerificação 4: sem vínculo");
@@ -409,7 +457,7 @@ async function transbordo(page) {
   console.log("\nVerificação 6: só os desvios de META aparecem na Alimentação (R16)");
   etapa = "Verificação 6";
   {
-    const page = await abrir(pc, rota("beatriz"));
+    const page = await abrir(pc, aba("beatriz", "alimentacao"));
     const alimentacao = page.locator("#alimentacao");
     const itens = alimentacao.locator("ul.bg-clin-atencao-fundo > li");
     ok((await itens.count()) === 1, `Alimentação lista 1 desvio (achados ${await itens.count()})`);
@@ -418,14 +466,16 @@ async function transbordo(page) {
     const tudo = await textoDe(alimentacao);
     ok(!/workout_plan|undefined|Treino B|Água:/.test(tudo), "o aviso do plano de treino e o aviso com baixa não aparecem em Alimentação");
     ok(tudo.includes("1.800 kcal"), 'a coluna "Meta" mostra o que o nutricionista prescreveu (1.800 kcal), não o 2.200 do perfil');
-    ok((await textoDe(fila(page))).includes("2 mudanças na sua prescrição"), 'a fila conta os DOIS avisos abertos ("2 mudanças na sua prescrição")');
     await page.close();
+    const resumo = await abrir(pc, rota("beatriz"));
+    ok((await textoDe(fila(resumo))).includes("2 mudanças na sua prescrição"), 'a fila conta os DOIS avisos abertos ("2 mudanças na sua prescrição")');
+    await resumo.close();
   }
 
   console.log("\nVerificação 7: o editor de metas abre com a prescrição (R15)");
   etapa = "Verificação 7";
   {
-    const page = await abrir(pc, rota("beatriz"));
+    const page = await abrir(pc, aba("beatriz", "alimentacao"));
     await abrirMetas(page);
     const valor = (r) => campo(page, r).locator("input").inputValue();
     const achados = [await valor("Calorias/dia"), await valor("Proteína/dia (g)"), await valor("Água/dia (ml)"), await valor("Peso alvo (kg)")];
@@ -451,7 +501,7 @@ async function transbordo(page) {
   console.log("\nVerificação 9: a mudança do plano de treino aparece (R19)");
   etapa = "Verificação 9";
   {
-    const page = await abrir(pc, rota("beatriz"));
+    const page = await abrir(pc, aba("beatriz", "treino"));
     const treino = page.locator("#treino");
     const itens = treino.locator("ul.bg-clin-atencao-fundo > li");
     ok((await itens.count()) === 1, `Treino lista 1 mudança do plano (achadas ${await itens.count()})`);
@@ -462,6 +512,10 @@ async function transbordo(page) {
       `e é a do Treino B, por extenso: "${txt}"`);
     ok(!/workout_plan|removido pelo paciente|undefined|daily_|Calorias/.test(await textoDe(treino)),
       "sem o valor cru do gatilho, nome de coluna nem aviso de meta no Treino");
+    await page.close();
+  }
+  {
+    const page = await abrir(pc, rota("beatriz"));
     const botao = page.getByRole("button", { name: "Reaplicar 1.800 kcal" });
     const idObs = await botao.getAttribute("aria-describedby");
     const obs = idObs ? page.locator(`[id="${idObs}"]`) : null;
@@ -487,15 +541,17 @@ async function transbordo(page) {
     for (const k of ["carlos", "luiza"]) {
       const outra = await abrir(pc, rota(k));
       ok(!(await textoDe(outra.locator("body"))).includes("Também dá baixa"), `${k}: sem a linha "Também dá baixa"`);
-      ok((await outra.locator("#treino ul.bg-clin-atencao-fundo").count()) === 0, `${k}: o Treino não lista mudança nenhuma`);
       await outra.close();
+      const treinoOutra = await abrir(pc, aba(k, "treino"));
+      ok((await treinoOutra.locator("#treino ul.bg-clin-atencao-fundo").count()) === 0, `${k}: o Treino não lista mudança nenhuma`);
+      await treinoOutra.close();
     }
   }
 
   console.log("\nVerificação 10: Aplicar metas espera a página nova");
   etapa = "Verificação 10";
   {
-    const page = await abrir(pc, rota("beatriz"));
+    const page = await abrir(pc, aba("beatriz", "alimentacao"));
     await abrirMetas(page);
     let rpcs = 0;
     page.on("request", (r) => {
@@ -535,7 +591,7 @@ async function transbordo(page) {
   console.log("\nVerificação 11: Fechar edição com a RPC em voo");
   etapa = "Verificação 11";
   {
-    const page = await abrir(pc, rota("beatriz"));
+    const page = await abrir(pc, aba("beatriz", "alimentacao"));
     await abrirMetas(page);
     const kcal = campo(page, "Calorias/dia").locator("input");
     await kcal.fill("1950");
@@ -562,6 +618,17 @@ async function transbordo(page) {
       null, { timeout: 10000 }
     ).catch(() => {});
     ok(await fechar.isDisabled(), '"Fechar edição" fica desligado com a RPC em voo');
+    // Trocar de aba agora desmontaria o formulário do mesmo jeito.
+    let aviso = "";
+    page.once("dialog", (d) => {
+      aviso = `${d.type()}: ${d.message()}`;
+      d.accept();
+    });
+    await page.locator('nav[aria-label="Assuntos do paciente"]').getByRole("link", { name: "Treino" }).click();
+    await page.waitForTimeout(800);
+    ok(aviso === "alert: Ainda salvando. Espere terminar para trocar de aba.",
+      `com a RPC em voo, a barra de abas avisa e não troca ("${aviso}")`);
+    ok(new URL(page.url()).searchParams.get("aba") === "alimentacao", "e a página continua na Alimentação");
     soltar();
     ok((await apareceu(page.getByText("Recusa simulada pelo script."), 30000)) &&
       (await page.getByRole("button", { name: "Aplicar metas" }).count()) === 1,
@@ -575,7 +642,7 @@ async function transbordo(page) {
   console.log("\nVerificação 12: o rascunho do cardápio trava as outras seções");
   etapa = "Verificação 12";
   {
-    const page = await abrir(pc, rota("beatriz"));
+    const page = await abrir(pc, aba("beatriz", "alimentacao"));
     const bloqueio = page.getByRole("button", { name: "Salve ou cancele a edição de Cardápio" });
     await clicar(page.getByRole("button", { name: "Editar cardápio" }));
     const nome = page.getByPlaceholder("Nome do plano (ex.: Plano de outubro)");
@@ -583,21 +650,21 @@ async function transbordo(page) {
     ok((await page.getByRole("button", { name: "Editar metas" }).count()) === 1, 'cardápio aberto sem rascunho: "Editar metas" continua livre');
     await nome.fill("Plano alimentar — fase 2");
     await apareceu(bloqueio.first());
+    // O "Editar plano" mora na aba Treino; aqui só o das metas trava.
     ok((await page.getByRole("button", { name: "Editar metas" }).count()) === 0 &&
-      (await page.getByRole("button", { name: "Editar plano" }).count()) === 0 &&
-      (await bloqueio.count()) === 2,
-      'com o nome do plano digitado, metas e treino dizem "Salve ou cancele a edição de Cardápio"');
+      (await bloqueio.count()) === 1,
+      'com o nome do plano digitado, metas diz "Salve ou cancele a edição de Cardápio"');
     await Promise.all([
       page.waitForResponse((r) => r.request().method() === "PATCH" && r.url().includes("/rest/v1/meal_plans"), { timeout: 30000 }),
       clicar(page.getByRole("button", { name: "Salvar nome e orientação" })),
     ]);
     await apareceu(page.getByRole("button", { name: "Editar metas" }));
-    ok((await bloqueio.count()) === 0, 'salvou o nome: "Editar metas" e "Editar plano" voltam');
+    ok((await bloqueio.count()) === 0, 'salvou o nome: "Editar metas" volta');
     // A opção nova de uma refeição também é rascunho; descartá-la solta.
     await clicar(page.locator("#alimentacao").getByRole("button", { name: /^(Adicionar|Outra opção)$/ }).first());
     await page.getByPlaceholder(/2 ovos mexidos/).fill("Iogurte natural com aveia");
     await apareceu(bloqueio.first());
-    ok((await bloqueio.count()) === 2, "a opção nova digitada também trava as outras seções");
+    ok((await bloqueio.count()) === 1, "a opção nova digitada também trava as metas");
     await clicar(page.getByRole("button", { name: "Descartar esta opção" }));
     await apareceu(page.getByRole("button", { name: "Editar metas" }));
     ok((await bloqueio.count()) === 0, "descartar a opção nova solta a trava");
@@ -607,7 +674,7 @@ async function transbordo(page) {
     // No escuro, a cópia `.dark :where(.tema-clinico) .btn-ghost` tem duas
     // classes e vencia o `text-clin-texto-2` do aviso de bloqueio.
     const escuro = await contexto(browser, COMPUTADOR, true, estado);
-    const page = await abrir(escuro, rota("beatriz"));
+    const page = await abrir(escuro, aba("beatriz", "alimentacao"));
     await clicar(page.getByRole("button", { name: "Editar cardápio" }));
     await page.getByPlaceholder("Nome do plano (ex.: Plano de outubro)").fill("Plano alimentar — fase 2");
     const aviso = page.getByRole("button", { name: "Salve ou cancele a edição de Cardápio" }).first();
@@ -636,7 +703,7 @@ async function transbordo(page) {
   etapa = "Verificação 13";
   {
     // Pedro não tem cardápio: o botão do cabeçalho é "Criar plano".
-    const page = await abrir(pc, rota("pedro"));
+    const page = await abrir(pc, aba("pedro", "alimentacao"));
     await clicar(page.getByRole("button", { name: "Montar cardápio" }));
     const criar = page.getByRole("button", { name: "Criar plano" });
     await pronto(criar);
@@ -667,6 +734,136 @@ async function transbordo(page) {
     ok(await apareceu(page.getByRole("button", { name: "Criar plano" }), 30000), "quando a página nova chega, o botão volta");
     ok(inserts === 1, `um insert em meal_plans só, mesmo com o segundo clique (${inserts})`);
     await page.unrouteAll({ behavior: "ignoreErrors" });
+    await page.close();
+  }
+
+  console.log("\nVerificação 14: as abas");
+  etapa = "Verificação 14";
+  const atual = (page) => page.locator('nav[aria-label="Assuntos do paciente"] a[aria-current="page"]');
+  const daAba = (page, a) => {
+    const u = new URL(page.url());
+    return (u.searchParams.get("aba") || "resumo") === a;
+  };
+  {
+    // Sem parâmetro abre o Resumo, e só ele: as outras abas nem montam.
+    const page = await abrir(pc, rota("beatriz"));
+    ok((await textoDe(atual(page))) === "Resumo", `sem ?aba= a aba marcada é o Resumo (${await textoDe(atual(page))})`);
+    let fora = 0;
+    for (const s of ["alimentacao", "treino", "corpo", "clinico"]) fora += await page.locator(`#${s}`).count();
+    ok(fora === 0, `no Resumo nenhuma seção das outras abas está na página (${fora})`);
+    ok((await page.locator("#conversa").count()) === 1 && (await page.locator("#notas").count()) === 1,
+      "a conversa e as notas estão no Resumo");
+    // "Ver semana" na fila abre a aba Treino.
+    await clicar(fila(page).getByRole("link", { name: "Ver semana" }));
+    await page.waitForURL((u) => u.searchParams.get("aba") === "treino", { timeout: 30000 });
+    await page.locator("#treino").waitFor({ state: "attached", timeout: 60000 });
+    ok((await textoDe(atual(page))) === "Treino", '"Ver semana" abre a aba Treino, marcada na barra');
+    ok((await page.locator("#conversa").count()) === 1, "a conversa continua lá na aba Treino");
+    // O Voltar do navegador volta para a aba anterior.
+    await page.goBack();
+    await page.waitForURL((u) => !u.searchParams.has("aba"), { timeout: 30000 });
+    await page.locator('dl:has-text("dias com registro")').first().waitFor({ state: "attached", timeout: 60000 });
+    ok((await textoDe(atual(page))) === "Resumo", "o Voltar do navegador volta para o Resumo");
+    await page.close();
+  }
+  {
+    const page = await abrir(pc, rota("joana"));
+    await clicar(fila(page).getByRole("link", { name: "Ver clínico" }));
+    await page.waitForURL((u) => u.searchParams.get("aba") === "clinico", { timeout: 30000 });
+    await page.locator("#clinico").waitFor({ state: "attached", timeout: 60000 });
+    ok((await textoDe(atual(page))) === "Clínico", '"Ver clínico" na fila da Joana abre a aba Clínico');
+    await page.close();
+  }
+  {
+    const page = await abrir(pc, aba("beatriz", "corpo"));
+    await clicar(page.locator("#corpo").getByRole("link", { name: "editar nas metas" }));
+    await page.waitForURL((u) => u.searchParams.get("aba") === "alimentacao", { timeout: 30000 });
+    await page.locator("#alimentacao").waitFor({ state: "attached", timeout: 60000 });
+    ok(daAba(page, "alimentacao"), '"editar nas metas" no Corpo abre a aba Alimentação');
+    await page.close();
+  }
+  {
+    // Um ?aba= desconhecido cai no Resumo, não numa tela vazia.
+    const page = await abrir(pc, rota("beatriz") + "?aba=prescricao", { secoes: false });
+    await page.locator('dl:has-text("dias com registro")').first().waitFor({ state: "attached", timeout: 60000 });
+    ok((await textoDe(atual(page))) === "Resumo", "?aba=prescricao (que não existe) abre o Resumo");
+    await page.close();
+  }
+  {
+    // Trocar de aba com metas alteradas pergunta antes; sem alteração, troca direto.
+    const page = await abrir(pc, aba("beatriz", "alimentacao"));
+    await abrirMetas(page);
+    const kcal = campo(page, "Calorias/dia").locator("input");
+    await kcal.fill("1900");
+    const linkTreino = page.locator('nav[aria-label="Assuntos do paciente"]').getByRole("link", { name: "Treino" });
+    let pergunta = "";
+    page.once("dialog", (d) => {
+      pergunta = d.message();
+      d.dismiss();
+    });
+    await clicar(linkTreino);
+    await page.waitForTimeout(800);
+    ok(pergunta === "Descartar as alterações em Metas?", `com metas alteradas, trocar de aba pergunta antes ("${pergunta}")`);
+    ok(daAba(page, "alimentacao") && (await kcal.inputValue()) === "1900",
+      "e quem cancela fica na Alimentação com o 1900 digitado");
+    page.once("dialog", (d) => d.accept());
+    await clicar(linkTreino);
+    await page.waitForURL((u) => u.searchParams.get("aba") === "treino", { timeout: 30000 });
+    await page.locator("#treino").waitFor({ state: "attached", timeout: 60000 });
+    ok(daAba(page, "treino"), "quem confirma vai para a aba Treino");
+    // A trava se soltou: o plano abre.
+    ok((await page.getByRole("button", { name: "Editar plano" }).count()) === 1, 'e o "Editar plano" está livre (a trava das metas se soltou)');
+    await page.close();
+  }
+  {
+    const page = await abrir(pc, aba("beatriz", "alimentacao"));
+    await abrirMetas(page);
+    let perguntou = false;
+    page.once("dialog", (d) => {
+      perguntou = true;
+      d.dismiss();
+    });
+    await clicar(page.locator('nav[aria-label="Assuntos do paciente"]').getByRole("link", { name: "Corpo" }));
+    await page.waitForURL((u) => u.searchParams.get("aba") === "corpo", { timeout: 30000 });
+    ok(!perguntou && daAba(page, "corpo"), "com o editor aberto e nada digitado, troca direto, sem perguntar");
+    page.removeAllListeners("dialog");
+    await page.close();
+  }
+  {
+    // No celular, a tela cheia da conversa leva a aba junto, e o Voltar cai nela.
+    const page = await abrir(cel, aba("beatriz", "alimentacao"));
+    await clicar(page.getByRole("link", { name: /^Mensagem/ }));
+    await page.waitForURL(/conversa=1/, { timeout: 30000 });
+    const u = new URL(page.url());
+    ok(u.searchParams.get("aba") === "alimentacao", `a tela cheia da conversa guarda a aba (${u.search})`);
+    await clicar(page.getByRole("link", { name: "Voltar" }));
+    await page.waitForFunction(() => !location.search.includes("conversa=1"), null, { timeout: 30000 });
+    ok(daAba(page, "alimentacao"), `o Voltar volta para a aba Alimentação (${new URL(page.url()).search})`);
+    // As cinco abas não cabem em 390 px: a barra rola, a página não.
+    const m = await transbordo(page);
+    ok(m.doc <= m.larg, `no celular a barra de abas não alarga a página (documento ${m.doc}px, janela ${m.larg}px)`, m.vaza.join(" | "));
+    await page.close();
+  }
+
+  {
+    // No celular, abrir a conversa em tela cheia e voltar não desmonta o
+    // rascunho: é o motivo de a tela cheia levar ?aba= junto.
+    const page = await abrir(cel, aba("beatriz", "alimentacao"));
+    await abrirMetas(page);
+    const kcal = campo(page, "Calorias/dia").locator("input");
+    await kcal.fill("1900");
+    await clicar(page.getByRole("link", { name: /^Mensagem/ }));
+    await page.waitForURL(/conversa=1/, { timeout: 30000 });
+    await clicar(page.getByRole("link", { name: "Voltar" }));
+    await page.waitForFunction(() => !location.search.includes("conversa=1"), null, { timeout: 30000 });
+    ok((await kcal.inputValue()) === "1900" && (await page.getByRole("button", { name: "Fechar edição" }).count()) === 1,
+      `celular: abrir a conversa e voltar mantém o editor de metas aberto com o 1900 (${await kcal.inputValue()})`);
+    await page.close();
+  }
+  {
+    // Cada aba tem o próprio título: o leitor de tela anuncia a troca.
+    const page = await abrir(pc, aba("beatriz", "treino"));
+    ok((await page.title()) === "Treino · Paciente · Pace Fit", `o título da página diz a aba (${await page.title()})`);
     await page.close();
   }
 

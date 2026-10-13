@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { podeAbrir, reduzirEdicao } from "./edicao";
+import { oQueSeguraATroca, podeAbrir, reduzirEdicao } from "./edicao";
 
 const vazio = { aberta: null, suja: false };
 
@@ -102,5 +102,30 @@ describe("limpar", () => {
     e = reduzirEdicao(e, { tipo: "sujar", secao: "metas" });
     e = reduzirEdicao(e, { tipo: "limpar", secao: "treino" }); // gravação do treino terminou
     expect(e).toEqual({ aberta: "metas", suja: true });
+  });
+});
+
+describe("oQueSeguraATroca", () => {
+  // A página do paciente é em abas. Trocar de aba (pela barra ou pelo Voltar
+  // do navegador) desmonta o editor aberto: um rascunho digitado sumiria
+  // calado, e uma gravação em voo perderia o erro, se falhasse.
+  it("nada aberto e nada gravando: troca direto", () => {
+    expect(oQueSeguraATroca({ aberta: null, suja: false }, 0)).toBe(null);
+  });
+
+  it("editor aberto sem nada digitado: troca direto", () => {
+    expect(oQueSeguraATroca({ aberta: "metas", suja: false }, 0)).toBe(null);
+  });
+
+  it("alteração não salva: pergunta", () => {
+    expect(oQueSeguraATroca({ aberta: "metas", suja: true }, 0)).toBe("alteracao");
+    expect(oQueSeguraATroca({ aberta: "cardapio", suja: true }, 0)).toBe("alteracao");
+  });
+
+  it("gravação em voo segura a troca, com ou sem rascunho", () => {
+    // Treino e cardápio gravam a cada ação, sem rascunho: só a contagem
+    // de gravações sabe que há uma a caminho.
+    expect(oQueSeguraATroca({ aberta: "treino", suja: false }, 1)).toBe("gravando");
+    expect(oQueSeguraATroca({ aberta: "metas", suja: true }, 2)).toBe("gravando");
   });
 });
