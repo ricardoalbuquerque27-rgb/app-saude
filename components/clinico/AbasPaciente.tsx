@@ -83,7 +83,9 @@ export function AbasPaciente({ uid, ativa }: { uid: string; ativa: AbaPaciente }
         ref={barra}
         aria-label="Assuntos do paciente"
         aria-busy={carregando}
-        className="-mx-1 overflow-x-auto [scrollbar-width:none]"
+        // scroll-px: o scrollIntoView da aba aberta deixa a folga da seta
+        // (44 px); sem ela a seta cobria o fim de "Consultas" aberta.
+        className="-mx-1 scroll-px-12 overflow-x-auto [scrollbar-width:none]"
       >
         <ul role="list" className="flex min-w-max border-b border-clin-linha px-1 sm:gap-1">
           {ABAS.map((a) => {

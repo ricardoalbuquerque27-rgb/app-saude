@@ -88,12 +88,12 @@ export function PainelConsulta({
 
   // Função, e não componente: um componente declarado aqui dentro seria
   // outro a cada render, e o botão perderia o foco do teclado ao recarregar.
-  const botao = (rotulo: string, onClick: () => void, primario = false) => (
+  const botao = (rotulo: string, onClick: () => void, primario = false, esperando = false) => (
     <button
       key={rotulo}
       type="button"
       onClick={onClick}
-      disabled={ocupado}
+      disabled={ocupado || esperando}
       className={`inline-flex ${primario ? ACAO_PRIMARIA : ACAO_SECUNDARIA} disabled:opacity-60`}
     >
       {ocupado && qual === rotulo && (
@@ -122,7 +122,9 @@ export function PainelConsulta({
           <>
             {/* Aceitar um pedido cujo horário já passou criaria uma consulta
                 sem desfecho na hora; aí só "Outro horário". */}
-            {!comecou && botao("Aceitar", () => manter("Aceitar"), true)}
+            {/* Desligado até as consultas do dia chegarem: um toque rápido
+                aceitaria sem o aviso de choque. */}
+            {!comecou && botao("Aceitar", () => manter("Aceitar"), true, !doDia && !diaFalhou)}
             {botao("Outro horário", () => setEditando("remarcar"), comecou)}
             {botao("Recusar", () => {
               if (window.confirm(`Recusar o pedido de ${nome}?`)) fechar("Recusar", "cancelada");

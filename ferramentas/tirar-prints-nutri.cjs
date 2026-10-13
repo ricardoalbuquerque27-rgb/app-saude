@@ -1000,8 +1000,11 @@ async function transbordo(page) {
       ok(!(await textoDe(page.locator("#consultas"))).includes("Precisa de você"), "Realizada tira a consulta da Joana das pendências");
       ok((await textoDe(page.locator("#consultas"))).includes("Sem retorno marcado"),
         "sem próxima consulta, a realizada sobe como 'Sem retorno marcado', com o Marcar retorno");
-      ok((await page.locator("#consultas").getByRole("button", { name: "Marcar retorno" }).count()) >= 1,
-        "o 'Marcar retorno' está à vista depois de fechar a consulta");
+      // "Realizada" abre o formulário do retorno, e ele SOBREVIVE ao refresh
+      // (a consulta muda de grupo, mas é o mesmo painel).
+      const form = page.locator("#consultas form");
+      ok((await form.count()) === 1 && (await textoDe(page.locator("#consultas"))).includes("Marcar retorno"),
+        "depois de 'Realizada', o formulário do retorno continua aberto quando a página recarrega");
       await page.close();
       const resumo = await abrir(pc, rota("joana"));
       ok(!(await textoDe(fila(resumo))).includes("sem desfecho"), "a fila da Joana não acusa mais consulta sem desfecho");
@@ -1012,7 +1015,7 @@ async function transbordo(page) {
     // g2) Luiza: a consulta que está acontecendo já oferece Realizada e Faltou
     {
       const page = await abrir(pc, aba("luiza", "consultas"));
-      const proxima = page.locator("#consultas div:has(> h3:text-is('Próxima consulta'))");
+      const proxima = page.locator("#consultas li:has(> h3:text-is('Próxima consulta'))");
       ok((await proxima.getByRole("button", { name: "Realizada", exact: true }).count()) === 1 &&
         (await proxima.getByRole("button", { name: "Faltou", exact: true }).count()) === 1,
         "consulta em andamento: Realizada e Faltou sem esperar o fim");

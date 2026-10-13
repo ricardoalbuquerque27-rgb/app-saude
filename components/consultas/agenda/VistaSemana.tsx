@@ -90,7 +90,9 @@ export function VistaSemana({ consultas, nomes, agora, hoje, data, abrir }: Prop
       >
         <span className="font-semibold tabular-nums">{horaEmSaoPaulo(c.starts_at)}</span>{" "}
         <span className="font-medium">{(nomes[c.patient_id] ?? "Paciente").split(" ")[0]}</span>
-        {altura > 40 && (
+        {/* Linhas de 16 px: lado a lado, "10:00 Luiza" já quebra em duas,
+            e a terceira saía cortada pela metade. */}
+        {Math.floor((altura - 4) / 16) >= (faixas > 1 ? 3 : 2) && (
           <span className="block truncate">
             {pendente || s !== "agendada" ? ROTULO_SITUACAO[s] : ROTULO_TIPO[c.kind]}
           </span>

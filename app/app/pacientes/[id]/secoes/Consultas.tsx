@@ -17,6 +17,13 @@ import {
 } from "@/lib/consultas";
 import { FOCO } from "@/components/clinico/estilos";
 
+type Grupo = "pendente" | "proxima" | "retorno";
+const TITULO_DO_GRUPO: Record<Grupo, string> = {
+  pendente: "Precisa de você",
+  proxima: "Próxima consulta",
+  retorno: "Sem retorno marcado",
+};
+
 // A aba Consultas: o que precisa do nutri no topo (pedido, pedido de
 // remarcação, sem desfecho), a próxima consulta ou, sem nenhuma, a última
 // realizada com o "Marcar retorno", e o histórico. Cada consulta
@@ -71,6 +78,12 @@ export async function Consultas({
   // para a mais antiga.
   const historico = r.data.filter((c) => !jaMostradas.has(c.id));
 
+  const destaques: { c: Consulta; grupo: Grupo }[] = [
+    ...pendentes.map((c) => ({ c, grupo: "pendente" as const })),
+    ...(mostrarProxima && proxima ? [{ c: proxima, grupo: "proxima" as const }] : []),
+    ...(semRetorno ? [{ c: semRetorno, grupo: "retorno" as const }] : []),
+  ];
+
   const painel = (c: Consulta) => (
     <PainelConsulta consulta={c} nome={nome} agora={agora} nutriId={nutriId} mostrarNome={false} />
   );
@@ -81,31 +94,31 @@ export async function Consultas({
         <p className="text-[15px] text-clin-texto-2">Nenhuma consulta marcada ainda.</p>
       ) : (
         <div className="space-y-6">
-          {pendentes.length > 0 && (
-            <div>
-              <h3 className="mb-2 text-[15px] font-semibold text-clin-texto">Precisa de você</h3>
-              <ul role="list" className="space-y-3">
-                {pendentes.map((c) => (
-                  <li key={c.id} className="rounded-md border border-dashed border-clin-atencao p-4">
+          {/* Pendências, próxima e "sem retorno" numa lista só, com a
+              consulta como chave: quando a sem desfecho vira realizada, ela
+              passa de "Precisa de você" para "Sem retorno marcado" e o React
+              mantém o MESMO painel, com o "Marcar retorno" que ele abriu. Em
+              listas separadas o painel era recriado no refresh e o formulário
+              sumia no meio do preenchimento. O título sai quando o grupo muda. */}
+          {destaques.length > 0 && (
+            <ul role="list" className="space-y-3">
+              {destaques.map(({ c, grupo }, i) => (
+                <li key={c.id}>
+                  {(i === 0 || destaques[i - 1].grupo !== grupo) && (
+                    <h3 className={`mb-2 text-[15px] font-semibold text-clin-texto ${i > 0 ? "pt-3" : ""}`}>
+                      {TITULO_DO_GRUPO[grupo]}
+                    </h3>
+                  )}
+                  <div
+                    className={`rounded-md border p-4 ${
+                      grupo === "pendente" ? "border-dashed border-clin-atencao" : "border-clin-linha"
+                    }`}
+                  >
                     {painel(c)}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {mostrarProxima && proxima && (
-            <div>
-              <h3 className="mb-2 text-[15px] font-semibold text-clin-texto">Próxima consulta</h3>
-              <div className="rounded-md border border-clin-linha p-4">{painel(proxima)}</div>
-            </div>
-          )}
-
-          {semRetorno && (
-            <div>
-              <h3 className="mb-2 text-[15px] font-semibold text-clin-texto">Sem retorno marcado</h3>
-              <div className="rounded-md border border-clin-linha p-4">{painel(semRetorno)}</div>
-            </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
           )}
 
           {historico.length > 0 && (

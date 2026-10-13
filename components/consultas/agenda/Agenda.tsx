@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { andar, tituloDoPeriodo, type Consulta, type Vista } from "@/lib/consultas";
@@ -54,7 +54,11 @@ export function Agenda({
   /** Que leitura falhou: cada uma mostra o erro no lugar do que não carregou. */
   falhou: { periodo: boolean; pendencias: boolean; pacientes: boolean };
 }) {
-  const [aberta, setAberta] = useState<string | null>(null);
+  // A consulta aberta guardada inteira, e não só o id: depois de uma ação ela
+  // pode sair das listas (a sem desfecho de outro dia, aberta pela linha de
+  // aviso, deixa de ser pendência ao virar realizada), e a janela fecharia no
+  // meio do "Marcar retorno". Na tela vale a versão mais nova das listas.
+  const [aberta, setAberta] = useState<Consulta | null>(null);
 
   useEffect(() => {
     document.cookie = `agenda_vista=${vista}; path=/app/agenda; max-age=31536000; samesite=lax`;
@@ -62,16 +66,10 @@ export function Agenda({
 
   const todas = new Map<string, Consulta>();
   for (const c of [...consultas, ...pendencias]) todas.set(c.id, c);
-  // A consulta aberta pode sair das listas depois de uma ação: a sem desfecho
-  // de outro dia, aberta pela linha de aviso, deixa de ser pendência quando é
-  // marcada como realizada, e a janela fecharia no meio do "Marcar retorno".
-  // Fica a última versão vista dela.
-  const lembrada = useRef<Consulta | undefined>(undefined);
-  const achada = aberta ? todas.get(aberta) : undefined;
-  if (achada) lembrada.current = achada;
-  const consulta = aberta ? achada ?? (lembrada.current?.id === aberta ? lembrada.current : undefined) : undefined;
+  const consulta = aberta ? todas.get(aberta.id) ?? aberta : undefined;
+  const abrir = (id: string) => setAberta(todas.get(id) ?? null);
 
-  const props = { consultas, nomes, agora, hoje, data, abrir: setAberta, desde };
+  const props = { consultas, nomes, agora, hoje, data, abrir, desde };
 
   return (
     <div>
@@ -139,7 +137,7 @@ export function Agenda({
           <ErroSecao secao="os pedidos e as consultas sem desfecho" />
         </div>
       ) : (
-        <Pendencias pendencias={pendencias} nomes={nomes} agora={agora} abrir={setAberta} />
+        <Pendencias pendencias={pendencias} nomes={nomes} agora={agora} abrir={abrir} />
       )}
 
       {falhou.periodo ? (
