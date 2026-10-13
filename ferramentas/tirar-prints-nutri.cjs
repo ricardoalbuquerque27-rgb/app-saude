@@ -1186,9 +1186,11 @@ async function transbordo(page) {
         await page.goBack();
         await page.waitForURL((u) => u.pathname.endsWith(`/consultas/${EM_ANDAMENTO}`), { timeout: 30000 });
         await titulo(page).waitFor({ timeout: 60000 });
+        // `:disabled`, e não a propriedade `disabled`: dentro de um fieldset
+        // desligado a propriedade continua falsa (e a espera não esperava).
         await page.waitForFunction(() => {
           const t = document.querySelector("textarea");
-          return t && !t.disabled;
+          return t && !t.matches(":disabled");
         }, null, { timeout: 30000 }).catch(() => {});
         ok((await ev.inputValue()) === "Primeira parte. Segunda parte. Terceira parte.",
           "Voltar do navegador: a Evolução tem o texto que estava no banco, e não o do cache", JSON.stringify(await ev.inputValue()));
@@ -1529,12 +1531,31 @@ async function transbordo(page) {
       await new Promise((r) => setTimeout(r, 2500));
       await route.fulfill({ response: resposta });
     });
+    // A conclusão em si também demora a responder: o diálogo tem de continuar
+    // lá, ocupado, e não parecer cancelável enquanto algo irreversível corre.
+    await page.route("**/rest/v1/rpc/concluir_registro", async (route) => {
+      const resposta = await route.fetch();
+      await new Promise((r) => setTimeout(r, 2500));
+      await route.fulfill({ response: resposta });
+    });
     const conduta = page.getByLabel("Conduta", { exact: true });
     await conduta.fill("Manter o plano de 1.800 kcal.");
     await conduta.blur();
     ok(await abrirConclusao(page), "concluir com uma gravação ainda em voo");
     await d.getByLabel("Seu CRN").fill("CRN-3 12345");
     await confirmar(page).dblclick();
+    {
+      // "Concluindo…": Esc (duas vezes: o Chrome fecha na segunda mesmo com o
+      // cancel impedido), clique no fundo escuro e o X não fecham.
+      ok(await apareceu(d.getByRole("button", { name: "Concluindo…" }), 5000), 'o botão passa a "Concluindo…"');
+      await page.keyboard.press("Escape");
+      await page.keyboard.press("Escape");
+      await page.mouse.click(5, 5);
+      ok(await d.getByRole("button", { name: "Fechar" }).isDisabled({ timeout: 2000 }).catch(() => false), 'durante "Concluindo…" o X do diálogo fica desabilitado');
+      await page.waitForTimeout(300);
+      ok(await page.evaluate(() => !!document.querySelector("dialog")?.open) && (await d.isVisible()),
+        'durante "Concluindo…" Esc e o clique no fundo não fecham o diálogo');
+    }
     ok(await page.waitForFunction(() => /Concluído em/.test(document.body.innerText), null, { timeout: 40000 }).then(() => true, () => false),
       "concluir com o CRN: a página vira registro concluído");
     await page.unrouteAll({ behavior: "ignoreErrors" });

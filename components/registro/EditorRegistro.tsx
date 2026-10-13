@@ -6,10 +6,12 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import {
   CAMPOS_EXTRAS,
-  CAMPOS_PRINCIPAIS,
+  CAMPOS_MEDIDA,
+  errosDasMedidas,
   FAIXAS,
   LIMITES,
   lerMedida,
+  medidasValidas,
   rotuloDaAnamnese,
   temAlgumaParte,
   type CampoMedida,
@@ -17,7 +19,7 @@ import {
   type Medidas,
   type Registro,
 } from "@/lib/registro";
-import { dataCurta, horaEmSaoPaulo, rotuloDaConsulta, ROTULO_MODO, ROTULO_TIPO, type Consulta } from "@/lib/consultas";
+import { dataCurta, horaEmSaoPaulo, resumoDaConsulta, rotuloDaConsulta, type Consulta } from "@/lib/consultas";
 import { dataNoBrasil } from "@/lib/date";
 import { hrefDaAba } from "@/lib/abas";
 import type { Res } from "@/lib/consultasDb";
@@ -32,7 +34,6 @@ import { useSalvarRascunho } from "./useSalvarRascunho";
 
 type Parte = "anamnese" | "diagnostico" | "conduta" | "observar";
 
-const TODOS: CampoMedida[] = [...CAMPOS_PRINCIPAIS, ...CAMPOS_EXTRAS];
 const TITULO_PARTE = "block text-[17px] font-semibold leading-snug text-clin-texto";
 const AJUDA = "text-[14px] leading-snug text-clin-texto-2";
 /** Parou de digitar numa medida por este tempo: o erro dela aparece (como o salvamento, 1,5 s). */
@@ -52,7 +53,7 @@ const AJUDA_ANAMNESE = {
 function formularioDe(r: Registro | null) {
   const medidas = {} as Record<CampoMedida, string>;
   const validas: Medidas = {};
-  for (const c of TODOS) {
+  for (const c of CAMPOS_MEDIDA) {
     const v = r?.medidas?.[c];
     medidas[c] = typeof v === "number" ? String(v).replace(".", ",") : "";
     if (typeof v === "number") validas[c] = v;
@@ -80,7 +81,7 @@ function formularioDe(r: Registro | null) {
  */
 function montar(textos: Record<Parte, string>, medidas: Record<CampoMedida, string>, validas: Medidas): CamposRegistro {
   const m: Medidas = {};
-  for (const c of TODOS) {
+  for (const c of CAMPOS_MEDIDA) {
     const lido = lerMedida(c, medidas[c]);
     const v = lido.ok ? lido.valor : validas[c];
     if (v != null) m[c] = v;
@@ -144,8 +145,8 @@ export function EditorRegistro({
   const [erroDescarte, setErroDescarte] = useState<string | null>(null);
   const [concluirAberto, setConcluirAberto] = useState(false);
   // De "Concluir" até a página nova chegar. Não volta a falso quando dá certo:
-  // o diálogo pode ser fechado com Esc enquanto a página recarrega, e o
-  // formulário não pode aceitar tecla nesse intervalo (o banco recusaria).
+  // o registro já travou no banco, e se a página nova não trocar este editor
+  // (o refresh falhar), o formulário não pode aceitar tecla (o banco recusaria).
   const [concluindo, setConcluindo] = useState(false);
   const [, iniciar] = useTransition();
 
@@ -159,7 +160,7 @@ export function EditorRegistro({
     if (relogioToque.current) clearTimeout(relogioToque.current);
   }, []);
 
-  const retidas = TODOS.filter((c) => !lerMedida(c, medidas[c]).ok);
+  const retidas = CAMPOS_MEDIDA.filter((c) => !lerMedida(c, medidas[c]).ok);
   const rascunho = useSalvarRascunho(
     consulta.id,
     { updatedAt: registro?.updated_at ?? null },
@@ -238,17 +239,7 @@ export function EditorRegistro({
     const gravou = await rascunho.agora();
     if (!gravou) {
       setConcluindo(false);
-      if (retidas.length) {
-        return retidas
-          .map((c) => {
-            const lido = lerMedida(c, medidas[c]);
-            const rotulo = FAIXAS[c].rotulo;
-            if (lido.ok) return "";
-            // A faixa já abre com o nome ("Peso fora da faixa…"); o resto não.
-            return lido.erro.startsWith(rotulo) ? lido.erro : `${rotulo}: ${lido.erro}`;
-          })
-          .join(" ");
-      }
+      if (retidas.length) return errosDasMedidas(medidas);
       return rascunho.estadoAgora().erro ?? "Não foi possível salvar o rascunho. Tente de novo.";
     }
     const r = await chamarRegistro(
@@ -264,15 +255,7 @@ export function EditorRegistro({
 
   const temRascunho = rascunho.updatedAt !== null || rascunho.pendente;
   // Só medida válida conta: a inválida não vai ao banco.
-  const temParte = temAlgumaParte({
-    ...textos,
-    medidas: Object.fromEntries(
-      TODOS.flatMap((c) => {
-        const lido = lerMedida(c, medidas[c]);
-        return lido.ok && lido.valor != null ? [[c, lido.valor]] : [];
-      })
-    ),
-  });
+  const temParte = temAlgumaParte({ ...textos, medidas: medidasValidas(medidas) });
   const avisadas = retidas.filter((c) => tocado[c]);
   const desligado = descartando || rascunho.conferindo || concluindo;
 
@@ -354,10 +337,7 @@ export function EditorRegistro({
             <h1 className="break-words text-[21px] font-semibold leading-tight text-clin-texto sm:text-2xl">
               Consulta de {rotuloDaConsulta(consulta)}
             </h1>
-            <p className="mt-1 text-[15px] text-clin-texto-2">
-              {ROTULO_TIPO[consulta.kind].charAt(0).toUpperCase() + ROTULO_TIPO[consulta.kind].slice(1)} ·{" "}
-              {ROTULO_MODO[consulta.mode]} · {consulta.duration_min} min
-            </p>
+            <p className="mt-1 text-[15px] text-clin-texto-2">{resumoDaConsulta(consulta)}</p>
             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 text-[14px] text-clin-texto-2">
               {temRascunho && (
                 <span className={`${CLASSE_SELO} bg-clin-atencao-fundo text-clin-atencao`}>Rascunho</span>

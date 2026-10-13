@@ -37,6 +37,9 @@ export const CAMPOS_EXTRAS = [
   "neck_cm",
 ] as const satisfies readonly CampoMedida[];
 
+/** Os nove campos, na ordem da tela. */
+export const CAMPOS_MEDIDA: readonly CampoMedida[] = [...CAMPOS_PRINCIPAIS, ...CAMPOS_EXTRAS];
+
 export const FAIXAS: Record<
   CampoMedida,
   { min: number; max: number; rotulo: string; unidade: "kg" | "%" | "cm" }
@@ -163,6 +166,39 @@ export function lerMedida(
   if (lido.valor == null) return { ok: true, valor: null };
   const erro = erroDaMedida(campo, lido.valor);
   return erro ? { ok: false, erro } : { ok: true, valor: lido.valor };
+}
+
+/**
+ * As medidas que valem entre os textos da tela: lidas por `lerMedida`, sem as
+ * vazias e sem as inválidas. É o que a tela conta como "tem medida" e o que
+ * entra na conferência; um segundo jeito de ler o número daria um valor na
+ * tela e outro no banco.
+ */
+export function medidasValidas(textos: Record<CampoMedida, string>): Medidas {
+  const out: Medidas = {};
+  for (const c of CAMPOS_MEDIDA) {
+    const lido = lerMedida(c, textos[c]);
+    if (lido.ok && lido.valor != null) out[c] = lido.valor;
+  }
+  return out;
+}
+
+/**
+ * O que está errado nas medidas da tela, numa frase só ("Peso fora da faixa
+ * (20 a 400 kg)." ou "Cintura: Digite só o número, como 71,8."), ou "" se está
+ * tudo certo. Serve ao diálogo de concluir, que não mostra os campos: a
+ * mensagem da faixa já abre com o nome do campo, a de "não é número" não, e
+ * sem o nome não se saberia qual campo corrigir.
+ */
+export function errosDasMedidas(textos: Record<CampoMedida, string>): string {
+  const frases: string[] = [];
+  for (const c of CAMPOS_MEDIDA) {
+    const lido = lerMedida(c, textos[c]);
+    if (lido.ok) continue;
+    const rotulo = FAIXAS[c].rotulo;
+    frases.push(lido.erro.startsWith(rotulo) ? lido.erro : `${rotulo}: ${lido.erro}`);
+  }
+  return frases.join(" ");
 }
 
 /** Peso em kg e altura em cm; uma casa decimal. Sem um dos dois, ou com altura zero, não calcula. */

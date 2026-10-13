@@ -1,26 +1,17 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import {
-  dataCurta,
-  horaEmSaoPaulo,
-  rotuloDaConsulta,
-  ROTULO_MODO,
-  ROTULO_TIPO,
-  type Consulta,
-} from "@/lib/consultas";
+import { dataCurta, horaEmSaoPaulo, resumoDaConsulta, rotuloDaConsulta, type Consulta } from "@/lib/consultas";
 import type { Res } from "@/lib/consultasDb";
 import { dataNoBrasil, formatDate } from "@/lib/date";
 import { hrefDaAba } from "@/lib/abas";
 import {
-  CAMPOS_EXTRAS,
-  CAMPOS_PRINCIPAIS,
+  CAMPOS_MEDIDA,
   FAIXAS,
   imc,
   rotuloDaAnamnese,
   textoDaDiferenca,
   valorDaMedida,
   type Adendo,
-  type CampoMedida,
   type Registro,
 } from "@/lib/registro";
 import { ErroSecao } from "@/components/clinico/ErroSecao";
@@ -29,7 +20,6 @@ import { CLASSE_SELO } from "@/components/consultas/aparencia";
 import type { Antes } from "./CamposDeMedida";
 import { NovoAdendo } from "./NovoAdendo";
 
-const TODOS: CampoMedida[] = [...CAMPOS_PRINCIPAIS, ...CAMPOS_EXTRAS];
 const TITULO = "text-[17px] font-semibold leading-snug text-clin-texto";
 const TEXTO = "whitespace-pre-wrap break-words text-[15px] leading-relaxed text-clin-texto";
 
@@ -82,7 +72,7 @@ export function RegistroConcluido({
   alturaCm: number | null;
 }) {
   const quando = registro.concluded_at;
-  const medidas = TODOS.flatMap((c) => {
+  const medidas = CAMPOS_MEDIDA.flatMap((c) => {
     const v = registro.medidas?.[c];
     return typeof v === "number" ? [{ campo: c, valor: v }] : [];
   });
@@ -102,10 +92,7 @@ export function RegistroConcluido({
         <h1 className="mt-1 break-words text-[21px] font-semibold leading-tight text-clin-texto sm:text-2xl">
           Consulta de {rotuloDaConsulta(consulta)}
         </h1>
-        <p className="mt-1 text-[15px] text-clin-texto-2">
-          {ROTULO_TIPO[consulta.kind].charAt(0).toUpperCase() + ROTULO_TIPO[consulta.kind].slice(1)} ·{" "}
-          {ROTULO_MODO[consulta.mode]} · {consulta.duration_min} min
-        </p>
+        <p className="mt-1 text-[15px] text-clin-texto-2">{resumoDaConsulta(consulta)}</p>
         <p className="mt-2 text-[14px] leading-relaxed text-clin-texto-2">
           <span className={`${CLASSE_SELO} bg-clin-primaria-fundo text-clin-primaria`}>Concluído</span>{" "}
           {quando && `em ${dataEHora(quando)}`}

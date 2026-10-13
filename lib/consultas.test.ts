@@ -15,6 +15,7 @@ import {
   noDiaDoMes,
   periodoDaVista,
   proximaConsulta,
+  resumoDaConsulta,
   rotuloDaConsulta,
   situacao,
   sugestaoDeRetorno,
@@ -242,6 +243,13 @@ describe("textos", () => {
     // 23:30 de segunda em SP é terça em UTC: o dia é o de SP.
     expect(rotuloDaConsulta(consulta({ starts_at: "2026-10-20T02:30:00Z" }))).toBe(
       "seg., 19/10 às 23:30"
+    );
+  });
+
+  it("resumo da consulta: tipo com maiúscula, modalidade e duração", () => {
+    expect(resumoDaConsulta(consulta({ duration_min: 45 }))).toBe("Retorno · presencial · 45 min");
+    expect(resumoDaConsulta(consulta({ kind: "primeira", mode: "online", duration_min: 60 }))).toBe(
+      "1ª consulta · online · 60 min"
     );
   });
 

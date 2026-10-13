@@ -69,6 +69,12 @@ export const ROTULO_MODO: Record<ModoConsulta, string> = {
 };
 export const DURACOES = [30, 45, 60, 90] as const;
 
+/** "Retorno · presencial · 45 min": a linha sob o título do registro, aberto ou concluído. */
+export function resumoDaConsulta(c: Pick<Consulta, "kind" | "mode" | "duration_min">): string {
+  const tipo = ROTULO_TIPO[c.kind];
+  return `${tipo.charAt(0).toUpperCase()}${tipo.slice(1)} · ${ROTULO_MODO[c.mode]} · ${c.duration_min} min`;
+}
+
 function ms(agora: number | string): number {
   return typeof agora === "string" ? Date.parse(agora) : agora;
 }

@@ -3,13 +3,16 @@ import type { Consulta } from "./consultas";
 import {
   anteriores,
   CAMPOS_EXTRAS,
+  CAMPOS_MEDIDA,
   CAMPOS_PRINCIPAIS,
   erroDaMedida,
+  errosDasMedidas,
   FAIXAS,
   imc,
   lerMedida,
   lerNumero,
   LIMITES,
+  medidasValidas,
   ROTULO_REGISTRO,
   rotuloDaAnamnese,
   situacaoDoRegistro,
@@ -331,5 +334,58 @@ describe("textoDaDiferenca", () => {
     expect(textoDaDiferenca(70, 70)).toBe("sem mudança");
     // uma diferença que some no arredondamento também não muda nada
     expect(textoDaDiferenca(70.001, 70)).toBe("sem mudança");
+  });
+});
+
+/** Os nove campos em texto, como a tela os guarda; o que não vem é vazio. */
+function textos(t: Partial<Record<CampoMedida, string>>): Record<CampoMedida, string> {
+  return Object.fromEntries(CAMPOS_MEDIDA.map((c) => [c, t[c] ?? ""])) as Record<CampoMedida, string>;
+}
+
+describe("CAMPOS_MEDIDA", () => {
+  it("são os nove, os quatro da frente primeiro", () => {
+    expect(CAMPOS_MEDIDA).toEqual([...CAMPOS_PRINCIPAIS, ...CAMPOS_EXTRAS]);
+    expect(CAMPOS_MEDIDA).toHaveLength(9);
+  });
+});
+
+describe("medidasValidas", () => {
+  it("lê com vírgula ou ponto e deixa de fora o vazio e o inválido", () => {
+    expect(
+      medidasValidas(
+        textos({ weight_kg: "71,8", waist_cm: " 84.5 ", body_fat_pct: "", hip_cm: "6x", chest_cm: "718" })
+      )
+    ).toEqual({ weight_kg: 71.8, waist_cm: 84.5 });
+  });
+
+  it("sem nada preenchido, nada", () => {
+    expect(medidasValidas(textos({}))).toEqual({});
+  });
+
+  it("as bordas da faixa valem; fora dela não", () => {
+    expect(medidasValidas(textos({ weight_kg: "20", neck_cm: "80" }))).toEqual({ weight_kg: 20, neck_cm: 80 });
+    expect(medidasValidas(textos({ weight_kg: "19,9", neck_cm: "80,1" }))).toEqual({});
+  });
+});
+
+describe("errosDasMedidas", () => {
+  it("tudo certo, ou nada preenchido, é vazio", () => {
+    expect(errosDasMedidas(textos({}))).toBe("");
+    expect(errosDasMedidas(textos({ weight_kg: "71,8", hip_cm: "" }))).toBe("");
+  });
+
+  it("a faixa já traz o nome do campo e não ganha outro na frente", () => {
+    expect(errosDasMedidas(textos({ weight_kg: "718" }))).toBe("Peso fora da faixa (20 a 400 kg).");
+    expect(errosDasMedidas(textos({ body_fat_pct: "80" }))).toBe("% de gordura fora da faixa (2 a 75%).");
+  });
+
+  it("o que não é número ganha o nome do campo, senão não se saberia qual corrigir", () => {
+    expect(errosDasMedidas(textos({ waist_cm: "8x" }))).toBe("Cintura: Digite só o número, como 71,8.");
+  });
+
+  it("vários campos viram uma frase só, na ordem da tela", () => {
+    expect(errosDasMedidas(textos({ neck_cm: "5", weight_kg: "718", hip_cm: "abc" }))).toBe(
+      "Peso fora da faixa (20 a 400 kg). Quadril: Digite só o número, como 71,8. Pescoço fora da faixa (10 a 80 cm)."
+    );
   });
 });

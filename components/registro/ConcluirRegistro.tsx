@@ -2,22 +2,12 @@
 
 import { Fragment, useId, useState } from "react";
 import { Loader2 } from "lucide-react";
-import {
-  CAMPOS_EXTRAS,
-  CAMPOS_PRINCIPAIS,
-  FAIXAS,
-  LIMITES,
-  lerMedida,
-  textoDaMedida,
-  type CampoMedida,
-} from "@/lib/registro";
+import { CAMPOS_MEDIDA, FAIXAS, LIMITES, medidasValidas, textoDaMedida, type CampoMedida } from "@/lib/registro";
 import { ErroInline } from "@/components/clinico/ErroInline";
 import { ACAO_PRIMARIA, ACAO_SECUNDARIA } from "@/components/clinico/estilos";
 import { useRecarregar } from "@/components/clinico/useRecarregar";
 import { Dialogo } from "@/components/consultas/Dialogo";
 import { CAMPO } from "./CamposDeMedida";
-
-const TODOS: CampoMedida[] = [...CAMPOS_PRINCIPAIS, ...CAMPOS_EXTRAS];
 
 // "Concluir registro" (maquete 3): diz o que muda, deixa conferir as medidas
 // e, se o perfil não tem CRN, pede o número. Quem conclui de fato (gravar o
@@ -41,9 +31,9 @@ export function ConcluirRegistro({
   /** Para "entram no histórico de <nome>". */
   paciente: string;
   /**
-   * O texto de cada medida na tela, como o nutri digitou. Lido aqui pelo mesmo
-   * `lerMedida` do salvamento: um segundo jeito de ler número daria, para o
-   * mesmo "71,8", um valor na conferência e outro no banco.
+   * O texto de cada medida na tela, como o nutri digitou. Lido por
+   * `medidasValidas` (o `lerMedida` do salvamento): um segundo jeito de ler
+   * número daria, para o mesmo "71,8", um valor na conferência e outro no banco.
    */
   medidas: Record<CampoMedida, string>;
   /** O perfil não tem CRN: o campo aparece, e o banco grava no perfil. */
@@ -58,22 +48,23 @@ export function ConcluirRegistro({
   const [recarregando, recarregar] = useRecarregar();
   const ocupado = enviando || recarregando;
 
-  const itens = TODOS.flatMap((c) => {
+  const validas = medidasValidas(medidas);
+  const itens = CAMPOS_MEDIDA.flatMap((c) => {
     const texto = medidas[c].trim();
     if (texto === "") return [];
-    const lido = lerMedida(c, texto);
+    const valor = validas[c];
     return [
-      lido.ok && lido.valor != null
-        ? { campo: c, texto: textoDaMedida(c, lido.valor), invalida: false }
+      valor != null
+        ? { campo: c, texto: textoDaMedida(c, valor), invalida: false }
         : // Não vai ao banco como está: aparece como o nutri digitou, marcada.
           { campo: c, texto: `${FAIXAS[c].rotulo} “${texto}” (corrigir)`, invalida: true },
     ];
   });
 
+  // Ocupado, o Dialogo nem deixa fechar (Esc, fundo, X); aqui só o erro de
+  // uma tentativa antiga sai, para não estar lá na próxima vez.
   function fechar() {
-    // Um erro que ficou de uma tentativa antiga não deve estar lá na próxima
-    // vez; um que chega com o diálogo fechado (Esc durante o envio) fica.
-    if (!ocupado) setErro(null);
+    setErro(null);
     aoFechar();
   }
 
@@ -95,7 +86,7 @@ export function ConcluirRegistro({
   }
 
   return (
-    <Dialogo aberto={aberto} aoFechar={fechar} titulo="Concluir o registro?">
+    <Dialogo aberto={aberto} aoFechar={fechar} titulo="Concluir o registro?" ocupado={ocupado}>
       <form onSubmit={enviar} className="space-y-4">
         <ul className="list-disc space-y-2 pl-5 text-[15px] leading-snug text-clin-texto">
           <li>Depois de concluído, o registro não pode ser editado nem apagado. Correção entra como adendo, com data.</li>
@@ -130,11 +121,12 @@ export function ConcluirRegistro({
             <label htmlFor={idCrn} className="block text-[15px] font-semibold text-clin-texto">
               Seu CRN
             </label>
-            <p className="text-[14px] leading-snug text-clin-texto">
+            <p id={`${idCrn}-ajuda`} className="text-[14px] leading-snug text-clin-texto">
               O prontuário identifica o profissional. Fica salvo no seu perfil.
             </p>
             <input
               id={idCrn}
+              aria-describedby={`${idCrn}-ajuda`}
               type="text"
               autoComplete="off"
               placeholder="CRN-3 12345"
