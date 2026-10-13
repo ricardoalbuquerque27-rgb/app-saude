@@ -6,7 +6,7 @@ import { todayISO } from "./date";
 // 20261014120000 a RLS de body_measurements só deixa o paciente alterar ou
 // apagar a linha com `measured_by` nulo. A medida que o nutricionista tira na
 // consulta tem `measured_by` preenchido, e o banco a recusa SEM erro: o
-// supabase-js devolve zero linhas afetadas. Foi o que fez o assistente dizer
+// supabase-js devolve zero linhas afetadas. Mirando nela, o assistente diria
 // "peso atualizado" sem ter mudado nada. Este supabase falso guarda as linhas
 // em memória e se comporta assim, para o teste pegar o assistente que mira na
 // linha do nutricionista em vez de contar com um erro que nunca vem.

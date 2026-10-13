@@ -1580,7 +1580,8 @@ async function transbordo(page) {
       (await page.getByLabel("Novo adendo", { exact: true }).count()) === 1,
       "sem campos de edição: a única caixa de texto é a do novo adendo");
     ok(txt.includes("−0,8") && txt.includes(`desde ${ddmm(14)}`), `a medida traz a diferença para a consulta anterior (−0,8 desde ${ddmm(14)})`, txt);
-    ok(/IMC 23,2/.test(txt) && txt.includes("168 cm"), "e o IMC com a altura do perfil (23,2 com 168 cm)");
+    ok(/IMC 23,2/.test(txt) && txt.includes("com a altura atual do perfil (168 cm)"),
+      'e o IMC diz que vem da altura de hoje: "com a altura atual do perfil (168 cm)"', txt);
     const mC = await transbordo(page);
     ok(mC.doc <= mC.larg, `registro concluído sem transbordo no computador (documento ${mC.doc}px, janela ${mC.larg}px)`, mC.vaza.join(" | "));
     await fotografar(page, `${OUT}/registro-concluido-desktop-claro.png`, COMPUTADOR);
@@ -1634,6 +1635,46 @@ async function transbordo(page) {
       ok(!t.includes("desde"), "sem medida de consulta anterior, não há diferença para mostrar");
       ok(t.includes("Correção da conduta: o retorno é em 21 dias") && t.includes(`${diaBR(9)} às 16:20 · Ricardo Albuquerque · CRN-3 12345`),
         "o adendo que já existia aparece com a data dele e a assinatura");
+      // o adendo digitado e não salvo: fechar a página cai no aviso do navegador
+      await p.getByLabel("Novo adendo", { exact: true }).fill("Adendo que ainda não foi salvo.");
+      let aviso = "";
+      p.once("dialog", async (dlg) => {
+        aviso = dlg.type();
+        await dlg.dismiss();
+      });
+      await p.close({ runBeforeUnload: true });
+      await p.waitForTimeout(500);
+      ok(aviso === "beforeunload", `fechar com um adendo digitado e não salvo cai no aviso do navegador (${aviso || "sem aviso"})`);
+      await p.close();
+    }
+
+    // f2) o CRN apagado em outra aba depois de a página abrir: o perfil tinha
+    //     (o concluir de b) gravou), o banco pede de novo, e o diálogo, que
+    //     abriu sem o campo, passa a mostrá-lo. Na Joana (ap-10, o rascunho
+    //     dela), para não mexer no registro da Luiza.
+    {
+      const p = await abrir(pc, registro("joana", "ap-10"), { secoes: false });
+      await titulo(p).waitFor({ timeout: 60000 });
+      await campoLivre(p);
+      ok(await abrirConclusao(p), "com o CRN no perfil, o diálogo de concluir abre");
+      const dj = dialogo(p);
+      ok((await dj.getByLabel("Seu CRN").count()) === 0, "e não pede o CRN, que o perfil já tem");
+      const pedidos = [];
+      await p.route("**/rest/v1/rpc/concluir_registro", (route) => {
+        pedidos.push(route.request().postDataJSON());
+        return route.fulfill(recusa("Informe o seu CRN para concluir."));
+      });
+      await clicar(confirmar(p));
+      ok(await apareceu(dj.getByText("Informe o seu CRN para concluir."), 10000),
+        'o banco pede o CRN (apagado em outra aba): o diálogo mostra "Informe o seu CRN para concluir."');
+      ok(await apareceu(dj.getByLabel("Seu CRN"), 5000), 'e passa a mostrar o campo "Seu CRN"');
+      await dj.getByLabel("Seu CRN").fill("CRN-3 54321");
+      await clicar(confirmar(p));
+      for (let i = 0; i < 50 && pedidos.length < 2; i++) await p.waitForTimeout(100);
+      ok(pedidos.length === 2 && pedidos[0]?.p_crn == null && pedidos[1]?.p_crn === "CRN-3 54321",
+        "e o CRN digitado vai na tentativa seguinte", JSON.stringify(pedidos.map((x) => x?.p_crn ?? null)));
+      await p.unrouteAll({ behavior: "ignoreErrors" });
+      ok((await noMock("ap-10"))?.status === "rascunho", "o rascunho da Joana continua rascunho");
       await p.close();
     }
 

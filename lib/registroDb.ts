@@ -146,9 +146,10 @@ const COLUNAS_MEDIDA =
 
 /**
  * A série de medidas do paciente, da mais nova para a mais antiga, as de
- * consulta (`appointment_id`) e as que ele anotou em casa. Quem precisa só das
- * de consulta (o "antes" do editor) filtra com `anteriores`. As 200 mais
- * recentes: de sobra para um acompanhamento, e a lista não cresce sem teto.
+ * consulta (`appointment_id`) e as que ele anotou em casa, para a coluna de
+ * contexto ("última medida em casa"). As 200 mais recentes: de sobra para
+ * isso, e a lista não cresce sem teto. O "antes" do editor NÃO sai daqui
+ * (getMedidasDasConsultas).
  */
 export async function getMedidasDoPaciente(
   supabase: any,
@@ -160,5 +161,26 @@ export async function getMedidasDoPaciente(
     .eq("user_id", pacienteId)
     .order("date", { ascending: false })
     .limit(200);
+  return { data: (data ?? []) as LinhaDeMedida[], falhou: !!error };
+}
+
+/**
+ * Só as medidas tiradas em consulta, da mais nova para a mais antiga: de onde
+ * saem o "antes" do editor e a diferença do concluído (`anteriores`). Saíam da
+ * série de cima, e quem se pesa todo dia em casa passa das 200 em sete meses:
+ * a medida da consulta ficava atrás do teto e o "antes" sumia calado. Sem teto
+ * próprio: é uma por consulta. O Supabase corta em 1.000 linhas sem erro, e a
+ * ordem decrescente faz o corte, se um dia houver, cair nas mais antigas.
+ */
+export async function getMedidasDasConsultas(
+  supabase: any,
+  pacienteId: string,
+): Promise<Res<LinhaDeMedida[]>> {
+  const { data, error } = await supabase
+    .from("body_measurements")
+    .select(COLUNAS_MEDIDA)
+    .eq("user_id", pacienteId)
+    .not("appointment_id", "is", null)
+    .order("date", { ascending: false });
   return { data: (data ?? []) as LinhaDeMedida[], falhou: !!error };
 }

@@ -291,7 +291,7 @@ export function comDireitoAoRegistro(lista: Consulta[], agora: number | string):
 
 /**
  * O registro de uma consulta como quem montou a tela o leu: nulo = leu e não
- * existe; "falhou" = a leitura falhou; `undefined` = ninguém leu. Os três
+ * existe; "falhou" = a leitura falhou; `undefined` = ninguém leu. Os dois
  * últimos são "não sei", e o painel não pode adivinhar "Registrar consulta"
  * com eles (CLAUDE.md, "Leitura que falha não é 'não tem'").
  */

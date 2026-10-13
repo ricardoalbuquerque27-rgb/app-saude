@@ -33,6 +33,19 @@ export function NovoAdendo({ registroId }: { registroId: string }) {
     setTexto("");
   }, [recarregando]);
 
+  // Fechar ou recarregar com um adendo digitado e não salvo: o aviso do
+  // navegador, como no rascunho do registro (useSalvarRascunho). O adendo não
+  // salva sozinho, e sem o aviso o texto sumia sem pergunta.
+  useEffect(() => {
+    if (vazio) return;
+    function aoSair(e: BeforeUnloadEvent) {
+      e.preventDefault();
+      e.returnValue = "";
+    }
+    window.addEventListener("beforeunload", aoSair);
+    return () => window.removeEventListener("beforeunload", aoSair);
+  }, [vazio]);
+
   async function salvar(e: React.FormEvent) {
     e.preventDefault();
     if (ocupado || vazio) return;

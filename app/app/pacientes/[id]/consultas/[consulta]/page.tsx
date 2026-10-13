@@ -11,6 +11,7 @@ import { CAMPOS_META, getUltimaPrescricao, textoDaMeta, type CampoMeta, type Met
 import { anteriores, FAIXAS, situacaoDoRegistro, textoDaMedida, type CampoMedida, type Registro } from "@/lib/registro";
 import {
   getAdendos,
+  getMedidasDasConsultas,
   getMedidasDoPaciente,
   getRegistroDaConsulta,
   getRegistrosDoPaciente,
@@ -121,7 +122,7 @@ export default async function RegistroDaConsulta({
   const supabase = await createClient();
   const hoje = todayISO();
 
-  const [eu, perfilRes, consultas, registro, medidas, registros, desde, prescricao] = await Promise.all([
+  const [eu, perfilRes, consultas, registro, medidas, dasConsultas, registros, desde, prescricao] = await Promise.all([
     meuPerfil<{ id: string; role: string; crn: string | null }>(supabase, "id, role, crn"),
     supabase
       .from("profiles")
@@ -134,6 +135,9 @@ export default async function RegistroDaConsulta({
     getConsultasDoPaciente(supabase, uid),
     getRegistroDaConsulta(supabase, params.consulta),
     getMedidasDoPaciente(supabase, uid),
+    // O "antes" vem de uma leitura só das medidas de consulta: na série de
+    // cima, com teto de 200, as pesagens de casa as empurravam para fora.
+    getMedidasDasConsultas(supabase, uid),
     getRegistrosDoPaciente(supabase, uid),
     getDesdeDoPaciente(supabase, uid),
     getUltimaPrescricao(supabase, uid),
@@ -154,8 +158,8 @@ export default async function RegistroDaConsulta({
   const alturaCm = perfil.height_cm == null ? null : Number(perfil.height_cm);
   const dia = diaDaConsulta(consulta);
   const anterioresDasMedidas = {
-    data: medidas.falhou ? {} : anteriores(medidas.data, dia),
-    falhou: medidas.falhou,
+    data: dasConsultas.falhou ? {} : anteriores(dasConsultas.data, dia),
+    falhou: dasConsultas.falhou,
   };
   if (registro.data?.status === "concluido") {
     // Os adendos dependem do id do registro, que só aqui se conhece.
@@ -196,10 +200,11 @@ export default async function RegistroDaConsulta({
       ? { texto: ultimoConcluido.r.observar as string, data: dataCurta(diaDaConsulta(ultimoConcluido.c)) }
       : null;
 
-  // "Desde a última consulta" conta da última REALIZADA até hoje. Se ela é
-  // esta mesma (marcada como realizada antes de registrar, ou registrada dias
-  // depois), o texto falaria do que veio depois desta consulta, e não do que
-  // o nutri precisa ler para ela: fica de fora.
+  // "Desde a última consulta" conta da última REALIZADA até hoje. Se ela não
+  // é anterior a esta (é esta mesma, marcada como realizada antes de
+  // registrar, ou uma posterior, no registro de uma consulta antiga), o texto
+  // falaria do que veio depois desta consulta, e não do que o nutri precisa
+  // ler para ela: fica de fora.
   const desdeTexto =
     !desde.falhou && desde.data && desde.data.desde < dia
       ? { titulo: tituloDesde(desde.data), texto: textoDesdeUltima(desde.data) }

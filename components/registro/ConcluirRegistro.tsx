@@ -9,6 +9,9 @@ import { useRecarregar } from "@/components/clinico/useRecarregar";
 import { Dialogo } from "@/components/consultas/Dialogo";
 import { CAMPO } from "./CamposDeMedida";
 
+/** A recusa de `concluir_registro` sem CRN, letra por letra como na migração. */
+const CRN_FALTANDO = "Informe o seu CRN para concluir.";
+
 // "Concluir registro" (maquete 3): diz o que muda, deixa conferir as medidas
 // e, se o perfil não tem CRN, pede o número. Quem conclui de fato (gravar o
 // que falta, chamar o banco) é `aoConcluir`, no editor, que é quem tem o
@@ -43,6 +46,11 @@ export function ConcluirRegistro({
 }) {
   const idCrn = useId();
   const [crn, setCrn] = useState("");
+  // O banco pediu o CRN mesmo com o perfil dizendo que tinha: apagado em outra
+  // aba depois de esta página abrir. Sem o campo, o diálogo mostrava "Informe o
+  // seu CRN" e não deixava informar; só recarregando a página.
+  const [crnPedido, setCrnPedido] = useState(false);
+  const pedirCrn = precisaCrn || crnPedido;
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [recarregando, recarregar] = useRecarregar();
@@ -73,8 +81,9 @@ export function ConcluirRegistro({
     if (ocupado) return;
     setEnviando(true);
     setErro(null);
-    const falha = await aoConcluir(precisaCrn ? crn.trim() || null : null);
+    const falha = await aoConcluir(pedirCrn ? crn.trim() || null : null);
     if (falha) {
+      if (falha === CRN_FALTANDO) setCrnPedido(true);
       setErro(falha);
       setEnviando(false);
       return;
@@ -116,7 +125,7 @@ export function ConcluirRegistro({
           </div>
         )}
 
-        {precisaCrn && (
+        {pedirCrn && (
           <div className="space-y-1.5 rounded-md bg-clin-atencao-fundo px-4 py-3.5">
             <label htmlFor={idCrn} className="block text-[15px] font-semibold text-clin-texto">
               Seu CRN

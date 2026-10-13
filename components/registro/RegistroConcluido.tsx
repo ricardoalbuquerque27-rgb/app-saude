@@ -135,8 +135,12 @@ export function RegistroConcluido({
                   <dd className="mt-1 text-[17px] font-semibold tabular-nums text-clin-texto">
                     {valorImc.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
                   </dd>
+                  {/* O IMC não é gravado no registro: sai do peso daqui com a
+                      altura de HOJE no perfil. Sem dizer isso, um IMC que muda
+                      quando a altura é corrigida parecia parte do que foi
+                      escrito no dia. */}
                   <dd className="mt-0.5 text-[13px] tabular-nums text-clin-texto-2">
-                    {(alturaCm as number).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} cm
+                    com a altura atual do perfil ({(alturaCm as number).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} cm)
                   </dd>
                 </div>
               )}
