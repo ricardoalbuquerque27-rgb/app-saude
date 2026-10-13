@@ -18,6 +18,7 @@ import {
   type DailySeries,
   type ItemMeta,
 } from "./nutri";
+import type { Consulta } from "./consultas";
 
 /** 2026-10-08 é uma quinta. A janela de 7 dias vai de 02 (sexta) a 08. */
 const HOJE = "2026-10-08";
@@ -317,6 +318,73 @@ describe("montarResumos — tipo dos alertas", () => {
     expect(resumo({}).alertas).toEqual([
       { tipo: "parado", nivel: 3, texto: "Nunca registrou nada" },
     ]);
+  });
+});
+
+describe("montarResumos — consultas", () => {
+  // 12h em São Paulo do HOJE.
+  const AGORA = "2026-10-08T15:00:00Z";
+  const consulta = (c: Partial<Consulta>): Consulta => ({
+    id: "c", patient_id: A, nutritionist_id: "n", starts_at: "2026-10-20T17:00:00Z",
+    duration_min: 60, kind: "retorno", mode: "presencial", status: "agendada",
+    patient_message: null, reschedule_requested_at: null, cancelled_by: null, ...c,
+  });
+
+  it("pedido aguardando é nível 2, logo depois da prescrição e antes de parado", () => {
+    const r = montarResumos(
+      dados({ ...cenarioDeAlertas(), consultas: [consulta({ status: "pedido" })] }),
+      [A], {}, HOJE, AGORA
+    )[0];
+    expect(r.alertas.map((a) => [a.tipo, a.nivel])).toEqual([
+      ["dose", 1], ["prescricao", 2], ["consulta", 2], ["parado", 3],
+      ["treino", 4], ["treino", 4], ["exame", 5],
+    ]);
+    expect(r.alerts[2]).toBe("Pediu uma consulta");
+  });
+
+  it("sem desfecho é nível 4, depois dos treinos e antes do exame", () => {
+    const r = montarResumos(
+      dados({
+        ...cenarioDeAlertas(),
+        consultas: [consulta({ starts_at: "2026-10-06T13:00:00Z" })],
+      }),
+      [A], {}, HOJE, AGORA
+    )[0];
+    expect(r.alertas.map((a) => a.tipo)).toEqual([
+      "dose", "prescricao", "parado", "treino", "treino", "consulta", "exame",
+    ]);
+    expect(r.alerts[5]).toBe("Consulta de 06/10 sem desfecho");
+  });
+
+  it("só pedido: a gravidade é 2 e o paciente entra na fila", () => {
+    const r = montarResumos(
+      dados({
+        workouts: [{ user_id: A, date: HOJE }],
+        consultas: [consulta({ status: "pedido" })],
+      }),
+      [A], {}, HOJE, AGORA
+    )[0];
+    expect(r.gravidade).toBe(2);
+    expect(filaDeTriagem([r], HOJE).map((x) => x.id)).toEqual([A]);
+  });
+
+  it("consulta de outro paciente não vira alerta deste", () => {
+    const r = montarResumos(
+      dados({
+        workouts: [{ user_id: A, date: HOJE }],
+        consultas: [consulta({ patient_id: B, status: "pedido" })],
+      }),
+      [A], {}, HOJE, AGORA
+    )[0];
+    expect(r.alertas).toEqual([]);
+  });
+
+  it("agendada futura não é alerta", () => {
+    const r = montarResumos(
+      dados({ workouts: [{ user_id: A, date: HOJE }], consultas: [consulta({})] }),
+      [A], {}, HOJE, AGORA
+    )[0];
+    expect(r.alertas).toEqual([]);
   });
 });
 
