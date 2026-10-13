@@ -28,6 +28,8 @@ import NutriHome from "@/components/NutriHome";
 import PlanCheckIn from "@/components/PlanCheckIn";
 import NutriNotes from "@/components/NutriNotes";
 import MealPlanView from "@/components/MealPlanView";
+import { CartaoConsulta } from "@/components/CartaoConsulta";
+import { COLUNAS_CONSULTA, type Consulta } from "@/lib/consultas";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -72,6 +74,7 @@ export default async function DashboardPage() {
     notasRes,
     cardapioRes,
     vinculoRes,
+    consultasRes,
   ] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", uid).maybeSingle(),
     supabase
@@ -148,6 +151,13 @@ export default async function DashboardPage() {
       .eq("status", "active")
       .limit(1)
       .maybeSingle(),
+    // As consultas mais recentes (inclusive as futuras), para o cartão.
+    supabase
+      .from("appointments")
+      .select(COLUNAS_CONSULTA)
+      .eq("patient_id", uid)
+      .order("starts_at", { ascending: false })
+      .limit(10),
   ]);
 
   const profile = profileRes.data;
@@ -558,6 +568,18 @@ export default async function DashboardPage() {
           ))}
         </div>
       </section>
+
+      {/* A consulta com o nutricionista, só para quem tem acompanhamento.
+          Depois do "Hoje", que é o espaço nobre: sem nada marcado, o cartão
+          só diz isso e oferece pedir uma. */}
+      {temNutri && (
+        <CartaoConsulta
+          consultas={(consultasRes.data ?? []) as Consulta[]}
+          agora={new Date().toISOString()}
+          nutriNome={nutriNome}
+          falhou={!!consultasRes.error}
+        />
+      )}
 
       {/* ----------------------------------------------------------------
           2. SEU DIA — Score e números num bloco só

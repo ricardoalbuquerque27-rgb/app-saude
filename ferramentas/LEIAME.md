@@ -73,6 +73,19 @@ qualquer dia:
 - **Pedro Alves**: acabou de chegar, nunca registrou nada, sem metas.
 - **Luiza Prado**: em dia, sem nenhum alerta.
 
+E as consultas (`appointments`), uma situação por paciente sem mudar os
+alertas acima:
+
+- **Luiza**: realizada há 14 dias (tem "desde a última consulta") e a próxima
+  daqui a 2 dias, às 10:00, online.
+- **Beatriz**: pediu consulta online daqui a 3 dias, às 18:00, com recado.
+- **Carlos**: agendada amanhã às 09:00, com pedido de remarcação.
+- **Joana**: agendada há 5 dias e nunca fechada (sem desfecho).
+- **Pedro**: 1ª consulta amanhã às 11:00.
+
+No cenário padrão, a Maria tem uma consulta realizada há 20 dias e a próxima
+daqui a 3, para o cartão de consulta do lado do paciente.
+
 ```bash
 CENARIO=carteira node ferramentas/mock-supabase.cjs &
 # o resto como acima: .env.local, rm -rf .next, npm run dev
@@ -95,7 +108,12 @@ do Reaplicar), o "Aplicando…" que segura o botão até a página nova chegar, 
 cardápio põe nas metas e as abas (aba padrão, só a aba aberta montada, os
 botões da fila que abrem abas, a pergunta antes de descartar um rascunho
 pela barra de abas, a troca segurada com gravação em voo
-e a aba que a tela cheia do celular guarda). Ele descobre os ids dos pacientes perguntando
+e a aba que a tela cheia do celular guarda). Também fotografa a agenda nas três
+vistas e confere as consultas (Verificação 15): a vista padrão e a última
+usada, a linha de aviso, o pedido tracejado na semana, a pendência no mês,
+aceitar o pedido da Beatriz, "Manter horário" do Carlos, fechar a da Joana
+como realizada, o aviso de choque ao marcar em cima da Luiza e a seta que
+mostra a sexta aba no celular. Ele descobre os ids dos pacientes perguntando
 ao mock (`/__cenario`), e recusa rodar se o mock subiu com outro cenário.
 Sem `OUT`, os PNGs vão para `prints-nutri` no diretório temporário do
 sistema.
@@ -103,7 +121,27 @@ sistema.
 O mock aceita `PATCH` e `DELETE` no CORS; sem isso o navegador recusava o
 `PATCH` que marca a conversa como lida e o console enchia de erro. Ele não
 guarda nada: um `POST` responde 201 e a consulta seguinte devolve os mesmos
-dados de antes.
+dados de antes. **A exceção são as consultas**: as seis funções de consulta
+(`marcar_consulta`, `pedir_consulta`…) têm estado no mock, com as mesmas regras
+da migração, para dar para aceitar um pedido e ver a tela mudar. `POST
+/__reset` volta as consultas ao que o cenário subiu; o roteiro chama no começo
+e no fim. Quem vale é o banco: as regras de verdade são testadas em SQL (abaixo).
+
+## Funções e regras do banco (SQL)
+
+As migrações novas ficam em `supabase/migrations/` e são testadas num Postgres
+**local**, nunca no de produção:
+
+```bash
+pg_ctlcluster 16 main start          # o container já tem o Postgres 16
+ferramentas/testar-sql.sh            # todas as migrações e todos os testes
+```
+
+`supabase/testes/base-local.sql` imita o que a Supabase já tem (o
+`auth.uid()` lido do JWT, os papéis `anon` e `authenticated`, `profiles`,
+`patient_links` e as funções de vínculo copiadas de produção), e cada teste
+troca de usuário como a Supabase faz: o JWT em `request.jwt.claims` e depois
+o papel, nessa ordem. Tudo numa transação que termina em `ROLLBACK`.
 
 Os 1440 px do computador não são acaso: as duas colunas da página do paciente
 só existem a partir de `xl` (1280 px). Abaixo disso a página é uma coluna.
