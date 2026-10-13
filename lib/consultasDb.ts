@@ -17,7 +17,7 @@ import { MAX_DIAS_DESDE, resumoDesdeUltima, type ResumoDesde } from "@/lib/desde
 // Cada função devolve `falhou` junto: lista vazia por erro de leitura não é
 // "sem consulta" (CLAUDE.md, "Leitura que falha não é 'não tem'").
 
-type Res<T> = { data: T; falhou: boolean };
+export type Res<T> = { data: T; falhou: boolean };
 
 /** Do começo do dia `desde` ao fim do dia `ate`, em São Paulo. */
 function bordas(desde: string, ate: string) {

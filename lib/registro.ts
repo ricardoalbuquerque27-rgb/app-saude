@@ -210,7 +210,12 @@ export function rotuloDaAnamnese(kind: Consulta["kind"]): "Anamnese" | "Evoluç�
  * como texto.
  */
 export function anteriores(
-  serie: ({ date: string; appointment_id: string | null } & Medidas)[],
+  // `number | null` por campo: a linha vem do banco, onde a medida não tirada
+  // é nula. Nula já era pulada (`typeof valor !== "number"`); o tipo só passa
+  // a dizer isso, para a tela não precisar descartar os nulos antes.
+  serie: ({ date: string; appointment_id: string | null } & Partial<
+    Record<CampoMedida, number | null>
+  >)[],
   diaDaConsulta: string,
 ): Partial<Record<CampoMedida, { valor: number; data: string }>> {
   const out: Partial<Record<CampoMedida, { valor: number; data: string }>> = {};

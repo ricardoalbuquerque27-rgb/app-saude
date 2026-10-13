@@ -234,6 +234,17 @@ describe("anteriores", () => {
     expect(anteriores(serie, dia).weight_kg).toEqual({ valor: 72.5, data: "2026-09-29" });
   });
 
+  it("medida nula (do banco) não conta: o peso vem da consulta anterior que tem peso", () => {
+    const serie = [
+      { date: "2026-10-06", appointment_id: "a2", weight_kg: null, waist_cm: 86 },
+      { date: "2026-09-01", appointment_id: "a1", weight_kg: 74, waist_cm: null },
+    ];
+    expect(anteriores(serie, dia)).toEqual({
+      weight_kg: { valor: 74, data: "2026-09-01" },
+      waist_cm: { valor: 86, data: "2026-10-06" },
+    });
+  });
+
   it("sem linha anterior devolve vazio", () => {
     expect(anteriores([], dia)).toEqual({});
     expect(anteriores([{ date: "2026-10-01", appointment_id: null, weight_kg: 70 }], dia)).toEqual(
