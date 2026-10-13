@@ -22,14 +22,22 @@ Isso não é óbvio lendo a árvore de arquivos.
   Treino, Corpo, Clínico e Consultas. Ele prescreve ali mesmo, nas abas Alimentação
   (metas, cardápio) e Treino; a fila do Resumo tem o atalho Reaplicar, que
   grava de novo a última prescrição; o resto é leitura, fora a conversa e as
-  notas. Não há aba Prescrição. Veja "A página do paciente" abaixo.
+  notas. Não há aba Prescrição. Veja "A página do paciente" abaixo. O
+  registro de cada consulta (prontuário) tem página própria,
+  `pacientes/[id]/consultas/[consulta]` (veja "Registro da consulta").
 - **Lógica testada:** `lib/date.ts` (datas e janelas, `dataNoBrasil`),
   `lib/planCheckIn.ts` (adesão, `estadosDaSemana`), `lib/foods.ts` (tabela
   TACO), `lib/edicao.ts` (`reduzirEdicao`, a regra de uma edição por vez,
   e `oQueSeguraATroca`), `lib/abas.ts` (a aba que o endereço pede),
   `lib/consultas.ts` (situação de cada consulta, hora de São Paulo, choque,
-  grade do mês e da semana, o que cabe num dia do Mês, alertas de consulta), `lib/desdeConsulta.ts`
-  ("desde a última consulta"),
+  grade do mês e da semana, o que cabe num dia do Mês, alertas de consulta,
+  `resumoDaConsulta`), `lib/desdeConsulta.ts` ("desde a última consulta"),
+  `lib/registro.ts` (o registro da consulta: faixas e leitura das medidas,
+  `lerMedida`, `medidasValidas`, `errosDasMedidas`; `situacaoDoRegistro`; o
+  botão do painel, `entradaDoRegistro`; o Observar, `observarDaConsulta` e
+  `ultimoObservarPorPaciente`; o "antes" de cada medida, `anteriores`),
+  `lib/aiActions.ts` (só `atualizar_peso` e `remover_ultimo` de peso, que não
+  podem pegar a medida da consulta),
   `lib/temaClinico.ts` com `lib/contraste.ts` (paleta e razão de contraste)
   e, em `lib/nutri.ts`, a conta do resumo, da fila de triagem e da linha do
   tempo do nutri (`montarResumos`, `filaDeTriagem`, `montarLinhaDoTempo`),
@@ -142,11 +150,73 @@ horário avisa e não impede. O paciente vê o cartão de consulta
 (`components/CartaoConsulta.tsx`) na Início e em "Meu plano", no visual do
 app dele, e não recebe aviso fora do app (sem Web Push).
 
+## Registro da consulta
+
+Spec: `docs/superpowers/specs/2026-10-13-registro-da-consulta-design.md`.
+Um prontuário por consulta, em `/app/pacientes/<id>/consultas/<consulta>`
+(tema clínico pelo layout de `pacientes/[id]`; tela larga no `AppShell` pela
+mesma regra do detalhe, `detalheDoPaciente`). `consultation_records` e
+`consultation_addenda` têm **só política de leitura, e só do autor**, sem
+exigir vínculo (o prontuário não some quando o paciente revoga); o paciente
+não lê. Toda escrita é por função `SECURITY DEFINER` (`salvar_registro`,
+`concluir_registro`, `descartar_rascunho`, `adicionar_adendo`), com
+`{ ok, error, id? }` e o `updated_at` no salvar; o adendo é a única que não
+pede vínculo ativo. Rascunho → concluído → adendo: descartar apaga o
+rascunho; concluir copia nome e CRN (sem CRN no perfil, o diálogo pede e
+grava em `profiles.crn`), marca a consulta realizada se ainda agendada e
+trava; corrigir, só por adendo. `fechar_consulta` recusa falta e
+cancelamento com registro. As faixas de medida e os limites de texto estão
+na migração (`erro_das_medidas`, `erro_do_registro`) e em `lib/registro.ts`
+(`FAIXAS`, `LIMITES`): mudou um, mude o outro. O `appointment_id` do
+registro não tem cascata, de propósito (guarda de 20 anos): apagar uma
+consulta com registro, mesmo rascunho, falha, e apagar a conta do paciente
+ou do nutri dela também (a consulta cai em cascata com a conta e esbarra na
+chave).
+
+**Medidas da consulta.** Concluir publica em `body_measurements`, com
+`measured_by` (quem mediu; nulo é o paciente) e `appointment_id` (único), na
+data da consulta em São Paulo. A `measurements_all_own` virou quatro: o
+paciente lê todas as dele, mas cria só com as duas colunas nulas e edita e
+apaga só as com `measured_by` nulo; `measurements_author_read` deixa quem
+mediu ler depois do desvínculo. **Update e delete barrados pela RLS não dão
+erro**: afetam zero linhas e o supabase-js devolve `error: null`, e o
+assistente diria "peso atualizado" sem mudar nada. Por isso `atualizar_peso`
+e `remover_ultimo` (peso) filtram `.is("measured_by", null)` antes de escolher
+a linha, e o excluir da página Medidas, que marca "Medida na consulta" e não
+oferece o botão nela, pede `count: "exact"` e avisa com zero. Escrita nova em
+`body_measurements` precisa da mesma defesa.
+
+**O rascunho salva sozinho** (`components/registro/useSalvarRascunho.ts`),
+1,5 s depois da última tecla e ao sair do campo, sem cópia no navegador
+(texto clínico num computador compartilhado ficaria para o próximo). A
+trava entre abas é o `updated_at` (`p_visto_em`), guardado como o **texto
+exato** que o banco devolveu: `Date` corta os microssegundos, e toda gravação
+virava "O rascunho mudou em outra aba". **Uma gravação por vez**: a que chega
+com outra em voo espera e só lê o `updated_at` quando começa; duas juntas
+mandariam o mesmo valor, e a segunda seria recusada sem outra aba nenhuma.
+**Ao abrir, o editor confere o banco** ("Conferindo o rascunho…"; em 8 s sem
+resposta, segue com as props): o Voltar do navegador, e um link para página
+vista há menos de 30 s, devolvem do cache do roteador do Next a página com o
+rascunho de antes, e a primeira tecla seria recusada como "mudou em outra aba".
+
+O painel da consulta (`PainelConsulta`, agenda e aba Consultas) dá "Registrar
+consulta", "Continuar registro" ou "Ver registro" numa consulta que já começou
+e não é falta nem cancelamento; sem saber o registro (leitura que falhou ou
+não feita), só "Abrir registro" (`entradaDoRegistro`). A aba Consultas põe o
+selo ("Sem registro", "Rascunho", "Registrada") na linha do Histórico; sem
+os registros, nenhum selo e o `ErroSecao`. O "Observar no retorno" do último
+registro concluído aparece no painel de toda consulta que não seja falta nem
+cancelamento, futura inclusive, e nunca na do próprio registro nem nas
+anteriores (`observarDaConsulta`). "Último" é o da **consulta que começou por
+último**, não o concluído por último (`ultimoObservarPorPaciente`): quem
+preenche hoje o registro de uma consulta antiga faria a instrução velha
+passar por atual. Se ele não tem Observar, não se cai num mais antigo.
+
 ## Comandos
 
 ```bash
 npm run dev      # desenvolvimento
-npm test         # 230 testes unitários (vitest)
+npm test         # 304 testes unitários (vitest)
 ferramentas/testar-sql.sh   # migrações e testes SQL num Postgres local
 npm run build    # produção
 ```
@@ -235,3 +305,13 @@ remove ele. `MODULE_NOT_FOUND` nos scripts de `ferramentas/` é isso.
 - Conta de teste (`Maria Souza (teste)`) e a rota `/estilo` precisam sair
   antes de usuários reais.
 - No painel do Supabase, falta ligar a proteção contra senhas vazadas.
+- **Prontuário de ex-paciente sem tela.** O registro concluído segue legível
+  pelo autor no banco (as leituras do autor e `adicionar_adendo` não pedem
+  vínculo), mas o perfil e a consulta (`appointments_nutri_read`) pedem vínculo
+  ativo e não há lista de ex-pacientes: a página do registro mostra "Sem
+  acesso". O dado não se perde; falta o caminho até ele.
+- **A Resolução CFN 594/2017 não foi lida no texto oficial** (o site do CFN
+  não abre daqui). O registro foi desenhado pelos resumos do CONARQ, do CRN-3
+  e do CRN-5; o texto de venda "atende ao CFN" não sai antes de conferir.
+- No gráfico da página Medidas do paciente, o ponto da medida da consulta não
+  se distingue; a marca "Medida na consulta" fica só na linha da lista.

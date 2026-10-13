@@ -1,8 +1,10 @@
 # Registro da consulta (prontuário enxuto do nutricionista)
 
 **Data:** 2026-10-13
-**Situação:** desenho aprovado em três partes pelo dono do produto; spec
-para revisão antes do plano.
+**Situação:** desenho aprovado em três partes pelo dono do produto;
+implementado pelo plano `docs/superpowers/plans/2026-10-14-registro-da-consulta.md`.
+O que a execução decidiu diferente ou além do desenho vem marcado
+"(decidido na execução)".
 **Subprojeto:** 2 de 3 do acompanhamento (1: consultas e agenda, em
 produção · 2: registro da consulta · 3: evolução).
 **Maquetes:** canvas "Registro da consulta"
@@ -179,6 +181,12 @@ antes, o banco garante; o teste SQL e o unitário usam estes números):
 Tema clínico (o layout de `pacientes/[id]` já cobre a rota) e tela larga no
 `AppShell`, como o detalhe do paciente.
 
+Consulta sem direito a registro (futura, pedido, faltou, cancelada) e sem
+rascunho mostra o motivo em vez do formulário, que o banco recusaria a cada
+tecla; com rascunho, o editor abre, para o nutri poder descartar (uma
+consulta remarcada para a frente depois de começar a escrever). (decidido na
+execução)
+
 - **Topo:** "← Nome · Consultas"; "Consulta de qua., 21/10 às 12:45";
   tipo, modalidade e duração; selo e linha de situação ("Rascunho · Salvo
   às 13:02" ou "Concluído em … por Nome · CRN"); "Descartar rascunho" e
@@ -196,19 +204,32 @@ Tema clínico (o layout de `pacientes/[id]` já cobre a rota) e tela larga no
 - **Coluna "Para esta consulta"** (a partir de `xl`; abaixo disso, um
   bloco recolhível no topo, com o "Observar" sempre à vista):
   - o "Observar no retorno" do registro concluído anterior;
-  - "desde a última consulta" (o mesmo texto da agenda);
+  - "desde a última consulta" (o mesmo texto da agenda), que some quando a
+    última realizada é esta própria consulta: falaria do que veio depois
+    dela (decidido na execução);
   - a última medida lançada pelo paciente em casa;
   - os registros anteriores, com link.
 - **Salvamento:** o rascunho nasce na primeira digitação e salva sozinho
   1,5 s depois da última tecla e ao sair de um campo, uma gravação por vez
   (a seguinte espera a anterior, com o `updated_at` que ela devolveu). Estados: "Salvando…", "Salvo
   às HH:MM", "Não foi possível salvar. Tentar de novo". Sair da página com
-  alteração não salva cai no aviso do navegador.
+  alteração não salva cai no aviso do navegador. Decidido na execução:
+  - ao abrir, o editor confere o rascunho no banco ("Conferindo o
+    rascunho…", com o formulário travado; em 8 s sem resposta, segue com o
+    que veio da página): o cache do roteador do Next devolve a página velha
+    no Voltar e, em até 30 s, num link, e a primeira tecla seria recusada
+    como "mudou em outra aba";
+  - medida inválida (não é número, ou fora da faixa) mantém no envio o
+    último valor válido, porque cada salvamento grava as medidas inteiras e
+    omiti-la apagava a salva; vazio continua apagando. Enquanto ela está na
+    tela, o status não diz "Salvo".
 - **Concluir:** diálogo com o que muda (trava, medidas no histórico,
   consulta realizada), as medidas para conferir e, se o perfil não tem, o
-  campo do CRN.
+  campo do CRN. Enquanto conclui, o diálogo não fecha (Esc, fundo, X): a
+  conclusão não se cancela, e fechar parecia cancelar (decidido na execução).
 - **Concluído:** as cinco partes só para leitura; medidas com a diferença
-  para a consulta anterior; adendos embaixo, datados, com "Novo adendo".
+  para a consulta anterior; adendos embaixo, datados, com "Novo adendo". Sem
+  a coluna "Registros desta paciente" da maquete 2 (decidido na execução).
 - **Celular:** uma coluna; o contexto recolhido; os botões presos no rodapé.
 
 ### Por onde se chega
@@ -216,15 +237,34 @@ Tema clínico (o layout de `pacientes/[id]` já cobre a rota) e tela larga no
 - **Painel da consulta** (agenda e aba Consultas): numa consulta que já
   começou e não é faltou nem cancelada, o botão "Registrar consulta",
   "Continuar registro" ou "Ver registro"; e o "Observar no retorno" do
-  último registro concluído do paciente.
+  último registro concluído do paciente. Decidido na execução:
+  - com "Registrar consulta" ou "Continuar registro", "Realizada" vira
+    secundária (maquete 4): o painel não tem dois destaques;
+  - o "Observar no retorno" aparece no painel de **qualquer** consulta que
+    não seja faltou nem cancelada, inclusive futura e pedido: serve para
+    preparar o retorno. O botão do registro continua só na que já começou;
+  - "último registro concluído" é o da consulta que **começou** por último
+    (o início da consulta do registro, não a hora da conclusão), a mesma
+    chave da página do registro; a data mostrada é o dia dessa consulta.
+    Preencher hoje o registro de uma consulta antiga não muda qual é o
+    último. Na própria consulta desse registro, e nas anteriores a ela, o
+    painel não mostra Observar;
+  - se a leitura dos registros falha, o painel mostra o botão neutro "Abrir
+    registro" (a página do registro lê o banco por conta própria); se a do
+    Observar falha, a linha "Não foi possível carregar o Observar no
+    retorno.", em vez de sumir calado.
 - **Aba Consultas:** cada consulta que já começou e não é faltou nem
   cancelada (em andamento, sem desfecho ou realizada) ganha o selo "Sem
-  registro", "Rascunho" ou "Registrada" e o link certo.
+  registro", "Rascunho" ou "Registrada" e o link certo. O selo fica na linha
+  do Histórico, sem link (seria conteúdo interativo dentro do `<summary>`), e
+  o botão, no painel que a linha abre (decidido na execução).
 
 ### Paciente
 
 - Página Medidas e gráficos: a medida da consulta aparece com a marca
-  "medida na consulta" e **sem** o botão de excluir.
+  "medida na consulta" e **sem** o botão de excluir. A marca fica na linha
+  da lista; o gráfico não distingue o ponto da consulta (decidido na
+  execução).
 
 ### Mudanças em código que já existe
 
@@ -247,7 +287,11 @@ Tema clínico (o layout de `pacientes/[id]` já cobre a rota) e tela larga no
   com "O rascunho mudou em outra aba. Recarregue."
 - Concluir depois que outra aba marcou faltou: o banco recusa.
 - Vínculo encerrado: não salva nem conclui; o concluído segue legível pelo
-  autor.
+  autor **no banco** (as políticas de leitura do autor não pedem vínculo, nem
+  `adicionar_adendo`), mas não há tela por onde chegar: o perfil e a
+  consulta (`appointments_nutri_read`) pedem vínculo ativo e não existe
+  lista de ex-pacientes, então a página do registro mostra "Sem acesso".
+  Ficou em "Em aberto" no CLAUDE.md (decidido na execução).
 
 ## Datas e fuso
 

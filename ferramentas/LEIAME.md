@@ -137,7 +137,17 @@ o aviso de choque e o "Aceitar" do pedido da Beatriz, "Manter horário" do
 Carlos, Realizada e Faltou já na consulta em andamento da Luiza, fechar a da
 Joana como realizada (e o "Sem retorno marcado" que aparece), o aviso de
 choque ao marcar em cima da Luiza e a seta que mostra a sexta aba no
-celular. A Verificação 19 confere a medida da consulta na aba Corpo
+celular. As Verificações 16 a 18 conferem o registro da consulta: o rascunho
+(16: "Salvando…" e "Salvo às", o texto que volta ao recarregar e no Voltar do
+navegador, o "antes" do peso e o IMC, a medida inválida que não apaga a salva,
+a gravação que falha e o "Tentar de novo", a coluna "Para esta consulta", o
+celular, "Sem acesso", a consulta de outro paciente, a leitura que falha e o
+descarte); o concluir (17: o prazo da conferência ao abrir, o diálogo com o
+CRN e a faixa, o concluído travado, o que ficou no mock, o adendo e as recusas
+do banco no diálogo); e as entradas (18: o botão no painel da agenda e da aba
+Consultas, os selos, o "Faltou" recusado com rascunho, o Observar da consulta
+que começou por último, a aba sem selos quando os registros não carregam e o
+celular). A Verificação 19 confere a medida da consulta na aba Corpo
 da Luiza (a marca "na consulta" só na linha do prontuário, e sem transbordo no
 celular) e o campo "CRN (aparece no prontuário)" do Perfil do nutri: aparece, aceita até 30
 caracteres, salva sem os espaços das pontas, reaparece ao recarregar e grava nulo
