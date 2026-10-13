@@ -12,6 +12,7 @@ import {
   gradeDoMes,
   horaEmSaoPaulo,
   instanteEmSaoPaulo,
+  noDiaDoMes,
   periodoDaVista,
   proximaConsulta,
   rotuloDaConsulta,
@@ -360,5 +361,35 @@ describe("emFaixas", () => {
       ["b", 0, 2],
       ["d", 0, 1],
     ]);
+  });
+});
+
+describe("noDiaDoMes", () => {
+  const AGORA = "2026-10-19T12:00:00Z";
+  const as = (id: string, hora: string, c: Partial<Consulta> = {}) =>
+    consulta({ id, starts_at: `2026-10-20T${hora}:00Z`, ...c });
+
+  it("mostra as primeiras em ordem de hora e conta o resto", () => {
+    const r = noDiaDoMes([as("c", "19:00"), as("a", "13:00"), as("b", "15:00")], AGORA);
+    expect(r.mostrar.map((c) => c.id)).toEqual(["a", "b"]);
+    expect(r.resto).toBe(1);
+    expect(r.pendenciaNoResto).toBe(false);
+  });
+
+  it("avisa quando a pendência ficou escondida no resto", () => {
+    // Sem isso, um pedido às 18h num dia cheio sumiria do Mês.
+    const r = noDiaDoMes(
+      [as("a", "13:00"), as("b", "15:00"), as("c", "21:00", { status: "pedido" })],
+      AGORA
+    );
+    expect(r.resto).toBe(1);
+    expect(r.pendenciaNoResto).toBe(true);
+  });
+
+  it("com até o máximo, mostra todas e não há resto", () => {
+    const r = noDiaDoMes([as("a", "13:00"), as("b", "15:00", { status: "pedido" })], AGORA);
+    expect(r.mostrar).toHaveLength(2);
+    expect(r.resto).toBe(0);
+    expect(r.pendenciaNoResto).toBe(false);
   });
 });

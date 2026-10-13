@@ -246,6 +246,25 @@ export function gradeDoMes(data: string): { data: string; doMes: boolean }[] {
   return out;
 }
 
+/**
+ * O que cabe num dia do Mês: as primeiras consultas em ordem de hora e
+ * quantas ficam de fora. `pendenciaNoResto` existe porque, sem ele, o "+N"
+ * de um dia cheio esconderia um pedido marcado depois das que cabem.
+ */
+export function noDiaDoMes(
+  lista: Consulta[],
+  agora: number | string,
+  max = 2
+): { mostrar: Consulta[]; resto: number; pendenciaNoResto: boolean } {
+  const ordem = [...lista].sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at));
+  const fora = ordem.slice(max);
+  return {
+    mostrar: ordem.slice(0, max),
+    resto: fora.length,
+    pendenciaNoResto: fora.some((c) => ehPendencia(c, agora)),
+  };
+}
+
 /** O primeiro e o último dia que a vista mostra, para a consulta ao banco. */
 export function periodoDaVista(vista: Vista, data: string): { desde: string; ate: string } {
   if (vista === "dia") return { desde: data, ate: data };

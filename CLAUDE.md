@@ -28,7 +28,7 @@ Isso não é óbvio lendo a árvore de arquivos.
   TACO), `lib/edicao.ts` (`reduzirEdicao`, a regra de uma edição por vez,
   e `oQueSeguraATroca`), `lib/abas.ts` (a aba que o endereço pede),
   `lib/consultas.ts` (situação de cada consulta, hora de São Paulo, choque,
-  grade do mês e da semana, alertas de consulta), `lib/desdeConsulta.ts`
+  grade do mês e da semana, o que cabe num dia do Mês, alertas de consulta), `lib/desdeConsulta.ts`
   ("desde a última consulta"),
   `lib/temaClinico.ts` com `lib/contraste.ts` (paleta e razão de contraste)
   e, em `lib/nutri.ts`, a conta do resumo, da fila de triagem e da linha do
@@ -146,7 +146,7 @@ app dele, e não recebe aviso fora do app (sem Web Push).
 
 ```bash
 npm run dev      # desenvolvimento
-npm test         # 227 testes unitários (vitest)
+npm test         # 230 testes unitários (vitest)
 ferramentas/testar-sql.sh   # migrações e testes SQL num Postgres local
 npm run build    # produção
 ```

@@ -133,8 +133,11 @@ migração `harden_function_grants`.
   linha menor, "desde a última consulta" do paciente (só retorno).
 - **Semana:** grade por horário (7 colunas) no computador; no celular, a
   lista dos 7 dias. Tocar no nome do dia abre o Dia.
-- **Mês:** calendário com a contagem por dia e a marca de pendência; tocar
-  num dia abre o Dia.
+- **Mês:** calendário; tocar num dia abre o Dia. No computador, cada dia
+  mostra as consultas com hora e primeiro nome, no visual dos blocos da
+  Semana, até duas e depois "+N" (âmbar se uma pendência ficou de fora). No
+  celular, a contagem num círculo cheio e o ponto da pendência. (Era só a
+  contagem em cinza; o dono do produto pediu a consulta mais visível.)
 - Pendência (pedido, pedido de remarcação, sem desfecho) aparece tracejada.
   No topo, uma linha "2 pedidos aguardando · 1 consulta sem desfecho" com
   cada item abrindo o painel da consulta.
