@@ -1167,6 +1167,41 @@ async function transbordo(page) {
       ok((await page.getByLabel("Evolução", { exact: true }).inputValue()) === "Primeira parte. Segunda parte.",
         "recarregar a página traz o texto de volta do banco");
 
+      // c2) o Voltar do navegador devolve a página do cache do roteador do
+      //     Next, montada ANTES desta digitação: o editor confere o banco ao
+      //     abrir e segue de onde parou, sem "mudou em outra aba".
+      {
+        const ateNoMock = async (texto) => {
+          for (let i = 0; i < 60 && (await noMock(EM_ANDAMENTO))?.anamnese !== texto; i++) await page.waitForTimeout(100);
+          return (await noMock(EM_ANDAMENTO))?.anamnese === texto;
+        };
+        const ev = page.getByLabel("Evolução", { exact: true });
+        await clicar(ev);
+        await ev.press("End");
+        await ev.pressSequentially(" Terceira parte.");
+        await ateNoMock("Primeira parte. Segunda parte. Terceira parte.");
+        await page.waitForFunction(() => /Salvo às/.test(document.querySelector("[data-status-rascunho]")?.textContent || ""), null, { timeout: 30000 }).catch(() => {});
+        await clicar(contextoDe(page).locator(`a[href="${registro("luiza", CONCLUIDA)}"]`));
+        await page.waitForURL((u) => u.pathname.endsWith(`/consultas/${CONCLUIDA}`), { timeout: 30000 });
+        await page.goBack();
+        await page.waitForURL((u) => u.pathname.endsWith(`/consultas/${EM_ANDAMENTO}`), { timeout: 30000 });
+        await titulo(page).waitFor({ timeout: 60000 });
+        await page.waitForFunction(() => {
+          const t = document.querySelector("textarea");
+          return t && !t.disabled;
+        }, null, { timeout: 30000 }).catch(() => {});
+        ok((await ev.inputValue()) === "Primeira parte. Segunda parte. Terceira parte.",
+          "Voltar do navegador: a Evolução tem o texto que estava no banco, e não o do cache", JSON.stringify(await ev.inputValue()));
+        await clicar(ev);
+        await ev.press("End");
+        await ev.pressSequentially(" Quarta parte.");
+        ok(await ateNoMock("Primeira parte. Segunda parte. Terceira parte. Quarta parte."),
+          "e a digitação seguinte grava", JSON.stringify((await noMock(EM_ANDAMENTO))?.anamnese));
+        await page.waitForFunction(() => /Salvo às/.test(document.querySelector("[data-status-rascunho]")?.textContent || ""), null, { timeout: 30000 }).catch(() => {});
+        ok(/Salvo às/.test(await status(page).innerText()) && !(await textoDe(page.locator("body"))).includes("mudou em outra aba"),
+          'com "Salvo às" e sem "mudou em outra aba"', await status(page).innerText());
+      }
+
       // d) o "antes" do peso é o da consulta de 14 dias atrás; IMC com a altura do perfil (168 cm)
       const peso = campo(page, "Peso (kg)");
       ok((await textoDe(peso)).includes(`antes 66,4 em ${ddmm(14)}`),
@@ -1187,6 +1222,21 @@ async function transbordo(page) {
       for (let i = 0; i < 50 && (await noMock(EM_ANDAMENTO))?.medidas?.weight_kg !== 65.6; i++) await page.waitForTimeout(100);
       ok((await noMock(EM_ANDAMENTO))?.medidas?.weight_kg === 65.6, "sair do campo salva o peso (65,6 no mock)",
         JSON.stringify((await noMock(EM_ANDAMENTO))?.medidas));
+
+      // d1) medida inválida não apaga a que já estava salva, e o topo não diz "Salvo às"
+      {
+        await campoPeso.fill("6x");
+        await campoPeso.blur();
+        await page.waitForTimeout(800);
+        ok((await noMock(EM_ANDAMENTO))?.medidas?.weight_kg === 65.6,
+          'peso "6x" não apaga o 65,6 que estava salvo', JSON.stringify((await noMock(EM_ANDAMENTO))?.medidas));
+        const s = await status(page).innerText();
+        ok(!s.includes("Salvo às") && s.includes("não salvo"), `com o campo inválido, o topo diz que não salvou ("${s}")`);
+        await campoPeso.fill("65,6");
+        await campoPeso.blur();
+        await page.waitForFunction(() => /Salvo às/.test(document.querySelector("[data-status-rascunho]")?.textContent || ""), null, { timeout: 30000 }).catch(() => {});
+        ok(/Salvo às/.test(await status(page).innerText()), `corrigido, volta o "Salvo às" (${await status(page).innerText()})`);
+      }
 
       // d2) gravação que falha (aqui, "ok" sem updated_at) não perde o texto,
       //     e "Tentar de novo" grava; sair com alteração fora do banco avisa.
@@ -1299,6 +1349,12 @@ async function transbordo(page) {
         ok((await p.locator("textarea").count()) === 0 && (await textoDe(p.locator("main"))).includes("ainda não começou"),
           "consulta que ainda não começou: diz isso, sem formulário que o banco recusaria");
         await p.close();
+        // ap-6: o pedido da Beatriz (daqui a 2 dias), ainda não aceito.
+        const pedido = await abrir(pc, registro("beatriz", "ap-6"), { secoes: false });
+        await titulo(pedido).waitFor({ timeout: 60000 });
+        ok((await textoDe(pedido.locator("main"))).includes("Pedido de consulta ainda não aceito"),
+          "pedido: diz que não foi aceito, e não que ainda não começou");
+        await pedido.close();
         const q = await abrir(pc, registro("beatriz", "ap-5"), { secoes: false });
         await titulo(q).waitFor({ timeout: 60000 });
         ok((await q.getByLabel("Anamnese", { exact: true }).count()) === 1, '1ª consulta: a primeira parte se chama "Anamnese"');

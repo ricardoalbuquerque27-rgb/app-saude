@@ -145,6 +145,26 @@ export function erroDaMedida(campo: CampoMedida, valor: number): string | null {
   return `${f.rotulo} fora da faixa (${f.min} a ${f.max}${unidade}).`;
 }
 
+/**
+ * O texto de um campo de medida, conferido de uma vez: lido como número e
+ * dentro da faixa. Vazio é "sem medida" (`valor` nulo, apaga a medida); o que
+ * não é número, ou está fora da faixa, vem com a mensagem que a tela mostra
+ * embaixo do campo. A tela repetia essa conta em três lugares (o que vai ao
+ * banco, o aviso do campo e o IMC), e quem precisa separar "vazio" de
+ * "inválido" é o salvamento: vazio apaga a medida, inválido guarda a última
+ * que valia (EditorRegistro).
+ */
+export function lerMedida(
+  campo: CampoMedida,
+  texto: string,
+): { ok: true; valor: number | null } | { ok: false; erro: string } {
+  const lido = lerNumero(texto);
+  if (!lido.ok) return { ok: false, erro: "Digite só o número, como 71,8." };
+  if (lido.valor == null) return { ok: true, valor: null };
+  const erro = erroDaMedida(campo, lido.valor);
+  return erro ? { ok: false, erro } : { ok: true, valor: lido.valor };
+}
+
 /** Peso em kg e altura em cm; uma casa decimal. Sem um dos dois, ou com altura zero, não calcula. */
 export function imc(pesoKg?: number | null, alturaCm?: number | null): number | null {
   if (pesoKg == null || alturaCm == null) return null;

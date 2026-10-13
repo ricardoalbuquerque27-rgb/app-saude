@@ -7,6 +7,7 @@ import {
   erroDaMedida,
   FAIXAS,
   imc,
+  lerMedida,
   lerNumero,
   LIMITES,
   ROTULO_REGISTRO,
@@ -98,6 +99,32 @@ describe("erroDaMedida", () => {
   it("NaN e infinito não passam: com comparação simples, NaN escaparia da faixa", () => {
     expect(erroDaMedida("weight_kg", NaN)).toBe("Peso fora da faixa (20 a 400 kg).");
     expect(erroDaMedida("weight_kg", Infinity)).toBe("Peso fora da faixa (20 a 400 kg).");
+  });
+});
+
+describe("lerMedida", () => {
+  it("número dentro da faixa vale, com vírgula ou ponto e espaço nas pontas", () => {
+    expect(lerMedida("weight_kg", "71,8")).toEqual({ ok: true, valor: 71.8 });
+    expect(lerMedida("weight_kg", " 72.5 ")).toEqual({ ok: true, valor: 72.5 });
+    expect(lerMedida("weight_kg", "20")).toEqual({ ok: true, valor: 20 });
+    expect(lerMedida("weight_kg", "400")).toEqual({ ok: true, valor: 400 });
+  });
+
+  it("vazio é 'sem medida' (nulo), não erro: é o que apaga a medida", () => {
+    expect(lerMedida("waist_cm", "")).toEqual({ ok: true, valor: null });
+    expect(lerMedida("waist_cm", "   ")).toEqual({ ok: true, valor: null });
+  });
+
+  it("o que não é número pede o número", () => {
+    expect(lerMedida("weight_kg", "72kg")).toEqual({ ok: false, erro: "Digite só o número, como 71,8." });
+    expect(lerMedida("weight_kg", "6x")).toEqual({ ok: false, erro: "Digite só o número, como 71,8." });
+    expect(lerMedida("weight_kg", "71,")).toEqual({ ok: false, erro: "Digite só o número, como 71,8." });
+  });
+
+  it("fora da faixa traz a mensagem do banco", () => {
+    expect(lerMedida("weight_kg", "718")).toEqual({ ok: false, erro: "Peso fora da faixa (20 a 400 kg)." });
+    expect(lerMedida("body_fat_pct", "1,5")).toEqual({ ok: false, erro: "% de gordura fora da faixa (2 a 75%)." });
+    expect(lerMedida("weight_kg", "19,9")).toEqual({ ok: false, erro: "Peso fora da faixa (20 a 400 kg)." });
   });
 });
 

@@ -23,10 +23,15 @@ type Args<F extends FuncaoRegistro> =
  * `salvar_registro` e segue como o TEXTO que o banco mandou: passar por `Date`
  * corta os microssegundos, e o salvamento seguinte seria recusado como "mudou
  * em outra aba" sem que nada tivesse mudado.
+ *
+ * `verbo` entra nas mensagens que não vêm do banco ("Não foi possível
+ * descartar…"): com "salvar" fixo, um descarte que caía na rede dizia que não
+ * tinha salvado.
  */
 export async function chamarRegistro<F extends FuncaoRegistro>(
   funcao: F,
   args: Args<F>,
+  verbo = "salvar",
 ): Promise<{
   erro: string | null;
   dados: { id?: string; updated_at?: string } | null;
@@ -43,11 +48,11 @@ export async function chamarRegistro<F extends FuncaoRegistro>(
   } | null;
   if (error)
     return {
-      erro: "Não foi possível salvar. Confira a conexão e tente de novo.",
+      erro: `Não foi possível ${verbo}. Confira a conexão e tente de novo.`,
       dados: null,
     };
   if (r?.ok === false)
-    return { erro: r.error ?? "Não foi possível salvar.", dados: null };
+    return { erro: r.error ?? `Não foi possível ${verbo}.`, dados: null };
   return {
     erro: null,
     dados: {

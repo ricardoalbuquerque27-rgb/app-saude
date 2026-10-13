@@ -1,31 +1,22 @@
 "use client";
 
-import { useId, useRef, useState, useTransition } from "react";
+import { useEffect, useId, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ChevronDown, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import {
   CAMPOS_EXTRAS,
   CAMPOS_PRINCIPAIS,
   FAIXAS,
   LIMITES,
-  erroDaMedida,
-  imc,
-  lerNumero,
+  lerMedida,
   rotuloDaAnamnese,
   type CampoMedida,
   type CamposRegistro,
   type Medidas,
   type Registro,
 } from "@/lib/registro";
-import {
-  dataCurta,
-  horaEmSaoPaulo,
-  rotuloDaConsulta,
-  ROTULO_MODO,
-  ROTULO_TIPO,
-  type Consulta,
-} from "@/lib/consultas";
+import { dataCurta, horaEmSaoPaulo, rotuloDaConsulta, ROTULO_MODO, ROTULO_TIPO, type Consulta } from "@/lib/consultas";
 import { dataNoBrasil } from "@/lib/date";
 import { hrefDaAba } from "@/lib/abas";
 import type { Res } from "@/lib/consultasDb";
@@ -33,55 +24,73 @@ import { ErroInline } from "@/components/clinico/ErroInline";
 import { ErroSecao } from "@/components/clinico/ErroSecao";
 import { ACAO_SECUNDARIA, FOCO, LINK } from "@/components/clinico/estilos";
 import { CLASSE_SELO } from "@/components/consultas/aparencia";
+import { CAMPO, CamposDeMedida, type Antes } from "./CamposDeMedida";
 import { useSalvarRascunho } from "./useSalvarRascunho";
 
 type Parte = "anamnese" | "diagnostico" | "conduta" | "observar";
-type Antes = Partial<Record<CampoMedida, { valor: number; data: string }>>;
 
 const TODOS: CampoMedida[] = [...CAMPOS_PRINCIPAIS, ...CAMPOS_EXTRAS];
-
-// Campos escritos com utilitários, e não com .input: dentro do tema clínico,
-// no escuro, a cópia `.dark :where(.tema-clinico) .input` vence utilitário
-// sem `dark:` (CLAUDE.md). A borda é `campo` (3:1 sobre o chão) ou `perigo`.
-const CAMPO = `w-full rounded-md border bg-clin-chao px-3 text-clin-texto [color-scheme:light] dark:[color-scheme:dark] disabled:opacity-60 ${FOCO}`;
 const TITULO_PARTE = "block text-[17px] font-semibold leading-snug text-clin-texto";
 const AJUDA = "text-[14px] leading-snug text-clin-texto-2";
+/** Parou de digitar numa medida por este tempo: o erro dela aparece (como o salvamento, 1,5 s). */
+const TOQUE_MS = 1500;
 
 const AJUDA_ANAMNESE = {
   Anamnese: "Queixa, história, rotina, hábitos alimentares, sono, intestino e objetivos.",
   Evolução: "Como foi desde a última consulta: adesão, dificuldades, sintomas, rotina.",
 } as const;
 
-/** "71,8": o número como o nutri digitaria, com vírgula. */
-function numero(v: number, casas = 2): string {
-  return v.toLocaleString("pt-BR", { maximumFractionDigits: casas });
-}
-
-function rotuloDoCampo(c: CampoMedida): string {
-  const f = FAIXAS[c];
-  return f.unidade === "%" ? f.rotulo : `${f.rotulo} (${f.unidade})`;
-}
-
-/** A mensagem embaixo de um campo de medida, ou nulo se o texto vale. */
-function erroDoCampo(c: CampoMedida, texto: string): string | null {
-  const lido = lerNumero(texto);
-  if (!lido.ok) return "Digite só o número, como 71,8.";
-  return lido.valor == null ? null : erroDaMedida(c, lido.valor);
+/**
+ * O formulário que um registro abre: os textos, as medidas como o nutri as
+ * digitaria ("66,4") e as que valem em número. Serve à primeira montagem e a
+ * quando o banco tem outro rascunho que o da página (useSalvarRascunho,
+ * `aoConferir`): o mesmo caminho nos dois, para não divergirem.
+ */
+function formularioDe(r: Registro | null) {
+  const medidas = {} as Record<CampoMedida, string>;
+  const validas: Medidas = {};
+  for (const c of TODOS) {
+    const v = r?.medidas?.[c];
+    medidas[c] = typeof v === "number" ? String(v).replace(".", ",") : "";
+    if (typeof v === "number") validas[c] = v;
+  }
+  return {
+    textos: {
+      anamnese: r?.anamnese ?? "",
+      diagnostico: r?.diagnostico ?? "",
+      conduta: r?.conduta ?? "",
+      observar: r?.observar ?? "",
+    } as Record<Parte, string>,
+    medidas,
+    validas,
+    maisMedidas: CAMPOS_EXTRAS.some((c) => typeof r?.medidas?.[c] === "number"),
+  };
 }
 
 /**
- * O que vai ao banco. Medida inválida (texto que não é número, ou fora da
- * faixa) não vai: o banco recusaria o salvamento inteiro pela faixa
- * (`salvar_registro` confere as medidas também), e o texto das outras partes
- * ficaria sem gravar por causa de um campo. O campo fica marcado na tela.
+ * O que vai ao banco. Medida vazia sai (apaga). Medida inválida (texto que não
+ * é número, ou fora da faixa) vai com o último valor que valia: o banco grava
+ * as medidas inteiras a cada salvamento, e omitir o campo apagava a medida
+ * que já estava salva, com o topo dizendo "Salvo". Mandar o inválido também
+ * não serve: o banco recusa o salvamento inteiro pela faixa, e o texto das
+ * outras partes ficaria sem gravar por causa de um campo.
  */
-function montar(textos: Record<Parte, string>, medidas: Record<CampoMedida, string>): CamposRegistro {
+function montar(textos: Record<Parte, string>, medidas: Record<CampoMedida, string>, validas: Medidas): CamposRegistro {
   const m: Medidas = {};
   for (const c of TODOS) {
-    const lido = lerNumero(medidas[c]);
-    if (lido.ok && lido.valor != null && !erroDaMedida(c, lido.valor)) m[c] = lido.valor;
+    const lido = lerMedida(c, medidas[c]);
+    const v = lido.ok ? lido.valor : validas[c];
+    if (v != null) m[c] = v;
   }
   return { ...textos, medidas: m };
+}
+
+/** "Valor não salvo em Peso: corrija o campo." */
+function avisoDasRetidas(campos: CampoMedida[]): string {
+  const nomes = campos.map((c) => FAIXAS[c].rotulo);
+  if (nomes.length === 1) return `Valor não salvo em ${nomes[0]}: corrija o campo.`;
+  const lista = `${nomes.slice(0, -1).join(", ")} e ${nomes[nomes.length - 1]}`;
+  return `Valores não salvos em ${lista}: corrija os campos.`;
 }
 
 // O registro em rascunho (spec, "Página do registro"; maquetes 1 e 5): o topo
@@ -117,58 +126,78 @@ export function EditorRegistro({
 }) {
   const router = useRouter();
   const ids = useId();
-  const rascunho = useSalvarRascunho(consulta.id, { updatedAt: registro?.updated_at ?? null });
   const rotuloAnamnese = rotuloDaAnamnese(consulta.kind);
 
-  const [textos, setTextos] = useState<Record<Parte, string>>({
-    anamnese: registro?.anamnese ?? "",
-    diagnostico: registro?.diagnostico ?? "",
-    conduta: registro?.conduta ?? "",
-    observar: registro?.observar ?? "",
-  });
-  const [medidas, setMedidas] = useState<Record<CampoMedida, string>>(() => {
-    const m = {} as Record<CampoMedida, string>;
-    for (const c of TODOS) {
-      const v = registro?.medidas?.[c];
-      m[c] = typeof v === "number" ? String(v).replace(".", ",") : "";
-    }
-    return m;
-  });
-  // O erro do campo aparece depois de sair dele: "7" a caminho de "71,8"
-  // está fora da faixa, e o aviso piscaria a cada tecla.
+  const [inicio] = useState(() => formularioDe(registro));
+  const [textos, setTextos] = useState(inicio.textos);
+  const [medidas, setMedidas] = useState(inicio.medidas);
+  const [maisMedidas, setMaisMedidas] = useState(inicio.maisMedidas);
+  // O erro de uma medida aparece depois de sair dela ou de parar de digitar.
   const [tocado, setTocado] = useState<Partial<Record<CampoMedida, boolean>>>({});
-  const [maisMedidas, setMaisMedidas] = useState(() =>
-    CAMPOS_EXTRAS.some((c) => typeof registro?.medidas?.[c] === "number")
-  );
   const [descartando, setDescartando] = useState(false);
   const [erroDescarte, setErroDescarte] = useState<string | null>(null);
   const [, iniciar] = useTransition();
 
   // O formulário inteiro de agora, para cada tecla mandar tudo (o banco
-  // grava as partes juntas) sem esperar o estado do React assentar.
-  const atual = useRef({ textos, medidas });
+  // grava as partes juntas) sem esperar o estado do React assentar; e a
+  // última medida que valia de cada campo (ver `montar`).
+  const atual = useRef({ textos: inicio.textos, medidas: inicio.medidas });
+  const validas = useRef<Medidas>(inicio.validas);
+  const relogioToque = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (relogioToque.current) clearTimeout(relogioToque.current);
+  }, []);
+
+  const retidas = TODOS.filter((c) => !lerMedida(c, medidas[c]).ok);
+  const rascunho = useSalvarRascunho(
+    consulta.id,
+    { updatedAt: registro?.updated_at ?? null },
+    { retido: retidas.length > 0, aoConferir }
+  );
+
+  /** O banco tem outro rascunho que o desta página (veio do cache do roteador). */
+  function aoConferir(noBanco: Registro | null) {
+    if (noBanco?.status === "concluido") {
+      router.refresh();
+      return;
+    }
+    const f = formularioDe(noBanco);
+    atual.current = { textos: f.textos, medidas: f.medidas };
+    validas.current = f.validas;
+    setTextos(f.textos);
+    setMedidas(f.medidas);
+    setMaisMedidas(f.maisMedidas);
+    setTocado({});
+  }
 
   function mudarTexto(parte: Parte, valor: string) {
     const novo = { ...atual.current.textos, [parte]: valor };
     atual.current = { ...atual.current, textos: novo };
     setTextos(novo);
-    rascunho.salvar(montar(novo, atual.current.medidas));
+    rascunho.salvar(montar(novo, atual.current.medidas, validas.current));
   }
   function mudarMedida(c: CampoMedida, valor: string) {
     const novo = { ...atual.current.medidas, [c]: valor };
     atual.current = { ...atual.current, medidas: novo };
+    const lido = lerMedida(c, valor);
+    if (lido.ok) {
+      const v = { ...validas.current };
+      if (lido.valor == null) delete v[c];
+      else v[c] = lido.valor;
+      validas.current = v;
+    }
     setMedidas(novo);
-    rascunho.salvar(montar(atual.current.textos, novo));
+    rascunho.salvar(montar(atual.current.textos, novo, validas.current));
+    if (relogioToque.current) clearTimeout(relogioToque.current);
+    relogioToque.current = setTimeout(() => tocar(c), TOQUE_MS);
+  }
+  function tocar(c: CampoMedida) {
+    setTocado((t) => (t[c] ? t : { ...t, [c]: true }));
   }
   const sair = () => void rascunho.agora();
 
   async function descartar() {
-    if (
-      !window.confirm(
-        "Descartar o rascunho? O que foi escrito e medido nesta consulta será apagado."
-      )
-    )
-      return;
+    if (!window.confirm("Descartar o rascunho? O que foi escrito e medido nesta consulta será apagado.")) return;
     setDescartando(true);
     setErroDescarte(null);
     const erro = await rascunho.descartar();
@@ -187,14 +216,15 @@ export function EditorRegistro({
   }
 
   const temRascunho = rascunho.updatedAt !== null || rascunho.pendente;
-  const pesoLido = lerNumero(medidas.weight_kg);
-  const peso =
-    pesoLido.ok && pesoLido.valor != null && !erroDaMedida("weight_kg", pesoLido.valor) ? pesoLido.valor : null;
-  const valorImc = imc(peso, alturaCm);
+  const avisadas = retidas.filter((c) => tocado[c]);
+  const desligado = descartando || rascunho.conferindo;
 
   const situacao = (() => {
-    if (rascunho.estado === "salvando") return "Salvando…";
+    if (rascunho.conferindo) return "Conferindo o rascunho…";
     if (rascunho.estado === "erro") return null;
+    if (rascunho.estado === "salvando") return "Salvando…";
+    // Medida inválida na tela não está no banco: "Salvo às" seria mentira.
+    if (avisadas.length) return avisoDasRetidas(avisadas);
     if (!rascunho.salvoEm) return temRascunho ? null : "Salva sozinho enquanto você escreve.";
     const dia = dataNoBrasil(rascunho.salvoEm);
     const hora = horaEmSaoPaulo(rascunho.salvoEm);
@@ -209,7 +239,7 @@ export function EditorRegistro({
         <button
           type="button"
           onClick={descartar}
-          disabled={descartando}
+          disabled={desligado}
           className={`inline-flex ${ACAO_SECUNDARIA} disabled:opacity-60`}
         >
           {descartando && <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />}
@@ -241,46 +271,6 @@ export function EditorRegistro({
           className={`${CAMPO} resize-y border-clin-campo py-2.5 text-[16px] leading-relaxed sm:text-[15px]`}
         />
       </section>
-    );
-  };
-
-  const campoMedida = (c: CampoMedida) => {
-    const id = `${ids}-${c}`;
-    const erro = tocado[c] ? erroDoCampo(c, medidas[c]) : null;
-    const antes = anteriores.data[c];
-    return (
-      <div key={c} className="flex min-w-0 flex-col gap-1.5">
-        <label htmlFor={id} className="text-[14px] font-medium text-clin-texto">
-          {rotuloDoCampo(c)}
-        </label>
-        <input
-          id={id}
-          type="text"
-          inputMode="decimal"
-          autoComplete="off"
-          value={medidas[c]}
-          aria-invalid={erro ? true : undefined}
-          aria-describedby={[antes && `${id}-antes`, erro && `${id}-erro`].filter(Boolean).join(" ") || undefined}
-          onChange={(e) => mudarMedida(c, e.target.value)}
-          onBlur={() => {
-            setTocado((t) => (t[c] ? t : { ...t, [c]: true }));
-            sair();
-          }}
-          className={`${CAMPO} min-h-[48px] text-[16px] tabular-nums sm:min-h-[44px] sm:text-[15px] ${
-            erro ? "border-clin-perigo" : "border-clin-campo"
-          }`}
-        />
-        {antes && (
-          <p id={`${id}-antes`} className="text-[13px] tabular-nums text-clin-texto-2">
-            antes {numero(antes.valor)} em {dataCurta(antes.data)}
-          </p>
-        )}
-        {erro && (
-          <p id={`${id}-erro`} className="rounded bg-clin-perigo-fundo px-2 py-1 text-[13px] text-clin-perigo">
-            {erro}
-          </p>
-        )}
-      </div>
     );
   };
 
@@ -329,53 +319,26 @@ export function EditorRegistro({
             "observar" à vista); a partir de `xl` o grid o põe à direita. */}
         <div className="xl:sticky xl:top-6 xl:order-2">{contexto}</div>
 
-        {/* fieldset só pelo `disabled`: descartando, nenhuma tecla agenda uma
-            gravação que recriaria o rascunho depois do descarte. */}
-        <fieldset disabled={descartando} className="mt-8 min-w-0 space-y-8 xl:order-1 xl:mt-0">
+        {/* fieldset só pelo `disabled`. Conferindo o banco ao abrir, uma tecla
+            iria com o rascunho que veio da página, talvez velho; descartando,
+            ela agendaria uma gravação que recriaria o rascunho. */}
+        <fieldset disabled={desligado} aria-busy={rascunho.conferindo} className="mt-8 min-w-0 space-y-8 xl:order-1 xl:mt-0">
           {textoArea("anamnese", rotuloAnamnese, 6, AJUDA_ANAMNESE[rotuloAnamnese])}
 
-          <section aria-labelledby={`${ids}-medidas`} className="space-y-3">
-            <h2 id={`${ids}-medidas`} className={TITULO_PARTE}>
-              Medidas
-            </h2>
-            {anteriores.falhou && <ErroSecao secao="as medidas anteriores" />}
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">{CAMPOS_PRINCIPAIS.map(campoMedida)}</div>
-            <div className="flex flex-col gap-1 text-[14px] text-clin-texto-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4">
-              <p data-imc className="tabular-nums">
-                {alturaCm == null || alturaCm <= 0 ? (
-                  "IMC: altura não informada no perfil"
-                ) : valorImc == null ? (
-                  `IMC: preencha o peso · altura do perfil ${numero(alturaCm, 1)} cm`
-                ) : (
-                  <>
-                    <strong className="font-semibold text-clin-texto">
-                      IMC {valorImc.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
-                    </strong>{" "}
-                    · calculado com a altura do perfil ({numero(alturaCm, 1)} cm)
-                  </>
-                )}
-              </p>
-              <button
-                type="button"
-                aria-expanded={maisMedidas}
-                aria-controls={`${ids}-extras`}
-                onClick={() => setMaisMedidas((a) => !a)}
-                className={`inline-flex self-start text-left ${LINK}`}
-              >
-                Mais medidas: tórax, braço, coxa, panturrilha, pescoço
-                <ChevronDown
-                  aria-hidden="true"
-                  className={`h-4 w-4 shrink-0 transition-transform ${maisMedidas ? "rotate-180" : ""}`}
-                />
-              </button>
-            </div>
-            <div
-              id={`${ids}-extras`}
-              className={`${maisMedidas ? "grid" : "hidden"} grid-cols-2 gap-4 sm:grid-cols-4`}
-            >
-              {CAMPOS_EXTRAS.map(campoMedida)}
-            </div>
-          </section>
+          <CamposDeMedida
+            idBase={ids}
+            valores={medidas}
+            tocado={tocado}
+            anteriores={anteriores}
+            alturaCm={alturaCm}
+            aberto={maisMedidas}
+            aoAlternar={() => setMaisMedidas((a) => !a)}
+            aoMudar={mudarMedida}
+            aoSair={(c) => {
+              tocar(c);
+              sair();
+            }}
+          />
 
           {textoArea("diagnostico", "Diagnóstico nutricional", 3)}
 

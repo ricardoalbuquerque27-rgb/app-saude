@@ -94,9 +94,13 @@ function SemDireito({ uid, nome, consulta }: { uid: string; nome: string; consul
         Consulta de {rotuloDaConsulta(consulta)}
       </h1>
       <p className="mt-4 rounded-md border border-clin-linha px-4 py-3 text-[14px] leading-snug text-clin-texto">
+        {/* `situacao` diz "pedido" em qualquer horário: um pedido de ontem
+            não aceito não "ainda não começou". */}
         {s === "faltou" || s === "cancelada"
           ? "Consulta com falta ou cancelada não tem registro."
-          : "A consulta ainda não começou. O registro abre no horário dela."}
+          : s === "pedido"
+            ? "Pedido de consulta ainda não aceito. O registro abre depois de aceitar e no horário dela."
+            : "A consulta ainda não começou. O registro abre no horário dela."}
       </p>
     </div>
   );
