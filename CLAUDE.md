@@ -21,10 +21,11 @@ Isso não é óbvio lendo a árvore de arquivos.
   detalhe em `pacientes/[id]`, em abas por assunto: Resumo, Alimentação,
   Treino, Corpo, Clínico e Consultas. Ele prescreve ali mesmo, nas abas Alimentação
   (metas, cardápio) e Treino; a fila do Resumo tem o atalho Reaplicar, que
-  grava de novo a última prescrição; o resto é leitura, fora a conversa e as
-  notas. Não há aba Prescrição. Veja "A página do paciente" abaixo. O
-  registro de cada consulta (prontuário) tem página própria,
-  `pacientes/[id]/consultas/[consulta]` (veja "Registro da consulta").
+  grava de novo a última prescrição. Fora isso as abas só leem, menos a
+  conversa e as notas; o que ele escreve sobre a consulta vai no registro
+  (prontuário), em página própria, `pacientes/[id]/consultas/[consulta]`
+  (veja "Registro da consulta"). Não há aba Prescrição. Veja "A página do
+  paciente" abaixo.
 - **Lógica testada:** `lib/date.ts` (datas e janelas, `dataNoBrasil`),
   `lib/planCheckIn.ts` (adesão, `estadosDaSemana`), `lib/foods.ts` (tabela
   TACO), `lib/edicao.ts` (`reduzirEdicao`, a regra de uma edição por vez,
@@ -43,9 +44,12 @@ Isso não é óbvio lendo a árvore de arquivos.
   tempo do nutri (`montarResumos`, `filaDeTriagem`, `montarLinhaDoTempo`),
   as médias da semana e a comparação com a meta (`mediasDaSemana`,
   `compararComMeta`), os textos de meta e de desvio (`textoDaMeta`,
-  `textoDoDesvio`, `textoDoDesvioDoPlano`) e a divisão dos avisos entre meta
-  e plano de treino (`separarDesvios`). As consultas ao banco não têm teste,
-  nem `lib/perfil.ts`, que é só uma consulta.
+  `textoDoDesvio`, `textoDoDesvioDoPlano`), a divisão dos avisos entre meta
+  e plano de treino (`separarDesvios`) e o peso que vale num dia com duas
+  medidas (`pesoDoDia`). As consultas ao banco não têm teste (nem
+  `lib/perfil.ts`, que é só uma consulta), menos as que rodam contra um
+  Supabase em memória: as leituras do resumo, da linha do tempo e da série
+  em `lib/nutri.test.ts` e o "antes" das medidas em `lib/registroDb.test.ts`.
 
 Toda segurança é por **RLS no Postgres**, nunca por service role no app.
 Ao mexer em política, teste com `BEGIN ... ROLLBACK` e
@@ -168,10 +172,22 @@ trava; corrigir, só por adendo. `fechar_consulta` recusa falta e
 cancelamento com registro. As faixas de medida e os limites de texto estão
 na migração (`erro_das_medidas`, `erro_do_registro`) e em `lib/registro.ts`
 (`FAIXAS`, `LIMITES`): mudou um, mude o outro. O `appointment_id` do
-registro não tem cascata, de propósito (guarda de 20 anos): apagar uma
-consulta com registro, mesmo rascunho, falha, e apagar a conta do paciente
-ou do nutri dela também (a consulta cai em cascata com a conta e esbarra na
-chave).
+registro não tem cascata, de propósito (20 anos de guarda, pelos resumos; ver
+Em aberto): apagar uma consulta com registro, mesmo rascunho, falha, e apagar
+a conta do paciente ou do nutri dela também (a consulta cai em cascata com a
+conta e esbarra na chave).
+
+**Publicar: primeiro as duas migrações, depois o merge**, que dispara o
+deploy da Vercel: código novo em esquema velho quebra a aba Corpo e o resumo
+do paciente (leem `measured_by`), o salvar do perfil do nutri (`crn`) e a
+página do registro, e faz o assistente duplicar o peso calado (o filtro em
+`measured_by` falha e ele cai no insert). Antes de aplicar, em produção e só
+lendo: o dono de `body_measurements` (`pg_class.relowner`) é o papel que
+aplica a migração, dono das funções, e `relforcerowsecurity` é falso; senão
+a RLS nova barra o insert de `concluir_registro` (a réplica local roda como
+superusuário e não pega). Depois, `has_function_privilege('anon',
+'public.salvar_registro(uuid,jsonb,timestamptz)', 'execute')` dá falso, e o
+mesmo nas outras três.
 
 **Medidas da consulta.** Concluir publica em `body_measurements`, com
 `measured_by` (quem mediu; nulo é o paciente) e `appointment_id` (único), na
@@ -184,39 +200,34 @@ assistente diria "peso atualizado" sem mudar nada. Por isso `atualizar_peso`
 e `remover_ultimo` (peso) filtram `.is("measured_by", null)` antes de escolher
 a linha, e o excluir da página Medidas, que marca "Medida na consulta" e não
 oferece o botão nela, pede `count: "exact"` e avisa com zero. Escrita nova em
-`body_measurements` precisa da mesma defesa.
+`body_measurements` precisa da mesma defesa. **A medida da consulta não é
+registro do paciente**: contada, quem nunca registrou virava "N dias sem
+registrar" desde a consulta. A triagem (`montarResumos`, `ultimosRegistros`)
+conta só as com `measured_by` nulo, a linha do tempo a rotula "Medida na
+consulta", e no peso do dia ela vence a de casa (`pesoDoDia`).
 
-**O rascunho salva sozinho** (`components/registro/useSalvarRascunho.ts`),
-1,5 s depois da última tecla e ao sair do campo, sem cópia no navegador
-(texto clínico num computador compartilhado ficaria para o próximo). A
-trava entre abas é o `updated_at` (`p_visto_em`), guardado como o **texto
-exato** que o banco devolveu: `Date` corta os microssegundos, e toda gravação
-virava "O rascunho mudou em outra aba". **Uma gravação por vez**: a que chega
-com outra em voo espera e só lê o `updated_at` quando começa; duas juntas
-mandariam o mesmo valor, e a segunda seria recusada sem outra aba nenhuma.
-**Ao abrir, o editor confere o banco** ("Conferindo o rascunho…"; em 8 s sem
-resposta, segue com as props): o Voltar do navegador, e um link para página
-vista há menos de 30 s, devolvem do cache do roteador do Next a página com o
-rascunho de antes, e a primeira tecla seria recusada como "mudou em outra aba".
+**O rascunho salva sozinho** (`useSalvarRascunho`), 1,5 s depois da última
+tecla e ao sair do campo, sem cópia no navegador (computador compartilhado).
+O `updated_at` da trava entre abas fica como o **texto exato** do banco
+(`Date` corta os microssegundos, e toda gravação dava "mudou em outra aba");
+**uma gravação por vez** (duas juntas mandariam o mesmo `updated_at`); e **ao
+abrir, o editor confere o banco**: o cache do roteador do Next devolve no
+Voltar a página com o rascunho velho.
 
-O painel da consulta (`PainelConsulta`, agenda e aba Consultas) dá "Registrar
-consulta", "Continuar registro" ou "Ver registro" numa consulta que já começou
-e não é falta nem cancelamento; sem saber o registro (leitura que falhou ou
-não feita), só "Abrir registro" (`entradaDoRegistro`). A aba Consultas põe o
-selo ("Sem registro", "Rascunho", "Registrada") na linha do Histórico; sem
-os registros, nenhum selo e o `ErroSecao`. O "Observar no retorno" do último
-registro concluído aparece no painel de toda consulta que não seja falta nem
-cancelamento, futura inclusive, e nunca na do próprio registro nem nas
-anteriores (`observarDaConsulta`). "Último" é o da **consulta que começou por
-último**, não o concluído por último (`ultimoObservarPorPaciente`): quem
-preenche hoje o registro de uma consulta antiga faria a instrução velha
-passar por atual. Se ele não tem Observar, não se cai num mais antigo.
+O painel da consulta (`PainelConsulta`) dá "Registrar consulta", "Continuar
+registro" ou "Ver registro" numa consulta que já começou e não é falta,
+cancelamento nem pedido; sem saber o registro (leitura que falhou ou não
+feita), só "Abrir registro" (`entradaDoRegistro`), nunca um "Registrar"
+adivinhado. O "Observar no retorno" ali é o do registro concluído da
+**consulta que começou por último**, não o concluído por último
+(`ultimoObservarPorPaciente`): quem preenche hoje o registro de uma consulta
+antiga faria a instrução velha passar por atual.
 
 ## Comandos
 
 ```bash
 npm run dev      # desenvolvimento
-npm test         # 304 testes unitários (vitest)
+npm test         # 320 testes unitários (vitest)
 ferramentas/testar-sql.sh   # migrações e testes SQL num Postgres local
 npm run build    # produção
 ```
@@ -310,8 +321,8 @@ remove ele. `MODULE_NOT_FOUND` nos scripts de `ferramentas/` é isso.
   vínculo), mas o perfil e a consulta (`appointments_nutri_read`) pedem vínculo
   ativo e não há lista de ex-pacientes: a página do registro mostra "Sem
   acesso". O dado não se perde; falta o caminho até ele.
-- **A Resolução CFN 594/2017 não foi lida no texto oficial** (o site do CFN
-  não abre daqui). O registro foi desenhado pelos resumos do CONARQ, do CRN-3
-  e do CRN-5; o texto de venda "atende ao CFN" não sai antes de conferir.
+- **A Resolução CFN 594/2017 não foi lida no texto oficial.** O registro foi
+  desenhado pelos resumos do CONARQ, do CRN-3 e do CRN-5 (a guarda de 20
+  anos inclusive); o texto de venda "atende ao CFN" não sai antes de conferir.
 - No gráfico da página Medidas do paciente, o ponto da medida da consulta não
   se distingue; a marca "Medida na consulta" fica só na linha da lista.

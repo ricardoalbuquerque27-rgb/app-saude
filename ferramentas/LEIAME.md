@@ -143,8 +143,9 @@ navegador, o "antes" do peso e o IMC, a medida inválida que não apaga a salva,
 a gravação que falha e o "Tentar de novo", a coluna "Para esta consulta", o
 celular, "Sem acesso", a consulta de outro paciente, a leitura que falha e o
 descarte); o concluir (17: o prazo da conferência ao abrir, o diálogo com o
-CRN e a faixa, o concluído travado, o que ficou no mock, o adendo e as recusas
-do banco no diálogo); e as entradas (18: o botão no painel da agenda e da aba
+CRN e a faixa, o concluído travado e o rótulo do IMC, o que ficou no mock, o
+adendo e o aviso do navegador com um adendo não salvo, o campo do CRN quando
+o banco o pede de novo e as recusas do banco no diálogo); e as entradas (18: o botão no painel da agenda e da aba
 Consultas, os selos, o "Faltou" recusado com rascunho, o Observar da consulta
 que começou por último, a aba sem selos quando os registros não carregam e o
 celular). A Verificação 19 confere a medida da consulta na aba Corpo
@@ -168,6 +169,16 @@ conferência, para dar para aceitar um pedido, salvar um rascunho e concluir e
 ver a tela mudar. O `updated_at` do rascunho é a trava de concorrência: o mock o
 devolve com microssegundos, como o banco, e ele sempre anda. Quem vale é o
 banco: as regras de verdade são testadas em SQL (abaixo).
+
+**O mock ignora a lista de colunas do `select`**: devolve a linha inteira,
+peça o que pedir. Um erro de digitação numa lista de colunas
+(`COLUNAS_REGISTRO`, `COLUNAS_MEDIDA`, `COLUNAS_CONSULTA`…) ou uma coluna
+esquecida passa em todas as verificações de tela e só aparece no banco de
+verdade: coluna que não existe dá 400 no PostgREST, e a esquecida chega
+ausente. Filtro numa coluna que a tabela não tem também passa aqui e dá 400
+lá. Quem confere a lista de colunas das leituras de `lib/nutri.ts` é o
+Supabase em memória de `lib/nutri.test.ts`, que devolve só as colunas
+pedidas.
 
 Duas escritas pelo PostgREST também têm estado (o `/__reset` desfaz):
 

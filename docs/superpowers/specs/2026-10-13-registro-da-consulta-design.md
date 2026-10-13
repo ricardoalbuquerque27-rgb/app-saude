@@ -38,10 +38,12 @@ Um nutricionista, sem explicação:
    lança as medidas, sem perder nada se fechar a aba no meio;
 3. conclui o registro, conferindo as medidas, e a partir daí não consegue
    mais editar; corrige com um adendo datado;
-4. vê na aba Consultas quais consultas realizadas estão sem registro, em
-   rascunho ou registradas;
-5. vê as medidas da consulta no gráfico da aba Corpo, junto das que o
-   paciente lança.
+4. vê na aba Consultas quais consultas que já começaram (em andamento, sem
+   desfecho ou realizadas; não faltou, cancelada nem pedido) estão sem
+   registro, em rascunho ou registradas;
+5. vê as medidas da consulta na aba Corpo, junto das que o paciente lança:
+   em "Peso atual" e na tabela "Medidas registradas", marcadas "na
+   consulta" (a aba não tem gráfico).
 
 E o paciente vê as medidas tiradas na consulta no histórico dele, marcadas
 como "medida na consulta", e não consegue editá-las nem apagá-las.
@@ -150,7 +152,7 @@ Um registro por consulta.
 |---|---|---|
 | `salvar_registro(p_consulta, p_campos jsonb, p_visto_em timestamptz)` | cria o rascunho na primeira chamada, atualiza nas seguintes; devolve o `updated_at` novo | quem pede não é o nutri da consulta; vínculo inativo; a consulta ainda não começou; faltou ou cancelada; o registro já está concluído; `p_visto_em` diferente do `updated_at` gravado ("o rascunho mudou em outra aba") |
 | `concluir_registro(p_consulta, p_visto_em, p_crn)` | grava o CRN no perfil se vier; marca a consulta realizada se ainda agendada; publica as medidas (se houver alguma) em `body_measurements` com `measured_by`, `appointment_id` e a data da consulta em São Paulo; copia nome e CRN; trava | as mesmas da anterior; sem CRN (no perfil e no parâmetro); medida fora da faixa; nenhuma parte preenchida |
-| `descartar_rascunho(p_consulta)` | apaga o rascunho | não é o autor; já concluído |
+| `descartar_rascunho(p_consulta)` | apaga o rascunho | não é o autor; vínculo inativo; já concluído |
 | `adicionar_adendo(p_registro, p_texto)` | grava o adendo com nome e CRN | não é o autor; registro não concluído; texto vazio ou longo demais |
 
 E muda `fechar_consulta`: recusa `faltou` e `cancelada` quando a consulta
@@ -189,7 +191,8 @@ execução)
 
 - **Topo:** "← Nome · Consultas"; "Consulta de qua., 21/10 às 12:45";
   tipo, modalidade e duração; selo e linha de situação ("Rascunho · Salvo
-  às 13:02" ou "Concluído em … por Nome · CRN"); "Descartar rascunho" e
+  às 13:02", "Salvo em 20/10 às 18:40" quando a última gravação foi em outro
+  dia, ou "Concluído em … por Nome · CRN"); "Descartar rascunho" e
   "Concluir registro".
 - **Coluna principal, as cinco partes:**
   - Anamnese ou Evolução (com uma linha de ajuda);
@@ -205,14 +208,16 @@ execução)
   bloco recolhível no topo, com o "Observar" sempre à vista):
   - o "Observar no retorno" do registro concluído anterior;
   - "desde a última consulta" (o mesmo texto da agenda), que some quando a
-    última realizada é esta própria consulta: falaria do que veio depois
-    dela (decidido na execução);
+    última realizada não é anterior a esta (é esta mesma ou uma posterior,
+    no registro de uma consulta antiga): falaria do que veio depois dela
+    (decidido na execução);
   - a última medida lançada pelo paciente em casa;
   - os registros anteriores, com link.
 - **Salvamento:** o rascunho nasce na primeira digitação e salva sozinho
   1,5 s depois da última tecla e ao sair de um campo, uma gravação por vez
   (a seguinte espera a anterior, com o `updated_at` que ela devolveu). Estados: "Salvando…", "Salvo
-  às HH:MM", "Não foi possível salvar. Tentar de novo". Sair da página com
+  às HH:MM" ("Salvo em dd/mm às HH:MM" se foi em outro dia: o rascunho
+  aberto dias depois), "Não foi possível salvar. Tentar de novo". Sair da página com
   alteração não salva cai no aviso do navegador. Decidido na execução:
   - ao abrir, o editor confere o rascunho no banco ("Conferindo o
     rascunho…", com o formulário travado; em 8 s sem resposta, segue com o
@@ -235,7 +240,8 @@ execução)
 ### Por onde se chega
 
 - **Painel da consulta** (agenda e aba Consultas): numa consulta que já
-  começou e não é faltou nem cancelada, o botão "Registrar consulta",
+  começou e não é faltou, cancelada nem pedido (um pedido de ontem não
+  aceito também não tem), o botão "Registrar consulta",
   "Continuar registro" ou "Ver registro"; e o "Observar no retorno" do
   último registro concluído do paciente. Decidido na execução:
   - com "Registrar consulta" ou "Continuar registro", "Realizada" vira
@@ -253,8 +259,8 @@ execução)
     registro" (a página do registro lê o banco por conta própria); se a do
     Observar falha, a linha "Não foi possível carregar o Observar no
     retorno.", em vez de sumir calado.
-- **Aba Consultas:** cada consulta que já começou e não é faltou nem
-  cancelada (em andamento, sem desfecho ou realizada) ganha o selo "Sem
+- **Aba Consultas:** cada consulta que já começou e não é faltou,
+  cancelada nem pedido (em andamento, sem desfecho ou realizada) ganha o selo "Sem
   registro", "Rascunho" ou "Registrada" e o link certo. O selo fica na linha
   do Histórico, sem link (seria conteúdo interativo dentro do `<summary>`), e
   o botão, no painel que a linha abre (decidido na execução).
@@ -284,7 +290,7 @@ execução)
   carregam, mostra a lista sem selos e um aviso, não "Sem registro" em tudo.
 - Salvamento que falha: o texto fica no formulário, com "Tentar de novo".
 - Duas abas no mesmo rascunho: `p_visto_em` faz o banco recusar a segunda,
-  com "O rascunho mudou em outra aba. Recarregue."
+  com "O rascunho mudou em outra aba. Recarregue a página."
 - Concluir depois que outra aba marcou faltou: o banco recusa.
 - Vínculo encerrado: não salva nem conclui; o concluído segue legível pelo
   autor **no banco** (as políticas de leitura do autor não pedem vínculo, nem
