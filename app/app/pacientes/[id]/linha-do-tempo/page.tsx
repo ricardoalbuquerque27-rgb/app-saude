@@ -13,9 +13,9 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { formatDate } from "@/lib/date";
 import { getPatientActivity, type ActivityItem } from "@/lib/nutri";
-import { ErroSecao } from "../secoes/ErroSecao";
+import { ErroSecao } from "@/components/clinico/ErroSecao";
 import { LinkPacientes, SemAcesso } from "../secoes/SemAcesso";
-import { FOCO } from "../secoes/estilos";
+import { FOCO } from "@/components/clinico/estilos";
 
 export const dynamic = "force-dynamic";
 

@@ -11,7 +11,9 @@ import {
   type MetasPrescritas,
   type PatientSummary,
 } from "@/lib/nutri";
-import { ErroSecao } from "./ErroSecao";
+import { ErroSecao } from "@/components/clinico/ErroSecao";
+import { LINK } from "@/components/clinico/estilos";
+import { textoDesdeUltima, tituloDesde, type ResumoDesde } from "@/lib/desdeConsulta";
 
 // As ações moram sobre o fundo `atencao-fundo` do AlertaFila, e ali só valem
 // os pares com contraste testado nesse fundo: `atencao`, `texto` e
@@ -53,13 +55,21 @@ export async function Fila({
   resumo,
   prescricao,
   desvios: desviosAbertos,
+  desde: desdeUltima,
 }: {
   uid: string;
   resumo: Promise<{ resumos: PatientSummary[]; falhou: boolean }>;
   prescricao: Promise<{ data: MetasPrescritas | null; error: unknown }>;
   desvios: Promise<{ data: Desvio[]; error: unknown }>;
+  /** "Desde a última consulta"; null quando não houve consulta realizada. */
+  desde: Promise<{ data: ResumoDesde | null; falhou: boolean }>;
 }) {
-  const [r, presc, desvios] = await Promise.all([resumo, prescricao, desviosAbertos]);
+  const [r, presc, desvios, desde] = await Promise.all([
+    resumo,
+    prescricao,
+    desviosAbertos,
+    desdeUltima,
+  ]);
   if (r.falhou) {
     return (
       <div className="pb-6">
@@ -120,6 +130,12 @@ export async function Fila({
             Ver clínico
           </Link>
         );
+      case "consulta":
+        return (
+          <Link href={hrefDaAba(uid, "consultas")} className={`inline-flex ${ACAO_NA_FILA}`}>
+            Ver consultas
+          </Link>
+        );
     }
   }
 
@@ -140,6 +156,19 @@ export async function Fila({
           { valor: textoVariacaoPeso(s.weightDelta30), rotulo: "peso em 30 dias" },
         ]}
       />
+      {/* A linha que o nutri lê antes de atender (spec de consultas). Sem
+          consulta realizada não há "desde", e nada aparece. */}
+      {desde.falhou ? (
+        <ErroSecao secao="o resumo desde a última consulta" />
+      ) : desde.data ? (
+        <p className="text-[15px] leading-relaxed text-clin-texto">
+          <span className="font-semibold">{tituloDesde(desde.data)}: </span>
+          {textoDesdeUltima(desde.data)}.{" "}
+          <Link href={hrefDaAba(uid, "consultas")} className={`inline-flex ${LINK}`}>
+            Ver consultas
+          </Link>
+        </p>
+      ) : null}
     </div>
   );
 }

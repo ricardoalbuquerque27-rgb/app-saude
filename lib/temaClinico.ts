@@ -100,6 +100,9 @@ export const PARES_TEXTO: [NomeCor, NomeCor][] = [
   ["texto", "atencao-fundo"],
   ["atencao-texto-2", "atencao-fundo"],
   ["perigo", "perigo-fundo"],
+  // Situação de consulta pendente ("Pedido do paciente") no bloco tracejado
+  // da agenda, que é branco (chao), não âmbar.
+  ["atencao", "chao"],
 ];
 
 /** Pares [frente, fundo] em que a cor é marca de gráfico: mínimo 3:1 (WCAG 1.4.11). */

@@ -4,6 +4,7 @@ import {
   andar,
   choques,
   dataDaUrl,
+  emFaixas,
   diasDaSemana,
   duracaoPadrao,
   ehPendencia,
@@ -331,5 +332,33 @@ describe("alertasDeConsulta", () => {
     // 23:00 de 09/10 em SP = 02:00 UTC de 10/10
     const lista = [consulta({ starts_at: "2026-10-10T02:00:00Z" })];
     expect(alertasDeConsulta(lista, agora)[0].texto).toBe("Consulta de 09/10 sem desfecho");
+  });
+});
+
+describe("emFaixas", () => {
+  it("consultas que não se tocam ficam numa faixa só", () => {
+    const r = emFaixas([
+      consulta({ id: "a", starts_at: "2026-10-20T12:00:00Z", duration_min: 60 }),
+      consulta({ id: "b", starts_at: "2026-10-20T13:00:00Z", duration_min: 60 }),
+    ]);
+    expect(r.map((x) => [x.consulta.id, x.faixa, x.faixas])).toEqual([
+      ["a", 0, 1],
+      ["b", 0, 1],
+    ]);
+  });
+
+  it("sobrepostas dividem a largura, e o grupo inteiro usa o mesmo número de faixas", () => {
+    const r = emFaixas([
+      consulta({ id: "c", starts_at: "2026-10-20T12:30:00Z", duration_min: 60 }),
+      consulta({ id: "a", starts_at: "2026-10-20T12:00:00Z", duration_min: 60 }),
+      consulta({ id: "b", starts_at: "2026-10-20T13:00:00Z", duration_min: 30 }),
+      consulta({ id: "d", starts_at: "2026-10-20T15:00:00Z", duration_min: 30 }),
+    ]);
+    expect(r.map((x) => [x.consulta.id, x.faixa, x.faixas])).toEqual([
+      ["a", 0, 2],
+      ["c", 1, 2],
+      ["b", 0, 2],
+      ["d", 0, 1],
+    ]);
   });
 });

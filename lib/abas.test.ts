@@ -14,6 +14,7 @@ describe("abaDaUrl", () => {
     expect(abaDaUrl("treino")).toBe("treino");
     expect(abaDaUrl("corpo")).toBe("corpo");
     expect(abaDaUrl("clinico")).toBe("clinico");
+    expect(abaDaUrl("consultas")).toBe("consultas");
   });
 
   it("valor desconhecido ou vazio cai no Resumo", () => {

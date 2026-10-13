@@ -401,3 +401,47 @@ export function alertasDeConsulta(
     out.push({ tipo: "consulta", nivel: 4, texto: `${semDesfecho.length} consultas sem desfecho` });
   return out;
 }
+
+// ---------------------------------------------------------------------------
+// Grade da semana
+// ---------------------------------------------------------------------------
+
+/**
+ * Faixa de cada consulta na coluna de um dia: as que se sobrepõem dividem a
+ * largura, lado a lado. Um grupo de sobrepostas (encadeadas: a com b, b com
+ * c) usa o mesmo número de faixas, para os blocos do grupo terem a mesma
+ * largura. Sai na ordem de início.
+ */
+export function emFaixas(
+  lista: Consulta[]
+): { consulta: Consulta; faixa: number; faixas: number }[] {
+  const ordem = [...lista].sort(
+    (a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at) || fimDa(a) - fimDa(b)
+  );
+  const out: { consulta: Consulta; faixa: number; faixas: number }[] = [];
+  let grupo: typeof out = [];
+  let fimDoGrupo = -Infinity;
+  let fimDaFaixa: number[] = [];
+
+  const fecharGrupo = () => {
+    for (const x of grupo) x.faixas = fimDaFaixa.length;
+    out.push(...grupo);
+    grupo = [];
+    fimDaFaixa = [];
+  };
+
+  for (const c of ordem) {
+    const ini = Date.parse(c.starts_at);
+    if (ini >= fimDoGrupo && grupo.length) fecharGrupo();
+    let faixa = fimDaFaixa.findIndex((fim) => fim <= ini);
+    if (faixa === -1) {
+      faixa = fimDaFaixa.length;
+      fimDaFaixa.push(0);
+    }
+    fimDaFaixa[faixa] = fimDa(c);
+    grupo.push({ consulta: c, faixa, faixas: 0 });
+    fimDoGrupo = Math.max(grupo.length > 1 ? fimDoGrupo : -Infinity, fimDa(c));
+  }
+  if (grupo.length) fecharGrupo();
+  return out;
+}

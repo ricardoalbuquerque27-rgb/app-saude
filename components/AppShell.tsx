@@ -23,6 +23,7 @@ import {
   ChevronRight,
   HeartPulse,
   Stethoscope,
+  CalendarDays,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import PageTransition from "@/components/PageTransition";
@@ -79,10 +80,12 @@ const menuGroups = [
 const nutriNav = [
   { href: "/app", label: "Visão geral", icon: LayoutDashboard, exact: true },
   { href: "/app/pacientes", label: "Pacientes", icon: Users, exact: false },
+  { href: "/app/agenda", label: "Agenda", icon: CalendarDays, exact: false },
 ];
 const nutriMobileNav = [
   { href: "/app", label: "Visão geral", icon: LayoutDashboard, exact: true },
   { href: "/app/pacientes", label: "Pacientes", icon: Users, exact: false },
+  { href: "/app/agenda", label: "Agenda", icon: CalendarDays, exact: false },
 ];
 const nutriMenuGroups = [
   {
@@ -133,6 +136,9 @@ export default function AppShell({
   // com 336 px, mais estreita que um celular. As outras telas continuam como
   // estavam.
   const detalheDoPaciente = /^\/app\/pacientes\/[^/]+\/?$/.test(pathname);
+  // A agenda abre pelo mesmo motivo: a grade da Semana tem sete colunas, e
+  // em 720 px cada dia ficava com ~95 px, estreito demais para "14:30 Beatriz".
+  const telaLarga = detalheDoPaciente || pathname.startsWith("/app/agenda");
 
   // Fecha o menu "Mais" ao trocar de página
   useEffect(() => {
@@ -271,7 +277,7 @@ export default function AppShell({
       {/* Conteúdo */}
       <main
         className={`mx-auto px-4 pb-28 pt-6 lg:pl-64 lg:pr-8 ${
-          detalheDoPaciente ? "max-w-7xl" : "max-w-5xl"
+          telaLarga ? "max-w-7xl" : "max-w-5xl"
         }`}
       >
         <div className="lg:pl-4">

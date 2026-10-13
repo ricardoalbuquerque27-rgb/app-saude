@@ -6,7 +6,13 @@
 // vive no endereço (?aba=treino) para o Voltar do navegador e um link mandado
 // a alguém abrirem a mesma aba.
 
-export type AbaPaciente = "resumo" | "alimentacao" | "treino" | "corpo" | "clinico";
+export type AbaPaciente =
+  | "resumo"
+  | "alimentacao"
+  | "treino"
+  | "corpo"
+  | "clinico"
+  | "consultas";
 
 export const ABAS: { id: AbaPaciente; rotulo: string }[] = [
   { id: "resumo", rotulo: "Resumo" },
@@ -14,6 +20,7 @@ export const ABAS: { id: AbaPaciente; rotulo: string }[] = [
   { id: "treino", rotulo: "Treino" },
   { id: "corpo", rotulo: "Corpo" },
   { id: "clinico", rotulo: "Clínico" },
+  { id: "consultas", rotulo: "Consultas" },
 ];
 
 /** A aba pedida no endereço; qualquer valor desconhecido cai no Resumo. */

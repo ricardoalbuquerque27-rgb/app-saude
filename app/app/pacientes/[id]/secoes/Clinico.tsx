@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { formatDate, todayISO } from "@/lib/date";
 import { Secao } from "@/components/clinico/Secao";
-import { ErroSecao } from "./ErroSecao";
+import { ErroSecao } from "@/components/clinico/ErroSecao";
 
 const TITULO_BLOCO = "text-[15px] font-semibold leading-snug text-clin-texto";
 
