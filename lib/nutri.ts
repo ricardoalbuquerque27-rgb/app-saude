@@ -1,5 +1,6 @@
 import { todayISO, addDaysISO, diasNaJanela, naJanela } from "@/lib/date";
 import { computeAdherence } from "@/lib/planCheckIn";
+import { alertasDeConsulta, COLUNAS_CONSULTA, type Consulta } from "@/lib/consultas";
 
 // Camada de dados do lado do nutricionista. Todas as consultas rodam com o
 // cliente autenticado do nutri — a RLS ("nutri reads patient") é quem libera
@@ -9,7 +10,7 @@ import { computeAdherence } from "@/lib/planCheckIn";
  * Tipo de cada alerta. A tela liga uma ação a cada um (abrir a dose, a
  * prescrição, a aba de treino...), então o tipo não pode ser lido do texto.
  */
-export type TipoAlerta = "dose" | "prescricao" | "parado" | "treino" | "exame";
+export type TipoAlerta = "dose" | "prescricao" | "parado" | "treino" | "exame" | "consulta";
 
 export type Alerta = { tipo: TipoAlerta; nivel: number; texto: string };
 
@@ -105,6 +106,7 @@ export async function resumirPacientes(
 
   const [
     mealsRes, wkRes, logsRes, bodyRes, examsRes, treatRes, planRes, checksRes, desviosRes,
+    consultasRes,
   ] = await Promise.all([
       supabase
         .from("meals")
@@ -158,10 +160,18 @@ export async function resumirPacientes(
         .select("patient_id")
         .in("patient_id", ids)
         .is("acknowledged_at", null),
+      // Só as que podem virar alerta: pedido e agendada (pedido de
+      // remarcação ou sem desfecho). As fechadas não entram na fila.
+      supabase
+        .from("appointments")
+        .select(COLUNAS_CONSULTA)
+        .in("patient_id", ids)
+        .in("status", ["pedido", "agendada"]),
     ]);
 
   const respostas = [
     mealsRes, wkRes, logsRes, bodyRes, examsRes, treatRes, planRes, checksRes, desviosRes,
+    consultasRes,
   ];
   let falhou = respostas.some((r) => r.error);
   const dados: DadosResumo = {
@@ -174,6 +184,7 @@ export async function resumirPacientes(
     plan: planRes.data ?? [],
     checks: checksRes.data ?? [],
     desvios: desviosRes.data ?? [],
+    consultas: consultasRes.data ?? [],
   };
   const resumos = montarResumos(dados, ids, names, today);
 
@@ -230,6 +241,8 @@ export type DadosResumo = {
   plan: any[];
   checks: any[];
   desvios: any[];
+  /** Pedidos e agendadas, para os alertas de consulta. */
+  consultas?: Consulta[];
   /**
    * Último dia com registro de quem não tem nenhum nos 30 dias que as
    * consultas trazem. Sem isto, quem parou há 45 dias virava "Nunca
@@ -246,7 +259,9 @@ export function montarResumos(
   dados: DadosResumo,
   ids: string[],
   names: Record<string, string>,
-  today: string
+  today: string,
+  /** O instante de agora, para "sem desfecho" (o fim da consulta já passou). */
+  agora: number | string = Date.now()
 ): PatientSummary[] {
   const { meals, workouts, logs, body, exams, treatments, plan, checks, desvios } =
     dados;
@@ -359,6 +374,13 @@ export function montarResumos(
         2,
         `${summary.desvios} ${summary.desvios > 1 ? "mudanças" : "mudança"} na sua prescrição`
       );
+    // Pedido (nível 2) logo aqui; sem desfecho (nível 4) depois dos treinos,
+    // para a lista seguir em ordem de nível.
+    const deConsulta = alertasDeConsulta(
+      (dados.consultas ?? []).filter((c) => c.patient_id === id),
+      agora
+    );
+    for (const a of deConsulta) if (a.nivel <= 2) alertar(a.tipo, a.nivel, a.texto);
 
     const idle = idleDays(summary, today);
     if (idle == null) alertar("parado", 3, "Nunca registrou nada");
@@ -371,6 +393,7 @@ export function montarResumos(
       );
     if (summary.planSemResposta7 >= 2)
       alertar("treino", 4, `${summary.planSemResposta7} treinos sem confirmação (7d)`);
+    for (const a of deConsulta) if (a.nivel > 2) alertar(a.tipo, a.nivel, a.texto);
     if (summary.alteredExams > 0)
       alertar(
         "exame",

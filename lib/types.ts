@@ -925,11 +925,69 @@ export type Database = {
         };
         Relationships: [];
       };
+      // Consultas: só leitura pela RLS; escrita pelas funções abaixo
+      // (supabase/migrations/20261013120000_consultas_e_agenda.sql).
+      appointments: {
+        Row: {
+          id: string;
+          nutritionist_id: string;
+          patient_id: string;
+          starts_at: string;
+          duration_min: number;
+          kind: string;
+          mode: string;
+          status: string;
+          patient_message: string | null;
+          reschedule_requested_at: string | null;
+          cancelled_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
     };
     Functions: {
+      marcar_consulta: {
+        Args: {
+          p_patient: string;
+          p_inicio: string;
+          p_duracao?: number;
+          p_tipo?: string;
+          p_modo?: string;
+        };
+        Returns: Json;
+      };
+      remarcar_consulta: {
+        Args: {
+          p_id: string;
+          p_inicio?: string | null;
+          p_duracao?: number | null;
+          p_tipo?: string | null;
+          p_modo?: string | null;
+        };
+        Returns: Json;
+      };
+      fechar_consulta: {
+        Args: { p_id: string; p_desfecho: string };
+        Returns: Json;
+      };
+      pedir_consulta: {
+        Args: { p_inicio: string; p_modo?: string; p_mensagem?: string | null };
+        Returns: Json;
+      };
+      pedir_remarcacao: {
+        Args: { p_id: string; p_mensagem: string };
+        Returns: Json;
+      };
+      cancelar_consulta: {
+        Args: { p_id: string };
+        Returns: Json;
+      };
       is_active_nutri_of: {
         Args: { p_patient: string };
         Returns: boolean;

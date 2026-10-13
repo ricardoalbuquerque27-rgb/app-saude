@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { ABAS, hrefDaAba, type AbaPaciente } from "@/lib/abas";
 import { useTrocaDeAba } from "./Edicao";
 
@@ -10,10 +11,13 @@ import { useTrocaDeAba } from "./Edicao";
 // é um endereço (?aba=treino), o Voltar do navegador volta para a anterior e
 // só a aba aberta consulta o banco.
 //
-// No celular, 14 px e menos folga: com o tamanho do computador as cinco
-// passavam de 390 px e o Clínico (tratamento, dose, exames) ficava fora da
-// tela, sem sinal de que a barra rolava. A rolagem fica de reserva para
-// fonte maior ou zoom, e a aba aberta é trazida para a vista ao montar.
+// No celular, 14 px e menos folga. Com as seis abas (Consultas entrou depois)
+// a barra passa de 390 px de qualquer jeito e rola; sem sinal disso, a última
+// aba ficava fora da tela e só o "C" de Consultas aparecia na borda. Por isso
+// o esmaecido com a seta no lado que tem aba escondida: a seta rola a barra.
+// Ela é só um atalho de toque (aria-hidden, fora do Tab): pelo teclado, o Tab
+// anda pelas abas e o navegador rola até a que recebe o foco. A aba aberta é
+// trazida para a vista ao montar.
 //
 // A troca muda a marca na hora do toque e espera o servidor numa transição:
 // a aba nova só chega depois das consultas dela, e sem isso o toque parecia
@@ -30,39 +34,93 @@ export function AbasPaciente({ uid, ativa }: { uid: string; ativa: AbaPaciente }
     daAtiva.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }, [ativa]);
 
+  // Há aba escondida à esquerda / à direita?
+  const barra = useRef<HTMLElement>(null);
+  const [escondida, setEscondida] = useState({ antes: false, depois: false });
+  useEffect(() => {
+    const el = barra.current;
+    if (!el) return;
+    const medir = () =>
+      setEscondida({
+        antes: el.scrollLeft > 1,
+        depois: el.scrollLeft + el.clientWidth < el.scrollWidth - 1,
+      });
+    medir();
+    el.addEventListener("scroll", medir, { passive: true });
+    const obs = new ResizeObserver(medir);
+    obs.observe(el);
+    return () => {
+      el.removeEventListener("scroll", medir);
+      obs.disconnect();
+    };
+  }, []);
+  const rolar = (sentido: 1 | -1) =>
+    barra.current?.scrollBy({ left: sentido * barra.current.clientWidth * 0.6, behavior: "smooth" });
+
+  const seta = (lado: "antes" | "depois") =>
+    escondida[lado] && (
+      <button
+        type="button"
+        aria-hidden="true"
+        tabIndex={-1}
+        data-mais-abas={lado}
+        onClick={() => rolar(lado === "antes" ? -1 : 1)}
+        className={`absolute inset-y-0 ${lado === "antes" ? "left-0 bg-gradient-to-r" : "right-0 bg-gradient-to-l"} flex w-11 items-center ${
+          lado === "antes" ? "justify-start" : "justify-end"
+        } from-clin-chao via-clin-chao to-transparent text-clin-texto-2`}
+      >
+        {lado === "antes" ? (
+          <ChevronLeft className="h-5 w-5" />
+        ) : (
+          <ChevronRight className="h-5 w-5" />
+        )}
+      </button>
+    );
+
   return (
-    <nav aria-label="Assuntos do paciente" aria-busy={carregando} className="-mx-1 overflow-x-auto">
-      <ul role="list" className="flex min-w-max border-b border-clin-linha px-1 sm:gap-1">
-        {ABAS.map((a) => {
-          const atual = a.id === marcada;
-          const href = hrefDaAba(uid, a.id);
-          return (
-            <li key={a.id}>
-              <Link
-                ref={a.id === ativa ? daAtiva : undefined}
-                href={href}
-                aria-current={atual ? "page" : undefined}
-                onClick={(e) => {
-                  // Ctrl/Cmd/Shift-clique e o botão do meio abrem noutra
-                  // janela: nada desmonta aqui, então não há o que perguntar.
-                  if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
-                  e.preventDefault();
-                  if (a.id === ativa || !podeTrocar()) return;
-                  setIndo(a.id);
-                  iniciar(() => router.push(href));
-                }}
-                className={`-mb-px inline-flex min-h-[44px] items-center whitespace-nowrap border-b-[3px] px-2 text-[14px] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-clin-primaria sm:px-3 sm:text-[15px] ${
-                  atual
-                    ? "border-clin-primaria font-semibold text-clin-primaria"
-                    : "border-transparent font-medium text-clin-texto-2 hover:text-clin-texto"
-                }`}
-              >
-                {a.rotulo}
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-    </nav>
+    <div className="relative">
+      <nav
+        ref={barra}
+        aria-label="Assuntos do paciente"
+        aria-busy={carregando}
+        // scroll-px: o scrollIntoView da aba aberta deixa a folga da seta
+        // (44 px); sem ela a seta cobria o fim de "Consultas" aberta.
+        className="-mx-1 scroll-px-12 overflow-x-auto [scrollbar-width:none]"
+      >
+        <ul role="list" className="flex min-w-max border-b border-clin-linha px-1 sm:gap-1">
+          {ABAS.map((a) => {
+            const atual = a.id === marcada;
+            const href = hrefDaAba(uid, a.id);
+            return (
+              <li key={a.id}>
+                <Link
+                  ref={a.id === ativa ? daAtiva : undefined}
+                  href={href}
+                  aria-current={atual ? "page" : undefined}
+                  onClick={(e) => {
+                    // Ctrl/Cmd/Shift-clique e o botão do meio abrem noutra
+                    // janela: nada desmonta aqui, então não há o que perguntar.
+                    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+                    e.preventDefault();
+                    if (a.id === ativa || !podeTrocar()) return;
+                    setIndo(a.id);
+                    iniciar(() => router.push(href));
+                  }}
+                  className={`-mb-px inline-flex min-h-[44px] items-center whitespace-nowrap border-b-[3px] px-2 text-[14px] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-clin-primaria sm:px-3 sm:text-[15px] ${
+                    atual
+                      ? "border-clin-primaria font-semibold text-clin-primaria"
+                      : "border-transparent font-medium text-clin-texto-2 hover:text-clin-texto"
+                  }`}
+                >
+                  {a.rotulo}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+      {seta("antes")}
+      {seta("depois")}
+    </div>
   );
 }

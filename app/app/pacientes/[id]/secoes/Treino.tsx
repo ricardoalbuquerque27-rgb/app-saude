@@ -20,7 +20,7 @@ import type {
   PlanoItem,
   Rotina,
 } from "@/components/clinico/tipos";
-import { ErroSecao } from "./ErroSecao";
+import { ErroSecao } from "@/components/clinico/ErroSecao";
 
 const DIAS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 const TITULO_BLOCO = "text-[15px] font-semibold leading-snug text-clin-texto";

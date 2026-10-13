@@ -21,6 +21,18 @@ const diaDe = (ms) =>
   }).format(new Date(ms));
 const HOJE = diaDe(Date.now());
 const dias = (n) => diaDe(Date.now() - n * 86400000);
+/**
+ * O instante (ISO) de uma hora de São Paulo, `n` dias atrás (negativo: no
+ * futuro). O mock usa −03:00 fixo; o app não (lib/consultas.ts).
+ */
+const naHora = (n, hhmm) => new Date(`${dias(n)}T${hhmm}:00-03:00`).toISOString();
+const consulta = (id, nutri, paciente, n, hhmm, extra = {}) => ({
+  id, nutritionist_id: nutri, patient_id: paciente, starts_at: naHora(n, hhmm),
+  duration_min: 45, kind: "retorno", mode: "presencial", status: "agendada",
+  patient_message: null, reschedule_requested_at: null, cancelled_by: null,
+  created_at: naHora(Math.max(n, 0) + 10, "12:00"), updated_at: naHora(Math.max(n, 0) + 10, "12:00"),
+  ...extra,
+});
 
 // ---------- dados ----------
 const medidas = [65.8, 66.2, 66.6, 66.9, 67.3, 67.7, 68.0, 68.4].map((w, i) => ({
@@ -158,6 +170,11 @@ const T = {
   exams: [], dose_logs: [], side_effects: [], nutri_templates: [], push_subscriptions: [],
   // Vazia no cenário de hoje: a Maria nunca mexeu numa meta por conta própria.
   prescription_deviations: [],
+  // A Maria teve consulta há 20 dias e tem a próxima daqui a 3.
+  appointments: [
+    consulta("ap-m1", NUT, PAC, 20, "14:00", { status: "realizada", kind: "primeira", duration_min: 60 }),
+    consulta("ap-m2", NUT, PAC, -3, "14:00", { mode: "online" }),
+  ],
 };
 
 // ---------- cenário "carteira" ----------
@@ -508,6 +525,36 @@ function carteira() {
     );
   };
 
+  // Consultas: uma situação por paciente, sem mexer nos alertas que as
+  // verificações de ferramentas/ já esperam de cada um.
+  //   Luiza    realizada há 14 dias (tem "desde a última consulta"), uma em
+  //            andamento agora (começou há 10 min) e a próxima daqui a 2
+  //            dias às 10:00; sem alerta
+  //   Beatriz  pediu consulta online daqui a 2 dias às 10:15, em cima da da
+  //            Luiza (o aviso de choque do "Aceitar") → "Pediu uma consulta"
+  //   Carlos   agendada amanhã, pediu para remarcar → alerta de remarcação
+  //   Joana    agendada há 5 dias e nunca fechada → "sem desfecho"
+  //   Pedro    1ª consulta amanhã; sem alerta
+  // Mais algumas no passado, para o mês e a semana terem volume.
+  const c = (n, ...resto) => consulta(`ap-${n}`, NUT, ...resto);
+  const consultas = [
+    c(1, P.luiza, 42, "10:00", { status: "faltou" }),
+    c(2, P.luiza, 28, "10:00", { status: "realizada" }),
+    c(3, P.luiza, 14, "10:00", { status: "realizada" }),
+    c(4, P.luiza, -2, "10:00", { mode: "online" }),
+    { ...c(13, P.luiza, 0, "12:00"), starts_at: new Date(Date.now() - 10 * 60000).toISOString(), duration_min: 60 },
+    c(5, P.beatriz, 30, "16:30", { status: "realizada", kind: "primeira", duration_min: 60 }),
+    c(6, P.beatriz, -2, "10:15", { status: "pedido", mode: "online",
+      patient_message: "Pode ser online? Saio tarde do trabalho." }),
+    c(7, P.carlos, 21, "09:00", { status: "realizada", kind: "primeira", duration_min: 60 }),
+    c(8, P.carlos, -1, "09:00", { reschedule_requested_at: naHora(1, "20:00"),
+      patient_message: "Prefiro sexta de manhã, pode ser?" }),
+    c(9, P.joana, 35, "10:30", { status: "realizada", kind: "primeira", duration_min: 60 }),
+    c(10, P.joana, 5, "10:30"),
+    c(11, P.pedro, -1, "11:00", { kind: "primeira", duration_min: 60 }),
+    c(12, P.carlos, 7, "15:00", { status: "cancelada", cancelled_by: "paciente" }),
+  ];
+
   const nutri = T.profiles.find((p) => p.id === NUT);
   return {
     pacientes: P,
@@ -515,7 +562,7 @@ function carteira() {
       { profiles: [nutri], patient_links: [
         convite(6, "Fernanda Lima", "H4X9QP", 3),
         convite(7, "Marcos Teixeira", "T8N2WD", 1),
-      ] },
+      ], appointments: consultas },
       carlos(), beatriz(), joana(), pedro(), luiza()
     ),
   };
@@ -533,6 +580,103 @@ if (CENARIO === "carteira") {
 } else if (CENARIO !== "padrao") {
   console.error(`CENARIO desconhecido: "${CENARIO}". Use "carteira", ou deixe sem definir.`);
   process.exit(1);
+}
+
+// As consultas do jeito que o cenário subiu: POST /__reset volta a elas, e o
+// roteiro de verificações pode rodar duas vezes seguidas.
+const CONSULTAS_INICIAIS = JSON.stringify(T.appointments ?? []);
+
+// ---------- funções de consulta (com estado) ----------
+// Imitam supabase/migrations/20261013120000_consultas_e_agenda.sql nas regras
+// que a tela usa; quem vale é o banco, testado em supabase/testes/.
+let seqConsulta = 0;
+function rpcConsulta(nome, a, quem) {
+  const A = (T.appointments ||= []);
+  const agora = Date.now();
+  const erro = (m) => ({ ok: false, error: m });
+  const ativo = (nutri, pac) =>
+    T.patient_links.some((l) => l.nutritionist_id === nutri && l.patient_id === pac && l.status === "active");
+  const achar = (id) => A.find((x) => x.id === id);
+  const iso = (v) => new Date(v).toISOString();
+  const toque = (x, campos) => Object.assign(x, campos, { updated_at: new Date().toISOString() });
+  const doNutri = (id) => {
+    const x = achar(id);
+    return x && x.nutritionist_id === quem && ativo(quem, x.patient_id) ? x : null;
+  };
+  switch (nome) {
+    case "marcar_consulta": {
+      if (!ativo(quem, a.p_patient)) return erro("Você não acompanha este paciente.");
+      if (!a.p_inicio) return erro("Escolha a data e a hora.");
+      const x = {
+        id: `ap-novo-${++seqConsulta}`, nutritionist_id: quem, patient_id: a.p_patient,
+        starts_at: iso(a.p_inicio), duration_min: a.p_duracao ?? 60, kind: a.p_tipo ?? "retorno",
+        mode: a.p_modo ?? "presencial", status: "agendada", patient_message: null,
+        reschedule_requested_at: null, cancelled_by: null,
+        created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+      };
+      A.push(x);
+      return { ok: true, id: x.id };
+    }
+    case "remarcar_consulta": {
+      const x = doNutri(a.p_id);
+      if (!x) return erro("Consulta não encontrada.");
+      if (!["pedido", "agendada"].includes(x.status)) return erro("Esta consulta já foi fechada.");
+      toque(x, {
+        starts_at: a.p_inicio ? iso(a.p_inicio) : x.starts_at,
+        duration_min: a.p_duracao ?? x.duration_min, kind: a.p_tipo ?? x.kind, mode: a.p_modo ?? x.mode,
+        status: "agendada", reschedule_requested_at: null,
+      });
+      return { ok: true, id: x.id };
+    }
+    case "fechar_consulta": {
+      const x = doNutri(a.p_id);
+      if (!x) return erro("Consulta não encontrada.");
+      if (a.p_desfecho !== "cancelada") {
+        if (x.status === "pedido") return erro("Aceite o pedido antes de fechar a consulta.");
+        if (x.status === "cancelada")
+          return erro("Consulta cancelada não pode virar realizada nem falta. Marque outra.");
+        if (Date.parse(x.starts_at) > agora) return erro("A consulta ainda não começou.");
+      }
+      toque(x, { status: a.p_desfecho, cancelled_by: a.p_desfecho === "cancelada" ? "nutri" : null,
+        reschedule_requested_at: null });
+      return { ok: true, id: x.id };
+    }
+    case "pedir_consulta": {
+      const l = T.patient_links.find((v) => v.patient_id === quem && v.status === "active");
+      if (!l) return erro("Você ainda não tem nutricionista no app.");
+      if (!a.p_inicio || Date.parse(a.p_inicio) <= agora) return erro("Escolha um horário no futuro.");
+      if (A.some((x) => x.patient_id === quem && x.status === "pedido"))
+        return erro("Você já tem um pedido aguardando resposta.");
+      const tipo = A.some((x) => x.patient_id === quem && x.status === "realizada") ? "retorno" : "primeira";
+      const x = {
+        id: `ap-novo-${++seqConsulta}`, nutritionist_id: l.nutritionist_id, patient_id: quem,
+        starts_at: iso(a.p_inicio), duration_min: tipo === "primeira" ? 60 : 45, kind: tipo,
+        mode: a.p_modo ?? "presencial", status: "pedido",
+        patient_message: (a.p_mensagem || "").trim() || null, reschedule_requested_at: null,
+        cancelled_by: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+      };
+      A.push(x);
+      return { ok: true, id: x.id };
+    }
+    case "pedir_remarcacao": {
+      const x = achar(a.p_id);
+      if (!x || x.patient_id !== quem) return erro("Consulta não encontrada.");
+      if (x.status !== "agendada" || Date.parse(x.starts_at) <= agora)
+        return erro("Só dá para pedir remarcação de uma consulta que ainda vai acontecer.");
+      if (!(a.p_mensagem || "").trim()) return erro("Diga qual horário fica melhor.");
+      toque(x, { reschedule_requested_at: new Date().toISOString(), patient_message: a.p_mensagem.trim() });
+      return { ok: true, id: x.id };
+    }
+    case "cancelar_consulta": {
+      const x = achar(a.p_id);
+      if (!x || x.patient_id !== quem) return erro("Consulta não encontrada.");
+      if (!(x.status === "pedido" || (x.status === "agendada" && Date.parse(x.starts_at) > agora)))
+        return erro("Esta consulta não pode mais ser cancelada pelo app.");
+      toque(x, { status: "cancelada", cancelled_by: "paciente", reschedule_requested_at: null });
+      return { ok: true, id: x.id };
+    }
+  }
+  return null;
 }
 
 // ---------- mini-PostgREST ----------
@@ -667,6 +811,10 @@ const srv = http.createServer((req, res) => {
     // quem é quem, para eles não repetirem os ids.
     if (url.pathname === "/__cenario")
       return envia(200, { cenario: CENARIO, nutri: NUT, pacientes: PACIENTES });
+    if (url.pathname === "/__reset") {
+      T.appointments = JSON.parse(CONSULTAS_INICIAIS);
+      return envia(200, { ok: true });
+    }
 
     // --- GoTrue ---
     if (url.pathname.startsWith("/auth/v1/")) {
@@ -684,7 +832,12 @@ const srv = http.createServer((req, res) => {
     // --- PostgREST ---
     if (url.pathname.startsWith("/rest/v1/")) {
       const alvo = url.pathname.replace("/rest/v1/", "");
-      if (alvo.startsWith("rpc/")) return envia(200, { ok: true });
+      if (alvo.startsWith("rpc/")) {
+        let args = {};
+        try { args = JSON.parse(corpo || "{}"); } catch {}
+        const r = rpcConsulta(alvo.slice(4), args, quemPede(req));
+        return envia(200, r ?? { ok: true });
+      }
       const linhas = T[alvo] ?? [];
       // HEAD é o que o supabase-js manda em .select(..., { head: true,
       // count: "exact" }) — a contagem vem só no cabeçalho. Sem tratar

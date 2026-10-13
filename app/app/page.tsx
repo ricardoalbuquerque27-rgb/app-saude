@@ -28,6 +28,8 @@ import NutriHome from "@/components/NutriHome";
 import PlanCheckIn from "@/components/PlanCheckIn";
 import NutriNotes from "@/components/NutriNotes";
 import MealPlanView from "@/components/MealPlanView";
+import { CartaoConsulta } from "@/components/CartaoConsulta";
+import { getConsultasDoCartao } from "@/lib/consultasDb";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -72,6 +74,7 @@ export default async function DashboardPage() {
     notasRes,
     cardapioRes,
     vinculoRes,
+    consultasRes,
   ] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", uid).maybeSingle(),
     supabase
@@ -148,6 +151,8 @@ export default async function DashboardPage() {
       .eq("status", "active")
       .limit(1)
       .maybeSingle(),
+    // As consultas mais recentes (inclusive as futuras), para o cartão.
+    getConsultasDoCartao(supabase, uid),
   ]);
 
   const profile = profileRes.data;
@@ -558,6 +563,20 @@ export default async function DashboardPage() {
           ))}
         </div>
       </section>
+
+      {/* A consulta com o nutricionista, só para quem tem acompanhamento.
+          Depois do "Hoje", que é o espaço nobre: sem nada marcado, o cartão
+          só diz isso e oferece pedir uma. */}
+      {temNutri && (
+        <CartaoConsulta
+          // Só as com o nutricionista de agora: as de um vínculo antigo o
+          // banco já cancela ao desvincular, e as passadas não são assunto aqui.
+          consultas={consultasRes.data.filter((c) => c.nutritionist_id === vinculo?.nutritionist_id)}
+          agora={new Date().toISOString()}
+          nutriNome={nutriNome}
+          falhou={consultasRes.falhou}
+        />
+      )}
 
       {/* ----------------------------------------------------------------
           2. SEU DIA — Score e números num bloco só

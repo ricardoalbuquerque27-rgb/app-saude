@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { FOCO } from "./estilos";
+import { FOCO } from "@/components/clinico/estilos";
 
 /** Volta para a lista de pacientes. */
 export function LinkPacientes() {

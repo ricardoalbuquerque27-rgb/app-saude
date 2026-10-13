@@ -2,7 +2,8 @@
 // (ver ferramentas/LEIAME.md), o dev no ar e o mock com CENARIO=carteira.
 //
 // Entra como nutricionista e faz duas coisas com o detalhe do paciente, que é
-// em abas (Resumo, Alimentação, Treino, Corpo, Clínico; ?aba=):
+// em abas (Resumo, Alimentação, Treino, Corpo, Clínico, Consultas; ?aba=) e
+// com a agenda (/app/agenda):
 //   1. tira os prints: paciente/aba x celular/computador x claro/escuro, e avisa
 //      se alguma página transborda a largura da janela;
 //   2. confere na tela o que só a tela mostra: cada verificação ACUSA (sai com
@@ -36,6 +37,7 @@ const SINAL_DA_ABA = {
   treino: "#treino",
   corpo: "#corpo",
   clinico: "#clinico",
+  consultas: "#consultas",
 };
 const TZ = "America/Sao_Paulo";
 
@@ -205,6 +207,9 @@ async function transbordo(page) {
     process.exit(2);
   }
   const P = cen.pacientes;
+  // As consultas voltam ao que o cenário subiu: a Verificação 15 aceita
+  // pedidos e fecha consultas, e uma segunda rodada acharia outra agenda.
+  await fetch(MOCK + "/__reset", { method: "POST" });
   const rota = (k) => `/app/pacientes/${P[k]}`;
   /** A rota de uma aba; o Resumo é a rota sem parâmetro. */
   const aba = (k, a) => rota(k) + (a === "resumo" ? "" : `?aba=${a}`);
@@ -223,6 +228,7 @@ async function transbordo(page) {
     ["beatriz-treino", "beatriz", "treino", null],
     ["beatriz-corpo", "beatriz", "corpo", null],
     ["beatriz-clinico", "beatriz", "clinico", null],
+    ["beatriz-consultas", "beatriz", "consultas", null], // pedido de consulta aberto
     ["beatriz-metas", "beatriz", "alimentacao", abrirMetas], // com "Editar metas" aberto
     // Os outros, no Resumo, onde cada um é diferente.
     ["luiza", "luiza", "resumo", null], // sem alertas
@@ -269,6 +275,25 @@ async function transbordo(page) {
     await ctx.close();
   }
 
+  // A agenda nas três vistas, nos dois temas e nas duas larguras.
+  console.log("\nAgenda (prints)");
+  for (const [tema, escuro] of [["claro", false], ["escuro", true]]) {
+    for (const disp of [CELULAR, COMPUTADOR]) {
+      const ctx = await contexto(browser, disp, escuro, estado);
+      for (const vista of ["dia", "semana", "mes"]) {
+        const page = await abrir(ctx, `/app/agenda?vista=${vista}`, { secoes: false });
+        await page.locator('nav[aria-label="Vista da agenda"]').waitFor({ timeout: 60000 });
+        ok(!/Não foi possível carregar/.test(await textoDe(page.locator("body"))), `agenda sem erro: ${vista}/${disp.nome}/${tema}`);
+        const m = await transbordo(page);
+        const arquivo = `${OUT}/agenda-${vista}-${disp.nome}-${tema}.png`;
+        await fotografar(page, arquivo, disp);
+        ok(m.doc <= m.larg, `sem transbordo: ${arquivo} (documento ${m.doc}px, janela ${m.larg}px)`, m.vaza.join(" | "));
+        await page.close();
+      }
+      await ctx.close();
+    }
+  }
+
   // Erro e transbordo em TODAS as abas de todos os pacientes, sem print: os
   // prints acima só mostram as abas da Beatriz, e as abas vazias do Pedro ou
   // o Clínico da Joana (exame fora) também precisam caber em 390 px.
@@ -277,7 +302,7 @@ async function transbordo(page) {
   for (const disp of [CELULAR, COMPUTADOR]) {
     const ctx = await contexto(browser, disp, false, estado);
     for (const k of ["luiza", "pedro", "carlos", "joana"]) {
-      for (const a of ["alimentacao", "treino", "corpo", "clinico"]) {
+      for (const a of ["alimentacao", "treino", "corpo", "clinico", "consultas"]) {
         const page = await abrir(ctx, aba(k, a));
         ok(!/Não foi possível carregar/.test(await textoDe(page.locator("body"))), `nenhuma seção com erro: ${k}/${a}/${disp.nome}`);
         const m = await transbordo(page);
@@ -866,6 +891,171 @@ async function transbordo(page) {
     ok((await page.title()) === "Treino · Paciente · Pace Fit", `o título da página diz a aba (${await page.title()})`);
     await page.close();
   }
+
+  // =====================================================================
+  // 15. Consultas e agenda
+  // =====================================================================
+  console.log("\nVerificação 15: consultas e agenda");
+  etapa = "consultas";
+  {
+    const diaSP = (n) =>
+      new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" })
+        .format(new Date(Date.now() + n * 86400000));
+    const agenda = (q = "") => `/app/agenda${q}`;
+    const vista = (page) => page.locator('nav[aria-label="Vista da agenda"]');
+    const aviso = (page) => page.locator('section[aria-labelledby="pendencias-agenda"]');
+    const janela = (page) => page.locator("dialog[open]");
+    const abrirAgenda = async (ctx, q) => {
+      const page = await abrir(ctx, agenda(q), { secoes: false });
+      await vista(page).waitFor({ timeout: 60000 });
+      return page;
+    };
+
+    // a) a vista padrão é o Dia de hoje, e a linha de aviso conta as pendências
+    {
+      const ctx = await contexto(browser, COMPUTADOR, false, {
+        ...estado,
+        cookies: estado.cookies.filter((c) => c.name !== "agenda_vista"),
+      });
+      const page = await abrirAgenda(ctx, "");
+      ok((await textoDe(page.locator("h2").first())).includes("hoje"), "sem cookie nem ?vista=, a agenda abre no Dia de hoje");
+      const txt = await textoDe(aviso(page));
+      ok(txt.includes("2 pedidos aguardando") && txt.includes("1 consulta sem desfecho"),
+        "a linha de aviso conta 2 pedidos (Beatriz, Carlos) e 1 sem desfecho (Joana)", txt);
+      // b) a última vista usada fica: Semana, e depois /app/agenda sem ?vista=
+      await page.close();
+      const semana = await abrirAgenda(ctx, "?vista=semana");
+      await semana.waitForTimeout(300);
+      await semana.close();
+      const de_novo = await abrirAgenda(ctx, "");
+      ok((await de_novo.locator('nav[aria-label="Vista da agenda"] [aria-current="page"]').innerText()).trim() === "Semana",
+        "sem ?vista=, a agenda abre na última vista usada (Semana)");
+      await de_novo.close();
+      await ctx.close();
+    }
+
+    // c) a semana põe cada consulta no dia certo, e o pedido tracejado
+    {
+      const page = await abrirAgenda(pc, `?vista=semana&data=${diaSP(2)}`);
+      const bloco = page.locator('button[title^="10:15 Beatriz"]');
+      ok((await bloco.count()) === 1, "Semana: o pedido da Beatriz (daqui a 2 dias, 10:15) aparece na grade");
+      const luiza = await page.locator('button[title^="10:00 Luiza"]').boundingBox();
+      const bea = await bloco.first().boundingBox();
+      ok(!!luiza && !!bea && bea.x >= luiza.x + luiza.width - 4,
+        "Semana: Luiza 10:00 e Beatriz 10:15, que se sobrepõem, ficam lado a lado");
+      const borda = await bloco.first().evaluate((el) => getComputedStyle(el).borderTopStyle).catch(() => "");
+      ok(borda === "dashed", `Semana: pedido é tracejado (${borda})`);
+      await page.close();
+    }
+    // d) o mês marca a pendência no dia da Joana (sem desfecho há 5 dias)
+    {
+      const page = await abrirAgenda(pc, `?vista=mes&data=${diaSP(-5)}`);
+      // Só o link do calendário: o "Dia" da troca de vista aponta para o mesmo endereço.
+      const dia = page.locator(`ol a[href="/app/agenda?vista=dia&data=${diaSP(-5)}"]`);
+      ok(/pendência/.test((await dia.getAttribute("aria-label")) || ""), "Mês: o dia da consulta sem desfecho tem a marca de pendência");
+      await page.close();
+    }
+
+    // e) aceitar o pedido da Beatriz pela linha de aviso
+    {
+      const page = await abrirAgenda(pc, "?vista=dia");
+      await clicar(aviso(page).getByRole("button", { name: /Beatriz Rocha pediu consulta/ }));
+      await janela(page).waitFor({ timeout: 30000 });
+      ok((await textoDe(janela(page))).includes("Pode ser online?"), "o painel mostra o recado do pedido");
+      await page.waitForFunction(() => document.querySelector("dialog[open]")?.textContent?.includes("Bate com"), null, { timeout: 30000 }).catch(() => {});
+      ok((await textoDe(janela(page))).includes("Bate com 10:00 Luiza Prado"),
+        "o painel do pedido avisa que o horário pedido bate com a consulta da Luiza", await textoDe(janela(page)));
+      await clicar(janela(page).getByRole("button", { name: "Aceitar" }));
+      await page.waitForFunction(() => !document.querySelector("dialog[open]"), null, { timeout: 30000 });
+      await page.waitForFunction(
+        () => (document.querySelector('section[aria-labelledby="pendencias-agenda"]')?.textContent || "").includes("1 pedido aguardando"),
+        null, { timeout: 30000 }
+      ).catch(() => {});
+      ok((await textoDe(aviso(page))).includes("1 pedido aguardando"), "Aceitar fecha o painel e o aviso passa a 1 pedido", await textoDe(aviso(page)));
+      await page.close();
+      const resumo = await abrir(pc, rota("beatriz"));
+      ok(!(await textoDe(fila(resumo))).includes("Pediu uma consulta"), "depois de aceito, a fila da Beatriz não acusa mais o pedido");
+      await resumo.close();
+    }
+
+    // f) Carlos: manter horário tira a pendência; a próxima consulta aparece
+    {
+      const page = await abrir(pc, aba("carlos", "consultas"));
+      ok((await textoDe(page.locator("#consultas"))).includes("Prefiro sexta de manhã"), "Consultas do Carlos: o recado da remarcação aparece");
+      await clicar(page.locator("#consultas").getByRole("button", { name: "Manter horário" }));
+      await page.waitForFunction(() => !document.querySelector("#consultas")?.textContent?.includes("Precisa de você"), null, { timeout: 30000 }).catch(() => {});
+      const txt = await textoDe(page.locator("#consultas"));
+      ok(!txt.includes("Precisa de você") && txt.includes("Próxima consulta"), "Manter horário: some a pendência e fica a próxima consulta", txt.slice(0, 200));
+      // O cabeçalho do paciente é o <header> com o nome (h1); o primeiro da
+      // página é o do AppShell no celular, escondido no computador.
+      ok((await textoDe(page.locator("header:has(h1)"))).includes("Próxima consulta"), "o cabeçalho do Carlos mostra a próxima consulta");
+      await page.close();
+    }
+
+    // g) Joana: fechar a sem desfecho como realizada
+    {
+      const page = await abrir(pc, aba("joana", "consultas"));
+      await clicar(page.locator("#consultas").getByRole("button", { name: "Realizada", exact: true }));
+      await page.waitForFunction(() => !document.querySelector("#consultas")?.textContent?.includes("Precisa de você"), null, { timeout: 30000 }).catch(() => {});
+      ok(!(await textoDe(page.locator("#consultas"))).includes("Precisa de você"), "Realizada tira a consulta da Joana das pendências");
+      ok((await textoDe(page.locator("#consultas"))).includes("Sem retorno marcado"),
+        "sem próxima consulta, a realizada sobe como 'Sem retorno marcado', com o Marcar retorno");
+      // "Realizada" abre o formulário do retorno, e ele SOBREVIVE ao refresh
+      // (a consulta muda de grupo, mas é o mesmo painel).
+      const form = page.locator("#consultas form");
+      ok((await form.count()) === 1 && (await textoDe(page.locator("#consultas"))).includes("Marcar retorno"),
+        "depois de 'Realizada', o formulário do retorno continua aberto quando a página recarrega");
+      await page.close();
+      const resumo = await abrir(pc, rota("joana"));
+      ok(!(await textoDe(fila(resumo))).includes("sem desfecho"), "a fila da Joana não acusa mais consulta sem desfecho");
+      ok(/Desde a última consulta \(\d\d\/\d\d\)/.test(await textoDe(resumo.locator("body"))), "o Resumo da Joana passa a ter 'Desde a última consulta'");
+      await resumo.close();
+    }
+
+    // g2) Luiza: a consulta que está acontecendo já oferece Realizada e Faltou
+    {
+      const page = await abrir(pc, aba("luiza", "consultas"));
+      const proxima = page.locator("#consultas li:has(> h3:text-is('Próxima consulta'))");
+      ok((await proxima.getByRole("button", { name: "Realizada", exact: true }).count()) === 1 &&
+        (await proxima.getByRole("button", { name: "Faltou", exact: true }).count()) === 1,
+        "consulta em andamento: Realizada e Faltou sem esperar o fim");
+      await page.close();
+    }
+
+    // h) marcar consulta: sem paciente avisa; em cima da Luiza avisa o choque e salva
+    {
+      const d2 = diaSP(2);
+      const page = await abrirAgenda(pc, `?vista=dia&data=${d2}`);
+      await clicar(page.getByRole("button", { name: "Marcar consulta" }));
+      const j = janela(page);
+      await j.waitFor({ timeout: 30000 });
+      await j.locator('input[type="time"]').fill("10:15");
+      await clicar(j.getByRole("button", { name: "Marcar consulta" }));
+      ok((await textoDe(j)).includes("Escolha o paciente."), "Marcar consulta sem paciente pede o paciente");
+      await j.locator("select").first().selectOption({ label: "Pedro Alves" });
+      await page.waitForFunction(() => document.querySelector("dialog[open]")?.textContent?.includes("Bate com"), null, { timeout: 30000 }).catch(() => {});
+      ok((await textoDe(j)).includes("Bate com 10:00 Luiza Prado"), "o formulário avisa o choque com a consulta da Luiza", await textoDe(j));
+      await clicar(j.getByRole("button", { name: "Marcar consulta" }));
+      await page.waitForFunction(() => !document.querySelector("dialog[open]"), null, { timeout: 30000 });
+      await page.waitForFunction(() => document.body.textContent.includes("10:15"), null, { timeout: 30000 }).catch(() => {});
+      const lista = await textoDe(page.locator("main"));
+      ok(lista.includes("10:15") && lista.includes("Pedro Alves"), "choque avisa e não impede: a consulta do Pedro às 10:15 entra no dia");
+      await page.close();
+    }
+
+    // i) no celular, a seta mostra que há aba escondida e rola até Consultas
+    {
+      const page = await abrir(cel, rota("beatriz"));
+      const seta = page.locator('[data-mais-abas="depois"]');
+      ok(await seta.isVisible(), "celular: a barra de abas mostra a seta de que há mais abas");
+      await seta.click();
+      await page.waitForTimeout(600);
+      const caixa = await page.getByRole("link", { name: "Consultas", exact: true }).boundingBox();
+      ok(!!caixa && caixa.x + caixa.width <= 390, `celular: depois da seta, a aba Consultas fica na tela (${caixa && Math.round(caixa.x + caixa.width)}px)`);
+      await page.close();
+    }
+  }
+  await fetch(MOCK + "/__reset", { method: "POST" });
 
   console.log("\nConsole e rede");
   ok(errosDeConsole.length === 0, `nenhum erro de console, de página ou de rede em todas as telas (${errosDeConsole.length})`,

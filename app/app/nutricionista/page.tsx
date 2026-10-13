@@ -12,6 +12,8 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui";
 import { todayISO, formatDate, dataNoBrasil } from "@/lib/date";
+import { CartaoConsulta } from "@/components/CartaoConsulta";
+import { getConsultasDoCartao } from "@/lib/consultasDb";
 import NutriNotes, { type Nota } from "@/components/NutriNotes";
 import MealPlanView from "@/components/MealPlanView";
 import ConectarNutri from "@/components/ConectarNutri";
@@ -77,7 +79,7 @@ export default async function MeuNutricionistaPage({
 
   const nutriId = link.nutritionist_id as string;
 
-  const [profRes, prescRes, planoRes, notasRes, refeicoesRes, sessoesRes] =
+  const [profRes, prescRes, planoRes, notasRes, refeicoesRes, sessoesRes, consultasRes] =
     await Promise.all([
       supabase.from("profiles").select("full_name").eq("id", nutriId).maybeSingle(),
       supabase
@@ -114,6 +116,7 @@ export default async function MeuNutricionistaPage({
         .not("prescribed_by", "is", null)
         .order("day_of_week", { ascending: true })
         .order("position", { ascending: true }),
+      getConsultasDoCartao(supabase, uid),
     ]);
 
   const nutriNome = (profRes.data as any)?.full_name || "Seu nutricionista";
@@ -186,6 +189,15 @@ export default async function MeuNutricionistaPage({
         {/* "Revogar acesso" roubava largura do nome, que truncava em
             "Ricardo Albuque…". A ação é secundária; o nome é que importa. */}
         <RevogarNutri linkId={link.id} />
+      </div>
+
+      <div className="mb-5">
+        <CartaoConsulta
+          consultas={consultasRes.data.filter((c) => c.nutritionist_id === nutriId)}
+          agora={new Date().toISOString()}
+          nutriNome={(profRes.data as any)?.full_name || undefined}
+          falhou={consultasRes.falhou}
+        />
       </div>
 
       {/* Abas espelham as do painel do nutricionista */}

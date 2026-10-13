@@ -16,9 +16,10 @@ Isso não é óbvio lendo a árvore de arquivos.
 - **Paciente:** `app/app/page.tsx` (Início), `nutricionista/` ("Meu plano":
   metas, cardápio, treino, conversa), `dieta/`, `treinos/`, `habitos/`,
   `medidas/`, `exames/`, `tratamento/`, `treino/[id]` (leitura do treino).
-- **Nutricionista:** `components/NutriHome.tsx`, `app/app/pacientes/` e o
+- **Nutricionista:** `components/NutriHome.tsx`, `app/app/pacientes/`, a
+  agenda em `app/app/agenda/` (veja "Consultas e agenda") e o
   detalhe em `pacientes/[id]`, em abas por assunto: Resumo, Alimentação,
-  Treino, Corpo e Clínico. Ele prescreve ali mesmo, nas abas Alimentação
+  Treino, Corpo, Clínico e Consultas. Ele prescreve ali mesmo, nas abas Alimentação
   (metas, cardápio) e Treino; a fila do Resumo tem o atalho Reaplicar, que
   grava de novo a última prescrição; o resto é leitura, fora a conversa e as
   notas. Não há aba Prescrição. Veja "A página do paciente" abaixo.
@@ -26,6 +27,9 @@ Isso não é óbvio lendo a árvore de arquivos.
   `lib/planCheckIn.ts` (adesão, `estadosDaSemana`), `lib/foods.ts` (tabela
   TACO), `lib/edicao.ts` (`reduzirEdicao`, a regra de uma edição por vez,
   e `oQueSeguraATroca`), `lib/abas.ts` (a aba que o endereço pede),
+  `lib/consultas.ts` (situação de cada consulta, hora de São Paulo, choque,
+  grade do mês e da semana, alertas de consulta), `lib/desdeConsulta.ts`
+  ("desde a última consulta"),
   `lib/temaClinico.ts` com `lib/contraste.ts` (paleta e razão de contraste)
   e, em `lib/nutri.ts`, a conta do resumo, da fila de triagem e da linha do
   tempo do nutri (`montarResumos`, `filaDeTriagem`, `montarLinhaDoTempo`),
@@ -43,7 +47,8 @@ authenticated` — nessa ordem.
 ## A página do paciente (nutricionista)
 
 `pacientes/[id]/page.tsx` monta as seções de `secoes/` em abas: Resumo
-(Fila: alertas e números), Alimentação, Treino, Corpo e Clínico. A aba vem
+(Fila: alertas, números e "desde a última consulta"), Alimentação, Treino,
+Corpo, Clínico e Consultas. A aba vem
 do endereço (`?aba=treino`; `lib/abas.ts`, que manda qualquer valor
 desconhecido para o Resumo) e **só a aba aberta é montada e consulta o
 banco**: cada aba cria ali mesmo as consultas que usa (o perfil do
@@ -67,13 +72,18 @@ Resumo e desmontava o rascunho. Botões da fila que levavam a uma seção ("Ver
 semana", "Ver clínico") agora abrem a aba dela.
 `?t=atividade` redireciona para `pacientes/[id]/linha-do-tempo`.
 
+No celular as seis abas passam de 390 px: a barra rola, e uma seta com
+esmaecido na borda mostra que há aba escondida (sem ela, só o "C" de
+Consultas aparecia). `ErroSecao` e os estilos de botão (`estilos.ts`) moram em
+`components/clinico/`, porque a agenda usa os mesmos.
+
 **Largura.** A partir de `lg`, a área de conteúdo do `AppShell` tem 720 px
 seja qual for a largura da janela (`max-w-5xl` menos o menu lateral e as
 margens). Com a coluna de conversa de 360 px a partir de `lg`, sobravam
 ~336 px para a principal, menos que um celular. Por isso as duas colunas só
 começam em `xl:` (1280 px), e o `AppShell` abre para `max-w-7xl` apenas em
-`/app/pacientes/<id>`. Para encaixar algo ao lado do conteúdo, meça a área
-do conteúdo, não a janela.
+`/app/pacientes/<id>` e na agenda (a grade da Semana tem sete colunas). Para
+encaixar algo ao lado do conteúdo, meça a área do conteúdo, não a janela.
 
 **Leitura que falha não é "não tem".** O supabase-js devolve
 `{ data: null, error }` sem lançar, e `data ?? []` esconde a falha: sem as
@@ -97,11 +107,42 @@ de plano de treino; com os dois abertos, a fila avisa embaixo do Reaplicar.
 E `set_patient_goals` trata nulo como "apagar a meta": "Reaplicar" manda os
 quatro valores da última prescrição, nunca só o campo que mudou.
 
+## Consultas e agenda
+
+Spec: `docs/superpowers/specs/2026-10-13-consultas-e-agenda-design.md`.
+Tabela `appointments` com **só política de leitura**; toda escrita é por
+função `SECURITY DEFINER` (`marcar_consulta`, `remarcar_consulta`,
+`fechar_consulta`, `pedir_consulta`, `pedir_remarcacao`, `cancelar_consulta`),
+que confere quem pede e a mudança de situação: com política de update, o
+paciente poderia se marcar como "realizada". As funções devolvem `{ ok, error }`
+como `set_patient_goals`. "Remarcar" com só o id é "Aceitar" o pedido e
+"Manter horário" na remarcação. **"Sem desfecho" não é gravado**: é uma agendada
+cujo fim (`starts_at + duration_min`) já passou (`situacao` em
+`lib/consultas.ts`); gravar pediria cron, e o Hobby só aceita diário.
+
+A migração mora em `supabase/migrations/` e é testada num Postgres local com
+`ferramentas/testar-sql.sh` (ver `ferramentas/LEIAME.md`), não em produção.
+Hora de consulta é sempre de São Paulo com o deslocamento do dia
+(`instanteEmSaoPaulo`), nunca `-03:00` fixo; o dia de uma consulta é
+`diaDaConsulta`/`dataNoBrasil`, nunca `starts_at.slice(0,10)`.
+
+A agenda (`/app/agenda?vista=dia|semana|mes&data=`) usa o tema clínico
+(`components/clinico/TemaClinico.tsx`, o mesmo do paciente) e os mesmos
+componentes (`components/consultas/`). Sem `?vista=`, vale a última usada
+(cookie `agenda_vista`); sem cookie, Dia. Pendência (pedido, pedido de
+remarcação, sem desfecho) vira alerta de tipo `consulta` na fila (nível 2 e
+4) e aparece tracejada na agenda, com uma linha de aviso no topo; não há
+coluna de pendências (o dono do produto achou "bagunçado"). Choque de
+horário avisa e não impede. O paciente vê o cartão de consulta
+(`components/CartaoConsulta.tsx`) na Início e em "Meu plano", no visual do
+app dele, e não recebe aviso fora do app (sem Web Push).
+
 ## Comandos
 
 ```bash
 npm run dev      # desenvolvimento
-npm test         # 169 testes unitários (vitest)
+npm test         # 226 testes unitários (vitest)
+ferramentas/testar-sql.sh   # migrações e testes SQL num Postgres local
 npm run build    # produção
 ```
 
@@ -143,6 +184,14 @@ os deploys por semanas sem mensagem de erro visível.
 **`npm run build` com o `npm run dev` no ar** apaga os chunks que o dev
 está servindo. O sintoma engana: 404 nos scripts, React não hidrata,
 formulário faz submit nativo.
+
+**Service worker e `router.refresh()`.** `public/sw.js` tinha `/app` na lista
+de cache-primeiro, e o `router.refresh()` do Next busca `/app?_rsc=…` (mesmo
+caminho): depois de qualquer ação na Início do paciente (confirmar treino, ler
+recado, cancelar consulta) a página voltava com o dado VELHO, para quem tinha o
+service worker instalado. A resposta RSC (`_rsc`, cabeçalho `RSC`) nunca vai
+para o cache; cache-primeiro só em `/_next/static/`. Ao mexer no sw.js, troque
+o nome do `CACHE` para apagar o antigo.
 
 **`playwright` fica fora do `package.json`** de propósito (o postinstall
 baixa navegadores e atrasa o build na Vercel). Qualquer `npm install`

@@ -3,7 +3,7 @@ import { Secao } from "@/components/clinico/Secao";
 import { Conversa } from "@/components/clinico/Conversa";
 import { NotasPrivadas } from "@/components/clinico/NotasPrivadas";
 import type { Mensagem } from "@/components/clinico/tipos";
-import { ErroSecao } from "./ErroSecao";
+import { ErroSecao } from "@/components/clinico/ErroSecao";
 
 export type Foco = "conversa" | "notas" | null;
 

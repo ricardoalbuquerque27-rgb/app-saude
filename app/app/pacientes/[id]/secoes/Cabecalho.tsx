@@ -2,8 +2,9 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { idadeEm, todayISO } from "@/lib/date";
 import { hrefDaAba, type AbaPaciente } from "@/lib/abas";
-import { ErroSecao } from "./ErroSecao";
-import { ACAO_PRIMARIA, ACAO_SECUNDARIA, LINK } from "./estilos";
+import { COLUNAS_CONSULTA, proximaConsulta, rotuloDaConsulta, ROTULO_MODO, type Consulta } from "@/lib/consultas";
+import { ErroSecao } from "@/components/clinico/ErroSecao";
+import { ACAO_PRIMARIA, ACAO_SECUNDARIA, LINK } from "@/components/clinico/estilos";
 
 export type PerfilCabecalho = {
   full_name: string | null;
@@ -12,8 +13,8 @@ export type PerfilCabecalho = {
   height_cm: number | null;
 };
 
-// Nome, idade, sexo e altura, e as três saídas da página: Mensagem, Nota
-// privada e Linha do tempo.
+// Nome, idade, sexo e altura, a próxima consulta, e as três saídas da
+// página: Mensagem, Nota privada e Linha do tempo.
 //
 // Mensagem e Nota privada vão para lugares diferentes conforme a largura. No
 // celular, `?conversa=1` / `?notas=1` abre só aquela parte em tela cheia, e
@@ -36,13 +37,28 @@ export async function Cabecalho({
   // Não lida = mensagem DO PACIENTE com read_at nulo. Só o envio do
   // nutricionista marca as respostas como lidas (Conversa), então a conta
   // quer dizer "ainda sem resposta", que é o que importa para a fila.
-  const { count, error } = await supabase
-    .from("patient_notes")
-    .select("id", { count: "exact", head: true })
-    .eq("patient_id", uid)
-    .eq("author_id", uid)
-    .eq("visibility", "shared")
-    .is("read_at", null);
+  const agora = new Date().toISOString();
+  const [notas, consultas] = await Promise.all([
+    supabase
+      .from("patient_notes")
+      .select("id", { count: "exact", head: true })
+      .eq("patient_id", uid)
+      .eq("author_id", uid)
+      .eq("visibility", "shared")
+      .is("read_at", null),
+    // A próxima é a agendada que ainda não acabou: começar até 4 h atrás
+    // cobre a que está acontecendo agora (a duração máxima é 240 min).
+    supabase
+      .from("appointments")
+      .select(COLUNAS_CONSULTA)
+      .eq("patient_id", uid)
+      .eq("status", "agendada")
+      .gte("starts_at", new Date(Date.now() - 4 * 3600_000).toISOString())
+      .order("starts_at", { ascending: true })
+      .limit(5),
+  ]);
+  const { count, error } = notas;
+  const proxima = consultas.error ? null : proximaConsulta((consultas.data ?? []) as Consulta[], agora);
 
   const nome = perfil.full_name || "Paciente";
   const idade = idadeEm(perfil.birth_date, todayISO());
@@ -84,6 +100,15 @@ export async function Cabecalho({
           <p className="mt-1 text-[14px] tabular-nums text-clin-texto-2">
             {detalhes}
           </p>
+          {/* Texto, não link: o cabeçalho fica em todas as abas, e um link
+              para a aba Consultas trocaria de aba sem a pergunta de
+              "Descartar as alterações?" da barra (AbasPaciente), perdendo um
+              rascunho de metas. A aba Consultas está logo abaixo. */}
+          {proxima && (
+            <p className="mt-1 text-[14px] tabular-nums text-clin-texto-2">
+              Próxima consulta: {rotuloDaConsulta(proxima)} · {ROTULO_MODO[proxima.mode]}
+            </p>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Link
@@ -117,6 +142,11 @@ export async function Cabecalho({
       {error && (
         <div className="mt-4">
           <ErroSecao secao="as mensagens não lidas" />
+        </div>
+      )}
+      {consultas.error && (
+        <div className="mt-4">
+          <ErroSecao secao="a próxima consulta" />
         </div>
       )}
     </header>

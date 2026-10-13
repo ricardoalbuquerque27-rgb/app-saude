@@ -18,10 +18,12 @@ import { Alimentacao } from "./secoes/Alimentacao";
 import { Treino } from "./secoes/Treino";
 import { Corpo } from "./secoes/Corpo";
 import { Clinico } from "./secoes/Clinico";
+import { Consultas } from "./secoes/Consultas";
+import { getConsultasDoPaciente, getDesdeDoPaciente } from "@/lib/consultasDb";
 import { ConversaENotas, type Foco } from "./secoes/ConversaENotas";
-import { ErroSecao } from "./secoes/ErroSecao";
+import { ErroSecao } from "@/components/clinico/ErroSecao";
 import { LinkPacientes, SemAcesso } from "./secoes/SemAcesso";
-import { FOCO } from "./secoes/estilos";
+import { FOCO } from "@/components/clinico/estilos";
 
 export const dynamic = "force-dynamic";
 
@@ -39,7 +41,7 @@ export function generateMetadata({
 }
 
 // O detalhe do paciente, em abas por assunto: Resumo (fila e números),
-// Alimentação, Treino, Corpo e Clínico. Foi uma rolagem só; com dados reais,
+// Alimentação, Treino, Corpo, Clínico e Consultas. Foi uma rolagem só; com dados reais,
 // a fila de alertas e as cinco seções empilhadas ficaram longas demais, e
 // cada assunto novo (consultas, evolução) esticaria mais. O que o
 // nutricionista lê e o que ele edita continuam na mesma aba.
@@ -133,6 +135,7 @@ export default async function PacienteDetalhe({
                 resumo={resumirPacientes(supabase, [uid], { [uid]: nome })}
                 prescricao={getUltimaPrescricao(supabase, uid)}
                 desvios={getDesviosAbertos(supabase, uid)}
+                desde={getDesdeDoPaciente(supabase, uid)}
               />
             </Suspense>
           </>
@@ -186,6 +189,17 @@ export default async function PacienteDetalhe({
         return (
           <Suspense fallback={<SkelCard />}>
             <Clinico uid={uid} />
+          </Suspense>
+        );
+      case "consultas":
+        return (
+          <Suspense fallback={<SkelCard />}>
+            <Consultas
+              uid={uid}
+              nutriId={nutriId}
+              nome={nome}
+              consultas={getConsultasDoPaciente(supabase, uid)}
+            />
           </Suspense>
         );
     }

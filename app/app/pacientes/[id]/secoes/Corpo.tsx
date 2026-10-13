@@ -9,8 +9,8 @@ import {
 } from "@/lib/nutri";
 import { Secao } from "@/components/clinico/Secao";
 import { VerHistorico } from "@/components/clinico/VerHistorico";
-import { ErroSecao } from "./ErroSecao";
-import { FOCO, LINK } from "./estilos";
+import { ErroSecao } from "@/components/clinico/ErroSecao";
+import { FOCO, LINK } from "@/components/clinico/estilos";
 
 const TITULO_BLOCO = "text-[15px] font-semibold leading-snug text-clin-texto";
 

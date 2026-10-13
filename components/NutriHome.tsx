@@ -9,7 +9,9 @@ import {
   Syringe,
   FileText,
   CalendarOff,
+  CalendarClock,
   ClipboardList,
+  Dumbbell,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { EmptyState } from "@/components/ui";
@@ -17,6 +19,7 @@ import {
   getPatientsSummary,
   filaDeTriagem,
   type PatientSummary,
+  type TipoAlerta,
 } from "@/lib/nutri";
 
 export const dynamic = "force-dynamic";
@@ -28,12 +31,16 @@ export const dynamic = "force-dynamic";
 // Pacientes já filtra por atenção e por hoje. Aqui cada paciente aparece
 // uma vez, e só se precisar do nutricionista.
 
-function alertIcon(alert: string) {
-  if (alert.includes("Dose")) return <Syringe className="h-3.5 w-3.5" />;
-  if (alert.includes("prescrição")) return <ClipboardList className="h-3.5 w-3.5" />;
-  if (alert.includes("exame")) return <FileText className="h-3.5 w-3.5" />;
-  return <CalendarOff className="h-3.5 w-3.5" />;
-}
+// Pelo tipo do alerta, não pelo texto: o texto muda ("Pediu uma consulta",
+// "Consulta de 09/10 sem desfecho") e o ícone não pode depender disso.
+const ICONE: Record<TipoAlerta, typeof Syringe> = {
+  dose: Syringe,
+  prescricao: ClipboardList,
+  parado: CalendarOff,
+  treino: Dumbbell,
+  exame: FileText,
+  consulta: CalendarClock,
+};
 
 function PatientRow({ s }: { s: PatientSummary }) {
   return (
@@ -49,15 +56,18 @@ function PatientRow({ s }: { s: PatientSummary }) {
           {s.name}
         </p>
         <div className="mt-0.5 flex flex-wrap gap-x-2 gap-y-1">
-          {s.alerts.slice(0, 2).map((a) => (
-            <span
-              key={a}
-              className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 dark:text-amber-400"
-            >
-              {alertIcon(a)}
-              {a}
-            </span>
-          ))}
+          {s.alertas.slice(0, 2).map((a) => {
+            const Icone = ICONE[a.tipo];
+            return (
+              <span
+                key={a.texto}
+                className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 dark:text-amber-400"
+              >
+                <Icone className="h-3.5 w-3.5" />
+                {a.texto}
+              </span>
+            );
+          })}
         </div>
       </div>
       <ChevronRight className="h-4 w-4 shrink-0 text-slate-300 dark:text-slate-400" />

@@ -25,7 +25,7 @@ import { TabelaRealMeta } from "@/components/clinico/TabelaRealMeta";
 import { VerHistorico } from "@/components/clinico/VerHistorico";
 import { EditorCardapio } from "@/components/clinico/EditorCardapio";
 import type { ItemCardapio, PlanoAlimentar } from "@/components/MealPlanEditor";
-import { ErroSecao } from "./ErroSecao";
+import { ErroSecao } from "@/components/clinico/ErroSecao";
 
 const ROTULO_CAMPO: Record<CampoMeta, string> = {
   daily_calorie_goal: "Calorias",

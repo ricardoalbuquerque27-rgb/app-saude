@@ -1,0 +1,31 @@
+import type { Situacao } from "@/lib/consultas";
+
+// Classes das telas de consulta (agenda e aba Consultas do paciente). Valem
+// só dentro de .tema-clinico, onde as variáveis --clin-* existem. Cada par de
+// texto e fundo aqui está em PARES_TEXTO de lib/temaClinico.ts (contraste
+// testado nos dois temas).
+//
+// Campos sem as classes .input/.label do app: dentro do tema clínico elas são
+// refeitas sob :where(.tema-clinico) e, no escuro, a cópia com `.dark` vence
+// qualquer utilitário sem `dark:` (CLAUDE.md). Escrever o campo inteiro com
+// utilitários evita a armadilha.
+
+export const CAMPO =
+  "min-h-[44px] w-full rounded-md border border-clin-campo bg-clin-chao px-3 text-[15px] text-clin-texto [color-scheme:light] dark:[color-scheme:dark] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clin-primaria";
+
+export const ROTULO_CAMPO =
+  "mb-1 block text-[14px] font-medium text-clin-texto";
+
+/** Selo da situação. Pendência em âmbar; agendada em verde; falta em vermelho. */
+export const SELO: Record<Situacao, string> = {
+  pedido: "bg-clin-atencao-fundo text-clin-atencao",
+  remarcar: "bg-clin-atencao-fundo text-clin-atencao",
+  "sem-desfecho": "bg-clin-atencao-fundo text-clin-atencao",
+  agendada: "bg-clin-primaria-fundo text-clin-primaria",
+  realizada: "bg-clin-primaria-fundo text-clin-texto-2",
+  faltou: "bg-clin-perigo-fundo text-clin-perigo",
+  cancelada: "text-clin-texto-2 line-through",
+};
+
+export const CLASSE_SELO =
+  "inline-flex items-center rounded px-1.5 py-0.5 text-[13px] font-semibold";
