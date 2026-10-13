@@ -19,11 +19,15 @@
 
 create table public.consultation_records (
   id uuid primary key default gen_random_uuid(),
-  -- Sem on delete: a consulta não se apaga, e se um dia se apagar o
-  -- prontuário não vai junto.
+  -- Sem on delete, de propósito: a chave BLOQUEIA apagar uma consulta que
+  -- tem registro, mesmo rascunho. E como appointments cai em cascata quando
+  -- se apaga a conta (auth.users) do paciente ou do nutri, apagar qualquer
+  -- uma das duas também falha por esta chave. O prontuário tem guarda de 20
+  -- anos (spec); a recusa obriga a decidir o que fazer com ele antes, em vez
+  -- de ele sumir calado junto da conta.
   appointment_id uuid not null unique references public.appointments(id),
-  -- Sem chave para auth.users, como o measured_by: apagar a conta não pode
-  -- levar o prontuário em cascata.
+  -- Sem chave para auth.users, como o measured_by: uma cascata daqui
+  -- apagaria o prontuário com a conta, sem passar pela recusa acima.
   nutritionist_id uuid not null,
   patient_id uuid not null,
   anamnese text check (char_length(anamnese) <= 20000),
@@ -77,7 +81,7 @@ create policy consultation_addenda_author_read on public.consultation_addenda
   for select to authenticated
   using (exists (
     select 1 from public.consultation_records r
-     where r.id = record_id and r.nutritionist_id = auth.uid()
+     where r.id = consultation_addenda.record_id and r.nutritionist_id = auth.uid()
   ));
 
 -- A Supabase dá tudo a anon e authenticated nas tabelas públicas. Sem
@@ -216,6 +220,12 @@ begin
   if v_existe and (p_visto_em is null or p_visto_em <> r.updated_at) then
     return jsonb_build_object('ok', false, 'error', 'O rascunho mudou em outra aba. Recarregue a página.');
   end if;
+  -- Sem rascunho, mas a tela diz que leu um: outra aba o descartou. Criar de
+  -- novo traria de volta, sem aviso, o rascunho que o nutri jogou fora (o
+  -- salvamento automático da aba velha dispara sozinho).
+  if not v_existe and p_visto_em is not null then
+    return jsonb_build_object('ok', false, 'error', 'O rascunho mudou em outra aba. Recarregue a página.');
+  end if;
 
   v_erro := public.erro_do_registro(v_anamnese, v_diagnostico, v_conduta, v_observar, v_medidas);
   if v_erro is not null then
@@ -286,7 +296,11 @@ begin
 
   select * into r from public.consultation_records where appointment_id = p_consulta for update;
   if not found then
-    -- Sem rascunho, não há o que concluir.
+    -- A tela leu um rascunho que outra aba descartou: é concorrência, como
+    -- em salvar_registro. Sem p_visto_em, simplesmente não há o que concluir.
+    if p_visto_em is not null then
+      return jsonb_build_object('ok', false, 'error', 'O rascunho mudou em outra aba. Recarregue a página.');
+    end if;
     return jsonb_build_object('ok', false, 'error', 'Preencha ao menos uma parte do registro.');
   end if;
   if r.status = 'concluido' then

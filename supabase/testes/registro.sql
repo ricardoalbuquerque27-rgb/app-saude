@@ -355,8 +355,29 @@ select teste.esperar((select count(*) = 0 from public.consultation_records where
   'o rascunho descartado some');
 set local role authenticated;
 select teste.ok(public.descartar_rascunho(:'c5'), 'descartar sem rascunho não é erro (duas abas)');
+-- A aba que ficou aberta com o rascunho descartado ainda tem o updated_at
+-- dele: o salvamento automático dela não pode trazer o rascunho de volta.
+select teste.erro(public.salvar_registro(:'c5', '{"anamnese": "da aba velha"}', :'u5c'),
+  'O rascunho mudou em outra aba. Recarregue a página.',
+  'salvar com o updated_at de um rascunho descartado é recusado');
+select teste.erro(public.concluir_registro(:'c5', :'u5c', 'CRN-3 12345'),
+  'O rascunho mudou em outra aba. Recarregue a página.',
+  'concluir com o updated_at de um rascunho descartado é recusado');
+reset role;
+select teste.esperar((select count(*) = 0 from public.consultation_records where appointment_id = :'c5'),
+  'a aba velha não recriou o rascunho descartado');
+set local role authenticated;
 select teste.erro(public.concluir_registro(:'c5', null),
   'Preencha ao menos uma parte do registro.', 'concluir sem rascunho nenhum recusado');
+select public.salvar_registro(:'c5', '{"anamnese": "Começando de novo."}', null) as r \gset
+select teste.ok(:'r', 'depois do descarte, salvar com p_visto_em nulo cria normalmente');
+reset role;
+select teste.esperar(
+  (select anamnese = 'Começando de novo.' and status = 'rascunho'
+     from public.consultation_records where appointment_id = :'c5'),
+  'o rascunho novo ficou gravado');
+set local role authenticated;
+select teste.ok(public.descartar_rascunho(:'c5'), 'descarta o rascunho novo');
 select teste.ok(public.fechar_consulta(:'c5', 'faltou'), 'sem o rascunho, a falta passa');
 
 -- ================================================================ adendo
