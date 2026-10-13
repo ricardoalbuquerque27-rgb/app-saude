@@ -275,6 +275,16 @@ export function situacaoDoRegistro(
   return r.status === "concluido" ? "registrada" : "rascunho";
 }
 
+/**
+ * As consultas da lista que têm direito a registro: as únicas cujo registro a
+ * agenda e a aba Consultas precisam ler. Perguntar ao banco pelas outras seria
+ * ler o que ele já recusa por regra, e o `in (...)` com todas as consultas de
+ * um acompanhamento de anos vira um endereço comprido à toa.
+ */
+export function comDireitoAoRegistro(lista: Consulta[], agora: number | string): Consulta[] {
+  return lista.filter((c) => situacaoDoRegistro(c, null, agora) !== "sem-direito");
+}
+
 /** A primeira consulta abre com a anamnese; as seguintes registram a evolução. */
 export function rotuloDaAnamnese(kind: Consulta["kind"]): "Anamnese" | "Evolução" {
   return kind === "primeira" ? "Anamnese" : "Evolução";

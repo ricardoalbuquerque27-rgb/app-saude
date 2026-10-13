@@ -1710,6 +1710,217 @@ async function transbordo(page) {
   }
   await fetch(MOCK + "/__reset", { method: "POST" });
 
+  // =====================================================================
+  // 18. Por onde se chega ao registro: painel, aba Consultas e agenda
+  // =====================================================================
+  console.log("\nVerificação 18: entradas do registro (painel, aba Consultas e agenda)");
+  etapa = "entradas do registro";
+  {
+    // Do mock (ferramentas/LEIAME.md): Luiza tem ap-1 (faltou, 42 dias atrás),
+    // ap-2 (realizada, 28 dias, sem registro), ap-3 (realizada, 14 dias, com
+    // registro concluído e "observar") e ap-13 (em andamento, sem registro);
+    // Joana tem ap-10, sem desfecho, com rascunho.
+    const EM_ANDAMENTO = "ap-13";
+    const CONCLUIDA = "ap-3";
+    const SEM_REGISTRO_ANTIGA = "ap-2";
+    const SEM_DESFECHO = "ap-10";
+    const OBSERVAR = "Adesão no fim de semana. Testar café da manhã com ovos.";
+    const ddmm = (n) => diaBR(n).slice(0, 5);
+    const destino = (k, c) => `${rota(k)}/consultas/${c}`;
+    const janela = (page) => page.locator("dialog[open]");
+    const aviso = (page) => page.locator('section[aria-labelledby="pendencias-agenda"]');
+    const consultas = (page) => page.locator("#consultas");
+    // Pelo dia que está NA LINHA (summary): o painel dentro do <details> pode
+    // citar outro dia ("Observar no retorno (29/09)") e casaria com duas.
+    const linhaDoHistorico = (page, dias) =>
+      consultas(page).locator("details").filter({ has: page.locator("summary", { hasText: ddmm(dias) }) });
+    const SELOS = /Sem registro|Rascunho|Registrada/;
+    const abrirAgenda = async (ctx, q) => {
+      const page = await abrir(ctx, `/app/agenda${q}`, { secoes: false });
+      await page.locator('nav[aria-label="Vista da agenda"]').waitFor({ timeout: 60000 });
+      return page;
+    };
+    const abrirConsultaDoDia = async (page, nome) => {
+      await clicar(page.locator("main ul[role=list] li button", { hasText: nome }).first());
+      await janela(page).waitFor({ timeout: 30000 });
+      return janela(page);
+    };
+    /** Abre o <details> de uma consulta do histórico e devolve o painel dentro dele. */
+    const abrirHistorico = async (page, dias) => {
+      const linha = linhaDoHistorico(page, dias);
+      await clicar(linha.locator("summary"));
+      return linha;
+    };
+    const statusNoMock = async (consulta) =>
+      (await (await fetch(`${MOCK}/rest/v1/consultation_records?appointment_id=eq.${consulta}`)).json())[0]?.status ?? null;
+    await fetch(MOCK + "/__reset", { method: "POST" });
+
+    // a) agenda, Dia de hoje: a consulta em andamento da Luiza (sem registro)
+    //    tem "Registrar consulta" e o "observar" do registro anterior
+    {
+      const page = await abrirAgenda(pc, "?vista=dia");
+      const j = await abrirConsultaDoDia(page, "Luiza Prado");
+      const link = j.getByRole("link", { name: "Registrar consulta", exact: true });
+      ok(await apareceu(link), 'agenda: o painel da consulta em andamento da Luiza tem "Registrar consulta"');
+      ok((await link.getAttribute("href").catch(() => null)) === destino("luiza", EM_ANDAMENTO),
+        "agenda: o botão leva à página do registro daquela consulta");
+      const txt = await textoDe(j);
+      ok(txt.includes(`Observar no retorno (${ddmm(14)})`) && txt.includes(OBSERVAR),
+        'agenda: o painel traz o "Observar no retorno" do registro anterior, com o dia', txt);
+      ok(txt.includes("Sem registro"), 'agenda: o painel mostra o selo "Sem registro"', txt);
+      ok(!/Não foi possível/.test(txt), "agenda: sem aviso de leitura que falhou quando a leitura deu certo", txt);
+      // o botão é o primário: "Realizada" deixa de ser, para não haver dois
+      const fundo = (loc) => loc.evaluate((el) => getComputedStyle(el).backgroundColor, null, { timeout: 5000 }).catch(() => "");
+      const realizada = await fundo(j.getByRole("button", { name: "Realizada", exact: true }));
+      const registrar = await fundo(link);
+      ok(!!registrar && realizada !== registrar, "agenda: só um botão primário no painel (o do registro)", `${realizada} / ${registrar}`);
+      await link.click({ timeout: 5000 }).catch(() => {});
+      await page.waitForURL("**" + destino("luiza", EM_ANDAMENTO), { timeout: 10000 }).catch(() => {});
+      ok(page.url().endsWith(destino("luiza", EM_ANDAMENTO)) &&
+        (await apareceu(page.getByRole("heading", { level: 1, name: /^Consulta de / }), 30000)),
+        "agenda: clicar no botão abre a página do registro");
+      await page.close();
+    }
+
+    // b) agenda: a sem desfecho da Joana, que tem rascunho, "Continuar registro"
+    {
+      const page = await abrirAgenda(pc, "?vista=dia");
+      await clicar(aviso(page).getByRole("button", { name: /Joana Ferreira: consulta de .* sem desfecho/ }));
+      const j = janela(page);
+      await j.waitFor({ timeout: 30000 });
+      const link = j.getByRole("link", { name: "Continuar registro", exact: true });
+      ok(await apareceu(link), 'agenda: o painel da Joana (sem desfecho, com rascunho) tem "Continuar registro"');
+      ok((await link.getAttribute("href").catch(() => null)) === destino("joana", SEM_DESFECHO),
+        "agenda: o botão da Joana leva ao registro da consulta sem desfecho");
+      const txt = await textoDe(j);
+      ok(!txt.includes("Registrar consulta") && txt.includes("Rascunho"),
+        'agenda: com rascunho não aparece "Registrar consulta", e o selo é "Rascunho"', txt);
+      ok(!txt.includes("Observar no retorno"), "agenda: a Joana não tem registro concluído, então nada a observar", txt);
+      await page.close();
+    }
+
+    // c) aba Consultas da Luiza: selos e botões de cada consulta
+    {
+      const page = await abrir(pc, aba("luiza", "consultas"));
+      const proxima = consultas(page).locator("li:has(> h3:text-is('Próxima consulta'))");
+      const txtProxima = await textoDe(proxima);
+      ok(txtProxima.includes("Sem registro"), 'aba Consultas: a consulta em andamento tem o selo "Sem registro"', txtProxima);
+      ok((await proxima.getByRole("link", { name: "Registrar consulta", exact: true }).count()) === 1,
+        'aba Consultas: e o botão "Registrar consulta"');
+      ok(txtProxima.includes(`Observar no retorno (${ddmm(14)})`) && txtProxima.includes(OBSERVAR),
+        'aba Consultas: o painel traz o "Observar no retorno"', txtProxima);
+
+      const concluida = linhaDoHistorico(page, 14);
+      ok((await textoDe(concluida.locator("summary"))).includes("Registrada"),
+        'aba Consultas: a de 14 dias atrás (com registro concluído) mostra "Registrada" na linha');
+      ok(!(await textoDe(concluida.locator("summary"))).includes("Sem registro"), "...e não o 'Sem registro'");
+      await abrirHistorico(page, 14);
+      const link = concluida.getByRole("link", { name: "Ver registro", exact: true });
+      ok(await apareceu(link), 'aba Consultas: a registrada abre com "Ver registro"');
+      ok((await link.getAttribute("href").catch(() => null)) === destino("luiza", CONCLUIDA), "...que leva ao registro dela");
+      ok(!(await textoDe(concluida)).includes("Observar no retorno"),
+        'aba Consultas: o registro concluído não mostra o próprio "observar" como se fosse de antes dele');
+
+      const antiga = linhaDoHistorico(page, 28);
+      ok((await textoDe(antiga.locator("summary"))).includes("Sem registro"),
+        'aba Consultas: a realizada de 28 dias atrás, sem registro, mostra "Sem registro"');
+      await abrirHistorico(page, 28);
+      ok((await antiga.getByRole("link", { name: "Registrar consulta", exact: true }).count()) === 1,
+        'aba Consultas: ela abre com "Registrar consulta"');
+      ok(!(await textoDe(antiga)).includes("Observar no retorno"),
+        'aba Consultas: o "observar" de um registro concluído depois dela não aparece nela');
+
+      const faltou = linhaDoHistorico(page, 42);
+      await abrirHistorico(page, 42);
+      const txtFaltou = await textoDe(faltou);
+      ok(!SELOS.test(txtFaltou) && (await faltou.getByRole("link", { name: /registro|Registrar/i }).count()) === 0,
+        "aba Consultas: a que faltou (42 dias atrás) fica sem selo e sem botão de registro", txtFaltou);
+      const futura = linhaDoHistorico(page, -2);
+      ok(!SELOS.test(await textoDe(futura.locator("summary"))),
+        "aba Consultas: a consulta futura também fica sem selo");
+
+      const m = await transbordo(page);
+      ok(m.doc <= m.larg, `aba Consultas com selos sem transbordo no computador (documento ${m.doc}px, janela ${m.larg}px)`, m.vaza.join(" | "));
+      await fotografar(page, `${OUT}/consultas-selos-desktop-claro.png`, COMPUTADOR);
+      await page.close();
+    }
+
+    // d) Joana: o rascunho aparece na aba, e "Faltou" mostra a recusa do banco
+    {
+      const page = await abrir(pc, aba("joana", "consultas"));
+      const painel = consultas(page);
+      ok((await textoDe(painel)).includes("Rascunho") &&
+        (await painel.getByRole("link", { name: "Continuar registro", exact: true }).count()) === 1,
+        'aba Consultas: a sem desfecho da Joana tem o selo "Rascunho" e "Continuar registro"');
+      await clicar(painel.getByRole("button", { name: "Faltou", exact: true }));
+      ok(await apareceu(painel.getByText("Descarte o rascunho do registro antes."), 15000),
+        '"Faltou" numa consulta com rascunho mostra "Descarte o rascunho do registro antes."');
+      ok((await statusNoMock(SEM_DESFECHO)) === "rascunho", "e o rascunho segue no banco");
+      await page.close();
+    }
+
+    // e) a leitura dos registros falha: a aba mostra a lista sem selos e o aviso
+    await fetch(MOCK + "/__falhar", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ tabela: "consultation_records" }),
+    });
+    {
+      const page = await abrir(pc, aba("luiza", "consultas"));
+      const txt = await textoDe(consultas(page));
+      ok(txt.includes("Não foi possível carregar os registros."),
+        'registros que não carregam: a aba Consultas avisa "Não foi possível carregar os registros."', txt);
+      ok(txt.includes("Próxima consulta") && txt.includes("Histórico"), "e a lista de consultas continua lá");
+      ok(!SELOS.test(txt), 'e não há selo nenhum: "Sem registro" em tudo seria dizer o que não se sabe', txt);
+      const proxima = consultas(page).locator("li:has(> h3:text-is('Próxima consulta'))");
+      ok((await proxima.getByRole("link", { name: "Abrir registro", exact: true }).count()) === 1 &&
+        (await proxima.getByRole("link", { name: "Registrar consulta", exact: true }).count()) === 0,
+        'e o painel oferece "Abrir registro" em vez de adivinhar "Registrar consulta"');
+      ok((await textoDe(proxima)).includes("Não foi possível carregar o Observar no retorno."),
+        'e o painel diz que o "Observar no retorno" não carregou, em vez de omitir');
+      await page.close();
+    }
+    // ...e a agenda: o botão neutro e a linha do observar
+    {
+      const page = await abrirAgenda(pc, "?vista=dia");
+      const j = await abrirConsultaDoDia(page, "Luiza Prado");
+      const link = j.getByRole("link", { name: "Abrir registro", exact: true });
+      ok(await apareceu(link), 'registros que não carregam: a agenda mostra "Abrir registro" no painel');
+      ok((await link.getAttribute("href").catch(() => null)) === destino("luiza", EM_ANDAMENTO),
+        "e ele leva à mesma página do registro");
+      const txt = await textoDe(j);
+      ok(!txt.includes("Registrar consulta") && !SELOS.test(txt), 'e não adivinha "Registrar consulta" nem mostra selo', txt);
+      ok(txt.includes("Não foi possível carregar o Observar no retorno."),
+        'agenda: a linha "Não foi possível carregar o Observar no retorno."', txt);
+      await page.close();
+    }
+    await fetch(MOCK + "/__reset", { method: "POST" });
+
+    // f) celular: sem transbordo na aba, nem no painel da agenda
+    {
+      const page = await abrir(cel, aba("luiza", "consultas"));
+      await abrirHistorico(page, 14);
+      const m = await transbordo(page);
+      ok(m.doc <= m.larg, `aba Consultas com selos sem transbordo no celular (documento ${m.doc}px, janela ${m.larg}px)`, m.vaza.join(" | "));
+      await fotografar(page, `${OUT}/consultas-selos-mobile-claro.png`, CELULAR);
+      await page.close();
+      const agendaCel = await abrirAgenda(cel, "?vista=dia");
+      await abrirConsultaDoDia(agendaCel, "Luiza Prado");
+      const n = await transbordo(agendaCel);
+      ok(n.doc <= n.larg, `painel da agenda com o botão do registro sem transbordo no celular (documento ${n.doc}px, janela ${n.larg}px)`, n.vaza.join(" | "));
+      await agendaCel.close();
+    }
+    // g) prints no escuro
+    {
+      const ctx = await contexto(browser, COMPUTADOR, true, estado);
+      const page = await abrir(ctx, aba("luiza", "consultas"));
+      await abrirHistorico(page, 14);
+      await fotografar(page, `${OUT}/consultas-selos-desktop-escuro.png`, COMPUTADOR);
+      await page.close();
+      await ctx.close();
+    }
+  }
+  await fetch(MOCK + "/__reset", { method: "POST" });
+
   console.log("\nConsole e rede");
   ok(errosDeConsole.length === 0, `nenhum erro de console, de página ou de rede em todas as telas (${errosDeConsole.length})`,
     [...new Set(errosDeConsole)].slice(0, 8).join("\n         "));

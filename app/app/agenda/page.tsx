@@ -19,6 +19,8 @@ import {
   getPendencias,
 } from "@/lib/consultasDb";
 import { textoDesdeUltima, tituloDesde } from "@/lib/desdeConsulta";
+import { comDireitoAoRegistro } from "@/lib/registro";
+import { getObservarDosPacientes, getRegistrosDasConsultas } from "@/lib/registroDb";
 import { Agenda } from "@/components/consultas/agenda/Agenda";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +29,10 @@ export const metadata = { title: "Agenda · Pace Fit" };
 // A agenda do nutricionista (spec: docs/superpowers/specs/2026-10-13-consultas-e-agenda-design.md).
 // O servidor busca só o período que a vista mostra, as pendências de
 // qualquer data (para a linha de aviso) e, na vista Dia, o "desde a última
-// consulta" de quem tem retorno no dia.
+// consulta" de quem tem retorno no dia. O registro e o "observar" das
+// consultas que a tela mostra (as do período e as pendências) vêm junto, para
+// o painel de cada uma saber se é "Registrar consulta", "Continuar registro"
+// ou "Ver registro".
 export default async function AgendaPage({
   searchParams,
 }: {
@@ -54,15 +59,16 @@ export default async function AgendaPage({
   // antiga de alguém fora da lista (sem perfil legível) cai no rótulo.
   const nomes: Record<string, string> = {};
   for (const p of pacientes.data) nomes[p.id] = p.nome;
-  const semNome = Array.from(
-    new Set([...periodo.data, ...pendencias.data].map((c) => c.patient_id))
-  ).filter((id) => !nomes[id]);
-  const outros = await getNomesDosPacientes(supabase, semNome);
-  Object.assign(nomes, outros.data);
+  const mostradas = new Map<string, Consulta>();
+  for (const c of [...periodo.data, ...pendencias.data]) mostradas.set(c.id, c);
+  const semNome = Array.from(new Set(Array.from(mostradas.values()).map((c) => c.patient_id))).filter(
+    (id) => !nomes[id]
+  );
 
   // "Desde a última consulta" só na vista Dia, para os retornos do dia.
-  const desdeTexto: Record<string, { titulo: string; texto: string }> = {};
-  if (vista === "dia") {
+  type DesdeDoDia = Record<string, { titulo: string; texto: string }>;
+  async function desdeDoDia() {
+    const desdeTexto: DesdeDoDia = {};
     const ids = Array.from(
       new Set(
         periodo.data
@@ -93,7 +99,27 @@ export default async function AgendaPage({
         }
       }
     }
+    return desdeTexto;
   }
+
+  // O registro e o "observar" só das consultas que têm direito a registro:
+  // são as que levam o botão. O "observar" vem por paciente, e só de quem
+  // tem uma dessas na tela. Tudo corre junto com os nomes e o "desde": as
+  // quatro leituras dependem só das consultas lidas acima.
+  const comDireito = comDireitoAoRegistro(Array.from(mostradas.values()), agora);
+  const [outros, registros, observar, desdeTexto] = await Promise.all([
+    getNomesDosPacientes(supabase, semNome),
+    getRegistrosDasConsultas(
+      supabase,
+      comDireito.map((c) => c.id)
+    ),
+    getObservarDosPacientes(
+      supabase,
+      Array.from(new Set(comDireito.map((c) => c.patient_id)))
+    ),
+    vista === "dia" ? desdeDoDia() : ({} as DesdeDoDia),
+  ]);
+  Object.assign(nomes, outros.data);
 
   return (
     <Agenda
@@ -107,10 +133,14 @@ export default async function AgendaPage({
       nomes={nomes}
       pacientes={pacientes.data}
       desde={desdeTexto}
+      registros={registros.data}
+      observar={observar.data}
       falhou={{
         periodo: periodo.falhou,
         pendencias: pendencias.falhou,
         pacientes: pacientes.falhou || outros.falhou,
+        registros: registros.falhou,
+        observar: observar.falhou,
       }}
     />
   );

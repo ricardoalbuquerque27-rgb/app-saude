@@ -1,4 +1,5 @@
 import type { Situacao } from "@/lib/consultas";
+import type { SituacaoRegistro } from "@/lib/registro";
 
 // Classes das telas de consulta (agenda e aba Consultas do paciente). Valem
 // só dentro de .tema-clinico, onde as variáveis --clin-* existem. Cada par de
@@ -25,6 +26,19 @@ export const SELO: Record<Situacao, string> = {
   realizada: "bg-clin-primaria-fundo text-clin-texto-2",
   faltou: "bg-clin-perigo-fundo text-clin-perigo",
   cancelada: "text-clin-texto-2 line-through",
+};
+
+/**
+ * Selo do registro da consulta, ao lado do da situação. O que falta fazer
+ * ("Sem registro", "Rascunho") em âmbar, como as pendências; o que está feito
+ * ("Registrada") só com a borda `linha` e o texto na cor da marca, para não
+ * competir com o selo da situação. Os dois primeiros levam uma borda
+ * transparente para os três terem a mesma altura.
+ */
+export const SELO_REGISTRO: Record<Exclude<SituacaoRegistro, "sem-direito">, string> = {
+  "sem-registro": "border border-transparent bg-clin-atencao-fundo text-clin-atencao",
+  rascunho: "border border-transparent bg-clin-atencao-fundo text-clin-atencao",
+  registrada: "border border-clin-linha text-clin-primaria",
 };
 
 export const CLASSE_SELO =

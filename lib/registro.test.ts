@@ -5,6 +5,7 @@ import {
   CAMPOS_EXTRAS,
   CAMPOS_MEDIDA,
   CAMPOS_PRINCIPAIS,
+  comDireitoAoRegistro,
   erroDaMedida,
   errosDasMedidas,
   FAIXAS,
@@ -225,6 +226,31 @@ describe("situacaoDoRegistro", () => {
       rascunho: "Rascunho",
       registrada: "Registrada",
     });
+  });
+});
+
+describe("comDireitoAoRegistro", () => {
+  const agora = Date.parse("2026-10-20T17:10:00Z");
+
+  it("fica com as que já começaram e não são pedido, falta nem cancelamento", () => {
+    const lista = [
+      consulta({ id: "em-andamento" }),
+      consulta({ id: "sem-desfecho", starts_at: "2026-10-19T17:00:00Z" }),
+      consulta({ id: "realizada", status: "realizada", starts_at: "2026-10-06T17:00:00Z" }),
+      consulta({ id: "futura", starts_at: "2026-10-21T17:00:00Z" }),
+      consulta({ id: "faltou", status: "faltou", starts_at: "2026-10-13T17:00:00Z" }),
+      consulta({ id: "cancelada", status: "cancelada", starts_at: "2026-10-13T17:00:00Z" }),
+      consulta({ id: "pedido", status: "pedido", starts_at: "2026-10-22T17:00:00Z" }),
+    ];
+    expect(comDireitoAoRegistro(lista, agora).map((c) => c.id)).toEqual([
+      "em-andamento",
+      "sem-desfecho",
+      "realizada",
+    ]);
+  });
+
+  it("lista vazia dá lista vazia", () => {
+    expect(comDireitoAoRegistro([], agora)).toEqual([]);
   });
 });
 
