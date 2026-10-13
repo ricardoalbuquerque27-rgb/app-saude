@@ -1,6 +1,8 @@
 // Service worker do Pace Fit — habilita instalação (PWA) e um shell offline.
 // Estratégia enxuta: nunca mexe em /api nem em requisições externas (Supabase).
-const CACHE = "pacefit-v2";
+// v3: a v2 guardava a resposta do router.refresh() de /app (ver abaixo); trocar
+// o nome apaga esse cache no "activate".
+const CACHE = "pacefit-v3";
 const OFFLINE_URLS = ["/app", "/manifest.webmanifest", "/icon.svg"];
 
 self.addEventListener("install", (event) => {
@@ -34,6 +36,13 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // A resposta que o Next busca no router.refresh() e na navegação do lado do
+  // cliente (`?_rsc=…`, cabeçalho RSC) é dado da página, nunca do cache. Antes,
+  // `/app?_rsc=…` caía na regra de cache-primeiro abaixo (o caminho é "/app",
+  // que está em OFFLINE_URLS), e depois de qualquer ação na Início (confirmar
+  // treino, ler recado, cancelar consulta) a página voltava com o dado VELHO.
+  if (url.searchParams.has("_rsc") || req.headers.get("RSC") === "1") return;
+
   // Navegações (páginas): rede primeiro, cai no cache se offline.
   if (req.mode === "navigate") {
     event.respondWith(
@@ -48,8 +57,12 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Assets estáticos do Next: cache primeiro, atualiza em segundo plano.
-  if (url.pathname.startsWith("/_next/") || OFFLINE_URLS.includes(url.pathname)) {
+  // Arquivos estáticos do Next (o nome tem hash, nunca mudam) e o manifesto e
+  // o ícone: cache primeiro. Só `/_next/static/`: `/_next/image` e afins mudam.
+  if (
+    url.pathname.startsWith("/_next/static/") ||
+    (OFFLINE_URLS.includes(url.pathname) && url.pathname !== "/app" && !url.search)
+  ) {
     event.respondWith(
       caches.match(req).then(
         (cached) =>

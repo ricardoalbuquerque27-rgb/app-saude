@@ -185,6 +185,14 @@ os deploys por semanas sem mensagem de erro visível.
 está servindo. O sintoma engana: 404 nos scripts, React não hidrata,
 formulário faz submit nativo.
 
+**Service worker e `router.refresh()`.** `public/sw.js` tinha `/app` na lista
+de cache-primeiro, e o `router.refresh()` do Next busca `/app?_rsc=…` (mesmo
+caminho): depois de qualquer ação na Início do paciente (confirmar treino, ler
+recado, cancelar consulta) a página voltava com o dado VELHO, para quem tinha o
+service worker instalado. A resposta RSC (`_rsc`, cabeçalho `RSC`) nunca vai
+para o cache; cache-primeiro só em `/_next/static/`. Ao mexer no sw.js, troque
+o nome do `CACHE` para apagar o antigo.
+
 **`playwright` fica fora do `package.json`** de propósito (o postinstall
 baixa navegadores e atrasa o build na Vercel). Qualquer `npm install`
 remove ele. `MODULE_NOT_FOUND` nos scripts de `ferramentas/` é isso.

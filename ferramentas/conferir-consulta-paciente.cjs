@@ -28,6 +28,22 @@ function ok(passou, msg, detalhe = "") {
 }
 const erros = [];
 
+/** Clica depois de o React hidratar o elemento: antes disso o clique não faz nada. */
+async function clicar(loc) {
+  await loc.waitFor({ state: "visible", timeout: 60000 });
+  await loc.evaluate(
+    (el) =>
+      new Promise((resolve) => {
+        const inicio = Date.now();
+        (function esperar() {
+          if (Object.keys(el).some((k) => k.startsWith("__reactProps$")) || Date.now() - inicio > 30000) return resolve();
+          setTimeout(esperar, 100);
+        })();
+      })
+  );
+  await loc.click();
+}
+
 (async () => {
   const cen = await (await fetch(MOCK + "/__cenario")).json().catch(() => null);
   if (!cen || cen.cenario !== "padrao") {
@@ -105,12 +121,12 @@ const erros = [];
     ok(t.includes("Próxima consulta") && t.includes("às 14:00") && t.includes("online"),
       "Início: mostra a próxima consulta (daqui a 3 dias, 14:00, online)", t);
     // Pedir para remarcar: sem recado avisa; com recado, fica o aviso de enviado.
-    await cartao(page).getByRole("button", { name: "Pedir para remarcar" }).click();
-    await cartao(page).getByRole("button", { name: "Enviar pedido" }).click();
+    await clicar(cartao(page).getByRole("button", { name: "Pedir para remarcar" }));
+    await clicar(cartao(page).getByRole("button", { name: "Enviar pedido" }));
     await esperarTexto(page, "Diga qual horário");
     ok((await texto(cartao(page))).includes("Diga qual horário fica melhor."), "remarcação sem recado pede o recado");
     await cartao(page).locator("textarea").fill("Pode ser quinta de manhã?");
-    await cartao(page).getByRole("button", { name: "Enviar pedido" }).click();
+    await clicar(cartao(page).getByRole("button", { name: "Enviar pedido" }));
     await esperarTexto(page, "Pedido de remarcação enviado");
     ok((await texto(cartao(page))).includes("Pedido de remarcação enviado"), "depois de pedir, o cartão diz que o pedido de remarcação foi enviado");
     await page.close();
@@ -118,23 +134,23 @@ const erros = [];
   await fetch(MOCK + "/__reset", { method: "POST" });
   {
     const page = await abrir(cel, "/app");
-    await cartao(page).getByRole("button", { name: "Cancelar", exact: true }).click();
+    await clicar(cartao(page).getByRole("button", { name: "Cancelar", exact: true }));
     await esperarTexto(page, "Nenhuma consulta marcada");
     ok((await texto(cartao(page))).includes("Nenhuma consulta marcada"), "Cancelar (com confirmação) tira a consulta");
 
     // Pedir consulta: horário no passado é recusado; no futuro vira pedido.
-    await cartao(page).getByRole("button", { name: "Pedir consulta" }).click();
+    await clicar(cartao(page).getByRole("button", { name: "Pedir consulta" }));
     await cartao(page).locator('input[type="date"]').fill(diaSP(5));
     await cartao(page).locator('input[type="time"]').fill("09:30");
-    await cartao(page).getByText("Online", { exact: true }).click();
+    await clicar(cartao(page).getByText("Online", { exact: true }));
     await cartao(page).locator("textarea").fill("Prefiro de manhã");
-    await cartao(page).getByRole("button", { name: "Enviar pedido" }).click();
+    await clicar(cartao(page).getByRole("button", { name: "Enviar pedido" }));
     await esperarTexto(page, "Pedido enviado para");
     const t = await texto(cartao(page));
     ok(t.includes("Pedido enviado para") && t.includes("às 09:30") && t.includes("online") && t.includes("Aguardando resposta"),
       "Pedir consulta: o cartão mostra o pedido aguardando o nutricionista", t);
     ok((await cartao(page).getByRole("button", { name: "Pedir consulta" }).count()) === 0, "com um pedido aberto, não dá para pedir outro");
-    await cartao(page).getByRole("button", { name: "Cancelar pedido" }).click();
+    await clicar(cartao(page).getByRole("button", { name: "Cancelar pedido" }));
     await esperarTexto(page, "Nenhuma consulta marcada");
     ok((await texto(cartao(page))).includes("Nenhuma consulta marcada"), "Cancelar pedido volta ao 'Pedir consulta'");
     await page.close();

@@ -979,7 +979,9 @@ async function transbordo(page) {
       await page.waitForFunction(() => !document.querySelector("#consultas")?.textContent?.includes("Precisa de você"), null, { timeout: 30000 }).catch(() => {});
       const txt = await textoDe(page.locator("#consultas"));
       ok(!txt.includes("Precisa de você") && txt.includes("Próxima consulta"), "Manter horário: some a pendência e fica a próxima consulta", txt.slice(0, 200));
-      ok((await textoDe(page.locator("header").first())).includes("Próxima consulta"), "o cabeçalho do Carlos mostra a próxima consulta");
+      // O cabeçalho do paciente é o <header> com o nome (h1); o primeiro da
+      // página é o do AppShell no celular, escondido no computador.
+      ok((await textoDe(page.locator("header:has(h1)"))).includes("Próxima consulta"), "o cabeçalho do Carlos mostra a próxima consulta");
       await page.close();
     }
 
