@@ -99,7 +99,14 @@ E os registros da consulta (prontuário: `consultation_records`, os adendos em
   `POST /__reset` apaga de novo.
 
 No cenário padrão, a Maria tem uma consulta realizada há 20 dias e a próxima
-daqui a 3, para o cartão de consulta do lado do paciente.
+daqui a 3, para o cartão de consulta do lado do paciente. A medida de 20 dias
+atrás (67,7 kg) é a que o nutri tirou nessa consulta (`measured_by` dele,
+`appointment_id` `ap-m1`): a página Medidas dela mostra a marca "Medida na
+consulta" e não oferece o excluir nessa linha. Com o mock **sem** `CENARIO` e o
+dev no ar, `node ferramentas/conferir-consulta-paciente.cjs` confere esse lado:
+o cartão de consulta (Início e "Meu plano"), a página Medidas (a marca, o excluir
+só nas medidas dela, "Este registro não pode ser apagado." quando o banco recusa
+sem erro e o aviso de erro no DELETE) e que o Perfil do paciente não mostra o CRN.
 
 ```bash
 CENARIO=carteira node ferramentas/mock-supabase.cjs &
@@ -130,7 +137,11 @@ o aviso de choque e o "Aceitar" do pedido da Beatriz, "Manter horário" do
 Carlos, Realizada e Faltou já na consulta em andamento da Luiza, fechar a da
 Joana como realizada (e o "Sem retorno marcado" que aparece), o aviso de
 choque ao marcar em cima da Luiza e a seta que mostra a sexta aba no
-celular. Ele descobre os ids dos pacientes perguntando
+celular. A Verificação 19 confere a medida da consulta na aba Corpo
+da Luiza (a marca "na consulta" só na linha do prontuário, e sem transbordo no
+celular) e o campo "CRN (aparece no prontuário)" do Perfil do nutri: aparece, aceita até 30
+caracteres, salva sem os espaços das pontas, reaparece ao recarregar e grava nulo
+quando em branco. Ele descobre os ids dos pacientes perguntando
 ao mock (`/__cenario`), e recusa rodar se o mock subiu com outro cenário.
 Sem `OUT`, os PNGs vão para `prints-nutri` no diretório temporário do
 sistema.
@@ -147,6 +158,18 @@ conferência, para dar para aceitar um pedido, salvar um rascunho e concluir e
 ver a tela mudar. O `updated_at` do rascunho é a trava de concorrência: o mock o
 devolve com microssegundos, como o banco, e ele sempre anda. Quem vale é o
 banco: as regras de verdade são testadas em SQL (abaixo).
+
+Duas escritas pelo PostgREST também têm estado (o `/__reset` desfaz):
+
+- `PATCH` e `DELETE` em `body_measurements` seguem a RLS do paciente: só enxergam
+  a linha dele com `measured_by` nulo. Numa linha da consulta o banco **não dá
+  erro**: afeta zero linhas, e é isso que o mock devolve (204, e `Content-Range:
+  */0` com `Prefer: count=exact`, que é o que `.delete({ count: "exact" })`
+  manda). Um `PATCH` que tentasse pôr `measured_by` ou `appointment_id` numa
+  linha dele leva 403, como o `with check` do banco.
+- `POST` em `profiles` (o upsert da página Perfil) grava no perfil de quem pede,
+  com o check do CRN (até 30 caracteres): é por isso que o CRN salvo reaparece ao
+  recarregar.
 
 Dois endereços que não são do Supabase (além do `/__cenario`):
 

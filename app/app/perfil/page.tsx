@@ -56,6 +56,7 @@ export default function PerfilPage() {
   const [birthDate, setBirthDate] = useState("");
   const [sex, setSex] = useState("");
   const [role, setRole] = useState("patient");
+  const [crn, setCrn] = useState("");
   const [weightGoal, setWeightGoal] = useState("");
   const [waterGoal, setWaterGoal] = useState("");
   const [calorieGoal, setCalorieGoal] = useState("");
@@ -86,6 +87,7 @@ export default function PerfilPage() {
       setBirthDate(p.birth_date ?? "");
       setSex(p.sex ?? "");
       setRole(p.role ?? "patient");
+      setCrn(p.crn ?? "");
       setWeightGoal(p.weight_goal_kg?.toString() ?? "");
       setWaterGoal(p.daily_water_goal_ml?.toString() ?? "");
       setCalorieGoal(p.daily_calorie_goal?.toString() ?? "");
@@ -138,6 +140,10 @@ export default function PerfilPage() {
       birth_date: birthDate || null,
       sex: sex || null,
       role: role === "nutritionist" ? "nutritionist" : "patient",
+      // Só o nutricionista tem CRN. Para o paciente a chave nem vai: o upsert
+      // não toca na coluna, em vez de gravar nulo por cima de um CRN que ele
+      // ainda tenha de quando era nutricionista. Vazio grava nulo.
+      ...(role === "nutritionist" ? { crn: crn.trim() || null } : {}),
       weight_goal_kg: weightGoal ? Number(weightGoal) : null,
       daily_water_goal_ml: waterGoal ? Number(waterGoal) : 2500,
       daily_calorie_goal: calorieGoal ? Number(calorieGoal) : null,
@@ -253,6 +259,18 @@ export default function PerfilPage() {
             maxLength={14}
           />
         </Field>
+        {role === "nutritionist" && (
+          <Field label="CRN (aparece no prontuário)">
+            <input
+              className="input"
+              type="text"
+              value={crn}
+              onChange={(e) => setCrn(e.target.value)}
+              placeholder="CRN-3 12345"
+              maxLength={30}
+            />
+          </Field>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <Field label="Altura (cm)">
             <input

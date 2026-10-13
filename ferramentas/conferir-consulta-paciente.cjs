@@ -1,6 +1,8 @@
 // O cartão de consulta do lado do paciente (Início e "Meu plano"), com a
 // Maria do cenário padrão: ver a próxima, pedir remarcação, cancelar, pedir
-// consulta e cancelar o pedido. Acusa com código de saída 1.
+// consulta e cancelar o pedido; e a medida que o nutri tirou na consulta, que
+// a página Medidas marca e não deixa excluir (nem o banco deixa), e o Perfil,
+// que não mostra o CRN. Acusa com código de saída 1.
 //
 // Precisa do mock SEM cenário (`node ferramentas/mock-supabase.cjs`) e do dev
 // no ar (ver LEIAME.md). As consultas do mock voltam ao início antes e depois
@@ -162,6 +164,133 @@ async function clicar(loc) {
   }
   await cel.close();
   await fetch(MOCK + "/__reset", { method: "POST" });
+
+  // A medida da consulta (Task 9). No mock da Maria, a de 20 dias atrás é a que
+  // o nutri tirou na consulta ap-m1: measured_by dele, ligada à consulta.
+  console.log("\nMedidas: a medida da consulta");
+  {
+    const DIA_DA_CONSULTA = diaSP(-20).split("-").reverse().join("/");
+    const MARCA = "Medida na consulta";
+    const ctx = await contexto(390, 844, true, false);
+    // O DELETE derrubado de propósito (abaixo) faz o navegador registrar o 500
+    // como erro de console; só esse, e só nessa página.
+    const abrirMedidas = async ({ tolera500 = false } = {}) => {
+      const page = await ctx.newPage();
+      page.on("console", (m) => {
+        if (m.type() !== "error") return;
+        if (tolera500 && /status of 500/.test(m.text())) return;
+        erros.push(`/app/medidas: ${m.text()}`);
+      });
+      page.on("pageerror", (e) => erros.push(`/app/medidas: ${e.message}`));
+      page.on("dialog", (d) => d.accept()); // "Excluir este registro?"
+      await page.goto(APP + "/app/medidas", { waitUntil: "networkidle", timeout: 120000 });
+      await page.getByText("Peso atual", { exact: true }).waitFor({ timeout: 60000 });
+      await page.locator("div.space-y-2 > div.card").first().waitFor({ timeout: 60000 });
+      await page.waitForTimeout(500);
+      return page;
+    };
+    const linhas = (page) => page.locator("div.space-y-2 > div.card");
+    const excluir = (page) => page.getByRole("button", { name: /^Excluir registro/ });
+    const mockTem = async (id) =>
+      (await (await fetch(`${MOCK}/rest/v1/body_measurements?id=eq.${id}`)).json()).length === 1;
+
+    // a) a linha da consulta tem a marca e nenhum excluir; as dela têm
+    {
+      const page = await abrirMedidas();
+      const total = await linhas(page).count();
+      ok(total === 8, `a lista tem as 8 medidas (${total})`);
+      ok((await page.getByText(MARCA, { exact: true }).count()) === 1, `só uma linha tem a marca "${MARCA}"`);
+      const daConsulta = linhas(page).filter({ hasText: MARCA });
+      const textoDaLinha = (await daConsulta.count()) === 1 ? await texto(daConsulta) : "(nenhuma linha com a marca)";
+      ok(textoDaLinha.includes(DIA_DA_CONSULTA), `e é a do dia da consulta (${DIA_DA_CONSULTA})`, textoDaLinha);
+      // A linha do dia, marcada ou não, é achada pela data: a 20 dias atrás.
+      const doDia = linhas(page).filter({ hasText: DIA_DA_CONSULTA });
+      ok((await doDia.count()) === 1 && (await doDia.getByRole("button").count()) === 0,
+        "a linha da consulta não tem botão nenhum (nem excluir)");
+      ok((await excluir(page).count()) === 7, `as outras 7 linhas têm o excluir (${await excluir(page).count()})`);
+      ok((await linhas(page).filter({ hasNotText: MARCA }).getByRole("button", { name: /^Excluir registro/ }).count()) === 7,
+        "e os 7 estão nas linhas sem a marca");
+      const doc = await page.evaluate(() => document.documentElement.scrollWidth);
+      ok(doc <= 390, `Medidas sem transbordo no celular (${doc}px)`);
+      await page.screenshot({ path: `${OUT}/medidas-mobile-claro.png`, fullPage: true });
+      await page.close();
+    }
+
+    // b) excluir uma das dela continua funcionando
+    {
+      const page = await abrirMedidas();
+      await clicar(excluir(page).first());
+      await page.waitForFunction(() => document.querySelectorAll("div.space-y-2 > div.card").length === 7, null, { timeout: 30000 })
+        .catch(() => {});
+      ok((await linhas(page).count()) === 7, "excluir uma medida dela tira a linha da lista");
+      ok((await page.getByText(MARCA, { exact: true }).count()) === 1, "e a da consulta continua lá, com a marca");
+      ok(!(await texto(page.locator("body"))).includes("não pode ser apagado"), "sem aviso de erro");
+      await page.close();
+      await fetch(MOCK + "/__reset", { method: "POST" });
+    }
+
+    // c) lista velha: a página ainda tem a linha da consulta como dela (a marca
+    // só chegou depois). O banco recusa SEM erro (zero linhas); a tela tem de
+    // dizer isso e manter a linha, e não fingir que apagou.
+    {
+      const page = await ctx.newPage();
+      page.on("console", (m) => m.type() === "error" && erros.push(`/app/medidas (lista velha): ${m.text()}`));
+      page.on("pageerror", (e) => erros.push(`/app/medidas (lista velha): ${e.message}`));
+      page.on("dialog", (d) => d.accept());
+      await page.route("**/rest/v1/body_measurements*", async (route) => {
+        if (route.request().method() !== "GET") return route.continue();
+        const resp = await route.fetch();
+        const dados = await resp.json();
+        await route.fulfill({ response: resp, json: dados.map((l) => ({ ...l, measured_by: null, appointment_id: null })) });
+      });
+      await page.goto(APP + "/app/medidas", { waitUntil: "networkidle", timeout: 120000 });
+      await linhas(page).first().waitFor({ timeout: 60000 });
+      await page.waitForTimeout(500);
+      ok((await excluir(page).count()) === 8, "com a lista velha, as 8 linhas oferecem o excluir");
+      await clicar(page.getByRole("button", { name: `Excluir registro de ${DIA_DA_CONSULTA}` }));
+      const aviso = page.getByText("Este registro não pode ser apagado.", { exact: true });
+      ok(await aviso.waitFor({ state: "visible", timeout: 30000 }).then(() => true, () => false),
+        'o banco recusou sem erro: a tela diz "Este registro não pode ser apagado."');
+      ok((await linhas(page).count()) === 8, "e a linha continua na lista");
+      ok(await mockTem("m5"), "e a medida da consulta continua no banco");
+      await page.screenshot({ path: `${OUT}/medidas-recusada-mobile-claro.png`, fullPage: true });
+      await page.close();
+    }
+
+    // d) erro de verdade no DELETE (não é o silêncio): também aparece
+    {
+      const page = await abrirMedidas({ tolera500: true });
+      await page.route("**/rest/v1/body_measurements*", (route) =>
+        route.request().method() === "DELETE"
+          ? route.fulfill({
+              status: 500, headers: { "access-control-allow-origin": "*" },
+              json: { code: "XX000", message: "falha sob encomenda", details: null, hint: null },
+            })
+          : route.continue());
+      await clicar(excluir(page).first());
+      const aviso = page.getByText("Não foi possível excluir o registro. Tente de novo.", { exact: true });
+      ok(await aviso.waitFor({ state: "visible", timeout: 30000 }).then(() => true, () => false),
+        "erro no DELETE: a tela avisa que não foi possível excluir");
+      ok((await linhas(page).count()) === 8, "e a linha continua na lista");
+      await page.close();
+    }
+    await ctx.close();
+    await fetch(MOCK + "/__reset", { method: "POST" });
+  }
+
+  console.log("\nPerfil: o paciente não vê o CRN");
+  {
+    const ctx = await contexto(390, 844, true, false);
+    const page = await ctx.newPage();
+    page.on("console", (m) => m.type() === "error" && erros.push(`/app/perfil: ${m.text()}`));
+    page.on("pageerror", (e) => erros.push(`/app/perfil: ${e.message}`));
+    await page.goto(APP + "/app/perfil", { waitUntil: "networkidle", timeout: 120000 });
+    await page.getByText("Nome completo", { exact: true }).waitFor({ timeout: 60000 });
+    ok((await page.getByText("CRN", { exact: false }).count()) === 0, "o Perfil do paciente não tem o campo CRN");
+    ok((await page.getByText("prontuário", { exact: false }).count()) === 0, 'e nada sobre "prontuário"');
+    await page.close();
+    await ctx.close();
+  }
 
   console.log("\nConsole");
   ok(erros.length === 0, `nenhum erro de console ou de página (${erros.length})`, [...new Set(erros)].slice(0, 6).join("\n         "));

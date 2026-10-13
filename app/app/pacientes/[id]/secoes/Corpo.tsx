@@ -11,6 +11,7 @@ import { Secao } from "@/components/clinico/Secao";
 import { VerHistorico } from "@/components/clinico/VerHistorico";
 import { ErroSecao } from "@/components/clinico/ErroSecao";
 import { FOCO, LINK } from "@/components/clinico/estilos";
+import { CLASSE_SELO } from "@/components/consultas/aparencia";
 
 const TITULO_BLOCO = "text-[15px] font-semibold leading-snug text-clin-texto";
 
@@ -49,7 +50,7 @@ export async function Corpo({
     // Com teto em hoje: medida lançada com data futura não é o "peso atual".
     supabase
       .from("body_measurements")
-      .select("date, weight_kg, body_fat_pct, waist_cm, hip_cm, chest_cm, arm_cm")
+      .select("date, weight_kg, body_fat_pct, waist_cm, hip_cm, chest_cm, arm_cm, measured_by")
       .eq("user_id", uid)
       .lte("date", hoje)
       .order("date", { ascending: false })
@@ -156,7 +157,18 @@ export async function Corpo({
                       scope="row"
                       className="whitespace-nowrap py-2 pr-3 text-left text-[13px] font-normal text-clin-texto-2"
                     >
-                      {formatDate(r.date)}
+                      <span className="block">{formatDate(r.date)}</span>
+                      {/* measured_by preenchido é a avaliação que o nutri
+                          tirou numa consulta (prontuário), não uma medida que
+                          o paciente anotou. Na linha de baixo, para não alargar
+                          a coluna da data. */}
+                      {r.measured_by && (
+                        <span
+                          className={`${CLASSE_SELO} mt-0.5 bg-clin-primaria-fundo text-clin-primaria`}
+                        >
+                          na consulta
+                        </span>
+                      )}
                     </th>
                     <td className="px-2 py-2">{medida(r.weight_kg)}</td>
                     <td className="px-2 py-2">{medida(r.body_fat_pct)}</td>

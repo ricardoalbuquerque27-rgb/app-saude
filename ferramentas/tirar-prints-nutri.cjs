@@ -1993,6 +1993,97 @@ async function transbordo(page) {
   }
   await fetch(MOCK + "/__reset", { method: "POST" });
 
+  console.log("\nVerificação 19: medida da consulta na aba Corpo e CRN no perfil");
+  etapa = "medida da consulta e CRN";
+  {
+    // Do mock (ferramentas/LEIAME.md): a Luiza tem quatro medidas dela e a que
+    // o registro de ap-3 (14 dias atrás) publicou: 66,4 kg, com measured_by.
+    const MARCA = "na consulta";
+    const linhasDoCorpo = (page) => page.locator('#corpo [role="region"] tbody tr');
+
+    // a) a aba Corpo marca a medida do prontuário e só ela
+    {
+      const page = await abrir(pc, aba("luiza", "corpo"));
+      await clicar(page.locator("#corpo summary"));
+      const linhas = linhasDoCorpo(page);
+      await linhas.first().waitFor({ state: "visible", timeout: 30000 });
+      ok((await linhas.count()) === 5, `Corpo da Luiza: 5 medidas, 4 dela e 1 da consulta (${await linhas.count()})`);
+      const marcadas = linhas.filter({ has: page.getByText(MARCA, { exact: true }) });
+      ok((await marcadas.count()) === 1, `só uma linha tem a marca "${MARCA}"`);
+      const txt = (await textoDe(marcadas.first())).replace(/\s+/g, " ");
+      ok(txt.includes(diaBR(14)) && txt.includes("66,4"), "e é a da consulta: o dia dela e os 66,4 kg", txt);
+      ok((await linhas.filter({ hasNotText: MARCA }).count()) === 4, "as quatro medidas dela ficam sem a marca");
+      await fotografar(page, `${OUT}/corpo-na-consulta-desktop-claro.png`, COMPUTADOR);
+      await page.close();
+    }
+    {
+      const ctx = await contexto(browser, COMPUTADOR, true, estado);
+      const page = await abrir(ctx, aba("luiza", "corpo"));
+      await clicar(page.locator("#corpo summary"));
+      await linhasDoCorpo(page).first().waitFor({ state: "visible", timeout: 30000 });
+      await fotografar(page, `${OUT}/corpo-na-consulta-desktop-escuro.png`, COMPUTADOR);
+      await page.close();
+      await ctx.close();
+    }
+    {
+      const page = await abrir(cel, aba("luiza", "corpo"));
+      await clicar(page.locator("#corpo summary"));
+      await linhasDoCorpo(page).first().waitFor({ state: "visible", timeout: 30000 });
+      const m = await transbordo(page);
+      ok(m.doc <= m.larg, `Corpo com a marca sem transbordo no celular (documento ${m.doc}px, janela ${m.larg}px)`, m.vaza.join(" | "));
+      await page.close();
+    }
+
+    // b) o perfil do nutricionista: o campo CRN grava no perfil e volta ao recarregar
+    {
+      const ROTULO = "CRN (aparece no prontuário)";
+      const crnNoMock = async () =>
+        (await (await fetch(`${MOCK}/rest/v1/profiles?id=eq.${cen.nutri}`)).json())[0]?.crn;
+      const abrirPerfil = async () => {
+        const page = await abrir(pc, "/app/perfil", { secoes: false });
+        await page.getByText("Nome completo", { exact: true }).waitFor({ timeout: 60000 });
+        return page;
+      };
+      const salvar = async (page) => {
+        await clicar(page.getByRole("button", { name: "Salvar alterações" }));
+        return apareceu(page.getByRole("button", { name: "Salvo!" }), 30000);
+      };
+
+      let page = await abrirPerfil();
+      const entrada = campo(page, ROTULO).locator("input");
+      ok(await apareceu(entrada), `o Perfil do nutricionista tem o campo "${ROTULO}"`);
+      ok((await entrada.inputValue()) === "", "e ele começa vazio (o perfil do mock não tem CRN)");
+      ok((await entrada.getAttribute("maxlength")) === "30", "o campo aceita até 30 caracteres (maxlength)");
+      await entrada.click();
+      await page.keyboard.type("X".repeat(40));
+      ok((await entrada.inputValue()).length === 30, "digitar 40 caracteres deixa 30");
+
+      await entrada.fill("  CRN-3 12345  ");
+      ok(await salvar(page), "salvar o perfil com o CRN mostra Salvo!");
+      ok((await crnNoMock()) === "CRN-3 12345", "o CRN vai para profiles.crn, sem os espaços das pontas", String(await crnNoMock()));
+      await page.close();
+
+      page = await abrirPerfil();
+      ok((await campo(page, ROTULO).locator("input").inputValue()) === "CRN-3 12345",
+        "ao recarregar a página, o CRN reaparece no campo");
+      await fotografar(page, `${OUT}/perfil-crn-desktop-claro.png`, COMPUTADOR);
+
+      // vazio salva nulo, e não uma string vazia
+      await campo(page, ROTULO).locator("input").fill("   ");
+      ok(await salvar(page), "salvar com o CRN em branco mostra Salvo!");
+      ok((await crnNoMock()) === null, "e o CRN em branco grava nulo (não texto vazio)", JSON.stringify(await crnNoMock()));
+      await page.close();
+
+      const celular = await abrir(cel, "/app/perfil", { secoes: false });
+      await celular.getByText("Nome completo", { exact: true }).waitFor({ timeout: 60000 });
+      await apareceu(campo(celular, ROTULO).locator("input"));
+      const m = await transbordo(celular);
+      ok(m.doc <= m.larg, `Perfil com o CRN sem transbordo no celular (documento ${m.doc}px, janela ${m.larg}px)`, m.vaza.join(" | "));
+      await celular.close();
+    }
+  }
+  await fetch(MOCK + "/__reset", { method: "POST" });
+
   console.log("\nConsole e rede");
   ok(errosDeConsole.length === 0, `nenhum erro de console, de página ou de rede em todas as telas (${errosDeConsole.length})`,
     [...new Set(errosDeConsole)].slice(0, 8).join("\n         "));

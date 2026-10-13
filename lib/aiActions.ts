@@ -1137,11 +1137,17 @@ export async function executeAction(
         const peso = toNum(args.peso_kg);
         if (peso == null || peso <= 0) return { ok: false, resumo: "Peso inválido." };
         const hoje = todayISO();
+        // Só a medida do próprio paciente (`measured_by` nulo). A que o
+        // nutricionista tirou na consulta é do prontuário: a RLS recusa o
+        // update dela SEM erro (zero linhas, e o supabase-js não reclama), e o
+        // assistente diria "peso atualizado" sem ter mudado nada. Sem a linha
+        // do paciente, cai no insert abaixo e registra uma nova.
         const { data: hojeReg } = await supabase
           .from("body_measurements")
           .select("id")
           .eq("user_id", uid)
           .eq("date", hoje)
+          .is("measured_by", null)
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
@@ -1172,10 +1178,13 @@ export async function executeAction(
         };
         const c = conf[tipo];
         if (!c) return { ok: false, resumo: "Tipo inválido para remover." };
-        const { data: last } = await supabase
-          .from(c.table)
-          .select("id")
-          .eq("user_id", uid)
+        let busca = supabase.from(c.table).select("id").eq("user_id", uid);
+        // Peso: só as medidas do próprio paciente. A da consulta (`measured_by`
+        // preenchido) a RLS não deixa apagar, e sem erro: o delete afetaria
+        // zero linhas e o assistente diria "última medida apagada" com ela
+        // ainda lá. Refeição, treino e exame não têm a coluna.
+        if (tipo === "peso") busca = busca.is("measured_by", null);
+        const { data: last } = await busca
           .order(c.order, { ascending: false })
           .limit(1)
           .maybeSingle();

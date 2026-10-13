@@ -9,7 +9,10 @@
 //
 // Quase nada é guardado: um POST responde 201 e a leitura seguinte devolve o que
 // já havia. As exceções, com estado e com as regras da migração, são as funções
-// de consulta (rpcConsulta) e as do registro da consulta (rpcRegistro). POST
+// de consulta (rpcConsulta) e as do registro da consulta (rpcRegistro), e as
+// escritas de escrever(): o upsert do perfil (o CRN) e o PATCH/DELETE de
+// body_measurements com a RLS do paciente (a medida da consulta não se altera
+// nem se apaga, e o banco recusa sem erro). POST
 // /__reset volta tudo ao que o cenário subiu; POST /__falhar derruba os GET de
 // uma tabela (500) até o próximo /__reset.
 
@@ -57,6 +60,11 @@ const medidas = [65.8, 66.2, 66.6, 66.9, 67.3, 67.7, 68.0, 68.4].map((w, i) => (
   // Nulos: medida que o paciente anotou. Preenchidos: a do prontuário.
   measured_by: null, appointment_id: null,
 }));
+// A de 20 dias atrás cai no dia da consulta realizada da Maria (ap-m1, abaixo):
+// é a que o nutri tirou lá. Os números não mudam; só passa a ser do prontuário
+// (measured_by) e ligada à consulta, para a página Medidas do paciente mostrar a
+// marca "Medida na consulta" e não oferecer o excluir.
+Object.assign(medidas[5], { measured_by: NUT, appointment_id: "ap-m1", created_at: naHora(20, "14:50") });
 
 const refeicoesHist = [];
 ["Café da manhã", "Almoço", "Jantar"].forEach((t, j) => {
@@ -1067,6 +1075,62 @@ const sessao = (id) => ({
   refresh_token: "refresh-falso", user: usuario(id),
 });
 
+/**
+ * Escritas pelo PostgREST. Quase toda tabela só aceita e não guarda (201, vazio);
+ * estas duas guardam, com a regra do banco, e o /__reset desfaz:
+ *
+ *  - body_measurements, PATCH e DELETE: a RLS do paciente (migração
+ *    20261014120000) só deixa mexer na linha DELE com `measured_by` nulo. Quando
+ *    a política esconde a linha, o banco NÃO dá erro: afeta zero linhas, e o
+ *    supabase-js devolve `{ error: null, count: 0 }`. É esse silêncio que o app
+ *    tem de tratar (Medidas) ou evitar (assistente), e o mock o reproduz. Com
+ *    `Prefer: count=exact` o total vai no Content-Range, como no PostgREST.
+ *  - profiles, POST (o upsert da página Perfil): grava no perfil de quem pede,
+ *    com o check do CRN (até 30 caracteres), para o CRN salvo reaparecer.
+ */
+function escrever(tabela, metodo, params, corpo, quem, prefer) {
+  const vazio = { status: 201, dados: [], cabecalhos: {} };
+  let dados = null;
+  try { dados = corpo ? JSON.parse(corpo) : null; } catch {}
+  const representacao = prefer.includes("return=representation");
+  const contagem = (n) => (prefer.includes("count=") ? { "content-range": `*/${n}` } : {});
+
+  if (tabela === "profiles" && metodo === "POST") {
+    const novos = (Array.isArray(dados) ? dados : [dados]).filter((x) => x && typeof x === "object");
+    if (novos.some((n) => n.id !== quem))
+      return { status: 403, dados: { code: "42501", message: 'new row violates row-level security policy for table "profiles"' }, cabecalhos: {} };
+    if (novos.some((n) => typeof n.crn === "string" && n.crn.length > 30))
+      return { status: 400, dados: { code: "23514", message: 'new row for relation "profiles" violates check constraint "profiles_crn_check"' }, cabecalhos: {} };
+    const gravados = novos.map((n) => {
+      let linha = T.profiles.find((p) => p.id === n.id);
+      if (linha) Object.assign(linha, n);
+      else T.profiles.push((linha = { ...n }));
+      return linha;
+    });
+    return { status: 201, dados: representacao ? gravados : [], cabecalhos: {} };
+  }
+
+  if (tabela === "body_measurements" && (metodo === "PATCH" || metodo === "DELETE")) {
+    // O que a política de update/delete deixa o paciente enxergar.
+    const visiveis = aplicaFiltros(T.body_measurements, params)
+      .filter((l) => l.user_id === quem && l.measured_by == null);
+    if (metodo === "PATCH") {
+      // O with check do update: continua sendo linha dele, sem assinatura de nutri nem consulta.
+      const depois = visiveis.map((l) => ({ ...l, ...dados }));
+      if (depois.some((l) => l.user_id !== quem || l.measured_by != null || l.appointment_id != null))
+        return { status: 403, dados: { code: "42501", message: 'new row violates row-level security policy for table "body_measurements"' }, cabecalhos: {} };
+      visiveis.forEach((l, i) => Object.assign(l, depois[i]));
+      if (representacao) return { status: 200, dados: visiveis, cabecalhos: contagem(visiveis.length) };
+    } else {
+      T.body_measurements = T.body_measurements.filter((l) => !visiveis.includes(l));
+      if (representacao) return { status: 200, dados: visiveis, cabecalhos: contagem(visiveis.length) };
+    }
+    return { status: 204, dados: null, cabecalhos: contagem(visiveis.length) };
+  }
+
+  return vazio;
+}
+
 const srv = http.createServer((req, res) => {
   const url = new URL(req.url, "http://localhost");
   const params = [...url.searchParams.entries()];
@@ -1140,8 +1204,10 @@ const srv = http.createServer((req, res) => {
       // count: "exact" }) — a contagem vem só no cabeçalho. Sem tratar
       // isto, todo contador do app aparecia zerado AQUI, o que parece bug
       // do app e não é.
-      if (req.method !== "GET" && req.method !== "HEAD")
-        return envia(201, []);
+      if (req.method !== "GET" && req.method !== "HEAD") {
+        const r = escrever(alvo, req.method, params, corpo, quemPede(req), req.headers["prefer"] || "");
+        return envia(r.status, r.dados, r.cabecalhos);
+      }
 
       let out = aplicaOrdem(aplicaFiltros(linhas, params), params);
       const total = out.length;
