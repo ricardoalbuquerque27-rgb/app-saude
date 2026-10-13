@@ -175,6 +175,38 @@ export function imc(pesoKg?: number | null, alturaCm?: number | null): number | 
 }
 
 // ---------------------------------------------------------------------------
+// Medida em texto
+// ---------------------------------------------------------------------------
+
+/** "71,8 kg", "84 cm", "31,5%": o valor como o nutri o lê, o % colado ao número. */
+export function valorDaMedida(campo: CampoMedida, valor: number): string {
+  const v = valor.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+  const { unidade } = FAIXAS[campo];
+  return unidade === "%" ? `${v}%` : `${v} ${unidade}`;
+}
+
+/** "Peso 71,8 kg", "Gordura 31,5%": com o nome, para uma linha de medidas. */
+export function textoDaMedida(campo: CampoMedida, valor: number): string {
+  // "% de gordura 31,5%" repetiria o símbolo.
+  const nome = campo === "body_fat_pct" ? "Gordura" : FAIXAS[campo].rotulo;
+  return `${nome} ${valorDaMedida(campo, valor)}`;
+}
+
+/**
+ * A diferença para o "antes": "−0,8" (o sinal de menos de verdade, não o
+ * hífen), "+2" ou "sem mudança". 65,6 − 66,4 dá −0,8000000000000114 em ponto
+ * flutuante; arredondar em duas casas antes de escrever é o que evita mostrar
+ * isso, e também faz uma diferença que some no arredondamento valer "sem
+ * mudança", e não "−0".
+ */
+export function textoDaDiferenca(atual: number, antes: number): string {
+  const d = Math.round((atual - antes) * 100) / 100;
+  if (d === 0) return "sem mudança";
+  const v = Math.abs(d).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+  return `${d < 0 ? "−" : "+"}${v}`;
+}
+
+// ---------------------------------------------------------------------------
 // Situação do registro
 // ---------------------------------------------------------------------------
 

@@ -11,6 +11,7 @@ import {
   LIMITES,
   lerMedida,
   rotuloDaAnamnese,
+  temAlgumaParte,
   type CampoMedida,
   type CamposRegistro,
   type Medidas,
@@ -22,9 +23,11 @@ import { hrefDaAba } from "@/lib/abas";
 import type { Res } from "@/lib/consultasDb";
 import { ErroInline } from "@/components/clinico/ErroInline";
 import { ErroSecao } from "@/components/clinico/ErroSecao";
-import { ACAO_SECUNDARIA, FOCO, LINK } from "@/components/clinico/estilos";
+import { ACAO_PRIMARIA, ACAO_SECUNDARIA, FOCO, LINK } from "@/components/clinico/estilos";
 import { CLASSE_SELO } from "@/components/consultas/aparencia";
+import { chamarRegistro } from "./acoes";
 import { CAMPO, CamposDeMedida, type Antes } from "./CamposDeMedida";
+import { ConcluirRegistro } from "./ConcluirRegistro";
 import { useSalvarRascunho } from "./useSalvarRascunho";
 
 type Parte = "anamnese" | "diagnostico" | "conduta" | "observar";
@@ -108,6 +111,7 @@ export function EditorRegistro({
   metas,
   contexto,
   hoje,
+  precisaCrn,
 }: {
   uid: string;
   nome: string;
@@ -123,6 +127,8 @@ export function EditorRegistro({
   contexto: React.ReactNode;
   /** Hoje em São Paulo, do servidor: "Salvo às" (hoje) ou "Salvo em" (outro dia). */
   hoje: string;
+  /** O perfil do nutri não tem CRN: o diálogo de concluir pede. */
+  precisaCrn: boolean;
 }) {
   const router = useRouter();
   const ids = useId();
@@ -136,6 +142,11 @@ export function EditorRegistro({
   const [tocado, setTocado] = useState<Partial<Record<CampoMedida, boolean>>>({});
   const [descartando, setDescartando] = useState(false);
   const [erroDescarte, setErroDescarte] = useState<string | null>(null);
+  const [concluirAberto, setConcluirAberto] = useState(false);
+  // De "Concluir" até a página nova chegar. Não volta a falso quando dá certo:
+  // o diálogo pode ser fechado com Esc enquanto a página recarrega, e o
+  // formulário não pode aceitar tecla nesse intervalo (o banco recusaria).
+  const [concluindo, setConcluindo] = useState(false);
   const [, iniciar] = useTransition();
 
   // O formulário inteiro de agora, para cada tecla mandar tudo (o banco
@@ -215,9 +226,55 @@ export function EditorRegistro({
     });
   }
 
+  /**
+   * Grava o que falta e conclui. Devolve o erro para o diálogo mostrar, ou
+   * nulo. `agora()` primeiro: conclui o que está no banco, e o que acabou de
+   * ser digitado ainda não está. Medida inválida na tela faz `agora()` devolver
+   * falso, e quem diz o que está errado é o campo, não uma chamada ao banco
+   * que seria recusada.
+   */
+  async function concluir(crn: string | null): Promise<string | null> {
+    setConcluindo(true);
+    const gravou = await rascunho.agora();
+    if (!gravou) {
+      setConcluindo(false);
+      if (retidas.length) {
+        return retidas
+          .map((c) => {
+            const lido = lerMedida(c, medidas[c]);
+            const rotulo = FAIXAS[c].rotulo;
+            if (lido.ok) return "";
+            // A faixa já abre com o nome ("Peso fora da faixa…"); o resto não.
+            return lido.erro.startsWith(rotulo) ? lido.erro : `${rotulo}: ${lido.erro}`;
+          })
+          .join(" ");
+      }
+      return rascunho.estadoAgora().erro ?? "Não foi possível salvar o rascunho. Tente de novo.";
+    }
+    const r = await chamarRegistro(
+      "concluir_registro",
+      // O `updated_at` da gravação que `agora()` acabou de esperar: o do render
+      // seria o de antes dela.
+      { p_consulta: consulta.id, p_visto_em: rascunho.estadoAgora().updatedAt, p_crn: crn },
+      "concluir"
+    ).catch(() => ({ erro: "Não foi possível concluir. Confira a conexão e tente de novo.", dados: null }));
+    if (r.erro) setConcluindo(false);
+    return r.erro;
+  }
+
   const temRascunho = rascunho.updatedAt !== null || rascunho.pendente;
+  // Só medida válida conta: a inválida não vai ao banco.
+  const temParte = temAlgumaParte({
+    ...textos,
+    medidas: Object.fromEntries(
+      TODOS.flatMap((c) => {
+        const lido = lerMedida(c, medidas[c]);
+        return lido.ok && lido.valor != null ? [[c, lido.valor]] : [];
+      })
+    ),
+  });
   const avisadas = retidas.filter((c) => tocado[c]);
-  const desligado = descartando || rascunho.conferindo;
+  const desligado = descartando || rascunho.conferindo || concluindo;
 
   const situacao = (() => {
     if (rascunho.conferindo) return "Conferindo o rascunho…";
@@ -233,9 +290,9 @@ export function EditorRegistro({
 
   // Função, e não componente: um componente declarado aqui seria outro a
   // cada render, e o botão perderia o foco do teclado.
-  const acoes = (classe: string) =>
-    temRascunho && (
-      <div className={classe}>
+  const acoes = (classe: string) => (
+    <div className={classe}>
+      {temRascunho && (
         <button
           type="button"
           onClick={descartar}
@@ -245,8 +302,17 @@ export function EditorRegistro({
           {descartando && <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />}
           Descartar rascunho
         </button>
-      </div>
-    );
+      )}
+      <button
+        type="button"
+        onClick={() => setConcluirAberto(true)}
+        disabled={desligado || !temParte}
+        className={`inline-flex ${ACAO_PRIMARIA} disabled:opacity-60`}
+      >
+        Concluir registro
+      </button>
+    </div>
+  );
 
   const textoArea = (parte: Parte, rotulo: string, linhas: number, ajuda?: string) => {
     const id = `${ids}-${parte}`;
@@ -367,6 +433,16 @@ export function EditorRegistro({
       {acoes(
         "sticky bottom-[61px] z-10 -mx-4 mt-8 flex gap-2 border-t border-clin-linha bg-clin-chao px-4 py-3 lg:hidden [&>button]:flex-1"
       )}
+
+      {/* Fora do fieldset: dentro dele os botões do diálogo ficariam desligados. */}
+      <ConcluirRegistro
+        aberto={concluirAberto}
+        aoFechar={() => setConcluirAberto(false)}
+        paciente={nome}
+        medidas={medidas}
+        precisaCrn={precisaCrn}
+        aoConcluir={concluir}
+      />
     </div>
   );
 }

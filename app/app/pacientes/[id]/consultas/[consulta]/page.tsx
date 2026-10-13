@@ -8,8 +8,9 @@ import { dataCurta, diaDaConsulta, rotuloDaConsulta, ROTULO_TIPO, situacao, type
 import { getConsultasDoPaciente, getDesdeDoPaciente } from "@/lib/consultasDb";
 import { textoDesdeUltima, tituloDesde } from "@/lib/desdeConsulta";
 import { CAMPOS_META, getUltimaPrescricao, textoDaMeta, type CampoMeta, type MetasPrescritas } from "@/lib/nutri";
-import { anteriores, FAIXAS, situacaoDoRegistro, type CampoMedida, type Registro } from "@/lib/registro";
+import { anteriores, FAIXAS, situacaoDoRegistro, textoDaMedida, type CampoMedida, type Registro } from "@/lib/registro";
 import {
+  getAdendos,
   getMedidasDoPaciente,
   getRegistroDaConsulta,
   getRegistrosDoPaciente,
@@ -54,11 +55,7 @@ function ultimaEmCasa(serie: LinhaDeMedida[], hoje: string): string | null {
     if (linha.measured_by != null || linha.date > hoje) continue;
     const partes = (Object.keys(FAIXAS) as CampoMedida[])
       .filter((c) => typeof linha[c] === "number")
-      .map((c) => {
-        const v = (linha[c] as number).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
-        // "Gordura 22,2%", e não "% de gordura 22,2%".
-        return c === "body_fat_pct" ? `Gordura ${v}%` : `${FAIXAS[c].rotulo} ${v} ${FAIXAS[c].unidade}`;
-      });
+      .map((c) => textoDaMedida(c, linha[c] as number));
     if (partes.length) return `${partes.join(" · ")} em ${dataCurta(linha.date)}`;
   }
   return null;
@@ -125,7 +122,7 @@ export default async function RegistroDaConsulta({
   const hoje = todayISO();
 
   const [eu, perfilRes, consultas, registro, medidas, registros, desde, prescricao] = await Promise.all([
-    meuPerfil<{ id: string; role: string }>(supabase, "id, role"),
+    meuPerfil<{ id: string; role: string; crn: string | null }>(supabase, "id, role, crn"),
     supabase
       .from("profiles")
       .select("full_name, height_cm, daily_calorie_goal, protein_goal_g, daily_water_goal_ml, weight_goal_kg")
@@ -154,8 +151,26 @@ export default async function RegistroDaConsulta({
   if (registro.falhou) return <SoOErro secao="o registro desta consulta" />;
 
   const nome = perfil.full_name || "Paciente";
+  const alturaCm = perfil.height_cm == null ? null : Number(perfil.height_cm);
+  const dia = diaDaConsulta(consulta);
+  const anterioresDasMedidas = {
+    data: medidas.falhou ? {} : anteriores(medidas.data, dia),
+    falhou: medidas.falhou,
+  };
   if (registro.data?.status === "concluido") {
-    return <RegistroConcluido uid={uid} nome={nome} consulta={consulta} registro={registro.data} />;
+    // Os adendos dependem do id do registro, que só aqui se conhece.
+    const adendos = await getAdendos(supabase, registro.data.id);
+    return (
+      <RegistroConcluido
+        uid={uid}
+        nome={nome}
+        consulta={consulta}
+        registro={registro.data}
+        adendos={adendos}
+        anteriores={anterioresDasMedidas}
+        alturaCm={alturaCm}
+      />
+    );
   }
   // Com rascunho, o editor abre mesmo assim: uma consulta remarcada para a
   // frente depois de começar a escrever ainda precisa do "Descartar".
@@ -163,7 +178,6 @@ export default async function RegistroDaConsulta({
     return <SemDireito uid={uid} nome={nome} consulta={consulta} />;
   }
 
-  const dia = diaDaConsulta(consulta);
   const inicio = Date.parse(consulta.starts_at);
 
   // Os registros de consultas anteriores a esta, da mais nova para a mais
@@ -201,10 +215,11 @@ export default async function RegistroDaConsulta({
       nome={nome}
       consulta={consulta}
       registro={registro.data}
-      anteriores={{ data: medidas.falhou ? {} : anteriores(medidas.data, dia), falhou: medidas.falhou }}
-      alturaCm={perfil.height_cm == null ? null : Number(perfil.height_cm)}
+      anteriores={anterioresDasMedidas}
+      alturaCm={alturaCm}
       metas={{ data: textoDasMetas(metas), falhou: !!prescricao.error }}
       hoje={hoje}
+      precisaCrn={!eu.crn?.trim()}
       contexto={
         <ContextoDaConsulta
           observar={observar}

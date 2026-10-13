@@ -14,6 +14,9 @@ import {
   rotuloDaAnamnese,
   situacaoDoRegistro,
   temAlgumaParte,
+  textoDaDiferenca,
+  textoDaMedida,
+  valorDaMedida,
   type CampoMedida,
 } from "./registro";
 
@@ -290,5 +293,43 @@ describe("temAlgumaParte", () => {
   it("um texto, ou uma medida, basta", () => {
     expect(temAlgumaParte({ conduta: "Reduzir sódio" })).toBe(true);
     expect(temAlgumaParte({ anamnese: "  ", medidas: { weight_kg: 71.8 } })).toBe(true);
+  });
+});
+
+describe("valorDaMedida e textoDaMedida", () => {
+  it("escreve o valor com a unidade, em português", () => {
+    expect(valorDaMedida("weight_kg", 71.8)).toBe("71,8 kg");
+    expect(valorDaMedida("waist_cm", 84)).toBe("84 cm");
+    // o % cola no número
+    expect(valorDaMedida("body_fat_pct", 31.5)).toBe("31,5%");
+  });
+
+  it("corta em duas casas, sem a sobra da conta em ponto flutuante", () => {
+    expect(valorDaMedida("weight_kg", 65.60000000000001)).toBe("65,6 kg");
+  });
+
+  it("põe o nome na frente, e a gordura se chama Gordura", () => {
+    expect(textoDaMedida("weight_kg", 65.6)).toBe("Peso 65,6 kg");
+    expect(textoDaMedida("hip_cm", 102)).toBe("Quadril 102 cm");
+    // "% de gordura 22,2%" repetiria o símbolo
+    expect(textoDaMedida("body_fat_pct", 22.2)).toBe("Gordura 22,2%");
+  });
+});
+
+describe("textoDaDiferenca", () => {
+  it("usa o sinal de menos de verdade (−, não o hífen) e o de mais", () => {
+    expect(textoDaDiferenca(65.6, 66.4)).toBe("\u22120,8");
+    expect(textoDaDiferenca(84, 82)).toBe("+2");
+    expect(textoDaDiferenca(31.5, 32.4)).toBe("\u22120,9");
+  });
+
+  it("não deixa a conta em ponto flutuante aparecer (65,6 − 66,4 dá −0,8000000000000114)", () => {
+    expect(textoDaDiferenca(65.6, 66.4)).not.toMatch(/\d{3,}/);
+  });
+
+  it("igual ao de antes é \"sem mudança\", e não \"+0\" nem \"−0\"", () => {
+    expect(textoDaDiferenca(70, 70)).toBe("sem mudança");
+    // uma diferença que some no arredondamento também não muda nada
+    expect(textoDaDiferenca(70.001, 70)).toBe("sem mudança");
   });
 });

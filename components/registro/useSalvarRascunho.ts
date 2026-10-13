@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import type { Res } from "@/lib/consultasDb";
 import type { CamposRegistro, Registro } from "@/lib/registro";
 import { getRegistroDaConsulta } from "@/lib/registroDb";
 import { chamarRegistro } from "./acoes";
@@ -10,6 +11,17 @@ export type EstadoRascunho = "ocioso" | "salvando" | "salvo" | "erro";
 
 /** Quanto esperar depois da última tecla para gravar. */
 const ESPERA_MS = 1500;
+
+/**
+ * Quanto esperar a conferência do banco ao abrir. Sem prazo, uma leitura que
+ * não volta (rede ruim no celular, projeto do Supabase acordando) deixava o
+ * formulário desligado em "Conferindo o rascunho…" para sempre, e o nutri sem
+ * como escrever. Passado o prazo, segue como se a leitura tivesse falhado: com
+ * o que veio da página, e a trava do banco (`p_visto_em`) continua valendo.
+ * Oito segundos: mais que uma leitura lenta de verdade, menos que o nutri
+ * desistir e recarregar.
+ */
+const CONFERENCIA_MS = 8000;
 
 function parar(relogio: { current: ReturnType<typeof setTimeout> | null }) {
   if (relogio.current) clearTimeout(relogio.current);
@@ -61,6 +73,12 @@ const ultimaGravacao = new Map<string, Promise<boolean>>();
  * formulário não pode mandar (uma medida inválida): conta como pendente.
  * Enquanto há alteração fora do banco, fechar ou recarregar a página cai no
  * aviso do navegador.
+ *
+ * `updatedAt` e `erro` são o estado do último render. Quem espera `agora()` e
+ * depois precisa do valor que ela deixou (concluir manda o `updated_at` da
+ * gravação que acabou de terminar; o erro dela vai para o diálogo) lê
+ * `estadoAgora()`: o render seguinte ainda não aconteceu, e o `updatedAt`
+ * velho seria recusado como "mudou em outra aba".
  */
 export function useSalvarRascunho(
   consultaId: string,
@@ -75,6 +93,7 @@ export function useSalvarRascunho(
   salvar: (campos: CamposRegistro) => void;
   agora: () => Promise<boolean>;
   descartar: () => Promise<string | null>;
+  estadoAgora: () => { updatedAt: string | null; erro: string | null };
   estado: EstadoRascunho;
   salvoEm: string | null;
   erro: string | null;
@@ -102,6 +121,7 @@ export function useSalvarRascunho(
   /** Já há uma gravação esperando a vez: outra chamada pega carona nela. */
   const naFila = useRef(false);
   const relogio = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const erroAgora = useRef<string | null>(null);
   const retidoAgora = useRef(retido);
   retidoAgora.current = retido;
   const aoConferir = useRef(opcoes.aoConferir);
@@ -109,12 +129,25 @@ export function useSalvarRascunho(
 
   useEffect(() => {
     let vivo = true;
+    let prazo: ReturnType<typeof setTimeout> | undefined;
     (async () => {
-      await ultimaGravacao.get(consultaId);
-      const r = await getRegistroDaConsulta(createClient(), consultaId).catch(() => ({
-        data: null,
-        falhou: true,
-      }));
+      const falhou: Res<Registro | null> = { data: null, falhou: true };
+      let r: Res<Registro | null>;
+      try {
+        // A espera pela gravação do editor anterior também está sob o prazo:
+        // uma gravação parada seguraria a conferência do mesmo jeito.
+        const leitura = (async () => {
+          await ultimaGravacao.get(consultaId);
+          return getRegistroDaConsulta(createClient(), consultaId);
+        })();
+        const estourou = new Promise<Res<Registro | null>>((resolve) => {
+          prazo = setTimeout(() => resolve(falhou), CONFERENCIA_MS);
+        });
+        r = await Promise.race([leitura, estourou]);
+      } catch {
+        r = falhou;
+      }
+      clearTimeout(prazo);
       if (!vivo) return;
       if (!r.falhou && (r.data?.updated_at ?? null) !== inicio.current) {
         const noBanco = r.data;
@@ -130,6 +163,7 @@ export function useSalvarRascunho(
     })();
     return () => {
       vivo = false;
+      clearTimeout(prazo);
     };
   }, [consultaId]);
 
@@ -157,11 +191,13 @@ export function useSalvarRascunho(
       // com o valor velho e seria recusada como "mudou em outra aba".
       if (r.erro || !novo) {
         proximo.current ??= campos;
-        setErro(r.erro ?? "Não foi possível salvar.");
+        erroAgora.current = r.erro ?? "Não foi possível salvar.";
+        setErro(erroAgora.current);
         setEstado("erro");
         return false;
       }
       visto.current = novo;
+      erroAgora.current = null;
       setUpdatedAt(novo);
       setSalvoEm(novo);
       setErro(null);
@@ -211,6 +247,8 @@ export function useSalvarRascunho(
     return ok && !retidoAgora.current;
   }, [gravar]);
 
+  const estadoAgora = useCallback(() => ({ updatedAt: visto.current, erro: erroAgora.current }), []);
+
   /**
    * Apaga o rascunho no banco. Devolve a mensagem de erro, ou nulo.
    *
@@ -237,6 +275,7 @@ export function useSalvarRascunho(
       return r.erro;
     }
     visto.current = null;
+    erroAgora.current = null;
     fila.current = Promise.resolve(true);
     ultimaGravacao.delete(consultaId);
     setUpdatedAt(null);
@@ -271,5 +310,5 @@ export function useSalvarRascunho(
     return () => window.removeEventListener("beforeunload", aoSair);
   }, [pendente]);
 
-  return { salvar, agora, descartar, estado, salvoEm, erro, updatedAt, pendente, conferindo };
+  return { salvar, agora, descartar, estadoAgora, estado, salvoEm, erro, updatedAt, pendente, conferindo };
 }

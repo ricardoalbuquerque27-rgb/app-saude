@@ -1339,7 +1339,10 @@ async function transbordo(page) {
       {
         const p = await abrir(pc, registro("luiza", CONCLUIDA), { secoes: false });
         await titulo(p).waitFor({ timeout: 60000 });
-        ok((await p.locator("textarea").count()) === 0, "registro concluído: sem campos de edição");
+        // A única caixa de texto de um registro concluído é a do novo adendo (Verificação 17).
+        ok((await p.locator("main input").count()) === 0 && (await p.locator("textarea").count()) === 1 &&
+          (await p.getByLabel("Novo adendo", { exact: true }).count()) === 1,
+          "registro concluído: sem campos de edição das cinco partes");
         await p.close();
       }
       {
@@ -1391,6 +1394,297 @@ async function transbordo(page) {
         await p.close();
         await fetch(MOCK + "/__reset", { method: "POST" });
       }
+    }
+  }
+  await fetch(MOCK + "/__reset", { method: "POST" });
+
+  // =====================================================================
+  // 17. Registro da consulta: concluir, registro concluído e adendo
+  // =====================================================================
+  console.log("\nVerificação 17: registro da consulta (concluir, concluído e adendo)");
+  etapa = "registro concluído";
+  {
+    // ap-13: a consulta da Luiza em andamento, sem registro (peso de 14 dias
+    // atrás: 66,4 kg, na consulta ap-3, que tem registro concluído e um adendo).
+    const EM_ANDAMENTO = "ap-13";
+    const CONCLUIDA = "ap-3";
+    const registro = (k, c) => `${rota(k)}/consultas/${c}`;
+    const REGISTRO_API = `${MOCK}/rest/v1/consultation_records?appointment_id=eq.`;
+    const noMock = async (consulta) => (await (await fetch(REGISTRO_API + consulta)).json())[0] ?? null;
+    const doMock = async (tabela, filtro) => (await fetch(`${MOCK}/rest/v1/${tabela}?${filtro}`)).json();
+    const diaNoMock = (instante) =>
+      new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(instante));
+    const ddmm = (n) => diaBR(n).slice(0, 5);
+    const titulo = (page) => page.getByRole("heading", { level: 1, name: /^Consulta de / });
+    const status = (page) => page.locator("[data-status-rascunho]");
+    const dialogo = (page) => page.getByRole("dialog", { name: "Concluir o registro?" });
+    const confirmar = (page) => dialogo(page).getByRole("button", { name: /^Conclu/ });
+    const botaoDaPagina = (page) => page.getByRole("button", { name: "Concluir registro", exact: true });
+    // `:disabled`, e não a propriedade `disabled`: dentro de um fieldset
+    // desligado a propriedade continua falsa.
+    const campoLivre = (page) => page.waitForFunction(() => {
+      const t = document.querySelector("textarea");
+      return !!t && !t.matches(":disabled");
+    }, null, { timeout: 30000 }).then(() => true, () => false);
+    const salvouTudo = (page) => page.waitForFunction(
+      () => /Salvo às/.test(document.querySelector("[data-status-rascunho]")?.textContent || ""), null, { timeout: 30000 }
+    ).then(() => true, () => false);
+    const abrirConclusao = async (page) => {
+      await clicar(botaoDaPagina(page));
+      return apareceu(dialogo(page), 10000);
+    };
+    const voltar = async (page) => {
+      await dialogo(page).getByRole("button", { name: "Voltar" }).click();
+      await dialogo(page).waitFor({ state: "hidden", timeout: 10000 });
+    };
+    const semEspaco = (t) => t.replace(/\s+/g, " ").trim();
+    /** Resposta de função do banco inventada pela verificação (o mock não recusa isso sozinho). */
+    const recusa = (error) => ({
+      status: 200, contentType: "application/json",
+      headers: { "access-control-allow-origin": "*" }, body: JSON.stringify({ ok: false, error }),
+    });
+
+    // a) a conferência do banco ao abrir tem prazo: uma leitura que não volta
+    //    não deixa o formulário desligado para sempre.
+    {
+      const p = await pc.newPage();
+      espiar(p);
+      let segurando = false;
+      await p.route("**/rest/v1/consultation_records**", async (route) => {
+        if (route.request().method() !== "GET") return route.continue();
+        segurando = true;
+        await new Promise((r) => setTimeout(r, 11000));
+        segurando = false;
+        await route.continue();
+      });
+      await p.goto(APP + registro("luiza", EM_ANDAMENTO), { waitUntil: "load", timeout: 120000 });
+      await titulo(p).waitFor({ timeout: 60000 });
+      const liberou = await campoLivre(p);
+      ok(liberou && segurando, "a conferência do banco ao abrir tem prazo: o formulário libera com a leitura ainda sem resposta");
+      ok(!(await status(p).innerText()).includes("Conferindo"), 'e o topo deixa de dizer "Conferindo o rascunho…"', await status(p).innerText());
+      for (let i = 0; i < 150 && segurando; i++) await p.waitForTimeout(100);
+      ok(!(await status(p).innerText()).includes("Conferindo") && !(await p.locator("textarea").first().isDisabled()),
+        "a resposta que chega depois do prazo não desliga o formulário de novo");
+      await p.close();
+    }
+
+    // b) concluir: o diálogo, o CRN, a faixa, o salvamento em voo e o duplo clique
+    const page = await abrir(pc, registro("luiza", EM_ANDAMENTO), { secoes: false });
+    await titulo(page).waitFor({ timeout: 60000 });
+    let chamadas = 0;
+    page.on("request", (r) => { if (r.url().includes("/rpc/concluir_registro")) chamadas++; });
+    await campoLivre(page);
+    ok(await botaoDaPagina(page).isDisabled(), '"Concluir registro" fica desabilitado enquanto não há nada escrito');
+    const evolucao = page.getByLabel("Evolução", { exact: true });
+    await evolucao.fill("Retorno em dia. Boa adesão ao cardápio.");
+    ok(await botaoDaPagina(page).isEnabled(), "e libera com uma parte preenchida");
+    const peso = campo(page, "Peso (kg)").locator("input");
+    await peso.fill("65,6");
+    await peso.blur();
+    await salvouTudo(page);
+
+    ok(await abrirConclusao(page), '"Concluir registro" abre o diálogo');
+    const d = dialogo(page);
+    const dTxt = semEspaco(await textoDe(d));
+    ok(/não pode ser editado nem apagado/.test(dTxt) && /“medida na consulta”/.test(dTxt) && /fica marcada como realizada/.test(dTxt),
+      "o diálogo diz o que muda: trava, medidas no histórico e consulta realizada", dTxt);
+    ok(dTxt.includes("Confira as medidas") && dTxt.includes("Peso 65,6 kg"), "e mostra as medidas para conferir (Peso 65,6 kg)", dTxt);
+    ok(await d.getByLabel("Seu CRN").isVisible(), 'o nutri do mock não tem CRN: o diálogo pede "Seu CRN"');
+    const mDlg = await transbordo(page);
+    ok(mDlg.doc <= mDlg.larg, `diálogo de concluir sem transbordo no computador (documento ${mDlg.doc}px, janela ${mDlg.larg}px)`, mDlg.vaza.join(" | "));
+    await fotografar(page, `${OUT}/registro-concluir-desktop-claro.png`, COMPUTADOR);
+
+    // sem CRN: a recusa é do banco, e o diálogo fica aberto com o texto dela
+    await clicar(confirmar(page));
+    ok(await apareceu(d.getByText("Informe o seu CRN para concluir."), 10000),
+      'concluir sem CRN: o diálogo mostra "Informe o seu CRN para concluir."');
+    ok(chamadas === 1 && (await noMock(EM_ANDAMENTO))?.status === "rascunho",
+      `e o registro continua rascunho (${chamadas} chamada ao banco)`);
+    await voltar(page);
+
+    // peso 718: a tela diz a faixa e nem chama o banco
+    await peso.fill("718");
+    await peso.blur();
+    ok(await abrirConclusao(page), "com o peso inválido o diálogo abre do mesmo jeito");
+    ok(semEspaco(await textoDe(d)).includes("Peso “718”"), "e marca a medida que não vale na conferência", semEspaco(await textoDe(d)));
+    await d.getByLabel("Seu CRN").fill("CRN-3 12345");
+    await clicar(confirmar(page));
+    ok(await apareceu(d.getByText("Peso fora da faixa (20 a 400 kg)."), 10000),
+      'peso 718: o diálogo mostra "Peso fora da faixa (20 a 400 kg)."');
+    ok(chamadas === 1, `e o banco não é chamado (${chamadas} chamada no total)`);
+    ok((await noMock(EM_ANDAMENTO))?.medidas?.weight_kg === 65.6, "e o peso 718 não foi para o banco (continua 65,6)");
+    await voltar(page);
+    await peso.fill("65,6");
+    await peso.blur();
+    await salvouTudo(page);
+
+    // a Conduta ainda está sendo gravada (resposta segurada) quando se confirma;
+    // o duplo clique no botão conclui uma vez só
+    const respostas = [];
+    const pedidosConcluir = [];
+    page.on("request", (r) => { if (r.url().includes("/rpc/concluir_registro")) pedidosConcluir.push(r.postDataJSON()); });
+    await page.route("**/rest/v1/rpc/salvar_registro", async (route) => {
+      const resposta = await route.fetch();
+      respostas.push(await resposta.json());
+      await new Promise((r) => setTimeout(r, 2500));
+      await route.fulfill({ response: resposta });
+    });
+    const conduta = page.getByLabel("Conduta", { exact: true });
+    await conduta.fill("Manter o plano de 1.800 kcal.");
+    await conduta.blur();
+    ok(await abrirConclusao(page), "concluir com uma gravação ainda em voo");
+    await d.getByLabel("Seu CRN").fill("CRN-3 12345");
+    await confirmar(page).dblclick();
+    ok(await page.waitForFunction(() => /Concluído em/.test(document.body.innerText), null, { timeout: 40000 }).then(() => true, () => false),
+      "concluir com o CRN: a página vira registro concluído");
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+    ok(pedidosConcluir.length === 1, `o duplo clique conclui uma vez só (${pedidosConcluir.length} chamadas)`);
+    ok(!!respostas.at(-1)?.updated_at && pedidosConcluir[0]?.p_visto_em === respostas.at(-1).updated_at,
+      "a conclusão vai com o updated_at exato da última gravação (a que estava em voo)",
+      `${pedidosConcluir[0]?.p_visto_em} x ${respostas.at(-1)?.updated_at}`);
+    ok(pedidosConcluir[0]?.p_crn === "CRN-3 12345", "e com o CRN digitado");
+    const concluido = await noMock(EM_ANDAMENTO);
+    ok(concluido?.status === "concluido" && concluido?.conduta === "Manter o plano de 1.800 kcal.",
+      "o que estava em voo entrou no registro concluído", JSON.stringify(concluido?.conduta));
+
+    // c) o registro concluído
+    const main = page.locator("main");
+    const txt = semEspaco(await textoDe(main));
+    ok(new RegExp(`Concluído em ${diaBR(0)} às \\d\\d:\\d\\d por Ricardo Albuquerque · CRN-3 12345`).test(txt),
+      'o topo diz "Concluído em … às … por Ricardo Albuquerque · CRN-3 12345"', txt.slice(0, 300));
+    ok(txt.includes("Retorno em dia. Boa adesão ao cardápio.") && txt.includes("Manter o plano de 1.800 kcal.") &&
+      /Evolução/.test(txt) && /Diagnóstico nutricional/.test(txt) && /Observar no retorno/.test(txt),
+      "as partes aparecem para leitura");
+    ok((await main.locator("input").count()) === 0 && (await page.locator("textarea").count()) === 1 &&
+      (await page.getByLabel("Novo adendo", { exact: true }).count()) === 1,
+      "sem campos de edição: a única caixa de texto é a do novo adendo");
+    ok(txt.includes("−0,8") && txt.includes(`desde ${ddmm(14)}`), `a medida traz a diferença para a consulta anterior (−0,8 desde ${ddmm(14)})`, txt);
+    ok(/IMC 23,2/.test(txt) && txt.includes("168 cm"), "e o IMC com a altura do perfil (23,2 com 168 cm)");
+    const mC = await transbordo(page);
+    ok(mC.doc <= mC.larg, `registro concluído sem transbordo no computador (documento ${mC.doc}px, janela ${mC.larg}px)`, mC.vaza.join(" | "));
+    await fotografar(page, `${OUT}/registro-concluido-desktop-claro.png`, COMPUTADOR);
+
+    // d) o que ficou no banco
+    const consultaNoMock = (await doMock("appointments", `id=eq.${EM_ANDAMENTO}`))[0];
+    ok(consultaNoMock?.status === "realizada", "no mock a consulta virou realizada", consultaNoMock?.status);
+    const medidasNoMock = await doMock("body_measurements", `appointment_id=eq.${EM_ANDAMENTO}`);
+    const diaDaConsulta = consultaNoMock ? diaNoMock(consultaNoMock.starts_at) : "";
+    ok(medidasNoMock.length === 1 && medidasNoMock[0].date === diaDaConsulta && medidasNoMock[0].weight_kg === 65.6 &&
+      medidasNoMock[0].measured_by === cen.nutri,
+      `e a medida tem a data da consulta em São Paulo (${diaDaConsulta}) e o autor`, JSON.stringify(medidasNoMock));
+    const perfilNoMock = (await doMock("profiles", `id=eq.${cen.nutri}`))[0];
+    ok(perfilNoMock?.crn === "CRN-3 12345", "o CRN ficou no perfil do nutri", String(perfilNoMock?.crn));
+
+    // e) o adendo: vazio não salva; o que o banco recusa aparece; o certo entra na lista
+    const novo = page.getByLabel("Novo adendo", { exact: true });
+    const salvarAdendo = page.getByRole("button", { name: "Salvar adendo" });
+    ok(txt.includes("Nenhum adendo"), "sem adendo, a lista diz que não há");
+    ok(await salvarAdendo.isDisabled(), '"Novo adendo" vazio não salva: o botão fica desabilitado');
+    await novo.fill("   \n  ");
+    ok(await salvarAdendo.isDisabled(), "e só com espaços também");
+    await page.route("**/rest/v1/rpc/adicionar_adendo", (route) => route.fulfill(recusa("Escreva o adendo (até 5.000 caracteres).")));
+    await novo.fill("Texto que o banco recusa.");
+    await clicar(salvarAdendo);
+    ok(await apareceu(page.getByText("Escreva o adendo (até 5.000 caracteres)."), 10000),
+      "a recusa do banco aparece ao lado do campo");
+    ok((await novo.inputValue()) === "Texto que o banco recusa.", "e o texto continua no campo");
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+    const ADENDO = "A paciente mandou o exame de glicemia em jejum: 98 mg/dL. Sem mudança na conduta.";
+    await novo.fill(ADENDO);
+    await clicar(salvarAdendo);
+    const artigo = page.locator("article", { hasText: ADENDO });
+    ok(await apareceu(artigo, 15000), "o adendo aparece na lista");
+    const aTxt = semEspaco(await textoDe(artigo));
+    ok(new RegExp(`${diaBR(0)} às \\d\\d:\\d\\d · Ricardo Albuquerque · CRN-3 12345`).test(aTxt),
+      "com a data, a hora, o nome e o CRN de quem assinou", aTxt);
+    for (let i = 0; i < 50 && (await novo.inputValue()) !== ""; i++) await page.waitForTimeout(100);
+    ok((await novo.inputValue()) === "", "e o campo esvazia depois que o adendo entra");
+    ok((await doMock("consultation_addenda", `record_id=eq.${concluido.id}`)).length === 1, "no mock o adendo é do registro");
+    await page.close();
+
+    // f) um registro concluído de verdade (o do mock): assinatura e adendo de datas antigas, sem "desde"
+    {
+      const p = await abrir(pc, registro("luiza", CONCLUIDA), { secoes: false });
+      await titulo(p).waitFor({ timeout: 60000 });
+      const t = semEspaco(await textoDe(p.locator("main")));
+      ok(t.includes(`Concluído em ${diaBR(14)} às 10:52 por Ricardo Albuquerque · CRN-3 12345`),
+        `o registro de ap-3 diz quando e quem concluiu (${diaBR(14)} às 10:52)`, t.slice(0, 300));
+      ok(t.includes("Peso 66,4 kg") || /Peso\s*66,4 kg/.test(t), "e mostra o peso de 66,4 kg");
+      ok(!t.includes("desde"), "sem medida de consulta anterior, não há diferença para mostrar");
+      ok(t.includes("Correção da conduta: o retorno é em 21 dias") && t.includes(`${diaBR(9)} às 16:20 · Ricardo Albuquerque · CRN-3 12345`),
+        "o adendo que já existia aparece com a data dele e a assinatura");
+      await p.close();
+    }
+
+    // g) prints do concluído (escuro no computador; claro e escuro no celular)
+    for (const [tema, escuro, disp] of [["escuro", true, COMPUTADOR], ["claro", false, CELULAR], ["escuro", true, CELULAR]]) {
+      const ctx = await contexto(browser, disp, escuro, estado);
+      const p = await abrir(ctx, registro("luiza", EM_ANDAMENTO), { secoes: false });
+      await titulo(p).waitFor({ timeout: 60000 });
+      const m = await transbordo(p);
+      ok(m.doc <= m.larg, `registro concluído sem transbordo: ${disp.nome}/${tema} (documento ${m.doc}px, janela ${m.larg}px)`, m.vaza.join(" | "));
+      await fotografar(p, `${OUT}/registro-concluido-${disp.nome}-${tema}.png`, disp);
+      await p.close();
+      await ctx.close();
+    }
+    await fetch(MOCK + "/__reset", { method: "POST" });
+
+    // h) as recusas do banco no diálogo: outra aba escreveu primeiro (a gravação
+    //    falha e o banco nem é chamado) e uma consulta que virou falta
+    {
+      const a = await abrir(pc, registro("luiza", EM_ANDAMENTO), { secoes: false });
+      const b = await abrir(pc, registro("luiza", EM_ANDAMENTO), { secoes: false });
+      await titulo(a).waitFor({ timeout: 60000 });
+      await titulo(b).waitFor({ timeout: 60000 });
+      await campoLivre(a);
+      await campoLivre(b);
+      let chamadasB = 0;
+      b.on("request", (r) => { if (r.url().includes("/rpc/concluir_registro")) chamadasB++; });
+      await a.getByLabel("Evolução", { exact: true }).fill("Escrito na primeira aba.");
+      const pesoA = campo(a, "Peso (kg)").locator("input");
+      await pesoA.fill("65,6");
+      await pesoA.blur();
+      await salvouTudo(a);
+      await b.getByLabel("Evolução", { exact: true }).fill("Escrito na segunda aba.");
+      ok(await abrirConclusao(b), "na aba que ficou para trás o diálogo abre");
+      await dialogo(b).getByLabel("Seu CRN").fill("CRN-3 12345");
+      await clicar(confirmar(b));
+      ok(await apareceu(dialogo(b).getByText("O rascunho mudou em outra aba. Recarregue a página."), 15000),
+        'a gravação que falha antes de concluir aparece no diálogo: "O rascunho mudou em outra aba."');
+      ok(chamadasB === 0, `e o banco não recebe a conclusão (${chamadasB} chamadas)`);
+      ok((await noMock(EM_ANDAMENTO))?.status === "rascunho", "o registro segue rascunho");
+      await b.close();
+
+      // a aba A está em dia: a recusa agora vem da conclusão
+      await campoLivre(a);
+      ok(await abrirConclusao(a), "na aba em dia o diálogo abre");
+      await dialogo(a).getByLabel("Seu CRN").fill("CRN-3 12345");
+      await a.route("**/rest/v1/rpc/concluir_registro", (route) => route.fulfill(recusa("Consulta com falta ou cancelada não tem registro.")));
+      await clicar(confirmar(a));
+      ok(await apareceu(dialogo(a).getByText("Consulta com falta ou cancelada não tem registro."), 15000),
+        "a recusa do banco ao concluir aparece no diálogo");
+      ok(await dialogo(a).isVisible() && (await dialogo(a).getByLabel("Seu CRN").inputValue()) === "CRN-3 12345",
+        "e o diálogo continua aberto, com o CRN digitado");
+      await a.unrouteAll({ behavior: "ignoreErrors" });
+      await voltar(a);
+      // o formulário voltou a valer depois da recusa
+      ok(await a.getByLabel("Evolução", { exact: true }).isEnabled(), "recusado, o formulário fica livre para editar");
+
+      // prints do diálogo (o rascunho está no mock): escuro no computador, claro e escuro no celular
+      for (const [tema, escuro, disp] of [["escuro", true, COMPUTADOR], ["claro", false, CELULAR], ["escuro", true, CELULAR]]) {
+        const ctx = await contexto(browser, disp, escuro, estado);
+        const p = await abrir(ctx, registro("luiza", EM_ANDAMENTO), { secoes: false });
+        await titulo(p).waitFor({ timeout: 60000 });
+        await campoLivre(p);
+        const abriu = await abrirConclusao(p);
+        ok(abriu, `o diálogo abre: ${disp.nome}/${tema}`);
+        const m = await transbordo(p);
+        ok(m.doc <= m.larg, `diálogo de concluir sem transbordo: ${disp.nome}/${tema} (documento ${m.doc}px, janela ${m.larg}px)`, m.vaza.join(" | "));
+        await fotografar(p, `${OUT}/registro-concluir-${disp.nome}-${tema}.png`, disp);
+        await p.close();
+        await ctx.close();
+      }
+      await a.close();
     }
   }
   await fetch(MOCK + "/__reset", { method: "POST" });
