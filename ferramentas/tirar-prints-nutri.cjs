@@ -946,7 +946,8 @@ async function transbordo(page) {
     // d) o mês marca a pendência no dia da Joana (sem desfecho há 5 dias)
     {
       const page = await abrirAgenda(pc, `?vista=mes&data=${diaSP(-5)}`);
-      const dia = page.locator(`a[href="/app/agenda?vista=dia&data=${diaSP(-5)}"]`);
+      // Só o link do calendário: o "Dia" da troca de vista aponta para o mesmo endereço.
+      const dia = page.locator(`ol a[href="/app/agenda?vista=dia&data=${diaSP(-5)}"]`);
       ok(/pendência/.test((await dia.getAttribute("aria-label")) || ""), "Mês: o dia da consulta sem desfecho tem a marca de pendência");
       await page.close();
     }
