@@ -17,9 +17,13 @@ export type Alerta = { tipo: TipoAlerta; nivel: number; texto: string };
 export type PatientSummary = {
   id: string;
   name: string;
-  /** Último dia com QUALQUER registro (refeição, treino, log diário, medida). */
+  /**
+   * Último dia com QUALQUER registro do paciente (refeição, treino, log
+   * diário, medida que ele lançou). A medida da consulta não conta: quem
+   * registrou foi o nutricionista.
+   */
   lastActivity: string | null;
-  /** Dias distintos com registro nos últimos 7 dias (0–7). */
+  /** Dias distintos com registro do paciente nos últimos 7 dias (0–7). */
   daysLogged7: number;
   caloriesToday: number;
   proteinToday: number;
@@ -123,9 +127,10 @@ export async function resumirPacientes(
         .select("user_id, date, water_ml")
         .in("user_id", ids)
         .gte("date", d30),
+      // `measured_by` separa a medida da consulta (montarResumos).
       supabase
         .from("body_measurements")
-        .select("user_id, date, weight_kg")
+        .select("user_id, date, weight_kg, measured_by")
         .in("user_id", ids)
         .not("weight_kg", "is", null)
         .gte("date", d30)
@@ -211,11 +216,16 @@ async function ultimosRegistros(
   await Promise.all(
     ids.flatMap((id) =>
       tabelas.map(async (tabela) => {
-        const { data, error } = await supabase
+        let busca = supabase
           .from(tabela)
           .select("date")
           .eq("user_id", id)
-          .lte("date", today)
+          .lte("date", today);
+        // Só a medida que o paciente lançou. A da consulta fazia quem nunca
+        // registrou nada aparecer como "40 dias sem registrar", contados da
+        // consulta. As outras tabelas não têm a coluna.
+        if (tabela === "body_measurements") busca = busca.is("measured_by", null);
+        const { data, error } = await busca
           .order("date", { ascending: false })
           .limit(1);
         if (error) falhou = true;
@@ -232,7 +242,10 @@ export type DadosResumo = {
   meals: any[];
   workouts: any[];
   logs: any[];
-  /** Só medidas com peso, em ordem crescente de data. */
+  /**
+   * Só medidas com peso, em ordem crescente de data, com `measured_by`
+   * (preenchido na medida da consulta).
+   */
   body: any[];
   /** Só exames fora do normal. */
   exams: any[];
@@ -278,9 +291,14 @@ export function montarResumos(
     const myBody = body.filter((b) => b.user_id === id);
 
     // Dias com atividade — união das quatro fontes. Data futura fica de
-    // fora: com ela, quem está parado aparecia como "Registrou hoje".
+    // fora: com ela, quem está parado aparecia como "Registrou hoje". A
+    // medida da consulta (`measured_by`) também: quem registrou foi o
+    // nutricionista, e com ela quem nunca registrou nada virava "N dias sem
+    // registrar" contados da consulta, e o alerta de parado sumia depois de
+    // toda consulta. Para o peso ela continua valendo (pesos30, abaixo).
+    const doPaciente = myBody.filter((b) => b.measured_by == null);
     const activeDays = new Set<string>();
-    for (const r of [...myMeals, ...myWk, ...myLogs, ...myBody]) {
+    for (const r of [...myMeals, ...myWk, ...myLogs, ...doPaciente]) {
       if (r.date && r.date <= today) activeDays.add(r.date as string);
     }
     const sortedDays = Array.from(activeDays).sort();
@@ -480,7 +498,7 @@ export async function getPatientActivity(
         .gte("date", since),
       supabase
         .from("body_measurements")
-        .select("date, created_at, weight_kg, body_fat_pct, waist_cm")
+        .select("date, created_at, weight_kg, body_fat_pct, waist_cm, measured_by")
         .eq("user_id", uid)
         .gte("date", since),
       supabase
@@ -597,13 +615,19 @@ export function montarLinhaDoTempo(
     push("treino", w, w.name || "Treino", d);
   }
   for (const b of body) {
-    const d = [
+    const peso = b.weight_kg ? `Peso ${b.weight_kg} kg` : null;
+    const resto = [
       b.body_fat_pct ? `${b.body_fat_pct}% gordura` : null,
       b.waist_cm ? `cintura ${b.waist_cm} cm` : null,
-    ]
-      .filter(Boolean)
-      .join(" · ");
-    push("peso", b, b.weight_kg ? `Peso ${b.weight_kg} kg` : "Medidas", d);
+    ];
+    // A medida que o nutricionista tirou na consulta (`measured_by`) fica na
+    // linha do tempo, mas com o próprio rótulo: saía "Peso 66.4 kg", igual a
+    // uma pesagem que o paciente lançou em casa.
+    if (b.measured_by != null) {
+      push("peso", b, "Medida na consulta", [peso, ...resto].filter(Boolean).join(" · "));
+      continue;
+    }
+    push("peso", b, peso ?? "Medidas", resto.filter(Boolean).join(" · "));
   }
   for (const l of logs) {
     const parts = [
@@ -708,7 +732,7 @@ export async function getPatientSeries(
       .gte("date", since),
     supabase
       .from("body_measurements")
-      .select("date, weight_kg")
+      .select("date, weight_kg, measured_by, created_at")
       .eq("user_id", uid)
       .not("weight_kg", "is", null)
       .gte("date", since),
@@ -733,10 +757,31 @@ export async function getPatientSeries(
       water: Number(dayLog?.water_ml) || 0,
       sleep: dayLog?.sleep_hours != null ? Number(dayLog.sleep_hours) : null,
       workouts: (workouts.data ?? []).filter((w: any) => w.date === date).length,
-      weight: dayBody.length ? Number(dayBody[dayBody.length - 1].weight_kg) : null,
+      weight: pesoDoDia(dayBody),
     });
   }
   return { serie: out, falhou: [meals, logs, workouts, body].some((r) => r.error) };
+}
+
+/**
+ * O peso de um dia com mais de uma medida. Desde a medida da consulta isso é
+ * comum (a da consulta e a pesagem de casa no mesmo dia), e a série pegava a
+ * última na ordem em que o banco trouxe, que ninguém pediu: o peso do dia
+ * podia mudar de uma visita para outra. Vale a da consulta (`measured_by`), que é a
+ * medida profissional e a que o prontuário cita; sem ela, a lançada por
+ * último. Em cada grupo, a de `created_at` mais recente, seja qual for a ordem
+ * de chegada.
+ */
+export function pesoDoDia(
+  linhas: { weight_kg: number | string | null; measured_by?: string | null; created_at?: string | null }[]
+): number | null {
+  const comPeso = linhas.filter((l) => l.weight_kg != null);
+  const daConsulta = comPeso.filter((l) => l.measured_by != null);
+  const grupo = daConsulta.length ? daConsulta : comPeso;
+  const ultima = [...grupo].sort((a, b) =>
+    (a.created_at ?? "") < (b.created_at ?? "") ? -1 : (a.created_at ?? "") > (b.created_at ?? "") ? 1 : 0
+  ).pop();
+  return ultima ? Number(ultima.weight_kg) : null;
 }
 
 /** Média de um item na janela. `dias` diz quantos dias entraram na conta. */
