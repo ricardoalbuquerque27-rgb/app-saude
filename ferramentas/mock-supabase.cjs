@@ -526,7 +526,10 @@ function carteira() {
         prescriptions: [prescricao(k, uid, metas, 100)],
         meals: refeicoes(k, uid, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13], 1780, 108),
         daily_logs: diario(k, uid, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 2450, 9100),
-        body_measurements: medidas(k, uid, [[0, 65.4], [7, 65.6], [14, 66.0], [21, 66.4], [28, 66.8]]),
+        // Sem ponto há 14 dias: esse dia é o da consulta (ap-3), e a medida do
+        // prontuário (66,4 kg) fica sozinha nele. Duas medidas no mesmo dia
+        // apareceriam as duas na tabela e no gráfico do Corpo.
+        body_measurements: medidas(k, uid, [[0, 65.4], [7, 65.6], [21, 66.4], [28, 66.8]]),
         exams: [exame(k, 1, uid, 35, "Vitamina D", "38", "ng/mL", "30 a 100", "normal")],
         patient_notes: [
           nota(7, uid, uid, "Perdi 1,2 kg neste mês, obrigada pelo cardápio!", 5, "13:00", em(5, "20:00")),
@@ -591,7 +594,7 @@ function carteira() {
       diagnostico: "Perdeu 1,2 kg no mês, dentro do esperado. Adesão alta nos dias úteis e irregular aos sábados e domingos.",
       conduta: "Manter o plano de 1.800 kcal. Levar um lanche pronto nos passeios de fim de semana e reforçar a proteína no café da manhã. Retorno em 15 dias.",
       observar: "Adesão no fim de semana. Testar café da manhã com ovos.",
-      medidas: { weight_kg: 72.6 }, measurement_id: "bm-reg-3", status: "concluido",
+      medidas: { weight_kg: 66.4 }, measurement_id: "bm-reg-3", status: "concluido",
       concluded_at: pg(conclusao3, 412), assinatura_nome: "Ricardo Albuquerque",
       assinatura_crn: "CRN-3 12345",
       created_at: pg(Date.parse(naHora(14, "10:04")), 218), updated_at: pg(conclusao3, 413),
@@ -613,7 +616,7 @@ function carteira() {
   // A linha que o registro publicou na série de medidas da Luiza: do nutri
   // (measured_by), ligada à consulta e com a data do dia dela em São Paulo.
   const medidaDoRegistro = {
-    id: "bm-reg-3", user_id: P.luiza, date: dia3, weight_kg: 72.6, body_fat_pct: null,
+    id: "bm-reg-3", user_id: P.luiza, date: dia3, weight_kg: 66.4, body_fat_pct: null,
     waist_cm: null, hip_cm: null, arm_cm: null, chest_cm: null, thigh_cm: null,
     neck_cm: null, calf_cm: null, notes: null, created_at: new Date(conclusao3).toISOString(),
     measured_by: NUT, appointment_id: consulta3.id,

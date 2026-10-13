@@ -90,9 +90,9 @@ E os registros da consulta (prontuário: `consultation_records`, os adendos em
 
 - **Luiza**: a consulta de 14 dias atrás tem registro **concluído**, com as cinco
   partes (anamnese, diagnóstico, conduta, "observar no retorno" e a medida de
-  peso, 72,6 kg, publicada na série dela e ligada à consulta), assinado como
-  "Ricardo Albuquerque / CRN-3 12345", e **um adendo**. A consulta em andamento
-  **não** tem registro.
+  peso, 66,4 kg, publicada na série dela e ligada à consulta; é a única medida
+  desse dia), assinado como "Ricardo Albuquerque / CRN-3 12345", e **um adendo**.
+  A consulta em andamento **não** tem registro.
 - **Joana**: a consulta sem desfecho tem um **rascunho** só com a anamnese.
 - O perfil do nutri **não tem CRN** (`crn` nulo): é o que faz o diálogo de
   concluir pedir o número. Concluir com um CRN digitado grava no perfil, e o
