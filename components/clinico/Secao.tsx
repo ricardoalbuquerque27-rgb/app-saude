@@ -1,9 +1,11 @@
 // Moldura de cada bloco da página do paciente: título, ação opcional (Editar,
 // Ver histórico) e uma linha fina em cima em vez de caixa ou sombra.
 //
-// O `id` é a âncora dos botões da fila ("Ver semana" rola até Treino, "Ver
-// clínico" até Clínico). `scroll-mt` deixa o título abaixo da borda de cima
-// da janela depois do salto; sem ele a âncora cola o título no topo.
+// O `id` é a âncora de quem leva a uma seção dentro da aba aberta (os links
+// "#conversa" e "#notas" do cabeçalho, por exemplo); os botões da fila
+// abrem a aba da seção (lib/abas.ts). `scroll-mt` deixa o título abaixo da
+// borda de cima da janela depois do salto; sem ele a âncora cola o título no
+// topo.
 //
 // `className` serve para esconder a seção por largura (`hidden lg:block`):
 // com a conversa aberta em tela cheia no celular, as outras somem só ali. Uma

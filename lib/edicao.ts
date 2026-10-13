@@ -29,11 +29,21 @@ export function podeAbrir(e: EstadoEdicao, secao: SecaoEditavel): boolean {
 }
 
 /**
- * Trocar de aba desmonta o editor aberto (página do paciente em abas). Com
- * alteração não salva, o rascunho sumiria calado; só nesse caso pergunta.
+ * O que impede trocar de aba pela barra (página do paciente em abas). A troca
+ * desmonta o editor aberto (o Voltar do navegador também, mas esse não passa
+ * por aqui; veja components/clinico/Edicao.tsx):
+ * - "gravando": uma gravação em voo perderia o erro se falhasse, e o
+ *   nutricionista acharia que salvou. Treino e cardápio gravam a cada ação,
+ *   sem rascunho, então só a contagem de gravações sabe disso;
+ * - "alteracao": o rascunho digitado sumiria calado; a troca pergunta antes.
  */
-export function precisaConfirmarTroca(e: EstadoEdicao): boolean {
-  return e.aberta !== null && e.suja;
+export function oQueSeguraATroca(
+  e: EstadoEdicao,
+  gravando: number
+): "gravando" | "alteracao" | null {
+  if (gravando > 0) return "gravando";
+  if (e.aberta !== null && e.suja) return "alteracao";
+  return null;
 }
 
 export function reduzirEdicao(e: EstadoEdicao, a: AcaoEdicao): EstadoEdicao {

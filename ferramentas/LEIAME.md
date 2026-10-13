@@ -80,17 +80,22 @@ CENARIO=carteira node ferramentas/mock-supabase.cjs &
 OUT=/tmp/prints-nutri node ferramentas/tirar-prints-nutri.cjs
 ```
 
-`tirar-prints-nutri.cjs` entra como nutricionista, tira os prints (paciente ×
+`tirar-prints-nutri.cjs` entra como nutricionista, tira os prints (a página do
+paciente é em abas, `?aba=`: Beatriz em todas as abas e os outros no Resumo ×
 celular 390 px / computador 1440 px × claro/escuro, mais Beatriz com "Editar
-metas" aberto, a conversa em tela cheia no celular e Beatriz em 1100 px) e
+metas" aberto, a conversa em tela cheia no celular e Beatriz em 1100 px),
+confere erro e transbordo em todas as abas de todos os pacientes e
 **acusa**, com código de saída 1, quando alguma coisa não bate: transbordo de
 largura, seção com erro, a fila de cada paciente, o rascunho de metas que
 sobrevive ao envio de uma mensagem, o Voltar da conversa, o tratamento mais
 recente, "Sem acesso", o Reaplicar e o que o editor de metas mostra, a
 mudança do plano de treino no Treino (com a linha "Também dá baixa…" embaixo
 do Reaplicar), o "Aplicando…" que segura o botão até a página nova chegar, o
-"Fechar edição" desligado com a gravação em voo e a trava que o rascunho do
-cardápio põe nas outras seções. Ele descobre os ids dos pacientes perguntando
+"Fechar edição" desligado com a gravação em voo, a trava que o rascunho do
+cardápio põe nas metas e as abas (aba padrão, só a aba aberta montada, os
+botões da fila que abrem abas, a pergunta antes de descartar um rascunho
+pela barra de abas, a troca segurada com gravação em voo
+e a aba que a tela cheia do celular guarda). Ele descobre os ids dos pacientes perguntando
 ao mock (`/__cenario`), e recusa rodar se o mock subiu com outro cenário.
 Sem `OUT`, os PNGs vão para `prints-nutri` no diretório temporário do
 sistema.

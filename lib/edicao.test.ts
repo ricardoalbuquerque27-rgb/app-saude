@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { podeAbrir, precisaConfirmarTroca, reduzirEdicao } from "./edicao";
+import { oQueSeguraATroca, podeAbrir, reduzirEdicao } from "./edicao";
 
 const vazio = { aberta: null, suja: false };
 
@@ -105,19 +105,27 @@ describe("limpar", () => {
   });
 });
 
-describe("precisaConfirmarTroca", () => {
-  // A página do paciente virou abas. Trocar de aba desmonta o editor aberto, e
-  // um rascunho digitado sumiria calado; só nesse caso a troca pergunta antes.
-  it("nada aberto: troca direto", () => {
-    expect(precisaConfirmarTroca({ aberta: null, suja: false })).toBe(false);
+describe("oQueSeguraATroca", () => {
+  // A página do paciente é em abas. Trocar de aba (pela barra ou pelo Voltar
+  // do navegador) desmonta o editor aberto: um rascunho digitado sumiria
+  // calado, e uma gravação em voo perderia o erro, se falhasse.
+  it("nada aberto e nada gravando: troca direto", () => {
+    expect(oQueSeguraATroca({ aberta: null, suja: false }, 0)).toBe(null);
   });
 
   it("editor aberto sem nada digitado: troca direto", () => {
-    expect(precisaConfirmarTroca({ aberta: "metas", suja: false })).toBe(false);
+    expect(oQueSeguraATroca({ aberta: "metas", suja: false }, 0)).toBe(null);
   });
 
-  it("editor com alteração não salva: pergunta", () => {
-    expect(precisaConfirmarTroca({ aberta: "metas", suja: true })).toBe(true);
-    expect(precisaConfirmarTroca({ aberta: "cardapio", suja: true })).toBe(true);
+  it("alteração não salva: pergunta", () => {
+    expect(oQueSeguraATroca({ aberta: "metas", suja: true }, 0)).toBe("alteracao");
+    expect(oQueSeguraATroca({ aberta: "cardapio", suja: true }, 0)).toBe("alteracao");
+  });
+
+  it("gravação em voo segura a troca, com ou sem rascunho", () => {
+    // Treino e cardápio gravam a cada ação, sem rascunho: só a contagem
+    // de gravações sabe que há uma a caminho.
+    expect(oQueSeguraATroca({ aberta: "treino", suja: false }, 1)).toBe("gravando");
+    expect(oQueSeguraATroca({ aberta: "metas", suja: true }, 2)).toBe("gravando");
   });
 });

@@ -269,6 +269,25 @@ async function transbordo(page) {
     await ctx.close();
   }
 
+  // Erro e transbordo em TODAS as abas de todos os pacientes, sem print: os
+  // prints acima só mostram as abas da Beatriz, e as abas vazias do Pedro ou
+  // o Clínico da Joana (exame fora) também precisam caber em 390 px.
+  console.log("\nTodas as abas de todos os pacientes (erro e transbordo)");
+  etapa = "todas as abas";
+  for (const disp of [CELULAR, COMPUTADOR]) {
+    const ctx = await contexto(browser, disp, false, estado);
+    for (const k of ["luiza", "pedro", "carlos", "joana"]) {
+      for (const a of ["alimentacao", "treino", "corpo", "clinico"]) {
+        const page = await abrir(ctx, aba(k, a));
+        ok(!/Não foi possível carregar/.test(await textoDe(page.locator("body"))), `nenhuma seção com erro: ${k}/${a}/${disp.nome}`);
+        const m = await transbordo(page);
+        ok(m.doc <= m.larg, `sem transbordo: ${k}/${a}/${disp.nome} (documento ${m.doc}px, janela ${m.larg}px)`, m.vaza.join(" | "));
+        await page.close();
+      }
+    }
+    await ctx.close();
+  }
+
   // =====================================================================
   // 2. O cenário faz o que diz (a fila de cada paciente)
   // =====================================================================
@@ -599,6 +618,17 @@ async function transbordo(page) {
       null, { timeout: 10000 }
     ).catch(() => {});
     ok(await fechar.isDisabled(), '"Fechar edição" fica desligado com a RPC em voo');
+    // Trocar de aba agora desmontaria o formulário do mesmo jeito.
+    let aviso = "";
+    page.once("dialog", (d) => {
+      aviso = `${d.type()}: ${d.message()}`;
+      d.accept();
+    });
+    await page.locator('nav[aria-label="Assuntos do paciente"]').getByRole("link", { name: "Treino" }).click();
+    await page.waitForTimeout(800);
+    ok(aviso === "alert: Ainda salvando. Espere terminar para trocar de aba.",
+      `com a RPC em voo, a barra de abas avisa e não troca ("${aviso}")`);
+    ok(new URL(page.url()).searchParams.get("aba") === "alimentacao", "e a página continua na Alimentação");
     soltar();
     ok((await apareceu(page.getByText("Recusa simulada pelo script."), 30000)) &&
       (await page.getByRole("button", { name: "Aplicar metas" }).count()) === 1,
@@ -812,6 +842,28 @@ async function transbordo(page) {
     // As cinco abas não cabem em 390 px: a barra rola, a página não.
     const m = await transbordo(page);
     ok(m.doc <= m.larg, `no celular a barra de abas não alarga a página (documento ${m.doc}px, janela ${m.larg}px)`, m.vaza.join(" | "));
+    await page.close();
+  }
+
+  {
+    // No celular, abrir a conversa em tela cheia e voltar não desmonta o
+    // rascunho: é o motivo de a tela cheia levar ?aba= junto.
+    const page = await abrir(cel, aba("beatriz", "alimentacao"));
+    await abrirMetas(page);
+    const kcal = campo(page, "Calorias/dia").locator("input");
+    await kcal.fill("1900");
+    await clicar(page.getByRole("link", { name: /^Mensagem/ }));
+    await page.waitForURL(/conversa=1/, { timeout: 30000 });
+    await clicar(page.getByRole("link", { name: "Voltar" }));
+    await page.waitForFunction(() => !location.search.includes("conversa=1"), null, { timeout: 30000 });
+    ok((await kcal.inputValue()) === "1900" && (await page.getByRole("button", { name: "Fechar edição" }).count()) === 1,
+      `celular: abrir a conversa e voltar mantém o editor de metas aberto com o 1900 (${await kcal.inputValue()})`);
+    await page.close();
+  }
+  {
+    // Cada aba tem o próprio título: o leitor de tela anuncia a troca.
+    const page = await abrir(pc, aba("beatriz", "treino"));
+    ok((await page.title()) === "Treino · Paciente · Pace Fit", `o título da página diz a aba (${await page.title()})`);
     await page.close();
   }
 
