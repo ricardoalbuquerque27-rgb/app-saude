@@ -953,6 +953,28 @@ async function transbordo(page) {
       // Só o link do calendário: o "Dia" da troca de vista aponta para o mesmo endereço.
       const dia = page.locator(`ol a[href="/app/agenda?vista=dia&data=${diaSP(-5)}"]`);
       ok(/pendência/.test((await dia.getAttribute("aria-label")) || ""), "Mês: o dia da consulta sem desfecho tem a marca de pendência");
+      // A consulta aparece no dia com hora e nome, e não só "1 consulta" em
+      // cinza, que o dono do produto não via; a pendência, tracejada.
+      const joana = dia.locator('[title^="10:30 Joana"]');
+      ok(await apareceu(joana), "Mês: o dia da Joana mostra a consulta com hora e nome");
+      const borda = await joana.first().evaluate((el) => getComputedStyle(el).borderTopStyle).catch(() => "");
+      ok(borda === "dashed", `Mês: a consulta sem desfecho é tracejada (${borda})`);
+      await page.close();
+    }
+    // d2) amanhã: a remarcação do Carlos (09:00) e a 1ª consulta do Pedro (11:00), em ordem de hora
+    {
+      const page = await abrirAgenda(pc, `?vista=mes&data=${diaSP(1)}`);
+      const dia = page.locator(`ol a[href="/app/agenda?vista=dia&data=${diaSP(1)}"]`);
+      const pedro = dia.locator('[title^="11:00 Pedro"]');
+      ok(await apareceu(pedro), "Mês: o dia de amanhã mostra a 1ª consulta do Pedro, 11:00");
+      const borda = await pedro.first().evaluate((el) => getComputedStyle(el).borderTopStyle).catch(() => "");
+      ok(borda !== "dashed", `Mês: consulta agendada não é tracejada (${borda})`);
+      const titulos = await dia.locator("[title]").evaluateAll((els) => els.map((e) => e.getAttribute("title")));
+      ok(
+        titulos.length === 2 && titulos[0].startsWith("09:00 Carlos") && titulos[1].startsWith("11:00 Pedro"),
+        "Mês: as consultas do dia saem em ordem de hora",
+        JSON.stringify(titulos)
+      );
       await page.close();
     }
 

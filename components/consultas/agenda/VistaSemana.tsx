@@ -13,7 +13,7 @@ import {
   type Consulta,
 } from "@/lib/consultas";
 import { FOCO } from "@/components/clinico/estilos";
-import { CLASSE_SELO, SELO } from "../aparencia";
+import { BLOCO, CLASSE_SELO, SELO } from "../aparencia";
 import { hrefDaAgenda, type PropsDaVista } from "./tipos";
 
 // px por hora: uma consulta de 30 min fica com 32 px. Abaixo dos 44 px de
@@ -67,13 +67,6 @@ export function VistaSemana({ consultas, nomes, agora, hoje, data, abrir }: Prop
     const ateOFim = ((fim - minutoDoDia(c.starts_at)) / 60) * ALTURA_HORA - 2;
     const altura = Math.min(ateOFim, Math.max(30, (c.duration_min / 60) * ALTURA_HORA - 2));
     const pendente = s === "pedido" || s === "remarcar" || s === "sem-desfecho";
-    const estilo = pendente
-      ? "border border-dashed border-clin-atencao bg-clin-chao text-clin-atencao"
-      : s === "agendada"
-        ? "border border-transparent bg-clin-primaria-fundo text-clin-primaria"
-        : s === "faltou"
-          ? "border border-transparent bg-clin-perigo-fundo text-clin-perigo"
-          : "border border-clin-linha bg-clin-chao text-clin-texto-2";
     return (
       <button
         key={c.id}
@@ -86,7 +79,7 @@ export function VistaSemana({ consultas, nomes, agora, hoje, data, abrir }: Prop
           left: `calc(${(faixa / faixas) * 100}% + 2px)`,
           width: `calc(${100 / faixas}% - 4px)`,
         }}
-        className={`absolute overflow-hidden rounded px-1.5 py-0.5 text-left text-[13px] leading-tight ${estilo} ${FOCO}`}
+        className={`absolute overflow-hidden rounded px-1.5 py-0.5 text-left text-[13px] leading-tight ${BLOCO[s]} ${FOCO}`}
       >
         <span className="font-semibold tabular-nums">{horaEmSaoPaulo(c.starts_at)}</span>{" "}
         <span className="font-medium">{(nomes[c.patient_id] ?? "Paciente").split(" ")[0]}</span>

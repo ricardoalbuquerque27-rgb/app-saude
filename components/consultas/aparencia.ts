@@ -29,3 +29,20 @@ export const SELO: Record<Situacao, string> = {
 
 export const CLASSE_SELO =
   "inline-flex items-center rounded px-1.5 py-0.5 text-[13px] font-semibold";
+
+const BLOCO_PENDENTE = "border border-dashed border-clin-atencao bg-clin-chao text-clin-atencao";
+const BLOCO_PASSADO = "border border-clin-linha bg-clin-chao text-clin-texto-2";
+
+/**
+ * Bloco da consulta na grade da Semana e no dia do Mês. Pendência
+ * (pedido, remarcação, sem desfecho) é tracejada, como no protótipo aprovado.
+ */
+export const BLOCO: Record<Situacao, string> = {
+  pedido: BLOCO_PENDENTE,
+  remarcar: BLOCO_PENDENTE,
+  "sem-desfecho": BLOCO_PENDENTE,
+  agendada: "border border-transparent bg-clin-primaria-fundo text-clin-primaria",
+  faltou: "border border-transparent bg-clin-perigo-fundo text-clin-perigo",
+  realizada: BLOCO_PASSADO,
+  cancelada: BLOCO_PASSADO,
+};
