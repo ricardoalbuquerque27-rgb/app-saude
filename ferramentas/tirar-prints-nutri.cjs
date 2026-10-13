@@ -1079,6 +1079,266 @@ async function transbordo(page) {
   }
   await fetch(MOCK + "/__reset", { method: "POST" });
 
+  // =====================================================================
+  // 16. Registro da consulta: o rascunho
+  // =====================================================================
+  console.log("\nVerificação 16: registro da consulta (rascunho)");
+  etapa = "registro";
+  {
+    // Do mock (ferramentas/LEIAME.md): ap-13 é a consulta da Luiza em
+    // andamento (começou há 10 min, retorno, sem registro); ap-3 é a de 14 dias
+    // atrás, com registro concluído, a medida de 66,4 kg e o "observar".
+    const EM_ANDAMENTO = "ap-13";
+    const CONCLUIDA = "ap-3";
+    const OBSERVAR = "Adesão no fim de semana. Testar café da manhã com ovos.";
+    const registro = (k, c) => `${rota(k)}/consultas/${c}`;
+    const ddmm = (n) => diaBR(n).slice(0, 5);
+    /** O registro da consulta como está no mock agora (o "banco"). */
+    const noMock = async (consulta) =>
+      (await (await fetch(`${MOCK}/rest/v1/consultation_records?appointment_id=eq.${consulta}`)).json())[0] ?? null;
+    const titulo = (page) => page.getByRole("heading", { level: 1, name: /^Consulta de / });
+    const contextoDe = (page) => page.locator('aside[aria-label="Para esta consulta"]');
+    const status = (page) => page.locator("[data-status-rascunho]");
+    const selo = (page) => page.getByText("Rascunho", { exact: true });
+
+    // a) a consulta em andamento, sem registro: título, "Evolução" e nenhum selo
+    const page = await abrir(pc, registro("luiza", EM_ANDAMENTO), { secoes: false });
+    const carregou = await apareceu(titulo(page), 30000);
+    ok(carregou, `a página do registro abre (${registro("luiza", EM_ANDAMENTO)})`);
+    if (!carregou) {
+      ok(false, "o resto da Verificação 16 não rodou: a página do registro não abriu");
+      await page.close();
+    } else {
+      ok(/^Consulta de \S+, \d\d\/\d\d às \d\d:\d\d$/.test((await textoDe(titulo(page))).trim()),
+        `o título diz o dia e a hora ("${(await textoDe(titulo(page))).trim()}")`);
+      ok((await page.title()) === "Registro · Paciente · Pace Fit", `o título da aba do navegador (${await page.title()})`);
+      const evolucao = page.getByLabel("Evolução", { exact: true });
+      ok((await evolucao.count()) === 1, 'retorno: a primeira parte se chama "Evolução"');
+      ok((await selo(page).count()) === 0, "sem registro, a página não mostra o selo Rascunho antes de digitar");
+      ok(!(await noMock(EM_ANDAMENTO)), "e o mock não tem registro desta consulta (abrir não cria rascunho)");
+      const m = await transbordo(page);
+      ok(m.doc <= m.larg, `registro sem transbordo no computador (documento ${m.doc}px, janela ${m.larg}px)`, m.vaza.join(" | "));
+
+      // b) digitar: "Salvando…" e depois "Salvo às"; a segunda digitação chega
+      //    com a primeira gravação em voo (a resposta segura 3 s) e vira a
+      //    próxima, com o updated_at que a primeira devolveu.
+      const pedidos = [];
+      const respostas = [];
+      let segurar = true;
+      await page.route("**/rest/v1/rpc/salvar_registro", async (route) => {
+        pedidos.push(route.request().postDataJSON());
+        const resposta = await route.fetch();
+        respostas.push(await resposta.json());
+        if (segurar) {
+          segurar = false;
+          await new Promise((r) => setTimeout(r, 3000));
+        }
+        await route.fulfill({ response: resposta });
+      });
+      await pronto(evolucao);
+      await evolucao.click();
+      await evolucao.pressSequentially("Primeira parte.");
+      ok(await apareceu(status(page).getByText("Salvando…"), 10000), 'digitar na Evolução mostra "Salvando…"');
+      ok(!(await status(page).innerText()).includes("Salvo às"), "a primeira gravação ainda está em voo quando a segunda digitação começa");
+      await evolucao.pressSequentially(" Segunda parte.");
+      await page.waitForFunction(
+        () => /Salvo às/.test(document.querySelector("[data-status-rascunho]")?.textContent || ""),
+        null, { timeout: 30000 }
+      ).catch(() => {});
+      // Espera a segunda gravação terminar (o "Salvo às" da primeira pode vir antes).
+      for (let i = 0; i < 100 && !(respostas.length >= 2 && /Salvo às/.test(await status(page).innerText())); i++)
+        await page.waitForTimeout(100);
+      ok(/Salvo às \d\d:\d\d/.test(await status(page).innerText()), `depois aparece "Salvo às" (${await status(page).innerText()})`);
+      ok(pedidos.length === 2, `duas gravações, uma depois da outra (${pedidos.length})`);
+      ok(pedidos[0]?.p_visto_em === null, "a primeira gravação cria o rascunho (p_visto_em nulo)");
+      ok(!!respostas[0]?.updated_at && pedidos[1]?.p_visto_em === respostas[0].updated_at,
+        "a segunda vai com o updated_at exato que a primeira devolveu",
+        `${pedidos[1]?.p_visto_em} x ${respostas[0]?.updated_at}`);
+      const salvo = await noMock(EM_ANDAMENTO);
+      ok(salvo?.anamnese === "Primeira parte. Segunda parte.",
+        "digitar durante o salvamento: as duas partes do texto estão no mock", JSON.stringify(salvo?.anamnese));
+      ok(!(await textoDe(page.locator("body"))).includes("mudou em outra aba"), 'e não aparece "mudou em outra aba"');
+      ok(await selo(page).isVisible(), "depois de digitar, o selo Rascunho aparece");
+      await page.unrouteAll({ behavior: "ignoreErrors" });
+
+      // c) recarregar: o texto volta do banco
+      await page.reload({ waitUntil: "load" });
+      await titulo(page).waitFor({ timeout: 60000 });
+      ok((await page.getByLabel("Evolução", { exact: true }).inputValue()) === "Primeira parte. Segunda parte.",
+        "recarregar a página traz o texto de volta do banco");
+
+      // d) o "antes" do peso é o da consulta de 14 dias atrás; IMC com a altura do perfil (168 cm)
+      const peso = campo(page, "Peso (kg)");
+      ok((await textoDe(peso)).includes(`antes 66,4 em ${ddmm(14)}`),
+        `embaixo do Peso: "antes 66,4 em ${ddmm(14)}"`, await textoDe(peso));
+      const campoPeso = peso.locator("input");
+      ok((await campoPeso.getAttribute("inputmode")) === "decimal", "o peso abre o teclado numérico (inputmode decimal)");
+      await pronto(campoPeso);
+      await campoPeso.fill("718");
+      await campoPeso.blur();
+      ok(await apareceu(peso.getByText("Peso fora da faixa (20 a 400 kg)."), 5000), "peso 718 marca o campo com a faixa");
+      ok((await campoPeso.getAttribute("aria-invalid")) === "true", "e o campo fica aria-invalid");
+      await campoPeso.fill("65,6");
+      await campoPeso.blur();
+      const imc = page.locator("[data-imc]");
+      ok((await textoDe(imc)).includes("IMC 23,2") && (await textoDe(imc)).includes("168 cm"),
+        `IMC com a altura do perfil: 65,6 kg e 168 cm dão 23,2 (${await textoDe(imc)})`);
+      ok((await campoPeso.getAttribute("aria-invalid")) !== "true", "corrigido, o campo deixa de ser inválido");
+      for (let i = 0; i < 50 && (await noMock(EM_ANDAMENTO))?.medidas?.weight_kg !== 65.6; i++) await page.waitForTimeout(100);
+      ok((await noMock(EM_ANDAMENTO))?.medidas?.weight_kg === 65.6, "sair do campo salva o peso (65,6 no mock)",
+        JSON.stringify((await noMock(EM_ANDAMENTO))?.medidas));
+
+      // d2) gravação que falha (aqui, "ok" sem updated_at) não perde o texto,
+      //     e "Tentar de novo" grava; sair com alteração fora do banco avisa.
+      {
+        let falhar = true;
+        await page.route("**/rest/v1/rpc/salvar_registro", async (route) => {
+          if (!falhar) return route.continue();
+          falhar = false;
+          return route.fulfill({
+            status: 200, contentType: "application/json",
+            headers: { "access-control-allow-origin": "*" }, body: JSON.stringify({ ok: true }),
+          });
+        });
+        const diag = page.getByLabel("Diagnóstico nutricional", { exact: true });
+        await diag.fill("Eutrofia.");
+        await diag.blur();
+        ok(await apareceu(page.getByRole("alert").filter({ hasText: "Não foi possível salvar" }), 10000),
+          'gravação "ok" sem updated_at conta como falha: "Não foi possível salvar"');
+        ok((await diag.inputValue()) === "Eutrofia." && (await noMock(EM_ANDAMENTO))?.diagnostico !== "Eutrofia.",
+          "e o texto continua no campo, fora do banco");
+        await clicar(page.getByRole("button", { name: "Tentar de novo" }));
+        for (let i = 0; i < 50 && (await noMock(EM_ANDAMENTO))?.diagnostico !== "Eutrofia."; i++) await page.waitForTimeout(100);
+        ok((await noMock(EM_ANDAMENTO))?.diagnostico === "Eutrofia.", '"Tentar de novo" grava o que tinha falhado');
+        await page.unrouteAll({ behavior: "ignoreErrors" });
+
+        await page.getByLabel("Observar no retorno", { exact: true }).fill("Água.");
+        let aviso = "";
+        page.once("dialog", async (d) => {
+          aviso = d.type();
+          await d.dismiss();
+        });
+        // Antes dos 1,5 s: a alteração ainda não foi para o banco.
+        await page.close({ runBeforeUnload: true });
+        await page.waitForTimeout(500);
+        ok(aviso === "beforeunload", `fechar a página com alteração não gravada cai no aviso do navegador (${aviso || "sem aviso"})`);
+        for (let i = 0; i < 50 && (await noMock(EM_ANDAMENTO))?.observar !== "Água."; i++) await page.waitForTimeout(100);
+        ok((await noMock(EM_ANDAMENTO))?.observar === "Água.", "quem fica na página tem a alteração gravada logo depois");
+      }
+
+      // e) a coluna "Para esta consulta": o "observar" do registro de 14 dias atrás
+      const ctxTxt = await textoDe(contextoDe(page));
+      ok(ctxTxt.includes(OBSERVAR) && ctxTxt.includes(`registro de ${ddmm(14)}`),
+        `"Para esta consulta" mostra o "Observar no retorno" do registro de ${ddmm(14)}`, ctxTxt);
+      ok(ctxTxt.includes(`Desde a última consulta (${ddmm(14)})`), '"Para esta consulta" tem o "desde a última consulta"', ctxTxt);
+      ok(ctxTxt.includes("65,4 kg"), "e a última medida que a paciente lançou em casa (65,4 kg)", ctxTxt);
+      ok((await contextoDe(page).locator(`a[href="${registro("luiza", CONCLUIDA)}"]`).count()) === 1,
+        "e o registro anterior, com link");
+      for (const [tema, escuro] of [["claro", false], ["escuro", true]]) {
+        const ctx = await contexto(browser, COMPUTADOR, escuro, estado);
+        const p = await abrir(ctx, registro("luiza", EM_ANDAMENTO), { secoes: false });
+        await titulo(p).waitFor({ timeout: 60000 });
+        await fotografar(p, `${OUT}/registro-rascunho-desktop-${tema}.png`, COMPUTADOR);
+        await p.close();
+        await ctx.close();
+      }
+      await page.close();
+
+      // f) celular: sem transbordo; o contexto recolhido, com o "observar" à vista
+      for (const [tema, escuro] of [["claro", false], ["escuro", true]]) {
+        const ctx = await contexto(browser, CELULAR, escuro, estado);
+        const p = await abrir(ctx, registro("luiza", EM_ANDAMENTO), { secoes: false });
+        await titulo(p).waitFor({ timeout: 60000 });
+        const mc = await transbordo(p);
+        ok(mc.doc <= mc.larg, `registro sem transbordo no celular, ${tema} (documento ${mc.doc}px, janela ${mc.larg}px)`, mc.vaza.join(" | "));
+        if (!escuro) {
+          ok(await p.getByText(OBSERVAR).isVisible(), 'celular: o "Observar no retorno" fica à vista');
+          const botao = contextoDe(p).getByRole("button", { name: /Para esta consulta/ });
+          ok((await botao.getAttribute("aria-expanded")) === "false", "celular: o resto do contexto começa recolhido");
+          ok(!(await contextoDe(p).getByText(/Desde a última consulta/).isVisible()), 'celular: recolhido, o "desde a última" não aparece');
+          await clicar(botao);
+          ok(await apareceu(contextoDe(p).getByText(/Desde a última consulta/), 5000), "celular: tocar abre o contexto");
+          await clicar(botao);
+        }
+        await fotografar(p, `${OUT}/registro-rascunho-mobile-${tema}.png`, CELULAR);
+        await p.close();
+        await ctx.close();
+      }
+
+      // g) sem vínculo, consulta de outro paciente, registro concluído e leitura que falha
+      {
+        const p = await abrir(pc, "/app/pacientes/00000000-0000-0000-0000-000000000000/consultas/ap-13", { secoes: false });
+        ok(await apareceu(p.getByText("Sem acesso a este paciente"), 30000), 'registro de paciente sem vínculo: "Sem acesso a este paciente"');
+        ok((await p.locator("textarea").count()) === 0, "e nenhum campo do registro");
+        await p.close();
+      }
+      {
+        // notFound() chega como o conteúdo do 404, não como o código: o
+        // loading.tsx de pacientes/[id] já mandou o começo da página (200)
+        // quando a consulta se mostra de outro paciente. Pelo request do
+        // contexto (com os cookies do login), sem abrir o navegador.
+        for (const [k, c, oQue] of [
+          ["beatriz", EM_ANDAMENTO, "consulta de outro paciente"],
+          ["luiza", "ap-que-nao-existe", "consulta que não existe"],
+        ]) {
+          const html = await (await pc.request.get(APP + registro(k, c))).text();
+          ok(html.includes("This page could not be found") && !html.includes("<textarea"),
+            `${oQue}: a página de "não encontrada", sem o formulário`);
+        }
+      }
+      {
+        const p = await abrir(pc, registro("luiza", CONCLUIDA), { secoes: false });
+        await titulo(p).waitFor({ timeout: 60000 });
+        ok((await p.locator("textarea").count()) === 0, "registro concluído: sem campos de edição");
+        await p.close();
+      }
+      {
+        // ap-11: a 1ª consulta do Pedro, amanhã; ap-5: a 1ª da Beatriz, realizada há 30 dias, sem registro.
+        const p = await abrir(pc, registro("pedro", "ap-11"), { secoes: false });
+        await titulo(p).waitFor({ timeout: 60000 });
+        ok((await p.locator("textarea").count()) === 0 && (await textoDe(p.locator("main"))).includes("ainda não começou"),
+          "consulta que ainda não começou: diz isso, sem formulário que o banco recusaria");
+        await p.close();
+        const q = await abrir(pc, registro("beatriz", "ap-5"), { secoes: false });
+        await titulo(q).waitFor({ timeout: 60000 });
+        ok((await q.getByLabel("Anamnese", { exact: true }).count()) === 1, '1ª consulta: a primeira parte se chama "Anamnese"');
+        await q.close();
+      }
+
+      // h) Descartar rascunho pergunta antes, apaga no banco e volta para a aba Consultas
+      {
+        const p = await abrir(pc, registro("luiza", EM_ANDAMENTO), { secoes: false });
+        const descartar = p.getByRole("button", { name: "Descartar rascunho" });
+        let pergunta = "";
+        p.once("dialog", (d) => {
+          pergunta = d.message();
+          d.dismiss();
+        });
+        await clicar(descartar);
+        await p.waitForTimeout(500);
+        ok(/Descartar o rascunho/.test(pergunta), `"Descartar rascunho" pergunta antes ("${pergunta}")`);
+        ok(!!(await noMock(EM_ANDAMENTO)), "quem cancela fica com o rascunho");
+        p.once("dialog", (d) => d.accept());
+        await clicar(descartar);
+        await p.waitForURL((u) => u.searchParams.get("aba") === "consultas", { timeout: 30000 }).catch(() => {});
+        ok(new URL(p.url()).searchParams.get("aba") === "consultas", `quem confirma volta para a aba Consultas (${p.url()})`);
+        ok(!(await noMock(EM_ANDAMENTO)), "e o rascunho sai do mock");
+        await p.close();
+      }
+
+      // i) leitura do registro que falha: só o erro, nunca o formulário em branco
+      {
+        await fetch(MOCK + "/__falhar", { method: "POST", body: JSON.stringify({ tabela: "consultation_records" }) });
+        const p = await abrir(pc, registro("joana", "ap-10"), { secoes: false });
+        ok(await apareceu(p.getByText(/Não foi possível carregar/), 30000), "registro que não carrega mostra o erro");
+        ok((await p.locator("textarea").count()) === 0, "e nenhum campo em branco por cima do rascunho que não se vê");
+        await p.close();
+        await fetch(MOCK + "/__reset", { method: "POST" });
+      }
+    }
+  }
+  await fetch(MOCK + "/__reset", { method: "POST" });
+
   console.log("\nConsole e rede");
   ok(errosDeConsole.length === 0, `nenhum erro de console, de página ou de rede em todas as telas (${errosDeConsole.length})`,
     [...new Set(errosDeConsole)].slice(0, 8).join("\n         "));

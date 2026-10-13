@@ -130,12 +130,16 @@ export default function AppShell({
     .filter((i) => !mainHrefs.has(i.href));
 
   // O detalhe do paciente (/app/pacientes/<id>, não a lista nem a linha do
-  // tempo) é a única tela com duas colunas: a conversa fica numa coluna de
+  // tempo) tem duas colunas: a conversa fica numa coluna de
   // 360 px ao lado do conteúdo. Com max-w-5xl, menos o menu lateral e as
   // margens, sobram 720 px em qualquer largura, e a coluna principal ficava
   // com 336 px, mais estreita que um celular. As outras telas continuam como
   // estavam.
-  const detalheDoPaciente = /^\/app\/pacientes\/[^/]+\/?$/.test(pathname);
+  //
+  // O registro de uma consulta (/app/pacientes/<id>/consultas/<consulta>)
+  // também: tem a coluna "Para esta consulta" ao lado das cinco partes, e nos
+  // 720 px o formulário ficaria tão estreito quanto a coluna principal ficava.
+  const detalheDoPaciente = /^\/app\/pacientes\/[^/]+(\/consultas\/[^/]+)?\/?$/.test(pathname);
   // A agenda abre pelo mesmo motivo: a grade da Semana tem sete colunas, e
   // em 720 px cada dia ficava com ~95 px, estreito demais para "14:30 Beatriz".
   //
