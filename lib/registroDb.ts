@@ -65,11 +65,13 @@ export async function getRegistrosDasConsultas(
 }
 
 /**
- * O "observar no retorno" de cada paciente: o texto mais recente que não é
- * vazio, entre os registros concluídos, com o dia em que foi concluído. Só
- * concluído: o rascunho ainda é do nutri e pode mudar ou sumir. Percorre do
- * mais novo para o mais antigo e fica com o primeiro não vazio de cada um;
- * "não vazio" ignora espaço e quebra de linha, como `temAlgumaParte`.
+ * O "observar no retorno" de cada paciente: o texto do ÚLTIMO registro
+ * concluído, com o dia em que foi concluído. Só concluído: o rascunho ainda é
+ * do nutri e pode mudar ou sumir. Se o último concluído não tem `observar`
+ * (nulo, ou só espaço e quebra de linha, como em `temAlgumaParte`), o paciente
+ * fica sem entrada: nunca se cai para um registro mais antigo, porque a
+ * instrução de uma consulta anterior apareceria como se fosse a de agora,
+ * depois de o nutri ter registrado a consulta seguinte sem nada a observar.
  */
 export async function getObservarDosPacientes(
   supabase: any,
@@ -83,57 +85,18 @@ export async function getObservarDosPacientes(
     .in("patient_id", pacienteIds)
     .order("concluded_at", { ascending: false });
   const porPaciente: Record<string, { texto: string; data: string }> = {};
+  // Quem já teve o seu último concluído examinado, com texto ou sem.
+  const jaVistos = new Set<string>();
   for (const r of (data ?? []) as {
     patient_id: string;
     observar: string | null;
     concluded_at: string | null;
   }[]) {
-    if (porPaciente[r.patient_id]) continue;
-    if (r.observar == null || r.observar.trim() === "" || r.concluded_at == null) continue;
+    // Concluído sempre tem data (check no banco); a guarda é só para o tipo.
+    if (r.concluded_at == null || jaVistos.has(r.patient_id)) continue;
+    jaVistos.add(r.patient_id);
+    if (r.observar == null || r.observar.trim() === "") continue;
     porPaciente[r.patient_id] = { texto: r.observar, data: r.concluded_at };
   }
   return { data: porPaciente, falhou: !!error };
-}
-
-/** Os adendos de um registro, do mais antigo para o mais novo (a ordem em que foram escritos). */
-export async function getAdendos(supabase: any, registroId: string): Promise<Res<Adendo[]>> {
-  const { data, error } = await supabase
-    .from("consultation_addenda")
-    .select(COLUNAS_ADENDO)
-    .eq("record_id", registroId)
-    .order("created_at", { ascending: true });
-  return { data: (data ?? []) as Adendo[], falhou: !!error };
-}
-
-/**
- * Uma linha da série de medidas do paciente. Cada medida é `number | null`:
- * no banco a que não foi tirada é nula (`Medidas` de lib/registro.ts é o que
- * o editor manda, onde a medida vazia simplesmente não existe).
- */
-export type LinhaDeMedida = {
-  date: string;
-  appointment_id: string | null;
-  measured_by: string | null;
-} & Partial<Record<CampoMedida, number | null>>;
-
-const COLUNAS_MEDIDA =
-  "date, appointment_id, measured_by, weight_kg, body_fat_pct, waist_cm, hip_cm, chest_cm, arm_cm, thigh_cm, calf_cm, neck_cm";
-
-/**
- * A série de medidas do paciente, da mais nova para a mais antiga, as de
- * consulta (`appointment_id`) e as que ele anotou em casa. Quem precisa só das
- * de consulta (o "antes" do editor) filtra com `anteriores`. As 200 mais
- * recentes: de sobra para um acompanhamento, e a lista não cresce sem teto.
- */
-export async function getMedidasDoPaciente(
-  supabase: any,
-  pacienteId: string,
-): Promise<Res<LinhaDeMedida[]>> {
-  const { data, error } = await supabase
-    .from("body_measurements")
-    .select(COLUNAS_MEDIDA)
-    .eq("user_id", pacienteId)
-    .order("date", { ascending: false })
-    .limit(200);
-  return { data: (data ?? []) as LinhaDeMedida[], falhou: !!error };
 }
