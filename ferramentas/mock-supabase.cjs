@@ -6,6 +6,12 @@
 // CENARIO escolhe os dados (ver ferramentas/LEIAME.md):
 //   (não definido) a conta de teste de hoje, a Maria, para as telas do paciente;
 //   carteira       a carteira do nutricionista, para o detalhe do paciente.
+//
+// Quase nada é guardado: um POST responde 201 e a leitura seguinte devolve o que
+// já havia. As exceções, com estado e com as regras da migração, são as funções
+// de consulta (rpcConsulta) e as do registro da consulta (rpcRegistro). POST
+// /__reset volta tudo ao que o cenário subiu; POST /__falhar derruba os GET de
+// uma tabela (500) até o próximo /__reset.
 
 const http = require("http");
 
@@ -26,6 +32,14 @@ const dias = (n) => diaDe(Date.now() - n * 86400000);
  * futuro). O mock usa −03:00 fixo; o app não (lib/consultas.ts).
  */
 const naHora = (n, hhmm) => new Date(`${dias(n)}T${hhmm}:00-03:00`).toISOString();
+/**
+ * Um instante do jeito que o PostgREST devolve um timestamptz: microssegundos e
+ * "+00:00" (o ISO do JavaScript tem milissegundos e "Z"). O registro da consulta
+ * usa o `updated_at` como trava de concorrência e o app o guarda como TEXTO;
+ * com milissegundos o mock não pegaria um app que passasse o valor por `Date`
+ * (que corta os microssegundos) e a trava recusaria sem ninguém ter mexido.
+ */
+const pg = (ms, us = 0) => new Date(ms).toISOString().replace("Z", `${String(us).padStart(3, "0")}+00:00`);
 const consulta = (id, nutri, paciente, n, hhmm, extra = {}) => ({
   id, nutritionist_id: nutri, patient_id: paciente, starts_at: naHora(n, hhmm),
   duration_min: 45, kind: "retorno", mode: "presencial", status: "agendada",
@@ -40,6 +54,8 @@ const medidas = [65.8, 66.2, 66.6, 66.9, 67.3, 67.7, 68.0, 68.4].map((w, i) => (
   body_fat_pct: 30 + i * 0.2, waist_cm: 78 + i * 0.5, hip_cm: 99.6 + i * 0.3,
   arm_cm: 29, chest_cm: null, thigh_cm: null, neck_cm: null, calf_cm: null,
   notes: null, created_at: dias(i * 4) + "T10:00:00Z",
+  // Nulos: medida que o paciente anotou. Preenchidos: a do prontuário.
+  measured_by: null, appointment_id: null,
 }));
 
 const refeicoesHist = [];
@@ -76,7 +92,9 @@ const T = {
       sex: "F", role: "patient", onboarded: true, cpf: null, friend_code: null,
       reminder_enabled: false, reminder_time: null, reminder_tz_offset: 0, last_reminded_on: null,
       created_at: "2026-09-11T02:21:22Z", updated_at: "2026-09-11T12:00:35Z" },
-    { id: NUT, full_name: "Ricardo Albuquerque", role: "nutritionist", onboarded: true,
+    // Sem CRN de propósito: é o que faz o diálogo de "Concluir registro" pedir o número.
+    // `concluir_registro` grava o CRN digitado aqui; `POST /__reset` apaga de novo.
+    { id: NUT, full_name: "Ricardo Albuquerque", crn: null, role: "nutritionist", onboarded: true,
       height_cm: null, birth_date: null, weight_goal_kg: null, daily_water_goal_ml: 2500,
       daily_calorie_goal: null, protein_goal_g: 100, sex: "M", cpf: null, friend_code: "1FAA3F",
       reminder_enabled: false, reminder_time: null, reminder_tz_offset: 0, last_reminded_on: null,
@@ -265,6 +283,7 @@ function carteira() {
       body_fat_pct: Number((kg * 0.34).toFixed(1)), waist_cm: Math.round(kg * 1.1),
       hip_cm: Math.round(kg * 1.35), arm_cm: 30, chest_cm: null, thigh_cm: null,
       neck_cm: null, calf_cm: null, notes: null, created_at: `${dias(d)}T11:00:00Z`,
+      measured_by: null, appointment_id: null,
     }));
   const exame = (k, n, uid, d, titulo, valor, unidade, ref, status, notas = null) => ({
     id: `ex-${k}-${n}`, user_id: uid, date: dias(d), title: titulo, result_value: valor,
@@ -555,6 +574,51 @@ function carteira() {
     c(12, P.carlos, 7, "15:00", { status: "cancelada", cancelled_by: "paciente" }),
   ];
 
+  // Registros da consulta (prontuário), um por situação. O nutri do mock não
+  // tem CRN no perfil, então o concluído já traz o dele na assinatura (foi o
+  // que ele digitou ao concluir) e o diálogo de concluir pede o número de novo.
+  //   Luiza, a de 14 dias atrás   concluído, com as cinco partes, a medida de
+  //                               peso publicada na série e UM adendo
+  //   Luiza, a em andamento       sem registro
+  //   Joana, sem desfecho         rascunho só com a anamnese
+  const consulta3 = consultas.find((x) => x.id === "ap-3");
+  const dia3 = diaDe(Date.parse(consulta3.starts_at));
+  const conclusao3 = Date.parse(naHora(14, "10:52"));
+  const registros = [
+    {
+      id: "rg-3", appointment_id: consulta3.id, nutritionist_id: NUT, patient_id: P.luiza,
+      anamnese: "Retorno de 28 dias. Boa adesão ao cardápio de segunda a sexta; no fim de semana come fora e perde a conta das porções. Dorme 7 horas, intestino regular, sem queixas. Bebe cerca de 2 litros de água por dia.",
+      diagnostico: "Perdeu 1,2 kg no mês, dentro do esperado. Adesão alta nos dias úteis e irregular aos sábados e domingos.",
+      conduta: "Manter o plano de 1.800 kcal. Levar um lanche pronto nos passeios de fim de semana e reforçar a proteína no café da manhã. Retorno em 15 dias.",
+      observar: "Adesão no fim de semana. Testar café da manhã com ovos.",
+      medidas: { weight_kg: 72.6 }, measurement_id: "bm-reg-3", status: "concluido",
+      concluded_at: pg(conclusao3, 412), assinatura_nome: "Ricardo Albuquerque",
+      assinatura_crn: "CRN-3 12345",
+      created_at: pg(Date.parse(naHora(14, "10:04")), 218), updated_at: pg(conclusao3, 413),
+    },
+    {
+      id: "rg-10", appointment_id: "ap-10", nutritionist_id: NUT, patient_id: P.joana,
+      anamnese: "Retorno depois de 12 dias sem registrar. Conta uma semana corrida no trabalho, almoços fora de casa e pouco sono. Pergunta se pode trocar o lanche da tarde.",
+      diagnostico: null, conduta: null, observar: null, medidas: {}, measurement_id: null,
+      status: "rascunho", concluded_at: null, assinatura_nome: null, assinatura_crn: null,
+      created_at: pg(Date.parse(naHora(5, "10:41")), 530), updated_at: pg(Date.parse(naHora(5, "11:24")), 903),
+    },
+  ];
+  const adendos = [{
+    id: "ad-3-1", record_id: "rg-3", author_id: NUT,
+    body: "Correção da conduta: o retorno é em 21 dias, e não em 15, porque a paciente viaja na próxima semana.",
+    assinatura_nome: "Ricardo Albuquerque", assinatura_crn: "CRN-3 12345",
+    created_at: pg(Date.parse(naHora(9, "16:20")), 655),
+  }];
+  // A linha que o registro publicou na série de medidas da Luiza: do nutri
+  // (measured_by), ligada à consulta e com a data do dia dela em São Paulo.
+  const medidaDoRegistro = {
+    id: "bm-reg-3", user_id: P.luiza, date: dia3, weight_kg: 72.6, body_fat_pct: null,
+    waist_cm: null, hip_cm: null, arm_cm: null, chest_cm: null, thigh_cm: null,
+    neck_cm: null, calf_cm: null, notes: null, created_at: new Date(conclusao3).toISOString(),
+    measured_by: NUT, appointment_id: consulta3.id,
+  };
+
   const nutri = T.profiles.find((p) => p.id === NUT);
   return {
     pacientes: P,
@@ -562,7 +626,8 @@ function carteira() {
       { profiles: [nutri], patient_links: [
         convite(6, "Fernanda Lima", "H4X9QP", 3),
         convite(7, "Marcos Teixeira", "T8N2WD", 1),
-      ], appointments: consultas },
+      ], appointments: consultas, consultation_records: registros,
+      consultation_addenda: adendos, body_measurements: [medidaDoRegistro] },
       carlos(), beatriz(), joana(), pedro(), luiza()
     ),
   };
@@ -582,20 +647,59 @@ if (CENARIO === "carteira") {
   process.exit(1);
 }
 
-// As consultas do jeito que o cenário subiu: POST /__reset volta a elas, e o
-// roteiro de verificações pode rodar duas vezes seguidas.
-const CONSULTAS_INICIAIS = JSON.stringify(T.appointments ?? []);
+// Os registros da consulta existem em qualquer cenário (vazios fora da carteira).
+T.consultation_records ||= [];
+T.consultation_addenda ||= [];
+
+// As tabelas que as funções mexem, do jeito que o cenário subiu: POST /__reset
+// volta a elas, e o roteiro de verificações pode rodar duas vezes seguidas.
+// `profiles` está aqui porque concluir_registro grava o CRN no perfil do nutri,
+// e `body_measurements` porque publica a medida da consulta.
+const TABELAS_COM_ESTADO = [
+  "appointments", "consultation_records", "consultation_addenda", "body_measurements", "profiles",
+];
+const ESTADO_INICIAL = JSON.stringify(Object.fromEntries(TABELAS_COM_ESTADO.map((n) => [n, T[n] ?? []])));
+
+// Tabelas cujo GET devolve 500 até o próximo /__reset (POST /__falhar). As
+// leituras de página são do servidor do Next, que o `page.route` do Playwright
+// não intercepta; é o único jeito de ver a tela de "não carregou".
+const FALHANDO = new Set();
+
+function reiniciar() {
+  const inicial = JSON.parse(ESTADO_INICIAL);
+  for (const n of TABELAS_COM_ESTADO) T[n] = inicial[n];
+  FALHANDO.clear();
+}
+
+/**
+ * O "agora" no formato de pg(), que sempre anda: nunca devolve o mesmo valor
+ * duas vezes, nem com dois salvamentos no mesmo milissegundo (o banco faz o
+ * mesmo com `greatest(clock_timestamp(), updated_at + 1µs)`). Os microssegundos
+ * nunca são zero de propósito, ver pg().
+ */
+let relogio = { ms: 0, us: 0 };
+let giro = 0;
+function agoraPg() {
+  const ms = Date.now();
+  if (ms > relogio.ms) relogio = { ms, us: 50 + ((++giro * 137) % 900) };
+  else if (relogio.us >= 999) relogio = { ms: relogio.ms + 1, us: 50 };
+  else relogio = { ms: relogio.ms, us: relogio.us + 1 };
+  return pg(relogio.ms, relogio.us);
+}
+
+const vinculoAtivo = (nutri, pac) =>
+  T.patient_links.some((l) => l.nutritionist_id === nutri && l.patient_id === pac && l.status === "active");
 
 // ---------- funções de consulta (com estado) ----------
 // Imitam supabase/migrations/20261013120000_consultas_e_agenda.sql nas regras
 // que a tela usa; quem vale é o banco, testado em supabase/testes/.
 let seqConsulta = 0;
+let seqRegistro = 0;
 function rpcConsulta(nome, a, quem) {
   const A = (T.appointments ||= []);
   const agora = Date.now();
   const erro = (m) => ({ ok: false, error: m });
-  const ativo = (nutri, pac) =>
-    T.patient_links.some((l) => l.nutritionist_id === nutri && l.patient_id === pac && l.status === "active");
+  const ativo = vinculoAtivo;
   const achar = (id) => A.find((x) => x.id === id);
   const iso = (v) => new Date(v).toISOString();
   const toque = (x, campos) => Object.assign(x, campos, { updated_at: new Date().toISOString() });
@@ -629,6 +733,7 @@ function rpcConsulta(nome, a, quem) {
       return { ok: true, id: x.id };
     }
     case "fechar_consulta": {
+      if (!["realizada", "faltou", "cancelada"].includes(a.p_desfecho)) return erro("Desfecho inválido.");
       const x = doNutri(a.p_id);
       if (!x) return erro("Consulta não encontrada.");
       if (a.p_desfecho !== "cancelada") {
@@ -636,6 +741,14 @@ function rpcConsulta(nome, a, quem) {
         if (x.status === "cancelada")
           return erro("Consulta cancelada não pode virar realizada nem falta. Marque outra.");
         if (Date.parse(x.starts_at) > agora) return erro("A consulta ainda não começou.");
+      }
+      // As duas recusas do registro (migração do registro da consulta): falta ou
+      // cancelamento não pode prender um rascunho que ninguém mais conclui, nem
+      // contradizer um prontuário concluído. Realizada continua livre.
+      if (a.p_desfecho !== "realizada") {
+        const reg = T.consultation_records.find((r) => r.appointment_id === x.id);
+        if (reg?.status === "rascunho") return erro("Descarte o rascunho do registro antes.");
+        if (reg?.status === "concluido") return erro("Esta consulta tem registro concluído.");
       }
       toque(x, { status: a.p_desfecho, cancelled_by: a.p_desfecho === "cancelada" ? "nutri" : null,
         reschedule_requested_at: null });
@@ -677,6 +790,175 @@ function rpcConsulta(nome, a, quem) {
     }
   }
   return null;
+}
+
+// ---------- funções do registro da consulta (com estado) ----------
+// Imitam supabase/migrations/20261014120100_registro_da_consulta.sql (e as
+// faixas de erro_das_medidas) na MESMA ordem de conferências, porque é a ordem
+// que decide qual mensagem aparece quando duas recusas valem ao mesmo tempo.
+// O mock não é o banco: quem vale é o teste SQL. Aqui basta o que as telas usam.
+const MEDIDAS_FAIXAS = [
+  ["weight_kg", 20, 400, "Peso", " kg"],
+  ["body_fat_pct", 2, 75, "% de gordura", "%"],
+  ["waist_cm", 30, 250, "Cintura", " cm"],
+  ["hip_cm", 30, 250, "Quadril", " cm"],
+  ["chest_cm", 30, 250, "Tórax", " cm"],
+  ["arm_cm", 10, 80, "Braço", " cm"],
+  ["thigh_cm", 20, 120, "Coxa", " cm"],
+  ["calf_cm", 10, 80, "Panturrilha", " cm"],
+  ["neck_cm", 10, 80, "Pescoço", " cm"],
+];
+const chars = (t) => [...t].length; // char_length conta caracteres, não unidades UTF-16
+
+/** erro_das_medidas: nulo = as medidas valem. */
+function erroDasMedidas(m) {
+  if (m == null) return null;
+  if (typeof m !== "object" || Array.isArray(m)) return "Medida desconhecida.";
+  if (Object.keys(m).some((k) => !MEDIDAS_FAIXAS.some(([c]) => c === k))) return "Medida desconhecida.";
+  for (const [campo, min, max, rotulo, unidade] of MEDIDAS_FAIXAS) {
+    const v = m[campo];
+    if (v == null) continue;
+    if (typeof v !== "number" || v < min || v > max) return `${rotulo} fora da faixa (${min} a ${max}${unidade}).`;
+  }
+  return null;
+}
+
+/** erro_do_registro: os limites de texto e depois as medidas, na ordem da tela. */
+function erroDoRegistro(r, medidas) {
+  if (r.anamnese != null && chars(r.anamnese) > 20000) return "Texto longo demais em Anamnese.";
+  if (r.diagnostico != null && chars(r.diagnostico) > 5000) return "Texto longo demais em Diagnóstico.";
+  if (r.conduta != null && chars(r.conduta) > 10000) return "Texto longo demais em Conduta.";
+  if (r.observar != null && chars(r.observar) > 2000) return "Texto longo demais em Observar no retorno.";
+  return erroDasMedidas(medidas);
+}
+
+/** jsonb_strip_nulls no que importa aqui: medida nula é medida não tirada. */
+function semNulos(m) {
+  if (m == null) return {};
+  if (typeof m !== "object" || Array.isArray(m)) return m;
+  return Object.fromEntries(Object.entries(m).filter(([, v]) => v != null));
+}
+
+// btrim() do Postgres tira só espaços; o trim() do JavaScript tira qualquer branco.
+const btrim = (t) => String(t ?? "").replace(/^ +| +$/g, "");
+
+function rpcRegistro(nome, a, quem) {
+  if (!["salvar_registro", "concluir_registro", "descartar_rascunho", "adicionar_adendo"].includes(nome))
+    return null;
+  const R = T.consultation_records;
+  const erro = (m) => ({ ok: false, error: m });
+  const MUDOU = "O rascunho mudou em outra aba. Recarregue a página.";
+  const JA_CONCLUIDO = "O registro já foi concluído. Para corrigir, use um adendo.";
+
+  if (nome === "adicionar_adendo") {
+    const r = R.find((x) => x.id === a.p_registro);
+    if (!r || r.nutritionist_id !== quem) return erro("Registro não encontrado.");
+    if (r.status !== "concluido") return erro("Só registro concluído recebe adendo.");
+    const texto = String(a.p_texto ?? "").replace(/^\s+|\s+$/g, "");
+    if (texto === "" || chars(texto) > 5000) return erro("Escreva o adendo (até 5.000 caracteres).");
+    // O adendo é assinado quando é escrito: nome e CRN do perfil de agora, e, se
+    // o perfil não tem, os da conclusão (para não sair sem assinatura).
+    const perfil = T.profiles.find((p) => p.id === quem);
+    const crn = btrim(perfil?.crn) || null;
+    const x = {
+      id: `ad-novo-${++seqRegistro}`, record_id: r.id, author_id: quem, body: texto,
+      assinatura_nome: perfil?.full_name ?? r.assinatura_nome,
+      assinatura_crn: crn ?? r.assinatura_crn, created_at: agoraPg(),
+    };
+    T.consultation_addenda.push(x);
+    return { ok: true, id: x.id };
+  }
+
+  // As três funções por consulta começam igual: de quem é a consulta.
+  const c = T.appointments.find((x) => x.id === a.p_consulta);
+  if (!c || c.nutritionist_id !== quem || !vinculoAtivo(quem, c.patient_id)) return erro("Consulta não encontrada.");
+  const reg = R.find((x) => x.appointment_id === c.id);
+
+  if (nome === "descartar_rascunho") {
+    // Não confere a situação nem o horário: um rascunho que ficou numa consulta
+    // remarcada para a frente também precisa poder sair. Sem rascunho, ok.
+    if (!reg) return { ok: true };
+    if (reg.status === "concluido") return erro(JA_CONCLUIDO);
+    T.consultation_records = R.filter((x) => x !== reg);
+    return { ok: true };
+  }
+
+  if (["faltou", "cancelada"].includes(c.status)) return erro("Consulta com falta ou cancelada não tem registro.");
+  if (c.status === "pedido" || Date.parse(c.starts_at) > Date.now()) return erro("A consulta ainda não começou.");
+
+  if (nome === "salvar_registro") {
+    if (reg?.status === "concluido") return erro(JA_CONCLUIDO);
+    // O updated_at tem de ser o TEXTO que o mock devolveu, igual byte a byte.
+    if (reg && (a.p_visto_em == null || a.p_visto_em !== reg.updated_at)) return erro(MUDOU);
+    // Sem rascunho, mas a tela diz que leu um: outra aba o descartou.
+    if (!reg && a.p_visto_em != null) return erro(MUDOU);
+
+    const campo = (k) => (a.p_campos?.[k] == null ? null : String(a.p_campos[k]));
+    const novo = {
+      anamnese: campo("anamnese"), diagnostico: campo("diagnostico"),
+      conduta: campo("conduta"), observar: campo("observar"),
+    };
+    const medidas = semNulos(a.p_campos?.medidas);
+    const e = erroDoRegistro(novo, medidas);
+    if (e) return erro(e);
+
+    const quando = agoraPg();
+    if (!reg) {
+      const x = {
+        id: `rg-novo-${++seqRegistro}`, appointment_id: c.id, nutritionist_id: c.nutritionist_id,
+        patient_id: c.patient_id, ...novo, medidas, measurement_id: null, status: "rascunho",
+        concluded_at: null, assinatura_nome: null, assinatura_crn: null,
+        created_at: quando, updated_at: quando,
+      };
+      R.push(x);
+      return { ok: true, id: x.id, updated_at: quando };
+    }
+    Object.assign(reg, novo, { medidas, updated_at: quando });
+    return { ok: true, id: reg.id, updated_at: quando };
+  }
+
+  // concluir_registro
+  if (!reg) {
+    // A tela leu um rascunho que outra aba descartou: é concorrência.
+    if (a.p_visto_em != null) return erro(MUDOU);
+    return erro("Preencha ao menos uma parte do registro.");
+  }
+  if (reg.status === "concluido") return erro(JA_CONCLUIDO);
+  if (a.p_visto_em == null || a.p_visto_em !== reg.updated_at) return erro(MUDOU);
+
+  const e = erroDoRegistro(reg, reg.medidas);
+  if (e) return erro(e);
+  // Só espaço ou quebra de linha não é parte preenchida.
+  const preenchida = [reg.anamnese, reg.diagnostico, reg.conduta, reg.observar].some((t) => t != null && /\S/.test(t));
+  if (!preenchida && Object.keys(reg.medidas).length === 0) return erro("Preencha ao menos uma parte do registro.");
+  let crn = btrim(a.p_crn) || null;
+  if (crn && chars(crn) > 30) return erro("CRN longo demais (até 30 caracteres).");
+  const perfil = T.profiles.find((p) => p.id === quem);
+  const crnDoPerfil = btrim(perfil?.crn) || null;
+  if (!(crn ?? crnDoPerfil)) return erro("Informe o seu CRN para concluir.");
+
+  // Daqui em diante, só escrita.
+  if (crn) { if (perfil) perfil.crn = crn; }
+  else crn = crnDoPerfil;
+  if (c.status === "agendada")
+    Object.assign(c, { status: "realizada", reschedule_requested_at: null, updated_at: new Date().toISOString() });
+  let medida = null;
+  if (Object.keys(reg.medidas).length > 0) {
+    medida = {
+      id: `bm-reg-novo-${++seqRegistro}`, user_id: c.patient_id,
+      // O dia da consulta em São Paulo, nunca toISOString().slice(0, 10): às 22h
+      // o dia em UTC já é o de amanhã (a armadilha de fuso do CLAUDE.md).
+      date: diaDe(Date.parse(c.starts_at)),
+      ...Object.fromEntries(MEDIDAS_FAIXAS.map(([campo]) => [campo, reg.medidas[campo] ?? null])),
+      notes: null, created_at: new Date().toISOString(), measured_by: quem, appointment_id: c.id,
+    };
+    T.body_measurements.push(medida);
+  }
+  Object.assign(reg, {
+    status: "concluido", concluded_at: agoraPg(), measurement_id: medida?.id ?? null,
+    assinatura_nome: perfil?.full_name ?? null, assinatura_crn: crn, updated_at: agoraPg(),
+  });
+  return { ok: true, id: reg.id };
 }
 
 // ---------- mini-PostgREST ----------
@@ -812,8 +1094,17 @@ const srv = http.createServer((req, res) => {
     if (url.pathname === "/__cenario")
       return envia(200, { cenario: CENARIO, nutri: NUT, pacientes: PACIENTES });
     if (url.pathname === "/__reset") {
-      T.appointments = JSON.parse(CONSULTAS_INICIAIS);
+      reiniciar();
       return envia(200, { ok: true });
+    }
+    // { "tabela": "consultation_records" }: os GET nessa tabela passam a dar 500
+    // até o próximo /__reset. Serve para ver a tela de "não carregou".
+    if (url.pathname === "/__falhar") {
+      let tabela = "";
+      try { tabela = String(JSON.parse(corpo || "{}").tabela || ""); } catch {}
+      if (req.method !== "POST" || !tabela) return envia(400, { error: 'POST com { "tabela": "<nome>" }' });
+      FALHANDO.add(tabela);
+      return envia(200, { ok: true, falhando: [...FALHANDO] });
     }
 
     // --- GoTrue ---
@@ -835,9 +1126,12 @@ const srv = http.createServer((req, res) => {
       if (alvo.startsWith("rpc/")) {
         let args = {};
         try { args = JSON.parse(corpo || "{}"); } catch {}
-        const r = rpcConsulta(alvo.slice(4), args, quemPede(req));
+        const quem = quemPede(req);
+        const r = rpcConsulta(alvo.slice(4), args, quem) ?? rpcRegistro(alvo.slice(4), args, quem);
         return envia(200, r ?? { ok: true });
       }
+      if (FALHANDO.has(alvo) && (req.method === "GET" || req.method === "HEAD"))
+        return envia(500, { code: "XX000", message: `falha sob encomenda em ${alvo} (POST /__falhar)`, details: null, hint: null });
       const linhas = T[alvo] ?? [];
       // HEAD é o que o supabase-js manda em .select(..., { head: true,
       // count: "exact" }) — a contagem vem só no cabeçalho. Sem tratar

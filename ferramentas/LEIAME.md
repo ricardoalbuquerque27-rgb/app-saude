@@ -85,6 +85,19 @@ alertas acima:
 - **Joana**: agendada há 5 dias e nunca fechada (sem desfecho).
 - **Pedro**: 1ª consulta amanhã às 11:00.
 
+E os registros da consulta (prontuário: `consultation_records`, os adendos em
+`consultation_addenda` e a avaliação física em `body_measurements`):
+
+- **Luiza**: a consulta de 14 dias atrás tem registro **concluído**, com as cinco
+  partes (anamnese, diagnóstico, conduta, "observar no retorno" e a medida de
+  peso, 72,6 kg, publicada na série dela e ligada à consulta), assinado como
+  "Ricardo Albuquerque / CRN-3 12345", e **um adendo**. A consulta em andamento
+  **não** tem registro.
+- **Joana**: a consulta sem desfecho tem um **rascunho** só com a anamnese.
+- O perfil do nutri **não tem CRN** (`crn` nulo): é o que faz o diálogo de
+  concluir pedir o número. Concluir com um CRN digitado grava no perfil, e o
+  `POST /__reset` apaga de novo.
+
 No cenário padrão, a Maria tem uma consulta realizada há 20 dias e a próxima
 daqui a 3, para o cartão de consulta do lado do paciente.
 
@@ -125,11 +138,25 @@ sistema.
 O mock aceita `PATCH` e `DELETE` no CORS; sem isso o navegador recusava o
 `PATCH` que marca a conversa como lida e o console enchia de erro. Ele não
 guarda nada: um `POST` responde 201 e a consulta seguinte devolve os mesmos
-dados de antes. **A exceção são as consultas**: as seis funções de consulta
-(`marcar_consulta`, `pedir_consulta`…) têm estado no mock, com as mesmas regras
-da migração, para dar para aceitar um pedido e ver a tela mudar. `POST
-/__reset` volta as consultas ao que o cenário subiu; o roteiro chama no começo
-e no fim. Quem vale é o banco: as regras de verdade são testadas em SQL (abaixo).
+dados de antes. **A exceção são as consultas e os registros**: as seis funções
+de consulta (`marcar_consulta`, `pedir_consulta`…) e as do registro
+(`salvar_registro`, `concluir_registro`, `descartar_rascunho`,
+`adicionar_adendo`, mais as duas recusas novas de `fechar_consulta`) têm estado
+no mock, com as mesmas regras e mensagens da migração e na mesma ordem de
+conferência, para dar para aceitar um pedido, salvar um rascunho e concluir e
+ver a tela mudar. O `updated_at` do rascunho é a trava de concorrência: o mock o
+devolve com microssegundos, como o banco, e ele sempre anda. Quem vale é o
+banco: as regras de verdade são testadas em SQL (abaixo).
+
+Dois endereços que não são do Supabase (além do `/__cenario`):
+
+- `POST /__reset` volta as consultas, os registros, os adendos, as medidas e os
+  perfis (o CRN) ao que o cenário subiu, e desliga o `/__falhar`; o roteiro
+  chama no começo e no fim.
+- `POST /__falhar` com `{ "tabela": "consultation_records" }` faz os `GET` nessa
+  tabela devolverem 500 até o próximo `/__reset`. As leituras da página são do
+  servidor do Next, que o `page.route` do Playwright não intercepta; sem isto
+  não há como ver a tela de "não carregou".
 
 ## Funções e regras do banco (SQL)
 
