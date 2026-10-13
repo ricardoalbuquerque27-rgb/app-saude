@@ -59,4 +59,13 @@ describe("tema clínico", () => {
     expect(css).toContain(".tema-clinico{--clin-chao:#ffffff;");
     expect(css).toContain(".dark .tema-clinico{--clin-chao:#0c1210;");
   });
+
+  it("com o tema na página, o fundo dela inteira é o chão do tema", () => {
+    // Só a caixa do conteúdo tinha o chão; em volta dela ficava o fundo do
+    // app (outra cor, com o brilho verde), e a página parecia uma caixa
+    // solta com uma faixa vazia ao lado do menu.
+    const css = cssDoTemaClinico();
+    expect(css).toContain("body:has(.tema-clinico){background:#ffffff}");
+    expect(css).toContain(".dark body:has(.tema-clinico){background:#0c1210}");
+  });
 });

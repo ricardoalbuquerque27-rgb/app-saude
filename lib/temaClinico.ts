@@ -121,10 +121,18 @@ function bloco(tema: Record<NomeCor, string>): string {
  * do app é por classe (`.dark` no <html>), não por prefers-color-scheme —
  * daí o seletor descendente `.dark .tema-clinico`. Formato sem espaços:
  * o teste fixa o começo de cada bloco.
+ *
+ * O `body:has(...)` pinta a página inteira com o chão do tema. Só a caixa do
+ * conteúdo tinha esse fundo; em volta dela ficava o do app (outra cor, com o
+ * brilho verde), e a página do paciente parecia uma caixa solta, com uma
+ * faixa vazia entre ela e o menu. O `background` (e não `background-color`)
+ * apaga também o brilho, que o `.dark body` de globals.css põe.
  */
 export function cssDoTemaClinico(): string {
   return (
     `.tema-clinico{${bloco(TEMA_CLINICO.claro)}}` +
-    `.dark .tema-clinico{${bloco(TEMA_CLINICO.escuro)}}`
+    `.dark .tema-clinico{${bloco(TEMA_CLINICO.escuro)}}` +
+    `body:has(.tema-clinico){background:${TEMA_CLINICO.claro.chao}}` +
+    `.dark body:has(.tema-clinico){background:${TEMA_CLINICO.escuro.chao}}`
   );
 }
