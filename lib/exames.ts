@@ -1,6 +1,6 @@
 import {
   chaveDoExame,
-  classifyExam,
+  faixaDaTabela,
   parseExamNumber,
   parseReferenceRange,
   type ExamContext,
@@ -90,11 +90,17 @@ function diaMes(data: string): string {
 /**
  * A unidade para comparar: sem espaço e sem caixa ("mg/dL" e " MG / DL " são
  * a mesma). O NFKC junta o sinal de micro (U+00B5) e a letra grega mi
- * (U+03BC), que o laudo copiado de PDF traz um ou outro: "µg/dL" não pode ser
- * unidade diferente de "μg/dL".
+ * (U+03BC), que o laudo copiado de PDF traz um ou outro, e "mcg" e "ug" são
+ * como se digita o micrograma sem o símbolo: "mcg/dL", "ug/dL", "µg/dL" e
+ * "μg/dL" são a mesma unidade, e o ferro de 70 µg/dL para 80 mcg/dL não pode
+ * virar "unidade diferente".
  */
 function unidadeNormalizada(unidade: string | null): string {
-  return (unidade ?? "").normalize("NFKC").replace(/\s+/g, "").toLowerCase();
+  return (unidade ?? "")
+    .normalize("NFKC")
+    .replace(/\s+/g, "")
+    .toLowerCase()
+    .replace(/mcg|ug/g, "\u03bcg");
 }
 
 /**
@@ -107,16 +113,13 @@ function mesmaUnidade(a: string, b: string): boolean {
 }
 
 /**
- * A faixa numérica de um texto ("70 a 99", "< 200", "30–100 ng/mL").
- *
- * As vírgulas decimais viram ponto ANTES de chamar `parseReferenceRange`: ele
- * troca só a primeira, e "0,9 a 1,7" virava 0,9 a 1 (o 1,5 normal aparecia
- * como "saiu da faixa"). A tabela do app tem faixas assim (t4 livre,
- * creatinina, potássio).
+ * A faixa numérica de um texto ("70 a 99", "< 200", "30–100 ng/mL", "0,9 a
+ * 1,7"). Serve ao laudo e ao texto da faixa da tabela do app, que tem
+ * decimais com vírgula (t4 livre, creatinina, potássio).
  */
 function faixaDoTexto(texto: string | null | undefined): FaixaNumerica | null {
   if (!texto) return null;
-  const faixa = parseReferenceRange(texto.replace(/,/g, "."));
+  const faixa = parseReferenceRange(texto);
   if (!faixa || (faixa.min == null && faixa.max == null)) return null;
   return faixa;
 }
@@ -147,9 +150,12 @@ type Resultado = {
 
 /**
  * A faixa do último resultado: a do laudo; sem ela (ou ilegível), a da tabela
- * do app para o sexo do paciente. `reference: null` na chamada do
- * `classifyExam` porque o laudo já foi tentado aqui, e a prioridade da spec é
- * a do laudo (o `classifyExam` olha a tabela primeiro).
+ * do app para o sexo do paciente, e só quando o nome é igual ao de uma entrada
+ * dela (`faixaDaTabela`: "VLDL-colesterol" não leva a do colesterol total) e a
+ * unidade do resultado é a da entrada ou está em branco. Glicose de 5,1
+ * mmol/L contra 70-99 mg/dL seria "abaixo da faixa" para um valor normal; sem
+ * faixa, a linha diz "sem faixa para comparar". A prioridade é a da spec, a do
+ * laudo antes da tabela.
  */
 function faixaDoUltimo(
   ultimo: Resultado,
@@ -158,10 +164,13 @@ function faixaDoUltimo(
   const doLaudo = faixaDoTexto(ultimo.referencia);
   if (doLaudo) return { faixa: doLaudo, texto: (ultimo.referencia ?? "").trim() };
 
-  const c = classifyExam({ name: ultimo.titulo, value: ultimo.valor, reference: null, ctx });
-  if (c.matched && c.source === "tabela") {
-    const daTabela = faixaDoTexto(c.faixa);
-    if (daTabela) return { faixa: daTabela, texto: c.faixa };
+  const daTabela = faixaDaTabela(ultimo.titulo, ultimo.valor, ctx);
+  if (
+    daTabela &&
+    (ultimo.unidade === "" || ultimo.unidade === unidadeNormalizada(daTabela.unidade))
+  ) {
+    const faixa = faixaDoTexto(daTabela.faixa);
+    if (faixa) return { faixa, texto: daTabela.faixa };
   }
   return { faixa: null, texto: null };
 }
@@ -214,6 +223,10 @@ function compararComOAnterior(
  * Resultado sem número ("reagente") fica fora, e o exame que só tem desses
  * não aparece. Dois resultados do mesmo exame no mesmo dia contam como um, o
  * último da entrada; o "anterior" é sempre de uma data anterior.
+ *
+ * A entrada deve vir em ordem crescente de data e, no mesmo dia, de
+ * `created_at`: "o último da entrada" decide o resultado do dia, e a linha
+ * não traz `created_at` para desempatar aqui dentro.
  */
 export function compararExames(linhas: LinhaDeExame[], ctx: ExamContext): LinhaDoComparativo[] {
   // Primeiro o número: um "ver laudo" lançado depois não apaga o 44 do mesmo dia.
@@ -255,7 +268,11 @@ export function compararExames(linhas: LinhaDeExame[], ctx: ExamContext): LinhaD
     const { faixa, texto: faixaTexto } = faixaDoUltimo(ultimo, ctx);
     const { mudanca, diferenca, grupo } = compararComOAnterior(ultimo, anterior, faixa);
 
-    const daUnidadeDoUltimo = dias.filter((r) => mesmaUnidade(r.unidade, ultimo.unidade));
+    // Unidade estritamente igual (sem unidade só junta com sem unidade): a
+    // série mistura todos os pontos num desenho só, e 45 nmol/L ao lado de 24
+    // mcg/dL não é uma linha. Na comparação com o anterior a falta de unidade
+    // vale como "a mesma" (`mesmaUnidade`), para não apagar a de quem não digitou.
+    const daUnidadeDoUltimo = dias.filter((r) => r.unidade === ultimo.unidade);
     comparativo.push({
       chave,
       nome: ultimo.titulo,

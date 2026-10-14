@@ -44,7 +44,9 @@ export function parseReferenceRange(
   ref: unknown
 ): { min?: number; max?: number } | null {
   if (typeof ref !== "string") return null;
-  const s = ref.toLowerCase().replace(",", ".");
+  // Todas as vírgulas: com `replace(",", ".")` só a primeira trocava, e
+  // "0,9 a 1,7" virava 0,9 a 1 (o 1,5 normal saía "alterado, acima").
+  const s = ref.toLowerCase().replace(/,/g, ".");
 
   // intervalo: 70-99 / 70 a 99 / 70 até 99
   const range = s.match(/(-?\d+(?:\.\d+)?)\s*(?:-|–|a|até|ate)\s*(-?\d+(?:\.\d+)?)/);
@@ -336,14 +338,48 @@ function findDef(name: string): RangeDef | null {
   return best?.def ?? null;
 }
 
-// A chave que junta as grafias do mesmo exame: a primeira chave da entrada da
-// tabela a que o nome corresponde ("Glicose", "Glicemia de jejum" e "glicose em
-// jejum" são todas "glicose"). Sem isso o comparativo do nutricionista teria
-// uma linha por grafia, cada uma com um resultado só e sem nada para comparar.
-// Fora da tabela vale o nome normalizado (sem acento, caixa nem pontuação).
-// Só lê a tabela: não muda a classificação.
+// A entrada da tabela só quando o nome É uma das chaves dela (depois do `norm`),
+// o caminho de pontuação ≥ 1000 do `findDef`. O `findDef` aceita a chave como
+// palavra solta dentro do nome, o que serve para classificar uma frase livre
+// ("glicemia em jejum de 12h"), mas junta exames diferentes: "VLDL-colesterol" e
+// "Colesterol não-HDL" saíam como "colesterol total", "Vitamina K" como
+// potássio (chave "k"), "Hemoglobina corpuscular média" como hemoglobina e
+// "Capacidade total de ligação do ferro" como ferro.
+function defExata(nome: string): RangeDef | null {
+  const n = norm(nome);
+  if (!n) return null;
+  return TABLE.find((def) => def.keys.some((k) => norm(k) === n)) ?? null;
+}
+
+// A chave que junta as grafias do mesmo exame no comparativo do nutricionista:
+// a primeira chave da entrada da tabela cujo nome é IGUAL ao dado ("Glicose",
+// "Glicemia de jejum" e "glicose em jejum" são todas "glicose"). Sem isso o
+// comparativo teria uma linha por grafia, cada uma com um resultado só e sem
+// nada para comparar.
+//
+// A correspondência é exata, e não a do `findDef`, de propósito: com "um
+// resultado por dia", colesterol total 200 (10/07) e 190 (02/10) mais
+// VLDL-colesterol 24 (02/10) viravam UMA linha, "VLDL-colesterol, 24, entrou
+// na faixa", e o 190 sumia. Fora da tabela vale o nome normalizado (sem
+// acento, caixa nem pontuação). Só lê a tabela: não muda a classificação (a
+// página do paciente segue com o casamento do `findDef`).
 export function chaveDoExame(nome: string): string {
-  return findDef(nome)?.keys[0] ?? norm(nome);
+  return defExata(nome)?.keys[0] ?? norm(nome);
+}
+
+// A faixa de referência da tabela do app para o exame, pela mesma correspondência
+// exata de `chaveDoExame` (nome que só contém o de uma entrada não leva a faixa
+// dela), com a unidade em que a entrada está. Exame que depende do sexo, sem o
+// sexo, fica sem faixa: não chutamos, como no `classifyExam`. O `valor` entra
+// porque a entrada é uma função do valor, embora o texto da faixa não mude com ele.
+export function faixaDaTabela(
+  nome: string,
+  valor: number,
+  ctx: ExamContext
+): { faixa: string; unidade: string } | null {
+  const def = defExata(nome);
+  if (!def || (def.sexDependent && !ctx.sex)) return null;
+  return { faixa: def.classify(valor, ctx).faixa, unidade: def.unit };
 }
 
 const STATUS_LABEL: Record<ExamLevel, string> = {

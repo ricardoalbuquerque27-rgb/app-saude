@@ -217,6 +217,33 @@ describe("compararExames: unidades", () => {
     expect(l.mudanca).toBe("segue na faixa");
   });
 
+  it.each(["mcg/dL", "MCG/DL", "ug/dL", "\u00b5g/dL", "\u03bcg/dL"])(
+    "ferro 70 µg/dL depois 80 %s: a mesma unidade, compara pela tabela",
+    (unidade) => {
+      const [l] = compararExames(
+        [
+          ex("2026-07-10", "Ferro", "70", { unit: "\u00b5g/dL" }),
+          ex("2026-10-02", "Ferro", "80", { unit: unidade }),
+        ],
+        {}
+      );
+      expect(l.mudanca).toBe("segue na faixa");
+      expect(l.diferenca).toBe(10);
+      expect(l.faixa).toEqual({ min: 60, max: 160 });
+    }
+  );
+
+  it("mcg não é mg: 70 mg/dL e 80 mcg/dL são unidades diferentes", () => {
+    const [l] = compararExames(
+      [
+        ex("2026-07-10", "Ferro", "70", { unit: "mg/dL" }),
+        ex("2026-10-02", "Ferro", "80", { unit: "mcg/dL" }),
+      ],
+      {}
+    );
+    expect(l.mudanca).toBe("unidade diferente do anterior");
+  });
+
   it("unidade que falta de um lado conta como a mesma (laudo que omite)", () => {
     expect(glicose({ v: "90", u: null }, { v: "92", u: "mg/dL" }).mudanca).toBe("segue na faixa");
     expect(glicose({ v: "90", u: "mg/dL" }, { v: "92", u: null }).mudanca).toBe("segue na faixa");
@@ -338,6 +365,95 @@ describe("compararExames: mesmo exame, grafias e datas", () => {
   });
 });
 
+describe("compararExames: nome que só contém o de outro exame", () => {
+  it("VLDL-colesterol e colesterol total no mesmo dia ficam em linhas separadas", () => {
+    // Juntos, o VLDL (24) era o "último" do dia e apagava o 190 do colesterol
+    // total: uma linha só, "VLDL-colesterol, 24, entrou na faixa".
+    const linhas = compararExames(
+      [
+        ex("2026-07-10", "Colesterol total", "200"),
+        ex("2026-10-02", "Colesterol total", "190"),
+        ex("2026-10-02", "VLDL-colesterol", "24"),
+      ],
+      {}
+    );
+    expect(linhas).toHaveLength(2);
+    const total = linhas.find((l) => l.chave === "colesterol total")!;
+    expect(total.ultimo.valor).toBe(190);
+    expect(total.anterior).toEqual({ valor: 200, data: "2026-07-10" });
+    const vldl = linhas.find((l) => l.nome === "VLDL-colesterol")!;
+    expect(vldl.chave).toBe("vldl colesterol");
+    expect(vldl.ultimo.valor).toBe(24);
+    expect(vldl.mudanca).toBe("primeiro resultado");
+    // e o VLDL não leva a faixa do colesterol total (< 190)
+    expect(vldl.faixa).toBeNull();
+  });
+
+  it("colesterol não-HDL não é colesterol total", () => {
+    const linhas = compararExames(
+      [ex("2026-10-02", "Colesterol total", "190"), ex("2026-10-02", "Colesterol não-HDL", "130")],
+      {}
+    );
+    expect(linhas.map((l) => l.chave).sort()).toEqual(["colesterol nao hdl", "colesterol total"]);
+  });
+
+  it("Vitamina K não pega a faixa do potássio (a chave 'k')", () => {
+    const [l] = compararExames([ex("2026-10-02", "Vitamina K", "1,2")], {});
+    expect(l.chave).toBe("vitamina k");
+    expect(l.faixa).toBeNull();
+    expect(l.faixaTexto).toBeNull();
+  });
+
+  it("Hemoglobina corpuscular média não pega a faixa da hemoglobina", () => {
+    const [l] = compararExames([ex("2026-10-02", "Hemoglobina corpuscular média", "30")], { sex: "F" });
+    expect(l.faixa).toBeNull();
+  });
+
+  it("Capacidade total de ligação do ferro não pega a faixa do ferro", () => {
+    const [l] = compararExames([ex("2026-10-02", "Capacidade total de ligação do ferro", "320")], {});
+    expect(l.chave).toBe("capacidade total de ligacao do ferro");
+    expect(l.faixa).toBeNull();
+  });
+
+  it("sem a faixa da tabela, o laudo ainda vale", () => {
+    const [l] = compararExames(
+      [ex("2026-10-02", "Vitamina K", "1,2", { reference_range: "0,2 a 3,2" })],
+      {}
+    );
+    expect(l.faixa).toEqual({ min: 0.2, max: 3.2 });
+  });
+
+  it("Glicose, Glicemia de jejum e glicose em jejum continuam juntas", () => {
+    const linhas = compararExames(
+      [
+        ex("2026-01-15", "Glicose", "101"),
+        ex("2026-07-10", "Glicemia de jejum", "98"),
+        ex("2026-10-02", "glicose em jejum", "92"),
+      ],
+      {}
+    );
+    expect(linhas).toHaveLength(1);
+    expect(linhas[0].serie).toHaveLength(3);
+  });
+
+  it("Hemoglobina e Hemoglobina glicada seguem separadas", () => {
+    const linhas = compararExames(
+      [
+        ex("2026-07-10", "Hemoglobina", "13,5"),
+        ex("2026-10-02", "Hemoglobina", "14"),
+        ex("2026-07-10", "Hemoglobina glicada", "5,9"),
+        ex("2026-10-02", "Hemoglobina glicada", "5,6"),
+      ],
+      { sex: "M" }
+    );
+    expect(linhas.map((l) => l.chave).sort()).toEqual(["hemoglobina", "hemoglobina glicada"]);
+    const hb = linhas.find((l) => l.chave === "hemoglobina")!;
+    expect(hb.faixaTexto).toBe("13–17 g/dL (homens)");
+    const a1c = linhas.find((l) => l.chave === "hemoglobina glicada")!;
+    expect(a1c.faixaTexto).toBe("< 5,7%");
+  });
+});
+
 describe("compararExames: a faixa", () => {
   it("a do laudo do último resultado, com o texto e os números", () => {
     const [l] = compararExames(
@@ -419,8 +535,9 @@ describe("compararExames: a faixa", () => {
   });
 
   it("faixa com duas vírgulas decimais não perde a segunda casa", () => {
-    // O parseReferenceRange troca só a PRIMEIRA vírgula: '0,9 a 1,7' virava
-    // 0,9 a 1 e o 1,5 normal aparecia como 'saiu da faixa'.
+    // O parseReferenceRange trocava só a PRIMEIRA vírgula ('0,9 a 1,7' virava
+    // 0,9 a 1 e o 1,5 normal aparecia como 'saiu da faixa'); a correção mora
+    // nele (testada em examRanges.test.ts) e este caso garante que chega aqui.
     const laudo = compararExames(
       [
         ex("2026-07-10", FORA_DA_TABELA, "1.0", { reference_range: "0,9 a 1,7" }),
@@ -437,6 +554,45 @@ describe("compararExames: a faixa", () => {
     )[0];
     expect(tabela.faixa).toEqual({ min: 3.5, max: 5.1 });
     expect(tabela.mudanca).toBe("segue na faixa");
+  });
+
+  it("a tabela só vale com a unidade da tabela: glicose em mmol/L fica sem faixa", () => {
+    // 5,1 mmol/L é glicose normal; contra 70-99 mg/dL seria "abaixo da faixa".
+    const um = compararExames([ex("2026-10-02", "Glicose", "5,1", { unit: "mmol/L" })], {})[0];
+    expect(um.faixa).toBeNull();
+    expect(um.faixaTexto).toBeNull();
+
+    const dois = compararExames(
+      [
+        ex("2026-07-10", "Glicose", "5,6", { unit: "mmol/L" }),
+        ex("2026-10-02", "Glicose", "5,1", { unit: "mmol/L" }),
+      ],
+      {}
+    )[0];
+    expect(dois.mudanca).toBe("sem faixa para comparar");
+    expect(dois.diferenca).toBe(-0.5);
+    expect(dois.grupo).toBe(2);
+  });
+
+  it("em mmol/L, o laudo ainda dá a faixa", () => {
+    const [l] = compararExames(
+      [
+        ex("2026-07-10", "Glicose", "5,9", { unit: "mmol/L", reference_range: "3,9 a 5,5" }),
+        ex("2026-10-02", "Glicose", "5,1", { unit: "mmol/L", reference_range: "3,9 a 5,5" }),
+      ],
+      {}
+    );
+    expect(l.faixa).toEqual({ min: 3.9, max: 5.5 });
+    expect(l.mudanca).toBe("entrou na faixa");
+  });
+
+  it("a tabela vale sem unidade e com a unidade dela, de qualquer caixa e espaço", () => {
+    const faixa = (unit: string | null) =>
+      compararExames([ex("2026-10-02", "Glicose", "92", { unit })], {})[0].faixa;
+    expect(faixa(null)).toEqual({ min: 70, max: 99 });
+    expect(faixa("")).toEqual({ min: 70, max: 99 });
+    expect(faixa(" MG / DL ")).toEqual({ min: 70, max: 99 });
+    expect(faixa("mmol/L")).toBeNull();
   });
 
   it("a faixa também sai com um resultado só (o minigráfico e a coluna 'ref.' pedem)", () => {
@@ -579,12 +735,36 @@ describe("compararExames: a série do minigráfico", () => {
     expect(l.serie?.map((p) => p.valor)).toEqual([18, 24, 38]);
   });
 
-  it("resultado sem unidade entra na série (laudo que omite)", () => {
+  it("a série só junta unidades iguais: sem unidade só com sem unidade", () => {
+    // Na comparação com o anterior a falta de unidade vale como "a mesma"; na
+    // série não: ela mistura 3 pontos num desenho só, e um 45 nmol/L ao lado
+    // de 24 mcg/dL e 30 sem unidade seria uma linha sem sentido.
+    const zinco = (...v: [string, string, string | null][]) =>
+      compararExames(v.map(([d, valor, unit]) => ex(d, "Zinco", valor, { unit })), {})[0];
+
+    expect(
+      zinco(["2026-01-15", "45", "nmol/L"], ["2026-07-10", "24", "mcg/dL"], ["2026-10-02", "30", null]).serie
+    ).toBeNull();
+    // o último com unidade não puxa quem ficou sem
+    expect(
+      zinco(["2026-01-15", "18", null], ["2026-07-10", "24", "ng/mL"], ["2026-10-02", "38", "ng/mL"]).serie
+    ).toBeNull();
+    // todos sem unidade: é a mesma "unidade"
+    expect(
+      zinco(["2026-01-15", "18", null], ["2026-07-10", "24", ""], ["2026-10-02", "38", "  "]).serie
+    ).toHaveLength(3);
+  });
+
+  it("a comparação com o anterior continua tratando a falta de unidade como a mesma", () => {
     const [l] = compararExames(
-      vitD(["2026-01-15", "18", null], ["2026-07-10", "24", "ng/mL"], ["2026-10-02", "38", "ng/mL"]),
+      [
+        ex("2026-07-10", "Zinco", "24", { unit: "mcg/dL" }),
+        ex("2026-10-02", "Zinco", "30"),
+      ],
       {}
     );
-    expect(l.serie).toHaveLength(3);
+    expect(l.mudanca).toBe("sem faixa para comparar");
+    expect(l.diferenca).toBe(6);
   });
 
   it("dois no mesmo dia contam um ponto só (3 resultados em 2 dias: sem série)", () => {
