@@ -2127,7 +2127,7 @@ async function transbordo(page) {
   }
   await fetch(MOCK + "/__reset", { method: "POST" });
 
-  console.log("\nVerificação 20: aba Corpo, o anel da meta e a Evolução (Helena e Pedro)");
+  console.log("\nVerificação 20: gráficos do nutricionista, abas Corpo e Clínico (Helena, Pedro e Joana)");
   etapa = "Corpo: anel e Evolução";
   {
     // Do mock (ferramentas/LEIAME.md): a Helena tem o vínculo há 154 dias, a
@@ -2326,6 +2326,240 @@ async function transbordo(page) {
       ok(txt.includes("Não foi possível carregar as medidas") && !txt.includes("Ainda não dá para ver tendência") &&
         (await corpo(page).locator("figure").count()) === 0,
         `${tabela} falha: o erro da aba, e não "Ainda não dá" nem gráfico`, txt);
+      await page.close();
+      await fetch(MOCK + "/__reset", { method: "POST" });
+    }
+  }
+  // ---- Clínico: o comparativo dos exames (Helena, Joana e Pedro) ----
+  etapa = "Clínico: comparativo dos exames";
+  {
+    // Do mock (ferramentas/LEIAME.md): a Helena tem 16 resultados de 8 exames, em
+    // três laudos de 300, 245 e 192 dias atrás. O que a tela tem de dizer, na
+    // ordem em que a lógica (lib/exames.ts) os põe: Triglicerídeos (saiu da
+    // faixa), LDL (mais perto), depois os que estão dentro (Colesterol total,
+    // Glicemia de jejum, Vitamina B12, Vitamina D), depois os de um resultado só
+    // (VLDL-colesterol, a ferritina por último). "Glicose" e "Glicemia de
+    // jejum" são uma linha só, com minigráfico, e a Vitamina D também; os
+    // outros dizem "N resultados".
+    //
+    // O que NÃO se confere: o texto de "O que mudou" do Colesterol total. O
+    // laudo diz "< 190", e o parser lê isso como máximo inclusivo (o 190 "entra
+    // na faixa"); a correção prevista o trata como exclusivo, e a linha passa a
+    // dizer outra coisa. Que ele é uma linha à parte do VLDL-colesterol, do
+    // mesmo dia, confere.
+    const LAUDO_1 = 300, LAUDO_2 = 245, LAUDO_3 = 192;
+    const dm = (n) => diaBR(n).slice(0, 5);
+    const limpo = async (loc) => (await textoDe(loc)).replace(/\s+/g, " ").trim();
+    const painel = (page) => page.locator("#clinico");
+    const tabela = (page) => page.getByRole("region", { name: "Comparativo dos exames" });
+    const lista = (page) => page.getByRole("list", { name: "Resultados dos exames" });
+    const ORDEM = ["Triglicerídeos", "Colesterol LDL", "Colesterol total", "Glicemia de jejum", "Vitamina B12", "Vitamina D", "VLDL-colesterol", "Ferritina"];
+    const VAZIA = { nome: "", ref: "", ultimo: "", anterior: "", mudou: "", tendencia: "", graficos: 0 };
+
+    // As linhas da tabela de uma vez: o nome e a faixa na primeira coluna, e o
+    // texto de cada uma das outras quatro.
+    const lerLinhas = (page) =>
+      tabela(page).locator("tbody tr").evaluateAll((trs) =>
+        trs.map((tr) => {
+          const [nome, ref] = tr.querySelector("th").innerText.split("\n").map((t) => t.trim());
+          const [ultimo, anterior, mudou, tendencia] = [...tr.querySelectorAll("td")].map((td) => td.innerText.replace(/\s+/g, " ").trim());
+          return { nome, ref, ultimo, anterior, mudou, tendencia, graficos: tr.querySelectorAll('svg[role="img"]').length };
+        })
+      );
+
+    const rgb = (s) => (String(s).match(/[\d.]+/g) || []).slice(0, 3).map(Number);
+    const lum = ([r, g, b]) => {
+      const f = (c) => ((c /= 255) <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+      return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+    };
+    const razao = (a, b) => {
+      const [x, y] = [lum(rgb(a)), lum(rgb(b))].sort((p, q) => q - p);
+      return (x + 0.05) / (y + 0.05);
+    };
+
+    const conferir = async (page, disp, tema) => {
+      const rot = `${disp.nome}/${tema}`;
+      const caixa = tabela(page);
+      const desenhou = await apareceu(caixa, 20000);
+      ok(desenhou, `Helena: o Clínico mostra a tabela do comparativo dos exames (${rot})`);
+      if (!desenhou) return;
+      await caixa.evaluate((el) => el.scrollIntoView({ block: "center", behavior: "instant" }));
+
+      // a linha de resumo, com os três números
+      const resumo = await limpo(painel(page).locator("p", { hasText: "melhores ou dentro da faixa" }).first());
+      ok(resumo.includes("4 melhores ou dentro da faixa") && resumo.includes("1 pior que antes") && resumo.includes("2 só com um resultado"),
+        `a linha de resumo diz 4 melhores ou dentro da faixa, 1 pior que antes e 2 só com um resultado (${rot})`, resumo);
+
+      // a ordem e o texto de cada linha
+      const linhas = await lerLinhas(page);
+      const nomes = linhas.map((l) => l.nome);
+      ok(JSON.stringify(nomes) === JSON.stringify(ORDEM), `a tabela na ordem: ${ORDEM.join(", ")} (${rot})`, nomes.join(", "));
+      ok(!nomes.some((n) => /Glicose/.test(n)), `"Glicose" e "Glicemia de jejum" são uma linha só, a da Glicemia (${rot})`, nomes.join(", "));
+      const l = (nome) => linhas.find((x) => x.nome === nome) || VAZIA;
+
+      const trig = l("Triglicerídeos");
+      ok(trig.ref === "ref. < 150" && trig.ultimo.includes("168 mg/dL") && trig.ultimo.includes("Atenção") && trig.ultimo.includes(dm(LAUDO_3)),
+        `Triglicerídeos: ref. < 150, último 168 mg/dL com o selo Atenção e a data ${dm(LAUDO_3)} (${rot})`, JSON.stringify(trig));
+      ok(trig.anterior === `141 · ${dm(LAUDO_1)}` && trig.mudou.includes("+27") && trig.mudou.includes("saiu da faixa") && trig.tendencia === "2 resultados" && trig.graficos === 0,
+        `Triglicerídeos: anterior "141 · ${dm(LAUDO_1)}", +27, "saiu da faixa" e "2 resultados" no lugar do gráfico (${rot})`, JSON.stringify(trig));
+      const ldl = l("Colesterol LDL");
+      ok(ldl.ultimo.includes("132 mg/dL") && ldl.anterior === `145 · ${dm(LAUDO_1)}` && ldl.mudou.includes("−13") && ldl.mudou.includes("mais perto da faixa"),
+        `LDL: 132 mg/dL, anterior "145 · ${dm(LAUDO_1)}", −13 e "mais perto da faixa" (${rot})`, JSON.stringify(ldl));
+      const vitD = l("Vitamina D");
+      ok(vitD.ultimo.includes("38 ng/mL") && vitD.ultimo.includes("Normal") && vitD.anterior === `24 · ${dm(LAUDO_2)}` && vitD.mudou.includes("+14") && vitD.mudou.includes("entrou na faixa"),
+        `Vitamina D: 38 ng/mL Normal, anterior "24 · ${dm(LAUDO_2)}", +14 e "entrou na faixa" (${rot})`, JSON.stringify(vitD));
+      const glic = l("Glicemia de jejum");
+      ok(glic.ultimo.includes("92 mg/dL") && glic.anterior === `98 · ${dm(LAUDO_2)}` && glic.mudou.includes("−6") && glic.mudou.includes("segue na faixa"),
+        `Glicemia de jejum: 92 mg/dL, anterior "98 · ${dm(LAUDO_2)}" (a série de 3 junta Glicose e Glicemia), −6 e "segue na faixa" (${rot})`, JSON.stringify(glic));
+      // O anterior da B12 está em outra unidade (310 pg/mL contra 235 pmol/L): sem
+      // unidade, o 310 pareceria estar em pmol/L. A coluna não mostra o número.
+      const b12 = l("Vitamina B12");
+      ok(b12.ultimo.includes("235 pmol/L") && b12.ultimo.includes("Atenção") && b12.mudou === "unidade diferente do anterior" && b12.tendencia === "2 resultados",
+        `Vitamina B12: 235 pmol/L com o selo Atenção, "unidade diferente do anterior", sem diferença numérica (${rot})`, JSON.stringify(b12));
+      ok(b12.anterior === dm(LAUDO_1) && !b12.anterior.includes("310") && !b12.anterior.includes("pg"),
+        `e o Anterior da B12 mostra só a data ${dm(LAUDO_1)}, sem o 310 (${rot})`, b12.anterior);
+      // Colesterol total e VLDL-colesterol caem no mesmo dia: duas linhas.
+      const colTotal = l("Colesterol total");
+      const vldl = l("VLDL-colesterol");
+      ok(colTotal.ultimo.includes("190 mg/dL") && colTotal.anterior === `200 · ${dm(LAUDO_1)}` && vldl.ultimo.includes("24 mg/dL"),
+        `Colesterol total (190, anterior 200) e VLDL-colesterol (24) do mesmo dia são duas linhas (${rot})`, JSON.stringify({ colTotal, vldl }));
+      ok(vldl.mudou === "primeiro resultado" && vldl.anterior === "—" && vldl.tendencia === "1 resultado",
+        `VLDL-colesterol: "primeiro resultado", anterior "—" e "1 resultado" (${rot})`, JSON.stringify(vldl));
+      const ferr = l("Ferritina");
+      ok(ferr.ultimo.includes("45 ng/mL") && ferr.ultimo.includes(dm(LAUDO_2)) && ferr.mudou === "primeiro resultado" && ferr.tendencia === "1 resultado",
+        `Ferritina, por último: 45 ng/mL em ${dm(LAUDO_2)}, "primeiro resultado" e "1 resultado" (${rot})`, JSON.stringify(ferr));
+
+      // o minigráfico: só nas linhas com 3 resultados na mesma unidade
+      const graficos = await caixa.locator('svg[role="img"]').count();
+      ok(graficos === 2 && glic.graficos === 1 && vitD.graficos === 1 && linhas.filter((x) => x.graficos).length === 2,
+        `só duas linhas têm minigráfico (Glicemia de jejum e Vitamina D): ${graficos} svg[role=img] na tabela (${rot})`, JSON.stringify(linhas.map((x) => [x.nome, x.graficos])));
+      ok(glic.tendencia === "" && vitD.tendencia === "", `e nelas o gráfico ocupa o lugar do "N resultados" (${rot})`, JSON.stringify([glic.tendencia, vitD.tendencia]));
+      const minis = await caixa.locator('svg[role="img"]').evaluateAll((svgs) =>
+        svgs.map((s) => {
+          const estilo = (el, prop) => (el ? getComputedStyle(el)[prop] : null);
+          return {
+            rotulo: s.getAttribute("aria-label"),
+            largura: s.getAttribute("width"),
+            altura: s.getAttribute("height"),
+            pontos: s.querySelectorAll("circle.ponto-do-exame").length,
+            faixa: estilo(s.querySelector("rect.faixa-do-exame"), "fill"),
+            linha: estilo(s.querySelector(".linha-do-exame"), "stroke"),
+            ponto: estilo(s.querySelector("circle.ponto-do-exame"), "fill"),
+          };
+        })
+      );
+      const rotuloD = `Vitamina D: 18 em ${dm(LAUDO_1)}, 24 em ${dm(LAUDO_2)}, 38 em ${dm(LAUDO_3)}; faixa de 30 a 100.`;
+      const rotuloG = `Glicemia de jejum: 101 em ${dm(LAUDO_1)}, 98 em ${dm(LAUDO_2)}, 92 em ${dm(LAUDO_3)}; faixa de 70 a 99.`;
+      ok(minis.some((m) => m.rotulo === rotuloD) && minis.some((m) => m.rotulo === rotuloG),
+        `cada minigráfico tem role=img e a frase no aria-label (${rot})`, JSON.stringify(minis.map((m) => m.rotulo)));
+      ok(minis.every((m) => m.largura === "120" && m.altura === "36" && m.pontos === 3 && m.faixa && m.linha && m.ponto),
+        `120×36, três pontos, a linha e a faixa sombreada em cada um (${rot})`, JSON.stringify(minis));
+      const caixaDoSvg = await caixa.locator('svg[role="img"]').first().boundingBox();
+      ok(!!caixaDoSvg && Math.abs(caixaDoSvg.width - 120) < 1.5 && Math.abs(caixaDoSvg.height - 36) < 1.5,
+        `e desenhado em 120×36 px (${rot})`, JSON.stringify(caixaDoSvg));
+      const fundo = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+      const rz = minis.map((m) => ({
+        linhaNaFaixa: razao(m.linha, m.faixa),
+        pontoNaFaixa: razao(m.ponto, m.faixa),
+        linhaNoFundo: razao(m.linha, fundo),
+      }));
+      ok(rz.every((r) => r.linhaNaFaixa >= 3 && r.pontoNaFaixa >= 3 && r.linhaNoFundo >= 3),
+        `a linha e os pontos contrastam com a faixa e com o fundo (${tema}): linha/faixa ${rz.map((r) => r.linhaNaFaixa.toFixed(1)).join(" e ")}:1, linha/fundo ${rz.map((r) => r.linhaNoFundo.toFixed(1)).join(" e ")}:1`,
+        JSON.stringify({ minis, fundo }));
+
+      // a nota da ordem e a caixa com foco
+      const nota = await limpo(painel(page).locator("p", { hasText: "Ordem: primeiro o que piorou" }));
+      ok(nota.includes("A faixa é a do laudo") && nota.includes("3 resultados ou mais"), `a nota explica a ordem, a faixa e o minigráfico (${rot})`, nota);
+      ok((await caixa.getAttribute("tabindex")) === "0", `a caixa da tabela recebe foco do teclado (tabindex=0) (${rot})`);
+
+      if (disp.mobile) {
+        const m = await transbordo(page);
+        ok(m.doc <= m.larg, `Clínico da Helena sem transbordo no celular (${tema}) (documento ${m.doc}px, janela ${m.larg}px)`, m.vaza.join(" | "));
+        const med = await caixa.evaluate((el) => ({ tabela: el.scrollWidth, caixa: el.clientWidth }));
+        ok(med.tabela > med.caixa + 8 && med.caixa <= disp.w, `no celular a tabela rola dentro da própria caixa (${med.tabela}px de tabela em ${med.caixa}px de caixa) (${tema})`);
+        await caixa.focus();
+        await page.keyboard.press("ArrowRight");
+        await page.waitForTimeout(600);
+        ok((await caixa.evaluate((el) => el.scrollLeft)) > 0, `e o teclado rola a caixa depois de ela receber foco (${tema})`);
+        await caixa.evaluate((el) => { el.style.scrollBehavior = "auto"; el.scrollLeft = 0; });
+      }
+      await fotografar(page, `${OUT}/clinico-comparativo-${disp.nome}-${tema}.png`, disp);
+      if (disp.mobile) {
+        // as colunas da direita, que o primeiro print deixa para fora da caixa
+        await caixa.evaluate((el) => { el.scrollLeft = el.scrollWidth; });
+        await fotografar(page, `${OUT}/clinico-comparativo-${disp.nome}-${tema}-direita.png`, disp);
+      }
+
+      // "Ver todos os resultados (N)": a lista de sempre, do mais novo ao mais velho
+      const verTodos = painel(page).locator("summary", { hasText: "Ver todos os resultados (16)" });
+      const todos = lista(page);
+      ok((await apareceu(verTodos, 5000)) && !(await todos.isVisible()), `"Ver todos os resultados (16)" começa fechado (${rot})`);
+      await verTodos.scrollIntoViewIfNeeded();
+      await verTodos.click();
+      const abriu = await apareceu(todos, 5000);
+      ok(abriu, `clicar em "Ver todos os resultados (16)" abre a lista (${rot})`);
+      if (abriu) {
+        const itens = await todos.locator("li").evaluateAll((lis) => lis.map((li) => li.innerText.replace(/\s+/g, " ").trim()));
+        const datas = itens.map((t) => (t.match(/(\d{2})\/(\d{2})\/(\d{4})/) || []).slice(1).reverse().join(""));
+        ok(itens.length === 16 && datas.every(Boolean) && datas.every((d, i) => i === 0 || d <= datas[i - 1]),
+          `a lista tem os 16 resultados, do mais novo ao mais velho (${rot})`, itens.join(" | "));
+        ok(itens[0].includes(diaBR(LAUDO_3)) && itens[itens.length - 1].includes(diaBR(LAUDO_1)),
+          `começa em ${diaBR(LAUDO_3)} e acaba em ${diaBR(LAUDO_1)} (${rot})`, `${itens[0]} ... ${itens[itens.length - 1]}`);
+        ok(itens.some((t) => t.includes("Glicose") && t.includes("101 mg/dL")),
+          `e a lista traz o "Glicose" de 101, que a tabela juntou à Glicemia de jejum (${rot})`);
+        ok((await limpo(painel(page).locator("summary", { hasText: "Esconder resultados" }))).includes("Esconder resultados"),
+          `aberta, o botão passa a dizer "Esconder resultados" (${rot})`);
+        if (disp.nome === "desktop" && tema === "claro") await fotografar(page, `${OUT}/clinico-todos-os-resultados-desktop-claro.png`, disp);
+      }
+    };
+
+    for (const [tema, escuro] of [["claro", false], ["escuro", true]]) {
+      for (const disp of [COMPUTADOR, CELULAR]) {
+        const ctx = await contexto(browser, disp, escuro, estado);
+        const page = await abrir(ctx, aba("helena", "clinico"));
+        await conferir(page, disp, tema);
+        await page.close();
+        await ctx.close();
+      }
+    }
+
+    // Todos os exames com um resultado só: "Sem comparação ainda" e a lista
+    // de sempre, sem tabela nem minigráfico. A Joana tem três exames, cada um
+    // com um resultado.
+    {
+      const page = await abrir(pc, aba("joana", "clinico"));
+      const txt = await limpo(painel(page));
+      ok(txt.includes("Sem comparação ainda"), 'Joana: cada exame tem um resultado só, e a tela diz "Sem comparação ainda"', txt);
+      ok((await tabela(page).count()) === 0 && (await painel(page).locator('svg[role="img"]').count()) === 0 &&
+        (await painel(page).locator("summary", { hasText: "Ver todos" }).count()) === 0,
+        "e não tem tabela, nem minigráfico, nem o botão \"Ver todos os resultados\"");
+      const itens = await lista(page).locator("li").evaluateAll((lis) => lis.map((li) => li.innerText.replace(/\s+/g, " ").trim()));
+      ok(itens.length === 3 && (await lista(page).isVisible()), "a lista de sempre aparece aberta, com os três resultados", itens.join(" | "));
+      // (os dois de 20 dias atrás são do mesmo laudo: a ordem entre eles não importa)
+      const glicemia = itens.find((t) => t.includes("Glicemia de jejum")) || "";
+      ok(glicemia.includes("118 mg/dL") && glicemia.includes("alterado") && glicemia.includes("ref. 70 a 99") &&
+        glicemia.includes("Repetir em 30 dias.") && (itens[2] || "").includes("Colesterol LDL"),
+        "com a situação (alterado), a faixa e a observação de cada um, o mais novo primeiro (o LDL de 210 dias atrás por último)", itens.join(" | "));
+      await fotografar(page, `${OUT}/clinico-sem-comparacao-desktop-claro.png`, COMPUTADOR);
+      await page.close();
+    }
+    {
+      const page = await abrir(pc, aba("pedro", "clinico"));
+      ok((await limpo(painel(page))).includes("Nenhum exame registrado."), 'Pedro, sem exames: "Nenhum exame registrado."');
+      await page.close();
+    }
+
+    // leitura que falha: o erro da aba, nunca "Sem comparação ainda" nem "Nenhum exame"
+    {
+      await fetch(MOCK + "/__falhar", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ tabela: "exams" }),
+      });
+      const page = await abrir(pc, aba("helena", "clinico"));
+      const txt = await limpo(painel(page));
+      ok(txt.includes("Não foi possível carregar os dados clínicos") && !txt.includes("Sem comparação ainda") &&
+        !txt.includes("Nenhum exame registrado") && (await tabela(page).count()) === 0,
+        "exams falha: o erro da aba, e não \"Sem comparação ainda\", \"Nenhum exame\" nem tabela", txt);
       await page.close();
       await fetch(MOCK + "/__reset", { method: "POST" });
     }

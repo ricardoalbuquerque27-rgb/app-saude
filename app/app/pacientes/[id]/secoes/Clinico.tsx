@@ -1,7 +1,20 @@
+import { ChevronDown } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { formatDate, todayISO } from "@/lib/date";
+import { dataCurta } from "@/lib/consultas";
+import { formatDate, idadeEm, todayISO } from "@/lib/date";
+import { chaveDoExame, parseExamNumber, type ExamContext } from "@/lib/examRanges";
+import {
+  compararExames,
+  descricaoDaSerie,
+  resumoDoComparativo,
+  type LinhaDeExame,
+  type LinhaDoComparativo,
+} from "@/lib/exames";
+import { MiniGrafico } from "@/components/clinico/graficos/MiniGrafico";
 import { Secao } from "@/components/clinico/Secao";
 import { ErroSecao } from "@/components/clinico/ErroSecao";
+import { FOCO } from "@/components/clinico/estilos";
+import { CLASSE_SELO } from "@/components/consultas/aparencia";
 
 const TITULO_BLOCO = "text-[15px] font-semibold leading-snug text-clin-texto";
 
@@ -15,19 +28,77 @@ const STATUS_EXAME: Record<string, { rotulo: string; caixa: string }> = {
   normal: { rotulo: "normal", caixa: "bg-clin-primaria-fundo text-clin-primaria" },
 };
 
+const situacaoDoExame = (status: string | null) => (status ? STATUS_EXAME[status] : undefined);
+const comMaiuscula = (texto: string) => texto.charAt(0).toUpperCase() + texto.slice(1);
+
+/**
+ * Quantos exames a leitura traz, no máximo. O PostgREST corta em silêncio no
+ * limite, sem erro: com 200 linhas não dá para saber se há mais, e um
+ * comparativo montado sobre um pedaço do histórico diria "primeiro resultado"
+ * para quem tem dez. Exatamente o limite conta como leitura que falhou.
+ */
+const LIMITE_DE_EXAMES = 200;
+
+/** "5,9": vírgula decimal e sem separador de milhar, como o resultado é gravado. */
+const numero = (n: number) =>
+  n.toLocaleString("pt-BR", { maximumFractionDigits: 3, useGrouping: false });
+/** "+27", "−13" (sinal de menos de verdade, como nos gráficos) ou "0". */
+const comSinal = (n: number) => (n === 0 ? "0" : `${n < 0 ? "−" : "+"}${numero(Math.abs(n))}`);
+
+type Exame = LinhaDeExame & { notes: string | null };
+
+/**
+ * Em quantos dias cada exame tem resultado com número: o "N resultados" da
+ * coluna Tendência quando não há minigráfico. A linha do comparativo só traz a
+ * série com 3 resultados ou mais na MESMA unidade, então "2 resultados" para
+ * todo exame sem série mentiria sobre o que tem três e um deles em outra
+ * unidade. Mesma regra de `compararExames`: sem número fica fora, e dois
+ * resultados no mesmo dia contam um.
+ */
+function resultadosPorExame(exames: LinhaDeExame[]): Map<string, number> {
+  const dias = new Map<string, Set<string>>();
+  for (const e of exames) {
+    if (parseExamNumber(e.result_value) == null) continue;
+    const chave = chaveDoExame((e.title ?? "").trim());
+    if (!chave) continue;
+    const datas = dias.get(chave) ?? new Set<string>();
+    datas.add(e.date);
+    dias.set(chave, datas);
+  }
+  return new Map(Array.from(dias, ([chave, datas]) => [chave, datas.size]));
+}
+
 // Tratamento, próxima dose, exames e efeitos colaterais. Só leitura: são
 // registros do paciente, e o nutricionista não os altera.
-export async function Clinico({ uid }: { uid: string }) {
+//
+// Os exames viram o comparativo (último resultado de cada exame contra o
+// anterior, em palavras, lib/exames.ts), com a lista de todos os resultados
+// atrás de um botão. Sexo e nascimento entram só para a faixa da tabela do app
+// quando o laudo não traz a dele.
+export async function Clinico({
+  uid,
+  sexo,
+  nascimento,
+}: {
+  uid: string;
+  sexo: string | null;
+  nascimento: string | null;
+}) {
   const supabase = await createClient();
   const hoje = todayISO();
 
   const [examesRes, tratamentoRes, dosesRes, efeitosRes] = await Promise.all([
+    // Do mais velho ao mais novo, e no mesmo dia pela ordem de gravação:
+    // compararExames fica com o ÚLTIMO da entrada quando dois resultados do
+    // mesmo exame caem no mesmo dia. A lista "Ver todos" inverte, para ficar
+    // como sempre foi, do mais novo ao mais velho.
     supabase
       .from("exams")
       .select("date, title, result_value, unit, reference_range, status, notes")
       .eq("user_id", uid)
-      .order("date", { ascending: false })
-      .limit(40),
+      .order("date", { ascending: true })
+      .order("created_at", { ascending: true })
+      .limit(LIMITE_DE_EXAMES),
     // Nada impede dois tratamentos ativos ao mesmo tempo, e `.maybeSingle()`
     // sozinho FALHA com duas linhas: a aba antiga dizia "Nenhum tratamento
     // ativo" justamente para quem tinha dois. Vale o mais recente.
@@ -53,7 +124,9 @@ export async function Clinico({ uid }: { uid: string }) {
       .limit(12),
   ]);
 
-  if (examesRes.error || tratamentoRes.error || dosesRes.error || efeitosRes.error) {
+  // Leitura que volta cheia (200) é leitura cortada, e conta como falha.
+  const exameCheio = (examesRes.data?.length ?? 0) >= LIMITE_DE_EXAMES;
+  if (examesRes.error || exameCheio || tratamentoRes.error || dosesRes.error || efeitosRes.error) {
     return (
       <Secao id="clinico" titulo="Clínico">
         <ErroSecao secao="os dados clínicos" />
@@ -61,12 +134,22 @@ export async function Clinico({ uid }: { uid: string }) {
     );
   }
 
-  const exames = (examesRes.data ?? []) as any[];
+  const exames = (examesRes.data ?? []) as Exame[];
   const tratamento = tratamentoRes.data as any;
   const doses = (dosesRes.data ?? []) as any[];
   const efeitos = (efeitosRes.data ?? []) as any[];
   const doseAtrasada =
     !!tratamento?.next_dose_date && tratamento.next_dose_date < hoje;
+
+  const contexto: ExamContext = {
+    sex: sexo === "M" || sexo === "F" ? sexo : null,
+    age: idadeEm(nascimento, hoje),
+  };
+  const comparativo = compararExames(exames, contexto);
+  // Todos com um resultado só (ou nenhum com número): não há o que comparar, e
+  // a tela diz isso e mostra a lista de sempre, em vez de uma tabela de
+  // "primeiro resultado".
+  const semComparacao = comparativo.every((l) => l.mudanca === "primeiro resultado");
 
   return (
     <Secao id="clinico" titulo="Clínico">
@@ -128,41 +211,19 @@ export async function Clinico({ uid }: { uid: string }) {
       <h3 className={`mt-6 ${TITULO_BLOCO}`}>Exames</h3>
       {exames.length === 0 ? (
         <p className="mt-2 text-[14px] text-clin-texto-2">Nenhum exame registrado.</p>
+      ) : semComparacao ? (
+        <>
+          <p className="mt-2 text-[14px] text-clin-texto-2">
+            {comparativo.length === 0
+              ? "Sem comparação ainda: nenhum resultado tem número para comparar."
+              : "Sem comparação ainda: cada exame tem um resultado só."}
+          </p>
+          <div className="mt-2">
+            <ListaDeExames exames={exames} />
+          </div>
+        </>
       ) : (
-        <ul className="mt-2 divide-y divide-clin-linha">
-          {exames.map((e, i) => {
-            const st = STATUS_EXAME[e.status];
-            const resultado = [e.result_value, e.unit].filter(Boolean).join(" ");
-            return (
-              <li key={i} className="py-2.5">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-[14px] font-medium leading-snug text-clin-texto">
-                      {e.title}
-                    </p>
-                    <p className="text-[13px] tabular-nums text-clin-texto-2">
-                      {formatDate(e.date)}
-                      {e.reference_range ? ` · ref. ${e.reference_range}` : ""}
-                    </p>
-                  </div>
-                  <span
-                    className={`shrink-0 rounded px-2 py-0.5 text-right text-[13px] font-semibold tabular-nums ${
-                      st?.caixa ?? "text-clin-texto"
-                    }`}
-                  >
-                    {resultado || "—"}
-                    {st && <span className="font-normal"> · {st.rotulo}</span>}
-                  </span>
-                </div>
-                {e.notes && (
-                  <p className="mt-1 text-[13px] leading-snug text-clin-texto-2">
-                    {e.notes}
-                  </p>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+        <ComparativoDosExames comparativo={comparativo} exames={exames} />
       )}
 
       {efeitos.length > 0 && (
@@ -195,5 +256,190 @@ export async function Clinico({ uid }: { uid: string }) {
         </>
       )}
     </Secao>
+  );
+}
+
+/**
+ * A lista de todos os resultados, do mais novo ao mais velho, um por linha: a
+ * lista de antes do comparativo, sem mudança. `exames` vem do mais velho ao
+ * mais novo (a ordem que o comparativo pede), e aqui se inverte.
+ */
+function ListaDeExames({ exames }: { exames: Exame[] }) {
+  return (
+    <ul aria-label="Resultados dos exames" className="divide-y divide-clin-linha">
+      {[...exames].reverse().map((e, i) => {
+        const st = situacaoDoExame(e.status);
+        const resultado = [e.result_value, e.unit].filter(Boolean).join(" ");
+        return (
+          <li key={i} className="py-2.5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[14px] font-medium leading-snug text-clin-texto">
+                  {e.title}
+                </p>
+                <p className="text-[13px] tabular-nums text-clin-texto-2">
+                  {formatDate(e.date)}
+                  {e.reference_range ? ` · ref. ${e.reference_range}` : ""}
+                </p>
+              </div>
+              <span
+                className={`shrink-0 rounded px-2 py-0.5 text-right text-[13px] font-semibold tabular-nums ${
+                  st?.caixa ?? "text-clin-texto"
+                }`}
+              >
+                {resultado || "—"}
+                {st && <span className="font-normal"> · {st.rotulo}</span>}
+              </span>
+            </div>
+            {e.notes && (
+              <p className="mt-1 text-[13px] leading-snug text-clin-texto-2">
+                {e.notes}
+              </p>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/**
+ * A linha de resumo, a tabela (um exame por linha: o último resultado, o
+ * anterior, o que mudou e a tendência), a nota da ordem e o botão que abre a
+ * lista de todos os resultados.
+ *
+ * A tabela tem cinco colunas e não cabe em 390 px: rola dentro da própria
+ * caixa, e a página não ganha rolagem lateral. Caixa que rola precisa receber
+ * foco, senão quem usa teclado não alcança as colunas da direita (como a de
+ * "Medidas registradas" da aba Corpo).
+ */
+function ComparativoDosExames({
+  comparativo,
+  exames,
+}: {
+  comparativo: LinhaDoComparativo[];
+  exames: Exame[];
+}) {
+  const { melhores, piores, umResultado } = resumoDoComparativo(comparativo);
+  const resultados = resultadosPorExame(exames);
+
+  return (
+    <div className="mt-2">
+      <p className="text-[13px] text-clin-texto-2">
+        último resultado de cada exame contra o anterior
+      </p>
+
+      <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-clin-texto-2">
+        <span><strong className="font-semibold text-clin-texto">{melhores}</strong> {melhores === 1 ? "melhor ou dentro da faixa" : "melhores ou dentro da faixa"}</span>
+        <span><strong className="font-semibold text-clin-texto">{piores}</strong> {piores === 1 ? "pior que antes" : "piores que antes"}</span>
+        <span><strong className="font-semibold text-clin-texto">{umResultado}</strong> só com um resultado</span>
+      </p>
+
+      <div
+        tabIndex={0}
+        role="region"
+        aria-label="Comparativo dos exames"
+        className={`mt-3 overflow-x-auto rounded-md border border-clin-linha ${FOCO}`}
+      >
+        <table className="w-full min-w-[640px] border-collapse text-[14px] tabular-nums">
+          <thead>
+            <tr className="border-b border-clin-linha text-left text-[13px] text-clin-texto-2">
+              <th scope="col" className="py-2.5 pl-3.5 pr-2 font-medium">Exame</th>
+              <th scope="col" className="px-2 py-2.5 font-medium">Último</th>
+              <th scope="col" className="px-2 py-2.5 font-medium">Anterior</th>
+              <th scope="col" className="px-2 py-2.5 font-medium">O que mudou</th>
+              <th scope="col" className="py-2.5 pl-2 pr-3.5 font-medium">Tendência</th>
+            </tr>
+          </thead>
+          <tbody>
+            {comparativo.map((l) => {
+              const st = situacaoDoExame(l.ultimo.status);
+              const n = resultados.get(l.chave) ?? (l.anterior ? 2 : 1);
+              return (
+                <tr key={l.chave} className="border-b border-clin-linha text-clin-texto last:border-b-0">
+                  <th scope="row" className="min-w-[150px] py-3 pl-3.5 pr-2 text-left align-top font-medium">
+                    <span className="block">{l.nome}</span>
+                    <span className="block text-[13px] font-normal text-clin-texto-2">
+                      {l.faixaTexto ? `ref. ${l.faixaTexto}` : "sem faixa de referência"}
+                    </span>
+                  </th>
+                  <td className="px-2 py-3 align-top">
+                    <span className="block whitespace-nowrap font-semibold">{l.ultimo.texto}</span>
+                    {st && (
+                      <span className={`${CLASSE_SELO} mt-0.5 ${st.caixa}`}>{comMaiuscula(st.rotulo)}</span>
+                    )}
+                    <time dateTime={l.ultimo.data} className="block text-[13px] text-clin-texto-2">
+                      {dataCurta(l.ultimo.data)}
+                    </time>
+                  </td>
+                  {/* Sem quebra de linha: "141 ·" numa linha e "18/12" na outra
+                      não se lê, e o resultado com a unidade ("235 pmol/L")
+                      partido também não. A caixa rola, então a largura sobra.
+                      O anterior não traz unidade: "310" ao lado de "235
+                      pmol/L" leria como 310 pmol/L. Com a unidade trocada só
+                      a data aparece, e a coluna ao lado explica. */}
+                  <td className="whitespace-nowrap px-2 py-3 align-top text-clin-texto-2">
+                    {!l.anterior
+                      ? "—"
+                      : l.mudanca === "unidade diferente do anterior"
+                        ? dataCurta(l.anterior.data)
+                        : `${numero(l.anterior.valor)} · ${dataCurta(l.anterior.data)}`}
+                  </td>
+                  <td className="px-2 py-3 align-top">
+                    {l.diferenca != null && (
+                      <span className="block font-semibold">{comSinal(l.diferenca)}</span>
+                    )}
+                    {/* Piorou (saiu ou ficou mais longe da faixa): o par
+                        perigo/perigo-fundo, com a palavra, não só a cor. */}
+                    {l.grupo === 1 ? (
+                      <span className={`${CLASSE_SELO} mt-0.5 bg-clin-perigo-fundo text-clin-perigo`}>
+                        {l.mudanca}
+                      </span>
+                    ) : (
+                      <span className="block text-[13px] text-clin-texto-2">{l.mudanca}</span>
+                    )}
+                  </td>
+                  <td className="py-3 pl-2 pr-3.5 align-top">
+                    {l.serie ? (
+                      <MiniGrafico serie={l.serie} faixa={l.faixa} descricao={descricaoDaSerie(l)} />
+                    ) : (
+                      <span className="text-[13px] text-clin-texto-2">
+                        {n} {n === 1 ? "resultado" : "resultados"}
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="mt-3 text-[13px] leading-snug text-clin-texto-2">
+        Ordem: primeiro o que piorou, depois o que segue fora da faixa ou sem comparação, depois o que está
+        dentro da faixa e, por último, os de um resultado só. A faixa é a do laudo; sem ela, a da tabela do
+        app. O minigráfico aparece com 3 resultados ou mais na mesma unidade, e a faixa sombreada nele é a de
+        referência.
+      </p>
+
+      {/* <details> nativo, como o "Ver histórico": abre com teclado e leitor de
+          tela sem JavaScript, e a lista já vem renderizada no servidor. A
+          borda é a de campo (3:1), a de um controle. */}
+      <details className="group mt-4">
+        <summary
+          className={`inline-flex min-h-[44px] cursor-pointer list-none items-center gap-2 rounded-md border border-clin-campo bg-clin-chao px-4 text-[14px] font-medium text-clin-texto hover:bg-clin-primaria-fundo ${FOCO} [&::-webkit-details-marker]:hidden`}
+        >
+          <span className="group-open:hidden">Ver todos os resultados ({exames.length})</span>
+          <span className="hidden group-open:inline">Esconder resultados</span>
+          <ChevronDown
+            aria-hidden="true"
+            className="h-4 w-4 transition-transform group-open:rotate-180"
+          />
+        </summary>
+        <div className="mt-3">
+          <ListaDeExames exames={exames} />
+        </div>
+      </details>
+    </div>
   );
 }

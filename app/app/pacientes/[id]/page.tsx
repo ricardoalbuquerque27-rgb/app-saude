@@ -190,7 +190,7 @@ export default async function PacienteDetalhe({
       case "clinico":
         return (
           <Suspense fallback={<SkelCard />}>
-            <Clinico uid={uid} />
+            <Clinico uid={uid} sexo={perfil.sex} nascimento={perfil.birth_date} />
           </Suspense>
         );
       case "consultas": {

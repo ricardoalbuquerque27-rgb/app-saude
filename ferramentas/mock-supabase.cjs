@@ -722,7 +722,7 @@ function carteira() {
       e(14, LAUDO_3, "Colesterol total", "190", "mg/dL", "< 190", "atencao"),
       e(15, LAUDO_3, "VLDL-colesterol", "24", "mg/dL", "< 30", "normal"),
       // Outro laboratório, que dá a B12 em pmol/L: não se compara com os 310 pg/mL.
-      e(16, LAUDO_3, "Vitamina B12", "235", "pmol/L", "148 a 664", "normal"),
+      e(16, LAUDO_3, "Vitamina B12", "235", "pmol/L", "148 a 664", "atencao"),
     ];
 
     return juntar({
