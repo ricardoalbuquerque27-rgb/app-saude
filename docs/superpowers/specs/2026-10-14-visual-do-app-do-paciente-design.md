@@ -37,7 +37,8 @@ dois lados ("pode trocar nos dois lados").
 | O cardápio de hoje vira uma linha que leva à Dieta, onde o plano mostra "Comi isso". Hoje ele abre no lugar, num `<details>`. | Mockup aprovado | Um toque a mais para registrar a refeição a partir da Início. |
 | Saem da Início o cartão "Treinos recentes", o cartão do relatório (roxo) e o "Fale com a Gaia". Os dois primeiros viram links. A Gaia fica só no botão flutuante. | Mockup aprovado | Some a frase que explica o que a Gaia faz ("registra treino, refeição, água e peso por você"). |
 | Saem do bloco Progresso "Treinos (7 dias)" e "Sono hoje". Entra a variação de 30 dias. | Mockup aprovado | O sono do dia só fica em Hábitos. |
-| "Acima da meta" em cor de aviso **só nas calorias**. Água e proteína acima da meta fecham o anel sem aviso. | Esta spec, refinando o mockup ("passou da meta: aviso") | — Beber mais água do que a meta não é problema, e pintar isso de laranja ensinaria o contrário. |
+| **Meta ou limite.** Proteína e água são sempre meta, e passar delas fecha o anel sem aviso. As calorias são **limite** quando a meta de peso está abaixo do peso atual (aí passar delas dá "acima do limite" em cor de aviso), **meta** quando está acima (sem aviso) e neutras sem meta de peso. | Dono do produto, pela referência do OpenNutriTracker; corrige a versão anterior desta spec, que avisava sempre nas calorias | Quem quer ganhar massa e passou das calorias recebia um aviso laranja por fazer o que devia. Beber mais água que a meta também não é problema. |
+| Água em um toque: "+250 ml" no anel de água da Início, com "Desfazer". | Dono do produto, pela referência do OpenNutriTracker | Um toque acidental registra água. O "Desfazer" é a rede para isso. |
 | "Recado de Ricardo" na Início e "de Ricardo, seu nutricionista" na Dieta, com **de**, não do/da. | Esta spec, corrigindo o mockup ("Recado do Ricardo") | — O app não sabe o gênero de quem prescreve e não o adivinha pelo nome. |
 | A landing só recebe a letra. Seus degradês e animações ficam até ela ser reescrita para nutricionistas (Em aberto no CLAUDE.md). | Esta spec | Por um tempo, a landing e o app falam visuais diferentes. |
 | Número que é dado usa algarismos tabulares. | Dono do produto, pela referência do WHOOP | — |
@@ -167,8 +168,23 @@ As classes globais de `app/globals.css` são refeitas com as variáveis
 
 - **`ProgressRing`:** o anel é sempre `app-primaria` sobre trilho
   `app-linha`. Some o `colorClass` por anel. Uma nova prop `avisoAcima`
-  (padrão `false`) faz o rótulo dizer "acima da meta", em `app-atencao`,
-  quando `pct > 1`. Só as calorias passam `avisoAcima`.
+  (padrão `false`) faz o rótulo dizer "acima do limite", em `app-atencao`,
+  quando `pct > 1`.
+- **Meta ou limite das calorias.** Uma função pura e testada em
+  `lib/nutri.ts`, `papelDasCalorias(pesoAtual: number | null, metaDePeso:
+  number | null): "limite" | "meta" | null`, decide o papel:
+  - peso atual acima da meta de peso por mais de 0,5 kg dá "limite";
+  - abaixo por mais de 0,5 kg dá "meta";
+  - dentro de ±0,5 kg (manutenção), ou sem algum dos dois números, dá
+    `null`.
+
+  O peso atual é o do dia mais recente com peso (`pesoDoDia`), e a meta é
+  `profiles.weight_goal_kg`. Só o anel de calorias leva o papel no rótulo
+  ("Calorias · limite" ou "Calorias · meta"; com `null`, só "Calorias"), e
+  só com "limite" ele passa `avisoAcima`. Proteína e água não levam a
+  palavra e nunca avisam acima. O app não guarda o objetivo do paciente; a
+  meta de peso, que o nutricionista ou o paciente definiu, é o que diz a
+  direção.
 - **Barra de macros:** três segmentos com 2 px entre eles, nas cores
   `macro-*`. A legenda dá nome e gramas de cada macro ("Proteína 45 g").
 
@@ -255,8 +271,9 @@ página sai.
    dentro do "Hoje".
 5. **Seu dia.** O título vem com "score 72 · bom" à direita, em
    `app-texto-2`, com o número sem cor por faixa. Abaixo, três anéis:
-   Calorias (com `avisoAcima`), Água e Proteína. O "Definir metas" e o texto
-   de sem-dados continuam como hoje.
+   Calorias (com o papel de `papelDasCalorias`), Água (com o "+250 ml"; ver
+   "Água em um toque") e Proteína. O "Definir metas" e o texto de sem-dados
+   continuam como hoje.
    - **O Score se explica.** "score 72 · bom" é o `summary` de um `<details>`
      (nativo, sem JavaScript, como o cardápio era) com uma seta. Ao abrir,
      aparecem os quatro pilares de `computeHealthScore`: Sono, Movimento,
@@ -316,7 +333,9 @@ página sai.
      campo.
    - O chip "Hoje" fica para voltar.
    - Sai o subtítulo "Acompanhe suas refeições e macros."
-2. **Resumo do dia:** dois anéis, Calorias (com `avisoAcima`) e Proteína, e
+2. **Resumo do dia:** dois anéis, Calorias (com o papel de
+   `papelDasCalorias`; a página passa a ler a meta de peso e o peso mais
+   recente) e Proteína, e
    a barra de macros com legenda. O "Definir metas" fica. Com a data em
    hoje, a sugestão de proteína aparece abaixo da barra, sem link, porque o
    plano está logo abaixo. Em outro dia, não aparece.
@@ -372,6 +391,57 @@ sugestaoDeProteina(e: {
 - **Calorias ficam de fora**, e isso é decisão: "faltam 600 kcal" empurra
   quem está emagrecendo a comer sem fome, e o excesso já aparece no anel
   ("acima da meta").
+
+## Água em um toque
+
+Abaixo do anel de água da Início, um botão secundário "+250 ml", com 44 px
+de alvo. Ao tocar, registra 250 ml na data de hoje (`todayISO()`, São
+Paulo), atualiza a página (`router.refresh()`) e mostra, por 6 segundos,
+"+250 ml registrado · Desfazer" numa região `aria-live="polite"`.
+"Desfazer" registra −250 ml.
+
+- **Uma forma só de gravar água.** O `registrar_agua` do assistente
+  (`lib/aiActions.ts`) já lê o total do dia e grava só a coluna
+  `water_ml`, com `onConflict: "user_id,date"`. Esse trecho sai para uma
+  função `adicionarAgua(supabase, uid, ml)` em `lib/agua.ts`, com o piso em
+  0, que devolve `{ ok, total }` ou o erro. O assistente e o botão passam a
+  usá-la.
+- **Erro aparece.** Se a gravação falha, o botão diz "Não deu para
+  registrar a água" e o anel não muda.
+- **Uma gravação por vez.** O botão fica desabilitado enquanto grava: dois
+  toques rápidos leriam o mesmo total, e o segundo apagaria o primeiro. Entre
+  abas ou aparelhos a corrida continua possível. Fechá-la pede uma função
+  no banco (uma migração), o que não vale para um copo d'água.
+- O teste de `adicionarAgua` roda no Supabase em memória, como
+  `lib/nutri.test.ts`. Ele cobre: cria a linha do dia quando não existe,
+  soma ao total, o piso em 0 no desfazer, e devolve o erro em vez de
+  engolir.
+
+## Referência: apps publicados (14/10)
+
+Para ver telas reais sem abrir o Behance, o Figma ou o site do WHOOP
+(bloqueados pela rede do ambiente), as capturas vieram de repositórios
+públicos no GitHub.
+
+**[OpenNutriTracker](https://github.com/simonoppowa/OpenNutriTracker)**, app
+de nutrição publicado nas lojas. Dele vieram duas ideias:
+- **Meta ou limite:** "limit" ao lado do sódio e do açúcar.
+- **Água em um toque:** "1200 / 1900 ml +" na Início.
+
+Ficaram de fora:
+- **O "kcal restantes" no centro do anel.** Para quem emagrece, vira conta
+  de orçamento de dieta.
+- **A ofensiva de dias seguidos.** Pune quem falha um dia.
+- **O "+" no meio da barra de baixo.** Com o botão da Gaia, seriam dois
+  botões flutuantes.
+
+O calendário com um ponto nos dias registrados ficou para depois.
+
+**[NOOP](https://github.com/ryanbr/noop)**, app que lê a pulseira do WHOOP e
+imita o visual dele. Ficou para depois a tela de tendência: o último valor
+com a data, períodos sem dado suficiente desligados e explicados, e mínimo,
+média e máximo. Ela serviria à página Medidas do paciente. Os mostradores
+"líquidos" escuros ficaram de fora.
 
 ## Referência: WHOOP
 
@@ -430,6 +500,12 @@ alta tirada, os degradês tirados e o texto de apoio direto no chão em
   letra.
 - Trocar os pares rosa e âmbar que já passam no contraste fora da Início e
   da Dieta.
+- **A gravação da página Hábitos.** O `persist` de lá regrava a linha inteira
+  do dia a partir da tela e não confere o erro. Uma falha passa calada, e
+  água registrada em outro lugar enquanto Hábitos está aberto (pela Gaia,
+  pela Início ou por outra aba) volta ao valor antigo na gravação seguinte.
+  O problema é anterior a esta spec e fica como tarefa à parte. O botão da
+  Início não usa esse caminho.
 - O texto em masculino genérico que o app já usa ("seu nutricionista").
   Mudar isso pede um campo no perfil, e não é visual.
 
@@ -445,6 +521,9 @@ alta tirada, os degradês tirados e o texto de apoio direto no chão em
     `naJanela`, data futura fora e um dia só sem variação. Os testes atuais
     de `weightDelta30` também passam.
   - `ProgressRing`: `avisoAcima` só com `pct > 1`.
+  - `papelDasCalorias`: acima e abaixo da meta por mais de 0,5 kg, a borda
+    de 0,5 kg, e sem peso ou sem meta.
+  - `adicionarAgua`: os casos de "Água em um toque".
   - `computeHealthScore`: os valores de hoje, travados primeiro, mais o
     `semRegistro` de cada pilar.
   - `sugestaoDeProteina`, cobrindo:
@@ -467,7 +546,10 @@ alta tirada, os degradês tirados e o texto de apoio direto no chão em
     `.btn-primary`; `font-family` com "Instrument Sans" no corpo e nos
     títulos, no paciente e no `NutriHome`; nenhuma rolagem horizontal em
     390 px; e o aviso de leitura falha no "Para hoje" e no Progresso;
-  - também entram: o Score abre e mostra os quatro pilares, com o pilar sem
+  - também entram: o "+250 ml" muda o anel de água e o "Desfazer" o devolve;
+    "Calorias · limite" aparece para a paciente do mock (a meta de peso dela
+    está abaixo do peso atual);
+  - e mais: o Score abre e mostra os quatro pilares, com o pilar sem
     registro marcado; a sugestão de proteína aparece no cenário do mock e
     leva a `/app/dieta#plano`; e o centro dos anéis tem
     `font-variant-numeric: tabular-nums`, com "000" e "111" medindo a mesma
@@ -510,7 +592,8 @@ a ordem é:
 2. letra e classes globais, com as fotos de antes e depois;
 3. a casca;
 4. as funções puras da Início: `saudacao`, `montarParaHoje`, `pesoDe30Dias`,
-   `sugestaoDeProteina` e o `semRegistro` do Score;
+   `sugestaoDeProteina`, `papelDasCalorias`, o `semRegistro` do Score e
+   `adicionarAgua`;
 5. a Início;
 6. a Dieta;
 7. as outras telas;
