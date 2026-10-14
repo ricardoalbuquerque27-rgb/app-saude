@@ -338,37 +338,58 @@ function findDef(name: string): RangeDef | null {
   return best?.def ?? null;
 }
 
-// A entrada da tabela só quando o nome É uma das chaves dela (depois do `norm`),
-// o caminho de pontuação ≥ 1000 do `findDef`. O `findDef` aceita a chave como
-// palavra solta dentro do nome, o que serve para classificar uma frase livre
-// ("glicemia em jejum de 12h"), mas junta exames diferentes: "VLDL-colesterol" e
+// As palavras de cada entrada da tabela: a união das palavras de todas as keys
+// dela, contada como uma só (a entrada da glicose tem "glicose", "glicemia",
+// "jejum", "em" e "de"). Na ordem de TABLE.
+const PALAVRAS_DAS_ENTRADAS: Set<string>[] = TABLE.map(
+  (def) => new Set(def.keys.flatMap((k) => norm(k).split(" ")))
+);
+
+// A entrada da tabela a que o nome do exame se refere, ou nenhuma. O nome
+// casa quando:
+//   1. é IGUAL (depois do `norm`) a uma das keys de uma entrada; a exata vence; ou
+//   2. TODAS as suas palavras aparecem entre as palavras de UMA ÚNICA entrada.
+//      Se mais de uma qualificar, não há casamento: não dá para saber de qual
+//      o laudo fala, e a faixa da entrada errada é pior que nenhuma.
+//
+// Não é o casamento do `findDef`, que aceita a key como palavra solta dentro
+// de qualquer nome e juntava exames diferentes: "VLDL-colesterol" e
 // "Colesterol não-HDL" saíam como "colesterol total", "Vitamina K" como
 // potássio (chave "k"), "Hemoglobina corpuscular média" como hemoglobina e
-// "Capacidade total de ligação do ferro" como ferro.
-function defExata(nome: string): RangeDef | null {
+// "Capacidade total de ligação do ferro" como ferro. Aqui a palavra que
+// diferencia o exame ("vldl", "corpuscular", "prandial", "vitamina") nunca
+// está nas keys da entrada errada, então o nome não casa com ela. Já o sufixo
+// redundante ("Hemoglobina glicada (HbA1c)", "Glicose (jejum)") tem só
+// palavras da própria entrada e junta. Fica de fora quem só tem uma palavra
+// de uma entrada que também serve a outro exame ("T4" é a entrada do T4 livre).
+function entradaDaTabela(nome: string): RangeDef | null {
   const n = norm(nome);
   if (!n) return null;
-  return TABLE.find((def) => def.keys.some((k) => norm(k) === n)) ?? null;
+  const exata = TABLE.find((def) => def.keys.some((k) => norm(k) === n));
+  if (exata) return exata;
+  const palavras = n.split(" ");
+  const cobrem = TABLE.filter((_, i) => palavras.every((p) => PALAVRAS_DAS_ENTRADAS[i].has(p)));
+  return cobrem.length === 1 ? cobrem[0] : null;
 }
 
 // A chave que junta as grafias do mesmo exame no comparativo do nutricionista:
-// a primeira chave da entrada da tabela cujo nome é IGUAL ao dado ("Glicose",
-// "Glicemia de jejum" e "glicose em jejum" são todas "glicose"). Sem isso o
-// comparativo teria uma linha por grafia, cada uma com um resultado só e sem
-// nada para comparar.
+// a primeira chave da entrada da tabela a que o nome se refere (`entradaDaTabela`;
+// "Glicose", "Glicemia de jejum" e "glicose em jejum" são todas "glicose"). Sem
+// isso o comparativo teria uma linha por grafia, cada uma com um resultado só e
+// sem nada para comparar.
 //
-// A correspondência é exata, e não a do `findDef`, de propósito: com "um
+// O casamento é mais estrito que o do `findDef`, de propósito: com "um
 // resultado por dia", colesterol total 200 (10/07) e 190 (02/10) mais
 // VLDL-colesterol 24 (02/10) viravam UMA linha, "VLDL-colesterol, 24, entrou
 // na faixa", e o 190 sumia. Fora da tabela vale o nome normalizado (sem
 // acento, caixa nem pontuação). Só lê a tabela: não muda a classificação (a
 // página do paciente segue com o casamento do `findDef`).
 export function chaveDoExame(nome: string): string {
-  return defExata(nome)?.keys[0] ?? norm(nome);
+  return entradaDaTabela(nome)?.keys[0] ?? norm(nome);
 }
 
-// A faixa de referência da tabela do app para o exame, pela mesma correspondência
-// exata de `chaveDoExame` (nome que só contém o de uma entrada não leva a faixa
+// A faixa de referência da tabela do app para o exame, pelo mesmo casamento de
+// `chaveDoExame` (nome com uma palavra que a entrada não tem não leva a faixa
 // dela), com a unidade em que a entrada está. Exame que depende do sexo, sem o
 // sexo, fica sem faixa: não chutamos, como no `classifyExam`. O `valor` entra
 // porque a entrada é uma função do valor, embora o texto da faixa não mude com ele.
@@ -377,7 +398,7 @@ export function faixaDaTabela(
   valor: number,
   ctx: ExamContext
 ): { faixa: string; unidade: string } | null {
-  const def = defExata(nome);
+  const def = entradaDaTabela(nome);
   if (!def || (def.sexDependent && !ctx.sex)) return null;
   return { faixa: def.classify(valor, ctx).faixa, unidade: def.unit };
 }

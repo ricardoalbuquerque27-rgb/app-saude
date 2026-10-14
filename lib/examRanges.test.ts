@@ -52,7 +52,7 @@ describe("classifyExam (faixa do laudo)", () => {
 });
 
 describe("chaveDoExame", () => {
-  it("só junta ao da tabela quando o nome é igual a uma das chaves dela", () => {
+  it("nome igual a uma chave da tabela dá a primeira chave da entrada", () => {
     const glicose = chaveDoExame("Glicose");
     expect(glicose).toBe("glicose");
     expect(chaveDoExame("Glicemia de jejum")).toBe(glicose);
@@ -60,7 +60,7 @@ describe("chaveDoExame", () => {
     expect(chaveDoExame("  GLICEMIA ")).toBe(glicose);
   });
 
-  it("exame que só CONTÉM o nome de uma entrada não é aquela entrada", () => {
+  it("a palavra que diferencia o exame o separa: VLDL, não-HDL, vitamina K, corpuscular...", () => {
     // Pelo casamento por palavra inteira (o do classifyExam), cada um destes
     // virava o exame da direita e o comparativo juntava exames diferentes.
     expect(chaveDoExame("VLDL-colesterol")).toBe("vldl colesterol"); // não "colesterol total"
@@ -70,6 +70,39 @@ describe("chaveDoExame", () => {
     expect(chaveDoExame("Capacidade total de ligação do ferro")).toBe(
       "capacidade total de ligacao do ferro" // não "ferro"
     );
+  });
+
+  it("outras grafias separadas por uma palavra que a tabela não tem", () => {
+    expect(chaveDoExame("Colesterol (VLDL)")).toBe("colesterol vldl");
+    expect(chaveDoExame("Glicose pós-prandial")).toBe("glicose pos prandial");
+  });
+
+  it("palavras todas de uma entrada só, sem exata: junta (o sufixo redundante)", () => {
+    expect(chaveDoExame("Hemoglobina glicada (HbA1c)")).toBe("hemoglobina glicada");
+    expect(chaveDoExame("Glicose (jejum)")).toBe("glicose");
+    expect(chaveDoExame("Glicemia, jejum")).toBe("glicose");
+    expect(chaveDoExame("Triglicerídeos (TG)")).toBe("triglicerideos");
+  });
+
+  it("LDL colesterol e Colesterol LDL são o mesmo exame", () => {
+    expect(chaveDoExame("LDL colesterol")).toBe("ldl");
+    expect(chaveDoExame("Colesterol LDL")).toBe("ldl");
+  });
+
+  it("palavras que cabem em mais de uma entrada, sem exata: não casa com nenhuma", () => {
+    // 'vitamina' está na D e na B12; 'total' no colesterol total e na testosterona.
+    expect(chaveDoExame("Vitamina")).toBe("vitamina");
+    expect(chaveDoExame("Total")).toBe("total");
+    // as palavras estão na tabela, mas em entradas diferentes
+    expect(chaveDoExame("Testosterona livre")).toBe("testosterona livre");
+  });
+
+  it("a exata vence a que só cobre as palavras", () => {
+    // 'hemoglobina' é palavra da entrada da hemoglobina e da glicada (que a
+    // tem entre as keys): pela cobertura seriam duas e não casaria com nenhuma;
+    // a exata decide.
+    expect(chaveDoExame("Hemoglobina")).toBe("hemoglobina");
+    expect(chaveDoExame("Colesterol")).toBe("colesterol total");
   });
 
   it("hemoglobina e hemoglobina glicada seguem separadas", () => {
@@ -87,6 +120,18 @@ describe("faixaDaTabela", () => {
   it("devolve o texto da faixa e a unidade da entrada", () => {
     expect(faixaDaTabela("Glicose", 92, {})).toEqual({ faixa: "70–99 mg/dL (jejum)", unidade: "mg/dL" });
     expect(faixaDaTabela("Glicemia de jejum", 92, {})?.unidade).toBe("mg/dL");
+  });
+
+  it("a faixa também vale para as palavras todas de uma entrada só", () => {
+    expect(faixaDaTabela("Hemoglobina glicada (HbA1c)", 5.6, {})).toEqual({ faixa: "< 5,7%", unidade: "%" });
+    expect(faixaDaTabela("Glicose (jejum)", 92, {})?.faixa).toBe("70–99 mg/dL (jejum)");
+  });
+
+  it("nome com uma palavra que a entrada não tem não leva a faixa dela", () => {
+    expect(faixaDaTabela("Colesterol (VLDL)", 24, {})).toBeNull();
+    expect(faixaDaTabela("Glicose pós-prandial", 140, {})).toBeNull();
+    expect(faixaDaTabela("Colesterol não-HDL", 130, {})).toBeNull();
+    expect(faixaDaTabela("Vitamina", 30, {})).toBeNull(); // cabe na D e na B12
   });
 
   it("nome que só contém o de uma entrada não tem faixa", () => {

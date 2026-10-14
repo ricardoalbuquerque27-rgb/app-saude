@@ -88,19 +88,40 @@ function diaMes(data: string): string {
 }
 
 /**
+ * Uma parte da unidade (o que fica de cada lado da barra), na forma comparável:
+ *  - UI, IU e U são a mesma unidade internacional, com ou sem prefixo ("mUI",
+ *    "µUI", "uUI", "mIU"); o prefixo micro (u, µ, mc) vira µ e o mili fica m;
+ *  - em qualquer outra unidade, o prefixo micro inicial (u, µ, mc) vira µ:
+ *    "mcg", "ug" e "µg" são o micrograma, "umol" o micromol, "uL" o microlitro.
+ * Parte que não começa assim (mg, ng, mmol, dL, mL...) passa como está.
+ */
+function parteDaUnidade(parte: string): string {
+  const internacional = parte.match(/^(m|\u03bc|u|mc)?(?:ui|iu|u)$/);
+  if (internacional) {
+    const prefixo = internacional[1];
+    return (prefixo === undefined ? "" : prefixo === "m" ? "m" : "\u03bc") + "u";
+  }
+  return parte.replace(/^(?:\u03bc|u|mc)(?=[a-z])/, "\u03bc");
+}
+
+/**
  * A unidade para comparar: sem espaço e sem caixa ("mg/dL" e " MG / DL " são
  * a mesma). O NFKC junta o sinal de micro (U+00B5) e a letra grega mi
- * (U+03BC), que o laudo copiado de PDF traz um ou outro, e "mcg" e "ug" são
- * como se digita o micrograma sem o símbolo: "mcg/dL", "ug/dL", "µg/dL" e
- * "μg/dL" são a mesma unidade, e o ferro de 70 µg/dL para 80 mcg/dL não pode
- * virar "unidade diferente".
+ * (U+03BC), que o laudo copiado de PDF traz um ou outro; `parteDaUnidade`
+ * junta mcg, ug, µg e UI, IU, U. Por fim, µUI/mL e mUI/L são o mesmo número (1
+ * µUI/mL = 1 mUI/L, e a TSH aparece de um jeito ou do outro), então a
+ * primeira vira a segunda. Só essas equivalências: µg/mL e mg/L, por exemplo,
+ * não são tratadas como iguais.
  */
 function unidadeNormalizada(unidade: string | null): string {
-  return (unidade ?? "")
+  const u = (unidade ?? "")
     .normalize("NFKC")
     .replace(/\s+/g, "")
     .toLowerCase()
-    .replace(/mcg|ug/g, "\u03bcg");
+    .split("/")
+    .map(parteDaUnidade)
+    .join("/");
+  return u === "\u03bcu/ml" ? "mu/l" : u;
 }
 
 /**

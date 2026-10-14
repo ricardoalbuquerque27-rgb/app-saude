@@ -233,6 +233,74 @@ describe("compararExames: unidades", () => {
     }
   );
 
+  it.each(["mUI/L", "MUI/L", "uUI/mL", "\u00b5UI/mL", "\u03bcUI/mL", "mcUI/mL", "mIU/L", "mU/L"])(
+    "TSH 2,1 em %s usa a faixa da tabela (µUI/mL)",
+    (unit) => {
+      // µUI/mL e mUI/L são o mesmo número (1 µUI/mL = 1 mUI/L)
+      const [l] = compararExames([ex("2026-10-02", "TSH", "2,1", { unit })], {});
+      expect(l.faixa).toEqual({ min: 0.4, max: 4 });
+      expect(l.faixaTexto).toBe("0,4–4,0 µUI/mL");
+    }
+  );
+
+  it("TSH em mUI/L depois de µUI/mL compara normalmente", () => {
+    const [l] = compararExames(
+      [
+        ex("2026-07-10", "TSH", "5,2", { unit: "\u00b5UI/mL" }),
+        ex("2026-10-02", "TSH", "2,1", { unit: "mUI/L" }),
+      ],
+      {}
+    );
+    expect(l.mudanca).toBe("entrou na faixa");
+    expect(l.diferenca).toBe(-3.1);
+  });
+
+  it("U/L e UI/L são a mesma unidade (TGO comparado ao anterior)", () => {
+    const [l] = compararExames(
+      [
+        ex("2026-07-10", "TGO", "30", { unit: "U/L" }),
+        ex("2026-10-02", "TGO", "35", { unit: "UI/L" }),
+      ],
+      { sex: "M" }
+    );
+    expect(l.mudanca).toBe("segue na faixa");
+    expect(l.diferenca).toBe(5);
+    expect(l.faixa).toEqual({ max: 40 });
+  });
+
+  it("UI, IU e U se equivalem; as outras escalas não", () => {
+    const mudanca = (a: string, b: string) =>
+      compararExames(
+        [
+          ex("2026-07-10", "Marcador Zeta", "10", { unit: a, reference_range: "5 a 20" }),
+          ex("2026-10-02", "Marcador Zeta", "12", { unit: b, reference_range: "5 a 20" }),
+        ],
+        {}
+      )[0].mudanca;
+    expect(mudanca("UI/L", "IU/L")).toBe("segue na faixa");
+    expect(mudanca("U/L", "IU/L")).toBe("segue na faixa");
+    // sem equivalência criada além das pedidas:
+    expect(mudanca("U/L", "mU/L")).toBe("unidade diferente do anterior"); // mili não é inteiro
+    expect(mudanca("\u00b5UI/mL", "mUI/mL")).toBe("unidade diferente do anterior"); // micro não é mili
+    expect(mudanca("\u00b5g/mL", "mg/L")).toBe("unidade diferente do anterior"); // só vale para UI
+    expect(mudanca("mg/dL", "g/dL")).toBe("unidade diferente do anterior");
+  });
+
+  it("o prefixo micro vale em qualquer unidade: umol/L, µmol/L e mcmol/L são a mesma", () => {
+    const mudanca = (a: string, b: string) =>
+      compararExames(
+        [
+          ex("2026-07-10", "Marcador Zeta", "10", { unit: a, reference_range: "5 a 20" }),
+          ex("2026-10-02", "Marcador Zeta", "12", { unit: b, reference_range: "5 a 20" }),
+        ],
+        {}
+      )[0].mudanca;
+    expect(mudanca("umol/L", "\u00b5mol/L")).toBe("segue na faixa");
+    expect(mudanca("mcmol/L", "\u03bcmol/L")).toBe("segue na faixa");
+    expect(mudanca("cel/uL", "cel/\u00b5L")).toBe("segue na faixa");
+    expect(mudanca("mmol/L", "umol/L")).toBe("unidade diferente do anterior");
+  });
+
   it("mcg não é mg: 70 mg/dL e 80 mcg/dL são unidades diferentes", () => {
     const [l] = compararExames(
       [
@@ -365,7 +433,7 @@ describe("compararExames: mesmo exame, grafias e datas", () => {
   });
 });
 
-describe("compararExames: nome que só contém o de outro exame", () => {
+describe("compararExames: o nome do exame e a tabela", () => {
   it("VLDL-colesterol e colesterol total no mesmo dia ficam em linhas separadas", () => {
     // Juntos, o VLDL (24) era o "último" do dia e apagava o 190 do colesterol
     // total: uma linha só, "VLDL-colesterol, 24, entrou na faixa".
@@ -434,6 +502,66 @@ describe("compararExames: nome que só contém o de outro exame", () => {
     );
     expect(linhas).toHaveLength(1);
     expect(linhas[0].serie).toHaveLength(3);
+  });
+
+  it("sufixo redundante junta: Hemoglobina glicada (HbA1c) com Hemoglobina glicada, com a faixa da tabela", () => {
+    const linhas = compararExames(
+      [
+        ex("2026-07-10", "Hemoglobina glicada", "5,9"),
+        ex("2026-10-02", "Hemoglobina glicada (HbA1c)", "5,6"),
+      ],
+      {}
+    );
+    expect(linhas).toHaveLength(1);
+    expect(linhas[0].chave).toBe("hemoglobina glicada");
+    expect(linhas[0].nome).toBe("Hemoglobina glicada (HbA1c)");
+    expect(linhas[0].faixaTexto).toBe("< 5,7%");
+    expect(linhas[0].mudanca).toBe("entrou na faixa");
+  });
+
+  it("Glicose (jejum) junta com Glicose; LDL colesterol com Colesterol LDL", () => {
+    const g = compararExames(
+      [ex("2026-07-10", "Glicose", "98"), ex("2026-10-02", "Glicose (jejum)", "92")],
+      {}
+    );
+    expect(g).toHaveLength(1);
+    expect(g[0].diferenca).toBe(-6);
+    const ldl = compararExames(
+      [ex("2026-07-10", "Colesterol LDL", "145"), ex("2026-10-02", "LDL colesterol", "132")],
+      {}
+    );
+    expect(ldl).toHaveLength(1);
+    expect(ldl[0].chave).toBe("ldl");
+  });
+
+  it("Colesterol (VLDL) e Glicose pós-prandial ficam separados, sem a faixa errada", () => {
+    const linhas = compararExames(
+      [
+        ex("2026-07-10", "Colesterol total", "200"),
+        ex("2026-10-02", "Colesterol total", "190"),
+        ex("2026-10-02", "Colesterol (VLDL)", "24"),
+        ex("2026-07-10", "Glicose", "98"),
+        ex("2026-10-02", "Glicose", "92"),
+        ex("2026-10-02", "Glicose pós-prandial", "140"),
+      ],
+      {}
+    );
+    expect(linhas.map((l) => l.chave).sort()).toEqual([
+      "colesterol total",
+      "colesterol vldl",
+      "glicose",
+      "glicose pos prandial",
+    ]);
+    expect(linhas.find((l) => l.chave === "colesterol total")!.ultimo.valor).toBe(190);
+    expect(linhas.find((l) => l.chave === "glicose")!.ultimo.valor).toBe(92);
+    expect(linhas.find((l) => l.chave === "colesterol vldl")!.faixa).toBeNull();
+    expect(linhas.find((l) => l.chave === "glicose pos prandial")!.faixa).toBeNull();
+  });
+
+  it("palavra que cabe em duas entradas ('Vitamina'): sem faixa da tabela", () => {
+    const [l] = compararExames([ex("2026-10-02", "Vitamina", "30")], {});
+    expect(l.chave).toBe("vitamina");
+    expect(l.faixa).toBeNull();
   });
 
   it("Hemoglobina e Hemoglobina glicada seguem separadas", () => {
