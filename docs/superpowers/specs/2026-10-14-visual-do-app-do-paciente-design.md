@@ -40,6 +40,10 @@ dois lados ("pode trocar nos dois lados").
 | "Acima da meta" em cor de aviso **só nas calorias**. Água e proteína acima da meta fecham o anel sem aviso. | Esta spec, refinando o mockup ("passou da meta: aviso") | — Beber mais água do que a meta não é problema, e pintar isso de laranja ensinaria o contrário. |
 | "Recado de Ricardo" na Início e "de Ricardo, seu nutricionista" na Dieta, com **de**, não do/da. | Esta spec, corrigindo o mockup ("Recado do Ricardo") | — O app não sabe o gênero de quem prescreve e não o adivinha pelo nome. |
 | A landing só recebe a letra. Seus degradês e animações ficam até ela ser reescrita para nutricionistas (Em aberto no CLAUDE.md). | Esta spec | Por um tempo, a landing e o app falam visuais diferentes. |
+| Número que é dado usa algarismos tabulares. | Dono do produto, pela referência do WHOOP | — |
+| O Score se explica: tocar em "score 72 · bom" abre os quatro pilares, e o pilar sem registro diz que entrou com um valor padrão. | Dono do produto, pela referência do WHOOP | Expõe que o Score é uma conta simples. Esse é o objetivo: um número que esconde a conta não é confiável. |
+| Sugestão para fechar a meta de **proteína**, tirada só do cardápio prescrito. Sem sugestão de calorias, e sem plano não há sugestão. | Dono do produto, pela referência do WHOOP; o recorte é desta spec | Paciente sem cardápio não recebe ajuda nenhuma. Sugerir "coma mais 600 kcal" a quem está emagrecendo contraria o tratamento, e o app sugerir comida por conta própria seria prescrever. |
+| Do WHOOP **não** vêm o tema escuro, o semáforo verde, amarelo e vermelho, nem os mostradores no topo. | Esta spec | Ver "Referência: WHOOP". |
 
 ## A linguagem
 
@@ -57,6 +61,14 @@ dois lados ("pode trocar nos dois lados").
   verificações de `tirar-prints-nutri.cjs` continuam passando.
 - **Tamanhos:** título da tela 24, título de seção 17 (semibold), texto e
   lista 15, apoio, datas e unidades 13.
+- **Algarismos tabulares no dado.** Na Instrument Sans o algarismo é
+  proporcional (o "1" ocupa 391 unidades e o "0", 666), então um número que
+  muda (de 99 para 100 kcal) "dança" e uma coluna de valores não alinha. A
+  fonte tem `tnum`, conferido no arquivo. A classe `.tabular` (que já existe)
+  vai em todo número que é dado: o centro dos anéis, o peso e a variação, o
+  Score e os pilares, kcal e gramas nas listas e na legenda dos macros, e os
+  valores de medidas e exames. Número dentro de frase ("1 refeição ainda
+  falta") fica proporcional, porque lá o "1" tabular abre um buraco.
 - **Sem caixa alta.** Rótulo é frase normal. A classe `.eyebrow` é refeita
   sem `uppercase` nem `tracking`, e os `uppercase tracking-*` soltos nas telas
   do app saem. A landing fica como está, inclusive o menu dela
@@ -243,8 +255,30 @@ página sai.
    dentro do "Hoje".
 5. **Seu dia.** O título vem com "score 72 · bom" à direita, em
    `app-texto-2`, com o número sem cor por faixa. Abaixo, três anéis:
-   Calorias (com `avisoAcima`), Água e Proteína. O "Definir metas", a dica
-   do Score (`topTip`) e o texto de sem-dados continuam como hoje.
+   Calorias (com `avisoAcima`), Água e Proteína. O "Definir metas" e o texto
+   de sem-dados continuam como hoje.
+   - **O Score se explica.** "score 72 · bom" é o `summary` de um `<details>`
+     (nativo, sem JavaScript, como o cardápio era) com uma seta. Ao abrir,
+     aparecem os quatro pilares de `computeHealthScore`: Sono, Movimento,
+     Nutrição, e Hidratação e bem-estar. Cada um vem numa linha com o nome,
+     uma barra fina (`primaria` sobre `linha`, de 0 a 100), o valor e a dica
+     do pilar.
+   - Embaixo, uma frase: "O score é a média dos quatro, de 0 a 100, com o
+     que você registrou hoje e nesta semana."
+   - **O pilar sem registro diz que é padrão.** Hoje o sono sem registro
+     conta 60, a alimentação sem refeição conta 40 e o humor sem registro
+     conta 60 (dentro de "Hidratação e bem-estar"). Na explicação, a linha
+     desse pilar diz "sem registro hoje · conta 60", em vez de parecer
+     medida. Para isso, `ScorePillar` ganha `semRegistro: boolean`.
+     `lib/healthScore.ts` não tem teste hoje e passa a ter: os valores
+     atuais, travados antes da mudança, e a marca nova.
+   - A dica principal (`topTip`) fica, numa linha abaixo dos anéis, menos
+     quando a sugestão de proteína (abaixo) aparece e o pilar mais fraco é a
+     Nutrição: as duas diriam "faltam N g". Os emojis das dicas ("🌱", "💪")
+     saem, como o 👋 da saudação.
+   - **Sugestão para fechar a proteína:** uma linha abaixo dos anéis, quando
+     houver (ver "Sugestão para fechar a meta"). Na Início ela leva a
+     `/app/dieta#plano`.
 6. **Progresso.** O peso atual em destaque ("65,8 kg"), a variação ("−2,8 kg
    em 30 dias", por `textoVariacaoPeso`), uma linha fina de 30 dias em
    `app-primaria`, sem eixos nem grade, com a primeira e a última data nas
@@ -283,8 +317,11 @@ página sai.
    - O chip "Hoje" fica para voltar.
    - Sai o subtítulo "Acompanhe suas refeições e macros."
 2. **Resumo do dia:** dois anéis, Calorias (com `avisoAcima`) e Proteína, e
-   a barra de macros com legenda. O "Definir metas" fica.
-3. **Plano alimentar** (`MealPlanView`, quando há cardápio): um cartão só,
+   a barra de macros com legenda. O "Definir metas" fica. Com a data em
+   hoje, a sugestão de proteína aparece abaixo da barra, sem link, porque o
+   plano está logo abaixo. Em outro dia, não aparece.
+3. **Plano alimentar** (`MealPlanView`, quando há cardápio, com
+   `id="plano"` para o link da Início): um cartão só,
    com o título do plano e "de {primeiro nome}, seu nutricionista · ver em
    Meu plano". Depois vem a observação do plano, se houver. Por fim, as
    refeições: o nome de cada uma como subtítulo ("Café da manhã · feito"
@@ -298,6 +335,72 @@ página sai.
    `EmptyState` com ícone grande.
 
 O modal de refeição e a análise por foto mudam só pela linguagem.
+
+## Sugestão para fechar a meta
+
+Uma linha que diz quanto falta de proteína e qual refeição **do plano do
+nutricionista** cobre parte disso. Por exemplo: "Faltam 40 g de proteína
+para a meta de hoje. Próxima refeição do seu plano: lanche da tarde, 25 g
+(1 scoop de whey + 1 maçã)."
+
+A frase evita artigo antes do nome da refeição ("o lanche", "a ceia") para
+não depender do gênero de cada uma. A descrição da opção corta em duas
+linhas.
+
+**A conta** é uma função pura e testada em `lib/cardapio.ts`, módulo que
+já guarda a ordem das refeições (`MEAL_TYPES`) e pode ser lido no servidor:
+
+```ts
+sugestaoDeProteina(e: {
+  meta: number | null;          // profiles.protein_goal_g
+  consumido: number;            // soma de protein_g das refeições de hoje
+  itens: ItemDoPlano[];         // meal_plan_items do cardápio ativo
+  tiposRegistrados: string[];   // meal_type das refeições de hoje
+}): { faltam: number; refeicao: string; descricao: string; proteina: number } | null
+```
+
+- Sem meta, sem plano, ou com o vínculo com o nutricionista revogado: `null`.
+  O app não sugere comida por conta própria; quem prescreve é o nutricionista.
+- `faltam = round(meta − consumido)`. Abaixo de 10 g dá `null`, porque
+  lembrar de 4 g é chatice.
+- A refeição é a primeira, na ordem de `MEAL_TYPES`, que tem item no plano e
+  ainda não foi registrada hoje. Um `meal_type` fora da lista vem depois das
+  conhecidas, pela `position`. Entre as opções dessa refeição vale a de mais
+  proteína (no empate, a de menor `position`). Se nenhuma opção dela tem
+  proteína informada, passa para a próxima refeição; sem nenhuma, `null`.
+- "Hoje" é `todayISO()` (São Paulo). Na Dieta, só com a data em hoje.
+- **Calorias ficam de fora**, e isso é decisão: "faltam 600 kcal" empurra
+  quem está emagrecendo a comer sem fome, e o excesso já aparece no anel
+  ("acima da meta").
+
+## Referência: WHOOP
+
+O dono do produto pediu o WHOOP como referência (14/10). Vieram três ideias
+e ficaram três de fora.
+
+**Ideias aproveitadas:**
+- **A regra de cor.** O manual de marca deles reserva cada cor para um só
+  significado. É a mesma regra desta spec.
+- **Números em fonte de números.** Eles usam a DIN; aqui vale a
+  `tabular-nums` da própria Instrument Sans.
+- **Tocar no número explica o número.** Aqui é o Score explicável.
+
+**Ideias deixadas de fora:**
+- **O tema escuro com neon.** O público do WHOOP é atleta com sensor. O
+  nosso é paciente em acompanhamento, muitas vezes emagrecendo, e um
+  "vermelho" num dia ruim é culpa, não informação.
+- **Os mostradores no topo.** No WHOOP o sensor preenche tudo sozinho. Aqui
+  o dado é digitado, então de manhã o mostrador está vazio.
+- **O Score como protagonista.** A "Recuperação" deles vem da
+  variabilidade cardíaca; o nosso Score é uma conta simples sobre o que foi
+  registrado.
+
+**Ideias anotadas para depois, fora desta spec:**
+- **Esconder o peso**, com o nutricionista decidindo por paciente.
+- **Tendência dos exames para o paciente**, em palavras, com as faixas do
+  laboratório e sem faixa "ótima" inventada.
+- **Correlação de hábitos com resultado.** Se um dia entrar, é do lado do
+  nutricionista, e só com dado suficiente.
 
 ## As outras telas
 
@@ -342,6 +445,17 @@ alta tirada, os degradês tirados e o texto de apoio direto no chão em
     `naJanela`, data futura fora e um dia só sem variação. Os testes atuais
     de `weightDelta30` também passam.
   - `ProgressRing`: `avisoAcima` só com `pct > 1`.
+  - `computeHealthScore`: os valores de hoje, travados primeiro, mais o
+    `semRegistro` de cada pilar.
+  - `sugestaoDeProteina`, cobrindo:
+    - os casos que dão `null`: sem meta, sem plano, sem vínculo e faltando
+      menos de 10 g;
+    - a ordem de `MEAL_TYPES` e a refeição já registrada pulada;
+    - o empate de proteína resolvido pela `position`;
+    - a refeição sem proteína informada pulada;
+    - todas registradas;
+    - um `meal_type` desconhecido indo por último;
+    - o arredondamento.
 - **`ferramentas/conferir-inicio.cjs`**, com o Supabase falso:
   - continuam a data, a frase da confirmação uma vez, a dose citada no
     máximo duas vezes e o botão da Gaia que some ao descer e volta ao subir;
@@ -352,7 +466,13 @@ alta tirada, os degradês tirados e o texto de apoio direto no chão em
     `main` da Início e da Dieta; nenhum `background-image` em `.card` e
     `.btn-primary`; `font-family` com "Instrument Sans" no corpo e nos
     títulos, no paciente e no `NutriHome`; nenhuma rolagem horizontal em
-    390 px; e o aviso de leitura falha no "Para hoje" e no Progresso.
+    390 px; e o aviso de leitura falha no "Para hoje" e no Progresso;
+  - também entram: o Score abre e mostra os quatro pilares, com o pilar sem
+    registro marcado; a sugestão de proteína aparece no cenário do mock e
+    leva a `/app/dieta#plano`; e o centro dos anéis tem
+    `font-variant-numeric: tabular-nums`, com "000" e "111" medindo a mesma
+    largura nesse estilo, o que prova que a fonte servida pelo `next/font`
+    manteve o `tnum`.
 - **`ferramentas/conferir-consulta-paciente.cjs`:** as ações (pedir,
   remarcar, cancelar) passam a ser dirigidas em "Meu plano". Na Início,
   confere a linha em cada situação: agendada, remarcação pedida, pedido,
@@ -389,7 +509,8 @@ a ordem é:
 1. paleta e testes;
 2. letra e classes globais, com as fotos de antes e depois;
 3. a casca;
-4. as funções puras da Início;
+4. as funções puras da Início: `saudacao`, `montarParaHoje`, `pesoDe30Dias`,
+   `sugestaoDeProteina` e o `semRegistro` do Score;
 5. a Início;
 6. a Dieta;
 7. as outras telas;
