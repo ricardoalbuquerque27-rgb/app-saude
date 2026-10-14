@@ -246,6 +246,92 @@ export function temGraficoDePeso(
 }
 
 // ---------------------------------------------------------------------------
+// Meta de peso
+// ---------------------------------------------------------------------------
+
+/**
+ * O peso de onde o paciente partiu: o do primeiro dia com peso a partir de
+ * `desde`, pela regra de `pesoDoDia` (no dia com as duas medidas, a da
+ * consulta). As duas pontas do anel (inicial e atual) usam a mesma regra, para
+ * "4,3 de 8,6 kg" bater com o Peso atual ao lado.
+ *
+ * Não há teto de data aqui: a leitura do corpo já traz só até hoje.
+ */
+export function pesoInicialDoPeriodo(
+  linhas: LinhaDoCorpo[],
+  desde: string
+): { valor: number; data: string } | null {
+  const comPeso = linhas.flatMap((l) => {
+    const peso = numero(l.weight_kg);
+    return peso == null || l.date < desde
+      ? []
+      : [{ date: l.date, weight_kg: peso, measured_by: l.measured_by, created_at: l.created_at }];
+  });
+  if (!comPeso.length) return null;
+  const data = comPeso.reduce((menor, l) => (l.date < menor ? l.date : menor), comPeso[0].date);
+  const valor = pesoDoDia(comPeso.filter((l) => l.date === data));
+  return valor == null ? null : { valor, data };
+}
+
+/**
+ * Onde o paciente está no caminho do peso inicial até a meta. A direção sai
+ * da própria meta (abaixo do inicial é perder, acima é ganhar) e a conta é a
+ * mesma nos dois sentidos.
+ *
+ * - `progresso`: `feito` de `total` kg e a `fracao` (0 a 1) para o arco.
+ * - `atingida`: chegou à meta ou passou (no sentido certo), ou está a menos de
+ *   0,05 kg dela. `passou` só vem quando passou mais de 0,5 kg; abaixo disso
+ *   está dentro da oscilação da balança e "passou 0,3 kg" seria ruído. Quem
+ *   está a 200 g da meta ainda é `progresso` (98%): "meta atingida" é para
+ *   quem chegou.
+ * - `lado-errado`: foi para o lado oposto da meta; `diferenca` é o atual menos
+ *   o inicial (+1,2 querendo perder, -1 querendo ganhar), com o anel vazio.
+ * - nulo: sem meta, sem peso inicial ou atual, ou meta igual ao inicial (a 1
+ *   casa, a que o app mostra): não há caminho a percorrer, e dividir por ele
+ *   daria 0/0.
+ */
+export type ProgressoDaMeta =
+  | { tipo: "progresso"; fracao: number; feito: number; total: number }
+  | { tipo: "atingida"; passou: number | null }
+  | { tipo: "lado-errado"; diferenca: number }
+  | null;
+
+export function progressoDaMeta(
+  inicial: number | null,
+  atual: number | null,
+  meta: number | null
+): ProgressoDaMeta {
+  if (inicial == null || atual == null || meta == null) return null;
+
+  const total = Math.abs(inicial - meta);
+  if (umaCasa(total) === 0) return null;
+
+  const perder = meta < inicial;
+  const feito = perder ? inicial - atual : atual - inicial;
+  // Positivo: já passou da meta (no sentido certo); negativo: falta chegar.
+  const alemDaMeta = perder ? meta - atual : atual - meta;
+
+  if (alemDaMeta >= 0 || Math.abs(atual - meta) < 0.05) {
+    // Arredonda antes de comparar: 70,1 - 69,6 dá 0.5000000000000071 e
+    // viraria "passou da meta em 0,5 kg" por resto de ponto flutuante.
+    const passou = umaCasa(alemDaMeta);
+    return { tipo: "atingida", passou: passou > 0.5 ? passou : null };
+  }
+  if (feito < 0) return { tipo: "lado-errado", diferenca: umaCasa(atual - inicial) };
+
+  // A fração sai dos mesmos números que a tela mostra ("4,3 de 8,6"), e o
+  // 50% do texto bate com o arco.
+  const feitoMostrado = umaCasa(feito);
+  const totalMostrado = umaCasa(total);
+  return {
+    tipo: "progresso",
+    fracao: feitoMostrado / totalMostrado,
+    feito: feitoMostrado,
+    total: totalMostrado,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Escala
 // ---------------------------------------------------------------------------
 

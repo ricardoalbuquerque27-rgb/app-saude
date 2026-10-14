@@ -10,6 +10,8 @@ import {
   escalaDoPeso,
   descricaoDoPeso,
   descricaoDaMedida,
+  pesoInicialDoPeriodo,
+  progressoDaMeta,
   type LinhaDoCorpo,
   type SemanaDePeso,
   type PontoDeConsulta,
@@ -598,5 +600,127 @@ describe("descricaoDaMedida", () => {
 
   it("sem medida, diz isso", () => {
     expect(descricaoDaMedida("Cintura", "cm", [])).toBe("Cintura sem medidas.");
+  });
+});
+
+describe("pesoInicialDoPeriodo", () => {
+  it("é o peso do primeiro dia com peso; no dia com as duas, vale o da consulta", () => {
+    const linhas = [
+      casa("2026-05-20", 73.0),
+      casa("2026-05-12", 74.9, "10:00:00"),
+      consulta("2026-05-12", { weight_kg: 74.6 }, "13:00:00"),
+    ];
+    expect(pesoInicialDoPeriodo(linhas, "2026-05-12")).toEqual({ valor: 74.6, data: "2026-05-12" });
+  });
+
+  it("a consulta vence mesmo lançada antes da pesagem de casa do mesmo dia", () => {
+    const linhas = [casa("2026-05-12", 74.9, "20:00:00"), consulta("2026-05-12", { weight_kg: 74.6 }, "08:00:00")];
+    expect(pesoInicialDoPeriodo(linhas, "2026-05-12")!.valor).toBe(74.6);
+  });
+
+  it("sem consulta no dia, vale a pesagem de casa mais recente dele", () => {
+    const linhas = [casa("2026-05-12", 75.4, "10:00:00"), casa("2026-05-12", 74.9, "22:00:00")];
+    expect(pesoInicialDoPeriodo(linhas, "2026-05-12")).toEqual({ valor: 74.9, data: "2026-05-12" });
+  });
+
+  it("linhas anteriores a `desde` ficam fora", () => {
+    const linhas = [casa("2026-05-10", 80.0), consulta("2026-05-11", { weight_kg: 79.0 }), casa("2026-05-14", 74.9)];
+    expect(pesoInicialDoPeriodo(linhas, "2026-05-12")).toEqual({ valor: 74.9, data: "2026-05-14" });
+  });
+
+  it("o dia sem peso (só cintura) não é o primeiro dia com peso", () => {
+    const linhas = [
+      casa("2026-05-12", null, "12:00:00", { waist_cm: 92 }),
+      consulta("2026-05-13", { waist_cm: 91 }),
+      casa("2026-05-14", "73.5"),
+    ];
+    expect(pesoInicialDoPeriodo(linhas, "2026-05-12")).toEqual({ valor: 73.5, data: "2026-05-14" });
+  });
+
+  it("peso vazio não vira zero", () => {
+    expect(pesoInicialDoPeriodo([casa("2026-05-12", ""), casa("2026-05-13", 74)], "2026-05-12")).toEqual({
+      valor: 74,
+      data: "2026-05-13",
+    });
+  });
+
+  it("sem peso no período, nulo", () => {
+    expect(pesoInicialDoPeriodo([], "2026-05-12")).toBeNull();
+    expect(pesoInicialDoPeriodo([casa("2026-05-01", 80)], "2026-05-12")).toBeNull();
+  });
+});
+
+describe("progressoDaMeta", () => {
+  it("perder: quanto do caminho do peso inicial até a meta já foi feito", () => {
+    expect(progressoDaMeta(74.6, 70.3, 66)).toEqual({ tipo: "progresso", fracao: 0.5, feito: 4.3, total: 8.6 });
+  });
+
+  it("ganhar: a mesma conta no outro sentido", () => {
+    const r = progressoDaMeta(50, 52, 56);
+    expect(r).toMatchObject({ tipo: "progresso", feito: 2, total: 6 });
+    expect((r as { fracao: number }).fracao).toBeCloseTo(1 / 3, 2);
+  });
+
+  it("feito e total saem sem resto de ponto flutuante", () => {
+    // 74,6 - 66 dá 8.599999999999994 e 74,6 - 70,3 dá 4.299999999999997.
+    const r = progressoDaMeta(74.6, 70.3, 66) as { feito: number; total: number };
+    expect(r.feito).toBe(4.3);
+    expect(r.total).toBe(8.6);
+  });
+
+  it("sem mexer desde o peso inicial é progresso zero, não lado errado", () => {
+    expect(progressoDaMeta(74.6, 74.6, 66)).toEqual({ tipo: "progresso", fracao: 0, feito: 0, total: 8.6 });
+  });
+
+  it("lado errado, querendo perder: mais pesado que o inicial, com a diferença para cima", () => {
+    expect(progressoDaMeta(74.6, 75.8, 66)).toEqual({ tipo: "lado-errado", diferenca: 1.2 });
+  });
+
+  it("lado errado, querendo ganhar: mais leve que o inicial, com a diferença para baixo", () => {
+    expect(progressoDaMeta(50, 49, 56)).toEqual({ tipo: "lado-errado", diferenca: -1 });
+  });
+
+  it("meta atingida: no peso da meta, sem 'passou'", () => {
+    expect(progressoDaMeta(74.6, 66.0, 66)).toEqual({ tipo: "atingida", passou: null });
+  });
+
+  it("perto da meta mas ainda não nela (200 g) segue como progresso, não 'atingida'", () => {
+    const r = progressoDaMeta(74.6, 66.2, 66);
+    expect(r).toMatchObject({ tipo: "progresso", feito: 8.4, total: 8.6 });
+    expect((r as { fracao: number }).fracao).toBeCloseTo(0.977, 3);
+  });
+
+  it("a menos de 0,05 kg da meta já é atingida", () => {
+    expect(progressoDaMeta(74.6, 66.04, 66)).toEqual({ tipo: "atingida", passou: null });
+    expect(progressoDaMeta(50, 55.97, 56)).toEqual({ tipo: "atingida", passou: null });
+  });
+
+  it("passou da meta em mais de 0,5 kg: diz quanto", () => {
+    expect(progressoDaMeta(74.6, 65.2, 66)).toEqual({ tipo: "atingida", passou: 0.8 });
+    expect(progressoDaMeta(50, 57, 56)).toEqual({ tipo: "atingida", passou: 1 });
+  });
+
+  it("passou de 0,5 kg para menos (ou exatamente 0,5): só 'meta atingida'", () => {
+    expect(progressoDaMeta(74.6, 65.5, 66)).toEqual({ tipo: "atingida", passou: null });
+    expect(progressoDaMeta(74.6, 65.6, 66)).toEqual({ tipo: "atingida", passou: null });
+    expect(progressoDaMeta(50, 56.4, 56)).toEqual({ tipo: "atingida", passou: null });
+  });
+
+  it("0,5 kg passado com casa decimal não vira 'passou' por resto de ponto flutuante", () => {
+    // 70,1 - 69,6 dá 0.5000000000000071.
+    expect(progressoDaMeta(75, 69.6, 70.1)).toEqual({ tipo: "atingida", passou: null });
+    expect(progressoDaMeta(75, 69.5, 70.1)).toEqual({ tipo: "atingida", passou: 0.6 });
+  });
+
+  it("sem anel: meta, peso inicial ou peso atual ausentes", () => {
+    expect(progressoDaMeta(74.6, 70.3, null)).toBeNull();
+    expect(progressoDaMeta(null, 70.3, 66)).toBeNull();
+    expect(progressoDaMeta(74.6, null, 66)).toBeNull();
+  });
+
+  it("sem anel: meta igual ao peso inicial (não há caminho a percorrer)", () => {
+    expect(progressoDaMeta(66, 66, 66)).toBeNull();
+    expect(progressoDaMeta(66, 70, 66)).toBeNull();
+    expect(progressoDaMeta(66.02, 70, 66)).toBeNull();
   });
 });
