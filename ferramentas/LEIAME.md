@@ -92,20 +92,28 @@ e saem todos de `dias(n)`:
   consulta". Cintura e % de gordura de casa aparecem em quatro semanas do meio
   (os pontos vazados), nunca antes da primeira consulta nem depois da última: a
   variação (−7 cm, −3,6 pontos) é a das consultas.
-- **Clínico.** Três laudos, todos de **mais de 180 dias atrás**: a fila conta
-  como "N exames fora da referência" qualquer exame de status diferente de
-  "normal" dos últimos 180 dias, e triglicerídeos 168 ou LDL 132 são "atencao" de
-  verdade (é o que o app grava); mais novos, a Helena entraria na fila.
-  Triglicerídeos 141 → 168 mg/dL (saiu da faixa), LDL 145 → 132 (mais perto),
-  vitamina D 18 → 24 → 38 ng/mL (entrou, com minigráfico), "Glicose" 101 e
-  "Glicemia de jejum" 98 e 92 mg/dL (uma linha só, com minigráfico), colesterol
-  total 200 → 190 mg/dL (ref. "< 190") e VLDL-colesterol 24 mg/dL (ref. "< 30")
-  **no mesmo dia do 190**, que tem de continuar uma linha à parte, ferritina 45
-  ng/mL (um resultado, a data mais antiga das linhas de um resultado só, para
-  ficar por último) e vitamina B12 310 pg/mL → 235 pmol/L (unidade diferente
-  entre os dois resultados). Cada exame tem a faixa do laudo em `reference_range`.
-  A tabela do app daria "atencao" para o colesterol de 190, mas a comparação
-  trata a borda da faixa como dentro, e a linha diz "entrou na faixa".
+- **Clínico.** Três laudos e um resultado sem número, todos de **mais de 180
+  dias atrás**: a fila conta como "N exames fora da referência" qualquer exame
+  de status diferente de "normal" dos últimos 180 dias, e triglicerídeos 168 ou
+  LDL 132 são "atencao" de verdade (é o que o app grava); mais novos, a Helena
+  entraria na fila. São 18 resultados: triglicerídeos 141 → 168 mg/dL (saiu da
+  faixa), com um 165 lançado antes no mesmo dia do 168 (a linha avisa "mais de
+  um resultado em dd/mm"), LDL 145 → 132 (mais perto), vitamina D 18 → 24 → 38
+  ng/mL (entrou, com minigráfico), "Glicose" 101 e "Glicemia de jejum" 98 e 92
+  mg/dL (uma linha só, com minigráfico) e, 7 dias depois do 92, uma "Glicemia
+  de jejum" sem número, "Amostra hemolisada" (a linha diz "depois: Amostra
+  hemolisada em dd/mm"), colesterol total 200 → 190 mg/dL (ref. "< 190": o "<"
+  é estrito, o 190 ainda está fora, e a linha diz "mais perto da faixa") e
+  VLDL-colesterol 24 mg/dL **no mesmo dia do 190**, que tem de continuar uma
+  linha à parte, ferritina 45 ng/mL (um resultado, a data mais antiga das
+  linhas de um resultado só, para ficar por último) e vitamina B12 310 pg/mL →
+  235 pmol/L (unidade diferente entre os dois resultados). A faixa de cada
+  exame em `reference_range` é a do laudo, menos a do VLDL: "< 190 mg/dL", o
+  texto da tabela do colesterol total, que o app antigo gravava pelo casamento
+  frouxo de nome; o comparativo não a toma por laudo, e o VLDL fica sem faixa
+  nem selo. A B12 de 235 pmol/L está gravada "atencao", como o app antigo a
+  julgava (pela tabela em pg/mL); o selo do comparativo sai da faixa do laudo
+  (148 a 664) e diz "Normal".
 - **Dias da semana.** A 8ª semana fica sem pesagem em qualquer dia, mas as
   pontas dependem do dia em que o mock sobe: no domingo a 1ª semana é só o dia do
   vínculo (a consulta, sem pesagem de casa), e na segunda a semana em curso é só
@@ -118,7 +126,8 @@ e saem todos de `dias(n)`:
   esquecida ou escrita errada numa leitura nova do Corpo ou do Clínico passa
   nos dados da Helena e só aparece no banco de verdade. A ordem
   (`order=date.asc&order=created_at.asc`, ou as duas numa lista) o mock já
-  entende.
+  entende, e o `offset` também: as leituras dos exames e do Corpo pedem em
+  páginas (`.range()`), e sem ele a 2ª página repetiria a 1ª.
 
 E as consultas (`appointments`), uma situação por paciente sem mudar os
 alertas acima:
@@ -208,18 +217,25 @@ da Helena (o anel com 50% e "4,3 de 8,6 kg", a média semanal com a lacuna e o
 tocar, cintura e % de gordura, o contraste da linha e dos pontos nos dois temas e
 o celular sem transbordo), o "Ainda não dá para ver tendência" do Pedro e o erro
 da aba quando `body_measurements`, `patient_links` ou `appointments` falham
-(`/__falhar`). No Clínico, a da Helena (a linha de resumo e a tabela do
-comparativo na ordem, uma linha por exame: "Glicose" e "Glicemia de jejum" numa
-só, o Colesterol total e o VLDL-colesterol do mesmo dia em duas, a B12 em
-"unidade diferente do anterior" sem o número antigo; o minigráfico só nas duas
-linhas com 3 resultados, com o tamanho, as bordas da faixa e o contraste da
-linha e dos pontos nos dois temas; a nota da ordem; a caixa da tabela com foco e
-rolagem por teclado no celular, sem transbordo da página; e "Ver todos os
-resultados (16)", que abre a lista de sempre, do mais novo ao mais velho), a da
-Joana ("Sem comparação ainda", com a lista aberta e sem tabela nem minigráfico),
-a do Pedro ("Nenhum exame registrado.") e o erro da aba quando `exams` falha
-(`/__falhar`): a tela diz "Não foi possível carregar os dados clínicos" e não
-"Sem comparação ainda", "Nenhum exame registrado" nem tabela. Ele descobre os
+(`/__falhar`), as linhas das consultas em `campo` com 3:1 e o "definir nas
+metas" do Pedro, que não tem meta. No Clínico, a da Helena (a linha de resumo e
+a tabela do comparativo na ordem, uma linha por exame: "Glicose" e "Glicemia de
+jejum" numa só, o Colesterol total e o VLDL-colesterol do mesmo dia em duas, o
+Colesterol total "mais perto da faixa" com o "<" estrito, o selo de cada Último
+pela faixa da linha (a B12 "Normal", não o "atencao" gravado; o VLDL, com a
+referência da tabela gravada, sem faixa nem selo), a B12 em "unidade diferente
+do anterior" sem o número antigo, a data com o ano quando não é o de hoje, os
+avisos "mais de um resultado" e "depois: Amostra hemolisada" com o contraste; o
+minigráfico só nas duas linhas com 3 resultados, com o tamanho, as bordas da
+faixa e o contraste da linha e dos pontos nos dois temas; a nota da ordem; a
+caixa da tabela com foco e rolagem por teclado no celular, sem transbordo da
+página; e "Ver todos os resultados (18)", que abre a lista de sempre, do mais
+novo ao mais velho), a da Joana ("Sem comparação ainda", com a lista aberta e
+sem tabela nem minigráfico), a do Pedro ("Nenhum exame registrado.") e o erro
+quando `exams` falha (`/__falhar`): a tela diz "Não foi possível carregar os
+exames" só no bloco Exames, com o Tratamento na tela, e não "Sem comparação
+ainda", "Nenhum exame registrado" nem tabela. A Verificação 19 confere também
+que o Peso atual da Luiza, que é de casa, diz "em dd/mm/aaaa, em casa". Ele descobre os
 ids dos pacientes perguntando ao mock (`/__cenario`), e recusa rodar se o mock
 subiu com outro cenário.
 Sem `OUT`, os PNGs vão para `prints-nutri` no diretório temporário do
@@ -245,16 +261,20 @@ esquecida passa em todas as verificações de tela e só aparece no banco de
 verdade: coluna que não existe dá 400 no PostgREST, e a esquecida chega
 ausente. Filtro numa coluna que a tabela não tem também passa aqui e dá 400
 lá. Nenhuma ferramenta daqui confere que a lista existe na tabela. O que chega
-mais perto é o Supabase em memória de `lib/nutri.test.ts` (as leituras do
-resumo, da linha do tempo e da série de `lib/nutri.ts`): o `select` dele devolve
-só as colunas pedidas, então a coluna esquecida chega ausente, e só aparece se um
-teste depender do valor dela. Mais que isso ele não faz: não sabe quais colunas a
-tabela tem (a escrita errada volta `undefined`, sem o 400 do PostgREST, e um
-filtro numa coluna que não existe também passa); não aplica a RLS; nunca devolve
-`error`, então a leitura que falha não passa por ele; e só cobre as leituras que
-têm teste lá (`getEvolucaoDoCorpo`, a tabela do Corpo e a leitura dos exames do
-Clínico, não). O de `lib/registroDb.test.ts` é mais simples: o `select` ignora a
-lista de colunas, e ele só confere filtro, ordem e `limit`.
+mais perto são os Supabases em memória dos testes. O de `lib/nutri.test.ts` (as
+leituras do resumo, da linha do tempo e da série de `lib/nutri.ts`) e o de
+`lib/bancoEmMemoria.ts` (as leituras em páginas do Corpo e dos exames, em
+`lib/evolucaoDb.test.ts` e `lib/examesDb.test.ts`) devolvem só as colunas
+pedidas no `select`, então a coluna esquecida chega ausente, e só aparece se um
+teste depender do valor dela. Nenhum dos dois sabe quais colunas a tabela tem:
+a escrita errada volta `undefined`, sem o 400 do PostgREST, e no de
+`lib/nutri.test.ts` um filtro `is` ou `not` numa coluna que não existe também
+passa sem erro (lê a coluna como nula). Nenhum aplica a RLS. O de `lib/nutri.test.ts` nunca devolve `error`; o
+de `lib/bancoEmMemoria.ts` devolve quando o teste pede (é como os testes veem a
+página que falha), tem `range` e anota cada chamada com os filtros. Os dois só
+cobrem as leituras que têm teste; a tabela "Medidas registradas" do Corpo, por
+exemplo, não tem. O de `lib/registroDb.test.ts` é mais simples: o `select`
+ignora a lista de colunas, e ele só confere filtro, ordem e `limit`.
 
 Duas escritas pelo PostgREST também têm estado (o `/__reset` desfaz):
 

@@ -93,6 +93,15 @@ do resultado anterior de cada exame, e com 40 o anterior de um exame raro
 pode ficar de fora. Exatamente 200 também conta como falha, pelo mesmo
 motivo.
 
+> **Emenda da revisão final (2026-10-14), leitura cheia.** A regra "leitura
+> cheia = falha" vale para leitura com janela, que não cresce sem fim (o
+> período do Corpo, de até 12 meses). A leitura sem janela (os exames) só
+> cresce: com ela, oito laudos derrubavam a aba Clínico para sempre. Ela
+> pagina com `.range()` em páginas de 1.000 até uma página curta, com teto de
+> 5.000 linhas, e só o teto ou um erro é falha, mostrada só no bloco Exames
+> (Tratamento e Efeitos continuam). A leitura do Corpo usa a mesma paginação
+> e o mesmo teto (`lerEmPaginas`).
+
 ### Média semanal do peso
 
 - **Semana de segunda a domingo**, pela coluna `date` (já é dia de São
@@ -140,6 +149,17 @@ motivo.
 
 - **Situação** (Normal, Atenção, Alterado): a gravada no último resultado
   (`exams.status`), com o mesmo selo e as mesmas cores da lista de hoje.
+
+  > **Emenda da revisão final (2026-10-14), referência gravada.** A
+  > `reference_range` gravada nem sempre é do laudo: o casamento frouxo antigo
+  > gravava ali o texto da tabela do app (o VLDL-colesterol com o "< 190
+  > mg/dL" do colesterol total), e o `status` saía da mesma conta. Texto igual
+  > ao de uma faixa da tabela vale como a tabela (com a regra estrita de nome
+  > e a unidade), e texto em níveis ("Normal: < 5,7; Pré-diabetes: 5,7 a 6,4;
+  > ..."), ou com mais de uma faixa ou limite fora de parênteses, é ilegível:
+  > "sem faixa para comparar". Pelo mesmo motivo a Situação não é a gravada:
+  > sai da faixa da linha (tabela, os três níveis da entrada; laudo, normal
+  > dentro e alterado fora; sem faixa, sem selo).
 - **Ordem:** primeiro o que piorou (saiu da faixa, mais longe), depois o que
   segue fora (mais perto, igual), depois o resto (entrou, segue), depois os
   de um resultado só; dentro de cada grupo, o resultado mais recente
@@ -248,7 +268,8 @@ motivo.
 - Qualquer leitura da aba que falha mostra o erro da aba, não um gráfico
   vazio nem "Ainda não dá para ver tendência".
 - Leitura que volta cheia (1.000 linhas do corpo, 200 de exames) conta
-  como falha, com o mesmo erro.
+  como falha, com o mesmo erro (mudou: ver a emenda da revisão final, em
+  Dados).
 - Exame com valor sem número, unidade diferente do anterior ou sem faixa:
   dito na linha, nunca escondido nem comparado errado.
 

@@ -40,12 +40,17 @@ Isso não é óbvio lendo a árvore de arquivos.
   `lib/aiActions.ts` (só `atualizar_peso` e `remover_ultimo` de peso, que não
   podem pegar a medida da consulta),
   `lib/evolucao.ts` (a conta dos gráficos do Corpo: o período,
-  `inicioDoPeriodo`; a média semanal, `semanasDePeso`; os pontos da consulta e
-  as séries de medida, `variacaoDaMedida`; o anel da meta, `pesoInicialDoPeriodo`
-  e `progressoDaMeta`; a escala, o eixo e as frases de título e de `aria-label`),
+  `inicioDoPeriodo` e `limitadoEmUmAno`; a média semanal, `semanasDePeso`; os
+  pontos da consulta e as séries de medida, `variacaoDaMedida`; o anel da meta,
+  `pesoInicialDoPeriodo`, `progressoDaMeta` e as frases dele, `textoDoAnel`; a
+  escala, o eixo e as frases de título, `rotuloDoPeso`, e de `aria-label`),
   `lib/exames.ts` (o comparativo dos exames: `compararExames`,
-  `resumoDoComparativo`, `descricaoDaSerie`), a faixa e o nome de exame em
-  `lib/examRanges.ts` (`parseReferenceRange`, `chaveDoExame`, `faixaDaTabela`),
+  `resumoDoComparativo`, `descricaoDaSerie`, `avisosDaLinha`,
+  `fraseSemComparacao`, `dataDoComparativo`), a faixa, o nome e a unidade de
+  exame em `lib/examRanges.ts` (`parseReferenceRange`, `dentroDaFaixa`,
+  `chaveDoExame`, `faixaDaTabela`, `unidadeDoExame`, `ehTextoDaTabela`,
+  `classifyExam`), os números em pt-BR em `lib/numeros.ts`, a leitura em
+  páginas em `lib/paginacao.ts` (`lerEmPaginas`),
   `lib/temaClinico.ts` com `lib/contraste.ts` (paleta e razão de contraste)
   e, em `lib/nutri.ts`, a conta do resumo, da fila de triagem e da linha do
   tempo do nutri (`montarResumos`, `filaDeTriagem`, `montarLinhaDoTempo`),
@@ -56,7 +61,10 @@ Isso não é óbvio lendo a árvore de arquivos.
   medidas (`pesoDoDia`). As consultas ao banco não têm teste (nem
   `lib/perfil.ts`, que é só uma consulta), menos as que rodam contra um
   Supabase em memória: as leituras do resumo, da linha do tempo e da série
-  em `lib/nutri.test.ts` e o "antes" das medidas em `lib/registroDb.test.ts`.
+  em `lib/nutri.test.ts`, o "antes" das medidas em `lib/registroDb.test.ts`
+  e as leituras em páginas do Corpo e dos exames em `lib/evolucaoDb.test.ts`
+  e `lib/examesDb.test.ts` (o banco delas, `lib/bancoEmMemoria.ts`, tem
+  `range` e devolve `error` quando o teste pede).
 
 Toda segurança é por **RLS no Postgres**, nunca por service role no app.
 Ao mexer em política, teste com `BEGIN ... ROLLBACK` e
@@ -116,41 +124,61 @@ alerta de exame sumia calado. Na página, `resumirPacientes`,
 `getPatientSeries` e `getPatientActivity` devolvem `falhou` junto dos dados.
 `getPatientsSummary` manteve a assinatura antiga (Início e lista).
 
-**Gráficos.** Moram em `components/clinico/graficos/` e só desenham: o anel da
-meta e a Evolução (peso, cintura, % de gordura) na aba Corpo, o comparativo dos
-exames com o minigráfico na Clínico. A conta é de `lib/evolucao.ts` e
+**Gráficos.** Os desenhos moram em `components/clinico/graficos/` (as peças
+comuns em `base.tsx`) e só desenham: o anel da meta e a Evolução (peso,
+cintura, % de gordura) na aba Corpo, e o minigráfico dos exames. A tabela do
+comparativo é do `Clinico.tsx`. A conta é de `lib/evolucao.ts` e
 `lib/exames.ts`, testadas. Cor só por `var(--clin-*)`, nunca hex (é o que faz o
 escuro funcionar sem segunda lista), e par novo entra em `PARES_GRAFICO`
 (`lib/temaClinico.ts`), testado a 3:1 nos dois temas. A faixa do minigráfico é
 `primaria-fundo`, que contra a página dá 1,1 a 1,2:1; por isso o limite dela é
-uma linha de 1 px em `campo`. O `GraficoPeso` tem dica própria e não o `Tooltip`
-do recharts, que pega o ponto mais próximo e erra a semana nas pontas cortadas
-do período. A semana é de segunda a domingo, com um valor por dia antes da média
-(três pesagens no mesmo dia pesariam três vezes), e a medida da consulta fica
-fora da média, como ponto à parte. **Leitura que volta cheia conta como falha**
-e mostra `ErroSecao`: o Corpo lê o período inteiro (`getEvolucaoDoCorpo`, com
-piso e teto de data e `.limit(1000)`), o Clínico lê os exames com `.limit(200)`
-(e 200 linhas derrubam a aba toda, tratamento incluso). O PostgREST corta no
-limite sem erro, e um ano desenhado cortado como se fosse inteiro, ou um
-"anterior" que ficou fora da leitura, é o mesmo "Nunca registrou nada" de antes.
-"Ainda não dá para ver tendência" só vale com leitura que deu certo.
+uma linha de 1 px em `campo`, como a linha vertical de cada consulta no peso
+(em `linha` ela dava 1,24:1 e sumia). O `GraficoPeso` tem dica própria e não o
+`Tooltip` do recharts, que pega o ponto mais próximo e erra a semana nas
+pontas cortadas do período. A semana é de segunda a domingo, com um valor por
+dia antes da média (três pesagens no mesmo dia pesariam três vezes), e a
+medida da consulta fica fora da média, como ponto à parte.
+
+**Leitura em páginas, e só o teto é falha.** O PostgREST corta no limite sem
+erro, e um ano desenhado cortado como se fosse inteiro, ou um
+"anterior" que ficou fora da leitura, é o mesmo "Nunca registrou nada" de
+antes. Os exames e o período do Corpo (`getExamesDoPaciente`,
+`getEvolucaoDoCorpo`) leem em páginas de 1.000 com `.range()` até vir uma
+página curta (`lerEmPaginas`, `lib/paginacao.ts`), com teto de 5.000: só o
+teto, ou erro numa página, é falha. Era `.limit(200)` nos exames com "vir
+cheio é falha": numa leitura que só cresce, oito laudos derrubavam a aba
+Clínico para sempre, tratamento junto. A falha dos exames mostra o erro só no
+bloco Exames. "Ainda não dá para ver tendência" só vale com leitura que deu
+certo.
 
 **Comparativo dos exames.** Compara o último resultado de cada exame com o
 anterior, um resultado por dia (vale o último da leitura, que por isso vem em
-ordem de `date` e `created_at`). A faixa é a do laudo; a da tabela do app só
-vale se a unidade do resultado for vazia ou igual à dela. Para dois nomes serem
-o mesmo exame, `chaveDoExame` e `faixaDaTabela` (`lib/examRanges.ts`) exigem
-nome igual a uma key da tabela, ou todas as palavras do nome nas keys de UMA
-entrada **e** o nome contendo uma key inteira; palavra de amostra (soro, sérico,
-plasma, sangue…) não conta. O casamento frouxo do `findDef` juntou o
-VLDL-colesterol em "colesterol total" (o 24 do VLDL apagava o 190 do mesmo dia)
-e a Vitamina K em potássio: juntar à toa inventa uma conclusão clínica, separar
-à toa só dá duas linhas. Na unidade, o prefixo micro (u, μ, µ, mc) é um só, UI
-e U são a mesma, e µUI/mL equivale a mUI/L (o TSH chega nas três grafias);
-outra unidade diz "unidade diferente do anterior" em vez de comparar o número
-cru. `parseReferenceRange`
-trocava só a primeira vírgula decimal e lia "0,9 a 1,7" como 0,9 a 1; troca
-todas, e isso vale também para a página Exames do paciente.
+ordem de `date` e `created_at`; com valores diferentes no mesmo dia a linha
+avisa "mais de um resultado em dd/mm", e o resultado sem número que veio
+depois do último aparece como "depois: …"). A faixa é a do laudo; a da tabela
+do app só vale se a unidade do resultado for vazia ou da entrada. **O
+`status` e a `reference_range` gravados podem ter vindo da tabela**, pelo
+casamento frouxo antigo: o VLDL-colesterol tem "< 190 mg/dL" (do colesterol
+total) e a B12 em pmol/L tem "atencao" (julgada pela tabela em pg/mL). Por
+isso a referência que é, letra por letra, um texto de faixa da tabela
+(`ehTextoDaTabela`) vale como a tabela e não como laudo, e o selo do Último
+sai da faixa da linha (`situacao`: tabela, os três níveis da entrada; laudo,
+normal ou alterado), nunca do `status` gravado. `parseReferenceRange` lê "<"
+e ">" como estritos (o 190 com "< 190" está fora; "≤", "até", "≥" e o
+intervalo "a–b" são inclusivos) e devolve nulo para referência em níveis (mais
+de uma faixa fora de parênteses, ou palavra de sexo, idade, fase, risco ou
+nível): lida pela primeira faixa, a glicada que subiu "entrava na faixa".
+Para dois nomes serem o mesmo exame, `chaveDoExame`, `faixaDaTabela` e o
+`classifyExam` (`lib/examRanges.ts`) exigem nome igual a uma key da tabela, ou
+todas as palavras do nome nas keys de UMA entrada **e** o nome contendo uma
+key inteira; palavra de amostra (soro, sérico, plasma, sangue…) não conta. O
+casamento frouxo antigo (`findDef`, que saiu) juntou o VLDL-colesterol em
+"colesterol total" e a Vitamina K em potássio: juntar à toa inventa uma
+conclusão clínica, separar à toa só dá duas linhas. Na unidade, o prefixo
+micro (u, μ, µ, mc) é um só, UI, IU e U são a mesma, e µUI/mL equivale a mUI/L
+(o TSH chega de um jeito ou do outro); mEq/L ≡ mmol/L só no potássio e no
+sódio (no cálcio a conta é outra), declarado na entrada. Outra unidade diz
+"unidade diferente do anterior" em vez de comparar o número cru.
 
 **Avisos de meta e de plano.** A Alimentação mostra só os quatro campos de
 meta de `prescription_deviations` (`CAMPOS_META`); o aviso de mudança no
@@ -274,7 +302,7 @@ antiga faria a instrução velha passar por atual.
 
 ```bash
 npm run dev      # desenvolvimento
-npm test         # 570 testes unitários (vitest)
+npm test         # 722 testes unitários (vitest)
 ferramentas/testar-sql.sh   # migrações e testes SQL num Postgres local
 npm run build    # produção
 ```
@@ -373,15 +401,18 @@ remove ele. `MODULE_NOT_FOUND` nos scripts de `ferramentas/` é isso.
   anos inclusive); o texto de venda "atende ao CFN" não sai antes de conferir.
 - No gráfico da página Medidas do paciente, o ponto da medida da consulta não
   se distingue; a marca "Medida na consulta" fica só na linha da lista.
-- **A página Exames do paciente ainda classifica pelo casamento frouxo de nome
-  (`findDef`) e pela tabela do app antes do laudo, sem conferir a unidade.**
-  "Vitamina K" é julgada pela faixa do potássio, e a B12 em pmol/L pela tabela em
-  pg/mL. O `status` gravado vem do `classifyExam` e é o selo "Último" do
-  comparativo do nutri, que por isso pode discordar da faixa do laudo na mesma
-  linha (B12 235 pmol/L: "Atenção" ao lado de uma faixa que o põe dentro). O
-  comparativo já usa a regra nova (`chaveDoExame`, laudo primeiro, unidade
-  conferida); falta o `classifyExam`. Tarefa à parte sugerida.
+- **Exames gravados antes guardam o julgamento antigo.** O `classifyExam`
+  (página Exames do paciente, formulário e IA) já usa a regra estrita de nome,
+  a unidade da entrada e o "<" estrito, mas as linhas gravadas antes guardam o
+  `status` e a `reference_range` do casamento frouxo, e a página Exames do
+  paciente mostra o `status` gravado (a Vitamina K pode seguir "alterado" pela
+  faixa do potássio). O comparativo do nutri não lê nenhum dos dois como
+  verdade; o paciente, sim, até alguém regravar essas linhas. E o formulário e
+  a IA ainda gravam o texto da tabela em `reference_range` quando o laudo não
+  traz faixa: por isso `ehTextoDaTabela` continua necessário. A data `today`
+  que a IA grava quando não acha a do laudo (dois laudos no mesmo dia) também
+  segue em aberto.
 - **O `persist` de Hábitos (`app/app/habitos/page.tsx`) regrava a linha inteira
   do dia a partir do estado da tela e não confere o `error`.** O que mudou fora
   da tela (o assistente registrando água) pode voltar ao valor velho, e uma
-  gravação que falha parece salva. Tarefa à parte sugerida.
+  gravação que falha parece salva.
