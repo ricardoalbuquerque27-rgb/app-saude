@@ -10,6 +10,10 @@ import {
   escalaDoPeso,
   descricaoDoPeso,
   descricaoDaMedida,
+  variacaoDaMedida,
+  diasEntre,
+  marcasDeMes,
+  marcasDoEixo,
   pesoInicialDoPeriodo,
   progressoDaMeta,
   type LinhaDoCorpo,
@@ -600,6 +604,127 @@ describe("descricaoDaMedida", () => {
 
   it("sem medida, diz isso", () => {
     expect(descricaoDaMedida("Cintura", "cm", [])).toBe("Cintura sem medidas.");
+  });
+});
+
+describe("variacaoDaMedida", () => {
+  const ponto = (data: string, valor: number, daConsulta = true): PontoDeMedida => ({ data, valor, daConsulta });
+
+  it("o último menos o primeiro", () => {
+    expect(
+      variacaoDaMedida([ponto("2026-05-12", 92), ponto("2026-08-01", 90, false), ponto("2026-10-13", 85)])
+    ).toBe(-7);
+  });
+
+  it("sobe quando a medida sobe", () => {
+    expect(variacaoDaMedida([ponto("2026-05-12", 80), ponto("2026-10-13", 82.5)])).toBe(2.5);
+  });
+
+  it("uma casa decimal: 30,4 - 34,0 não sai -3,5999999999999943", () => {
+    // Subtraído no componente, o título mostraria o resto de ponto flutuante.
+    expect(30.4 - 34.0).not.toBe(-3.6);
+    expect(variacaoDaMedida([ponto("2026-05-12", 34.0), ponto("2026-10-13", 30.4)])).toBe(-3.6);
+  });
+
+  it("sem mudança é 0, e não -0", () => {
+    // toBe usa Object.is: -0 reprovaria. O "0" do título não pode sair "-0".
+    expect(variacaoDaMedida([ponto("2026-05-12", 90), ponto("2026-10-13", 90)])).toBe(0);
+    expect(variacaoDaMedida([ponto("2026-05-12", 90.04), ponto("2026-10-13", 90)])).toBe(0);
+  });
+
+  it("com menos de dois pontos não há variação", () => {
+    expect(variacaoDaMedida([])).toBeNull();
+    expect(variacaoDaMedida([ponto("2026-05-12", 92)])).toBeNull();
+  });
+
+  it("é a do último ponto contra o primeiro, e não a do menor contra o maior", () => {
+    const pontos = [ponto("2026-05-12", 92), ponto("2026-07-01", 96, false), ponto("2026-08-01", 84), ponto("2026-10-13", 88)];
+    expect(variacaoDaMedida(pontos)).toBe(-4);
+  });
+});
+
+describe("diasEntre", () => {
+  it("o mesmo dia é 0, e o seguinte é 1", () => {
+    expect(diasEntre("2026-10-14", "2026-10-14")).toBe(0);
+    expect(diasEntre("2026-10-14", "2026-10-15")).toBe(1);
+  });
+
+  it("atravessa mês, ano e 29 de fevereiro", () => {
+    expect(diasEntre("2026-05-12", "2026-10-14")).toBe(155);
+    expect(diasEntre("2026-12-30", "2027-01-02")).toBe(3);
+    expect(diasEntre("2028-02-28", "2028-03-01")).toBe(2);
+  });
+
+  it("não sofre com a virada do horário de verão: é conta de dia, não de hora", () => {
+    // 2018-11-03 e 2018-02-17 são as viradas do horário de verão do Brasil; em
+    // hora local, o dia de 23 ou 25 horas dava 0,96 ou 1,04 e o Math.round
+    // escondia o erro só se alguém lembrasse dele.
+    expect(diasEntre("2018-11-03", "2018-11-04")).toBe(1);
+    expect(diasEntre("2018-02-17", "2018-02-18")).toBe(1);
+    expect(diasEntre("2018-10-01", "2019-03-01")).toBe(151);
+  });
+
+  it("negativo quando o segundo dia vem antes", () => {
+    expect(diasEntre("2026-10-14", "2026-10-10")).toBe(-4);
+  });
+});
+
+describe("marcasDeMes", () => {
+  it("o dia 1 de cada mês dentro do período, em dias desde o começo", () => {
+    expect(marcasDeMes("2026-05-12", "2026-10-14")).toEqual([
+      { dia: 20, rotulo: "jun" },
+      { dia: 50, rotulo: "jul" },
+      { dia: 81, rotulo: "ago" },
+      { dia: 112, rotulo: "set" },
+      { dia: 142, rotulo: "out" },
+    ]);
+  });
+
+  it("o primeiro dia do período conta quando é dia 1, e o último também", () => {
+    expect(marcasDeMes("2026-10-01", "2026-12-01")).toEqual([
+      { dia: 0, rotulo: "out" },
+      { dia: 31, rotulo: "nov" },
+      { dia: 61, rotulo: "dez" },
+    ]);
+  });
+
+  it("período dentro de um mês, sem dia 1, não tem marca", () => {
+    expect(marcasDeMes("2026-10-02", "2026-10-14")).toEqual([]);
+  });
+
+  it("quando o período atravessa o ano, o janeiro leva o ano para não confundir", () => {
+    const marcas = marcasDeMes("2026-11-10", "2027-02-10");
+    expect(marcas.map((m) => m.rotulo)).toEqual(["dez", "jan/27", "fev"]);
+    expect(marcas.map((m) => m.dia)).toEqual([21, 52, 83]);
+  });
+
+  it("início depois do fim não tem marca", () => {
+    expect(marcasDeMes("2026-10-14", "2026-05-12")).toEqual([]);
+  });
+});
+
+describe("marcasDoEixo", () => {
+  it("inteiros de 2 em 2 para 5 marcas entre 65 e 75", () => {
+    expect(marcasDoEixo(65, 75, 5)).toEqual([66, 68, 70, 72, 74]);
+  });
+
+  it("no celular, 3 marcas: de 5 em 5", () => {
+    expect(marcasDoEixo(65, 75, 3)).toEqual([65, 70, 75]);
+  });
+
+  it("escala curta fica de 1 em 1", () => {
+    expect(marcasDoEixo(69, 73, 5)).toEqual([69, 70, 71, 72, 73]);
+  });
+
+  it("nunca passa do número pedido, e dá pelo menos duas", () => {
+    for (const [min, max] of [[60, 80], [69, 72], [100, 101], [40, 130]]) {
+      for (const alvo of [3, 5]) {
+        const m = marcasDoEixo(min, max, alvo);
+        expect(m.length, `${min}-${max}/${alvo}`).toBeLessThanOrEqual(alvo);
+        expect(m.length, `${min}-${max}/${alvo}`).toBeGreaterThanOrEqual(2);
+        expect(m.every((v) => v >= min && v <= max)).toBe(true);
+      }
+    }
   });
 });
 

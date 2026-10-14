@@ -110,6 +110,13 @@ export const PARES_GRAFICO: [NomeCor, NomeCor][] = [
   ["primaria", "linha"],
   ["atencao", "linha"],
   ["campo", "chao"],
+  // Aba Corpo, a Evolução (components/clinico/graficos/): a linha da média e o
+  // arco do anel sobre o fundo da página, o ponto da consulta (e o texto dos
+  // eixos, que pede mais: está em PARES_TEXTO) e a faixa do exame, que é o
+  // `primaria` sobre o `primaria-fundo` do selo "normal".
+  ["primaria", "chao"],
+  ["texto", "chao"],
+  ["primaria", "primaria-fundo"],
 ];
 
 function bloco(tema: Record<NomeCor, string>): string {

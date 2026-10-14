@@ -364,6 +364,88 @@ export function escalaDoPeso(
 }
 
 // ---------------------------------------------------------------------------
+// Variação da cintura e do % de gordura
+// ---------------------------------------------------------------------------
+
+/**
+ * Quanto a cintura (ou o % de gordura) mudou: o último ponto menos o primeiro
+ * do período, em 1 casa. `pontos` vem de `serieDeMedida`, em ordem de data.
+ * Nulo com menos de 2 pontos: não há com o que comparar.
+ *
+ * Em 1 casa aqui, e não no componente: 30,4 - 34,0 dá -3.5999999999999943, e
+ * o título "−3,6 pontos" saía com o resto de ponto flutuante.
+ */
+export function variacaoDaMedida(pontos: PontoDeMedida[]): number | null {
+  if (pontos.length < 2) return null;
+  return umaCasa(pontos[pontos.length - 1].valor - pontos[0].valor);
+}
+
+// ---------------------------------------------------------------------------
+// Eixos dos gráficos
+// ---------------------------------------------------------------------------
+
+/**
+ * Quantos dias de `de` até `ate` (YYYY-MM-DD), negativo se `ate` vem antes.
+ *
+ * Em UTC (`Date.UTC`) e não em hora local: dois dias em hora local diferem em
+ * 23 ou 25 horas na virada do horário de verão, e dividir por 24 h dava 0,96
+ * ou 1,04. É a posição de cada ponto no eixo X, que conta dias desde o início.
+ */
+export function diasEntre(de: string, ate: string): number {
+  const ms = (iso: string) => {
+    const [a, m, d] = iso.split("-").map(Number);
+    return Date.UTC(a, m - 1, d);
+  };
+  return Math.round((ms(ate) - ms(de)) / 86_400_000);
+}
+
+const MESES_ABREVIADOS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+
+/**
+ * As marcas do eixo X: o dia 1 de cada mês dentro de [desde, ate], na posição
+ * em dias desde `desde`. O janeiro leva o ano ("jan/27") quando o período
+ * atravessa um ano: sem ele, "dez jan fev" não diz de que janeiro se trata.
+ */
+export function marcasDeMes(desde: string, ate: string): { dia: number; rotulo: string }[] {
+  if (desde > ate) return [];
+  const viraOAno = desde.slice(0, 4) !== ate.slice(0, 4);
+  const marcas: { dia: number; rotulo: string }[] = [];
+  let [ano, mes] = desde.split("-").map(Number);
+  // Começa no mês de `desde`: o dia 1 dele só entra se `desde` for o dia 1.
+  for (;;) {
+    const primeiro = `${ano}-${String(mes).padStart(2, "0")}-01`;
+    if (primeiro > ate) break;
+    if (primeiro >= desde) {
+      const nome = MESES_ABREVIADOS[mes - 1];
+      marcas.push({
+        dia: diasEntre(desde, primeiro),
+        rotulo: viraOAno && mes === 1 ? `${nome}/${String(ano).slice(2)}` : nome,
+      });
+    }
+    mes += 1;
+    if (mes > 12) { mes = 1; ano += 1; }
+  }
+  return marcas;
+}
+
+/**
+ * As marcas do eixo Y do peso: inteiros, de 1, 2, 5, 10, 20 ou 50 em 50, o
+ * menor passo que dá `alvo` marcas ou menos dentro de [min, max]. No celular o
+ * alvo é 3: com mais, os números se atropelam. Sempre pelo menos duas.
+ */
+export function marcasDoEixo(min: number, max: number, alvo: number): number[] {
+  for (const passo of [1, 2, 5, 10, 20, 50]) {
+    const primeira = Math.ceil(min / passo);
+    const ultima = Math.floor(max / passo);
+    if (ultima - primeira + 1 > alvo) continue;
+    const marcas: number[] = [];
+    for (let i = primeira; i <= ultima; i++) marcas.push(i * passo);
+    if (marcas.length >= 2) return marcas;
+  }
+  return [min, max];
+}
+
+// ---------------------------------------------------------------------------
 // Frases do aria-label
 // ---------------------------------------------------------------------------
 

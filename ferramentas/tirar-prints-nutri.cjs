@@ -301,7 +301,9 @@ async function transbordo(page) {
   etapa = "todas as abas";
   for (const disp of [CELULAR, COMPUTADOR]) {
     const ctx = await contexto(browser, disp, false, estado);
-    for (const k of ["luiza", "pedro", "carlos", "joana"]) {
+    // A Helena é a paciente com mais dado (22 semanas de pesagem, seis
+    // consultas, três laudos): a que mais tem chance de transbordar em 390 px.
+    for (const k of ["luiza", "pedro", "carlos", "joana", "helena"]) {
       for (const a of ["alimentacao", "treino", "corpo", "clinico", "consultas"]) {
         const page = await abrir(ctx, aba(k, a));
         ok(!/Não foi possível carregar/.test(await textoDe(page.locator("body"))), `nenhuma seção com erro: ${k}/${a}/${disp.nome}`);
@@ -2121,6 +2123,211 @@ async function transbordo(page) {
       const m = await transbordo(celular);
       ok(m.doc <= m.larg, `Perfil com o CRN sem transbordo no celular (documento ${m.doc}px, janela ${m.larg}px)`, m.vaza.join(" | "));
       await celular.close();
+    }
+  }
+  await fetch(MOCK + "/__reset", { method: "POST" });
+
+  console.log("\nVerificação 20: aba Corpo, o anel da meta e a Evolução (Helena e Pedro)");
+  etapa = "Corpo: anel e Evolução";
+  {
+    // Do mock (ferramentas/LEIAME.md): a Helena tem o vínculo há 154 dias, a
+    // média semanal de 74,4 a 70,1 kg com a 8ª semana sem pesagem, seis
+    // consultas com peso, cintura e % de gordura (74,6 / 92 / 34,0 até 70,3 / 85
+    // / 30,4), a última ontem, no mesmo dia de uma pesagem de casa, e meta de
+    // 66 kg: o anel diz 4,3 de 8,6 kg, 50%. O Pedro chegou há 2 dias e nunca
+    // registrou nada.
+    //
+    // O que NÃO se confere: quantas semanas dizem "sem pesagem". A 8ª fica
+    // vazia em qualquer dia, mas as pontas dependem do dia da semana em que o
+    // mock sobe (no domingo a 1ª só tem a consulta; na segunda a semana em
+    // curso é só hoje; no sábado a 1ª tem uma pesagem; na terça a atual tem
+    // uma). Por isso: ao menos um "sem pesagem" e a linha em duas partes.
+    const ddmm = (n) => diaBR(n).slice(0, 5);
+    const corpo = (page) => page.locator("#corpo");
+    const figura = (page, titulo) =>
+      corpo(page).locator("figure").filter({ has: page.locator("figcaption", { hasText: titulo }) });
+    const limpo = async (loc) => (await textoDe(loc)).replace(/\s+/g, " ").trim();
+    // innerText não existe em elemento SVG (o eixo do gráfico é um <g>).
+    // Um texto por marca do eixo, separados por espaço (textContent cola os <text>: "junjulago").
+    const textoSvg = async (loc) =>
+      (await loc.evaluate((el) => [...el.querySelectorAll("text")].map((t) => t.textContent).join(" "))).replace(/\s+/g, " ").trim();
+    const MESES = /\b(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)\b/g;
+
+    const conferir = async (page, disp, tema) => {
+      const rot = `${disp.nome}/${tema}`;
+      const peso = figura(page, "média da semana");
+      const desenhou = await apareceu(peso.locator("svg.recharts-surface").first(), 30000);
+      ok(desenhou, `Helena: o gráfico do peso desenha (${rot})`);
+      if (!desenhou) return;
+      // No meio da janela: no celular a barra de baixo é fixa e cobre o toque em
+      // qualquer coisa que fique rente ao rodapé.
+      await peso.locator('svg[role="img"]').evaluate((el) => el.scrollIntoView({ block: "center", behavior: "instant" }));
+
+      // o topo e o anel: o mesmo peso atual nos dois
+      const topo = await limpo(corpo(page).locator("dl").first());
+      ok(topo.includes("70,3 kg") && topo.includes(`em ${diaBR(1)}, na consulta`),
+        `Peso atual: 70,3 kg "em ${diaBR(1)}, na consulta", no dia com as duas medidas (${rot})`, topo);
+      ok(topo.includes("66 kg") && topo.includes("50%") && topo.includes(`4,3 de 8,6 kg desde ${ddmm(154)}`),
+        `o anel diz 66 kg, 50% e "4,3 de 8,6 kg desde ${ddmm(154)}" (${rot})`, topo);
+      ok(!topo.includes("faltam"), `e o anel entra no lugar do "faltam N kg" (${rot})`, topo);
+      const anel = corpo(page).locator('[role="img"][aria-label^="Progresso até a meta"]');
+      ok((await anel.count()) === 1 && (await anel.getAttribute("aria-label")) === "Progresso até a meta: 4,3 de 8,6 kg, 50%",
+        `o anel tem role=img e "Progresso até a meta: 4,3 de 8,6 kg, 50%" (${rot})`, await anel.first().getAttribute("aria-label").catch(() => null));
+
+      // o título e a legenda
+      const cap = await limpo(peso.locator("figcaption"));
+      ok(cap.includes("média da semana") && cap.includes("70,1 kg") && cap.includes("−4,3 kg desde a 1ª semana"),
+        `o título do peso diz "média da semana", 70,1 kg e "−4,3 kg desde a 1ª semana" (${rot})`, cap);
+      ok(/medida na consulta|consulta/.test(cap) && /meta/.test(cap), `e a legenda cita a consulta e a meta (${rot})`, cap);
+
+      // a linha em duas partes (a lacuna), o "sem pesagem", os pontos e a meta
+      const d = (await peso.locator("path.recharts-line-curve").first().getAttribute("d")) || "";
+      const partes = (d.match(/M/g) || []).length;
+      ok(partes === 2, `a linha da média tem duas partes: a 8ª semana sem pesagem corta a linha (${partes}) (${rot})`, d.slice(0, 120));
+      ok((await peso.getByText("sem pesagem", { exact: true }).count()) >= 1,
+        `o gráfico escreve "sem pesagem" sobre a falha (${rot})`);
+      ok((await peso.locator("circle.ponto-consulta").count()) === 6, `seis pontos de consulta (${rot})`,
+        String(await peso.locator("circle.ponto-consulta").count()));
+      // (a classe do ReferenceLine fica no <g>; o traço é a <line> dentro dele)
+      const linhasDeConsulta = peso.locator(".linha-de-consulta line");
+      ok((await linhasDeConsulta.count()) === 6 && !!(await linhasDeConsulta.first().getAttribute("stroke-dasharray")),
+        `e seis linhas verticais tracejadas de consulta (${rot})`);
+      ok((await peso.getByText("meta 66 kg", { exact: true }).count()) === 1, `a linha da meta diz "meta 66 kg" (${rot})`);
+      const meta = peso.locator(".linha-da-meta line");
+      ok((await meta.count()) === 1 && !!(await meta.getAttribute("stroke-dasharray")), `a meta é uma linha tracejada (${rot})`);
+
+      // o eixo: meses no X; 3 marcas no Y no celular
+      const meses = (await textoSvg(peso.locator(".recharts-xAxis"))).match(MESES) || [];
+      ok(meses.length >= 4, `o eixo X marca os meses (${meses.join(" ")}) (${rot})`);
+      const marcasY = await peso.locator(".recharts-yAxis .recharts-cartesian-axis-tick").count();
+      ok(disp.mobile ? marcasY >= 2 && marcasY <= 3 : marcasY >= 4 && marcasY <= 6, `${disp.mobile ? "no celular, até 3 marcas" : "no computador, de 4 a 6 marcas"} no eixo Y (${marcasY}) (${rot})`);
+
+      // a descrição do SVG
+      const svg = peso.locator('svg[role="img"]');
+      const desc = (await svg.getAttribute("aria-label")) || "";
+      ok(desc.startsWith("Peso de ") && desc.includes("média da semana caiu de 74,4 para 70,1 kg") &&
+        desc.includes("seis consultas, a última com 70,3 kg") && desc.includes("meta 66 kg"),
+        `o SVG do peso tem role=img e a frase no aria-label (${rot})`, desc);
+
+      // cintura e % de gordura
+      const cin = figura(page, "Cintura");
+      const gor = figura(page, "% de gordura");
+      const capCin = await limpo(cin.locator("figcaption"));
+      const capGor = await limpo(gor.locator("figcaption"));
+      ok(capCin.includes("85 cm") && capCin.includes("−7 cm"), `a cintura diz 85 cm e −7 cm (${rot})`, capCin);
+      ok(capGor.includes("30,4%") && capGor.includes("−3,6 pontos"), `o % de gordura diz 30,4% e −3,6 pontos (${rot})`, capGor);
+      ok((await cin.locator("circle.ponto-consulta").count()) === 6 && (await cin.locator("circle.ponto-casa").count()) === 4,
+        `cintura: seis pontos cheios (consulta) e quatro vazados (casa) (${rot})`);
+      ok((await gor.locator("circle.ponto-consulta").count()) === 6 && (await gor.locator("circle.ponto-casa").count()) === 2,
+        `% de gordura: seis pontos cheios e dois vazados (${rot})`);
+      ok(((await cin.locator('svg[role="img"]').getAttribute("aria-label")) || "").endsWith("de 92 para 85 cm."),
+        `o SVG da cintura diz "de 92 para 85 cm." (${rot})`);
+      const caixaC = await cin.boundingBox();
+      const caixaG = await gor.boundingBox();
+      if (disp.mobile) {
+        ok(caixaG.y >= caixaC.y + caixaC.height - 1 && Math.abs(caixaG.x - caixaC.x) < 2,
+          `no celular, cintura e gordura ficam uma embaixo da outra (${rot})`, JSON.stringify({ caixaC, caixaG }));
+      } else {
+        ok(Math.abs(caixaG.y - caixaC.y) < 4 && caixaG.x > caixaC.x + caixaC.width - 2,
+          `no computador, cintura e gordura ficam lado a lado (${rot})`, JSON.stringify({ caixaC, caixaG }));
+      }
+
+      // as cores no tema: linha e pontos precisam de contraste com o fundo
+      const cores = await page.evaluate(() => {
+        const rgb = (s) => (s.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
+        const lum = ([r, g, b]) => {
+          const f = (c) => ((c /= 255) <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+          return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+        };
+        const razao = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+        const fundo = rgb(getComputedStyle(document.body).backgroundColor);
+        const linha = document.querySelector("#corpo figure path.recharts-line-curve");
+        const ponto = document.querySelector("#corpo figure circle.ponto-consulta");
+        const cs = (el) => getComputedStyle(el);
+        return {
+          fundo: cs(document.body).backgroundColor,
+          traco: cs(linha).stroke,
+          preenchimento: cs(ponto).fill,
+          razaoLinha: razao(rgb(cs(linha).stroke), fundo),
+          razaoPonto: razao(rgb(cs(ponto).fill), fundo),
+        };
+      });
+      ok(cores.razaoLinha >= 3 && cores.razaoPonto >= 3,
+        `a linha e os pontos da consulta contrastam com o fundo (${tema}): linha ${cores.razaoLinha.toFixed(1)}:1, ponto ${cores.razaoPonto.toFixed(1)}:1`,
+        JSON.stringify(cores));
+
+      // a dica: o mouse no computador, o toque no celular
+      const apontar = async (x, y) => (disp.mobile ? page.touchscreen.tap(x, y) : page.mouse.move(x, y));
+      const dica = peso.getByRole("tooltip");
+      {
+        const caixa = await peso.locator("circle.ponto-semana").nth(10).boundingBox();
+        await apontar(caixa.x + caixa.width / 2, caixa.y + caixa.height / 2);
+        const apareceuDica = await apareceu(dica, 5000);
+        const t = apareceuDica ? await limpo(dica) : "";
+        ok(apareceuDica && /Semana de \d{2}\/\d{2} a \d{2}\/\d{2}/.test(t) && /média \d+(,\d)? kg/.test(t) && /\d+ pesagens/.test(t),
+          `${disp.mobile ? "tocar" : "passar o mouse"} numa semana mostra "Semana de dd/mm a dd/mm", a média e as pesagens (${rot})`, t);
+        const tb = apareceuDica ? await dica.boundingBox() : null;
+        ok(!!tb && tb.x >= 0 && tb.x + tb.width <= disp.w, `e a dica cabe na janela (${rot})`, JSON.stringify(tb));
+      }
+      {
+        const caixa = await peso.locator("circle.ponto-consulta").nth(5).boundingBox();
+        await apontar(caixa.x + caixa.width / 2, caixa.y + caixa.height / 2);
+        await page.waitForTimeout(200);
+        const t = (await apareceu(dica, 5000)) ? await limpo(dica) : "";
+        ok(t.includes(`consulta de ${ddmm(1)}`) && t.includes("70,3 kg"),
+          `a dica da última consulta diz "consulta de ${ddmm(1)}" e 70,3 kg (${rot})`, t);
+      }
+      {
+        const eixo = await peso.locator(".recharts-xAxis .recharts-cartesian-axis-line").boundingBox();
+        await apontar(eixo.x + eixo.width - 9, eixo.y - 100);
+        await page.waitForTimeout(200);
+        const t = (await apareceu(dica, 5000)) ? await limpo(dica) : "";
+        ok(t.includes("semana em curso"), `na ponta direita a dica diz "semana em curso" (${rot})`, t);
+      }
+
+      if (disp.mobile) {
+        const m = await transbordo(page);
+        ok(m.doc <= m.larg, `Corpo da Helena sem transbordo no celular (${tema}) (documento ${m.doc}px, janela ${m.larg}px)`, m.vaza.join(" | "));
+      }
+      await fotografar(page, `${OUT}/corpo-evolucao-${disp.nome}-${tema}.png`, disp);
+    };
+
+    for (const [tema, escuro] of [["claro", false], ["escuro", true]]) {
+      for (const disp of [COMPUTADOR, CELULAR]) {
+        const ctx = await contexto(browser, disp, escuro, estado);
+        const page = await abrir(ctx, aba("helena", "corpo"));
+        await conferir(page, disp, tema);
+        await page.close();
+        await ctx.close();
+      }
+    }
+
+    // pouco dado: o Pedro nunca registrou nada, e o paciente sem tendência não
+    // ganha gráfico nem anel.
+    {
+      const page = await abrir(pc, aba("pedro", "corpo"));
+      const txt = await limpo(corpo(page));
+      ok(txt.includes("Ainda não dá para ver tendência"), 'Pedro: no lugar do gráfico, "Ainda não dá para ver tendência"', txt);
+      ok((await corpo(page).locator("figure svg.recharts-surface").count()) === 0, "e nenhum gráfico de peso, cintura ou gordura");
+      ok((await corpo(page).locator('[role="img"][aria-label^="Progresso"]').count()) === 0, "e nenhum anel (sem meta nem peso)");
+      ok(txt.includes("Cintura") && txt.includes("% de gordura"), "e a linha diz que cintura e % de gordura ficaram de fora", txt);
+      await fotografar(page, `${OUT}/corpo-pouco-dado-desktop-claro.png`, COMPUTADOR);
+      await page.close();
+    }
+
+    // leitura que falha: o erro da aba, nunca "Ainda não dá" nem um gráfico vazio
+    for (const tabela of ["body_measurements", "patient_links", "appointments"]) {
+      await fetch(MOCK + "/__falhar", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ tabela }),
+      });
+      const page = await abrir(pc, aba("helena", "corpo"));
+      const txt = await limpo(corpo(page));
+      ok(txt.includes("Não foi possível carregar as medidas") && !txt.includes("Ainda não dá para ver tendência") &&
+        (await corpo(page).locator("figure").count()) === 0,
+        `${tabela} falha: o erro da aba, e não "Ainda não dá" nem gráfico`, txt);
+      await page.close();
+      await fetch(MOCK + "/__reset", { method: "POST" });
     }
   }
   await fetch(MOCK + "/__reset", { method: "POST" });

@@ -38,6 +38,20 @@ describe("tema clínico", () => {
     expect(PARES_GRAFICO).toContainEqual(["campo", "chao"]);
   });
 
+  it("os pares que os gráficos da aba Corpo usam estão na lista de 3:1", () => {
+    // A linha da média e o arco do anel (primaria), o ponto da consulta
+    // (texto) e a meta (campo) sobre o fundo da página; a faixa do exame
+    // (primaria sobre primaria-fundo). Sem estar na lista, trocar um hex que
+    // derruba o contraste do gráfico não quebraria teste nenhum.
+    for (const par of [
+      ["primaria", "chao"],
+      ["texto", "chao"],
+      ["campo", "chao"],
+      ["primaria", "primaria-fundo"],
+    ])
+      expect(PARES_GRAFICO).toContainEqual(par);
+  });
+
   it.each(["claro", "escuro"] as const)(
     "a borda de campo passa 3:1 sobre o chão e é mais suave que o texto-2 no tema %s",
     (t) => {

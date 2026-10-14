@@ -109,7 +109,10 @@ e saem todos de `dias(n)`:
 - **Dias da semana.** A 8ª semana fica sem pesagem em qualquer dia, mas as
   pontas dependem do dia em que o mock sobe: no domingo a 1ª semana é só o dia do
   vínculo (a consulta, sem pesagem de casa), e na segunda a semana em curso é só
-  hoje (sem pesagem). As consultas do meio nunca caem no fim de semana.
+  hoje (sem pesagem). No sábado a 1ª semana tem uma pesagem só, e na terça a
+  semana em curso também. Por isso a Verificação 20 não conta quantas semanas
+  dizem "sem pesagem": confere que há ao menos uma e que a linha da média tem
+  duas partes. As consultas do meio nunca caem no fim de semana.
 - **O mock devolve a linha inteira**, qualquer que seja a lista de colunas do
   `select` (veja "O mock ignora a lista de colunas", abaixo): uma coluna
   esquecida ou escrita errada numa leitura nova do Corpo ou do Clínico passa
@@ -199,7 +202,13 @@ celular). A Verificação 19 confere a medida da consulta na aba Corpo
 da Luiza (a marca "na consulta" só na linha do prontuário, e sem transbordo no
 celular) e o campo "CRN (aparece no prontuário)" do Perfil do nutri: aparece, aceita até 30
 caracteres, salva sem os espaços das pontas, reaparece ao recarregar e grava nulo
-quando em branco. Ele descobre os ids dos pacientes perguntando
+quando em branco. A Verificação 20 confere a aba Corpo da Helena (o anel com
+50% e "4,3 de 8,6 kg", a média semanal com a lacuna e o "sem pesagem", os seis
+pontos de consulta, a meta, a dica ao passar o mouse e ao tocar, cintura e % de
+gordura, o contraste da linha e dos pontos nos dois temas e o celular sem
+transbordo), o "Ainda não dá para ver tendência" do Pedro e o erro da aba
+quando `body_measurements`, `patient_links` ou `appointments` falham
+(`/__falhar`). Ele descobre os ids dos pacientes perguntando
 ao mock (`/__cenario`), e recusa rodar se o mock subiu com outro cenário.
 Sem `OUT`, os PNGs vão para `prints-nutri` no diretório temporário do
 sistema.
