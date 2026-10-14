@@ -204,9 +204,10 @@ const T = {
 };
 
 // ---------- cenário "carteira" ----------
-// Cinco pacientes de um nutricionista, um para cada situação que o detalhe do
-// paciente precisa mostrar, mais dois convites. As datas saem de `dias(n)`,
-// então os alertas valem em qualquer dia em que o mock suba.
+// Seis pacientes de um nutricionista, cinco para cada situação que o detalhe do
+// paciente precisa mostrar e a sexta para os gráficos, mais dois convites. As
+// datas saem de `dias(n)`, então os alertas valem em qualquer dia em que o
+// mock suba.
 //
 //   Carlos   dose atrasada (e mais nada)
 //   Beatriz  usa 2.200 kcal onde a prescrição diz 1.800, mudou o treino, faltou
@@ -215,9 +216,11 @@ const T = {
 //   Joana    parada há 12 dias, com um exame alterado
 //   Pedro    acabou de chegar e nunca registrou nada
 //   Luiza    em dia, sem nenhum alerta
+//   Helena   em dia, sem nenhum alerta, com 22 semanas de pesagem e exames com
+//            histórico: os dados dos gráficos da aba Corpo e da aba Clínico
 function carteira() {
   const id = (n) => `c1a00000-0000-4000-8000-${String(n).padStart(12, "0")}`;
-  const P = { carlos: id(1), beatriz: id(2), joana: id(3), pedro: id(4), luiza: id(5) };
+  const P = { carlos: id(1), beatriz: id(2), joana: id(3), pedro: id(4), luiza: id(5), helena: id(6) };
   const dow = (iso) => (new Date(iso + "T12:00:00").getDay() + 6) % 7;
   /** Um instante de n dias atrás. Nunca use n = 0: a hora pode estar no futuro. */
   const em = (n, hhmm) => `${dias(n)}T${hhmm}:00Z`;
@@ -555,6 +558,185 @@ function carteira() {
     );
   };
 
+  // Helena: a paciente dos gráficos das abas Corpo e Clínico. Em dia, sem
+  // alerta nenhum, para não mexer na fila que as verificações conferem.
+  //
+  // Corpo. O vínculo começou há 154 dias (22 semanas), e é dali que o gráfico
+  // de peso conta as semanas, de segunda a domingo:
+  //  - pesagens de casa de 2 a 4 dias por semana, a média semanal caindo de
+  //    74,4 para 70,1 kg (a primeira e a última semana com pesagem fecham
+  //    nesses números; as do meio oscilam em volta da reta);
+  //  - a 8ª semana sem nenhuma pesagem, e a 2ª consulta cai nela: o ponto da
+  //    consulta fora da linha do peso, que o gráfico precisa mostrar;
+  //  - seis consultas realizadas, cada uma com peso, cintura e % de gordura
+  //    (74,6 / 92 / 34,0 até 70,3 / 85 / 30,4). A primeira é no dia do
+  //    vínculo: o peso inicial do anel é o dela, 74,6, e não os 74,4 de casa;
+  //  - ontem é a última consulta e também tem pesagem de casa: o ÚNICO dia com
+  //    as duas medidas, e o último dia com peso, então o "Peso atual" diz "na
+  //    consulta" e mostra a da consulta (70,3) e não a de casa (a diferença
+  //    entre as duas é de propósito). Nos outros dias de consulta não há
+  //    pesagem de casa;
+  //  - cintura e % de gordura de casa em alguns dias (os pontos vazados), todos
+  //    entre a primeira e a última consulta: a variação do gráfico (último
+  //    menos primeiro) segue sendo a das consultas, −7 cm e −3,6 pontos.
+  //  A meta de peso é 66 kg.
+  //
+  // O que depende do dia da semana em que o mock sobe: no domingo a 1ª semana
+  // é só o dia do vínculo (só a consulta, sem pesagem de casa) e na segunda a
+  // semana em curso é só hoje (sem pesagem). A 8ª fica sem pesagem em qualquer
+  // dia.
+  //
+  // Exames. Datas a mais de 180 dias, de propósito: o alerta "N exames fora da
+  // referência" da fila olha os 180 dias e conta qualquer status que não seja
+  // "normal", e triglicerídeos 168 ou LDL 132 são "atencao" de verdade (é o que
+  // o app grava). Mais recentes, a Helena entraria na fila com um alerta. São os
+  // exames que ela trouxe de antes do vínculo, em três laudos:
+  //   300 dias  triglicerídeos 141, LDL 145, vitamina D 18, "Glicose" 101,
+  //             colesterol total 200, vitamina B12 310 pg/mL
+  //   245 dias  vitamina D 24, "Glicemia de jejum" 98, ferritina 45
+  //   192 dias  triglicerídeos 168 (saiu), LDL 132 (mais perto), vitamina D 38
+  //             (entrou, com minigráfico), "Glicemia de jejum" 92 (a mesma linha
+  //             da Glicose, com minigráfico), colesterol total 190, VLDL-
+  //             colesterol 24 (NO MESMO DIA do 190: tem de continuar uma linha
+  //             à parte, e não somar ao colesterol total), vitamina B12 235
+  //             pmol/L (unidade diferente da anterior)
+  // A ferritina tem um resultado só e a data mais antiga das linhas de um
+  // resultado só (o VLDL é outra), para continuar por último na tabela.
+  const helena = () => {
+    const uid = P.helena, k = "he";
+    const metas = { kcal: 1700, prot: 105, agua: 2500, peso: 66 };
+    const DESDE = 154;
+    const SEM_PESAGEM = 8;
+    const dowDesde = dow(dias(DESDE));
+    /** A semana do gráfico (1 = a do vínculo) em que cai o dia de n dias atrás. */
+    const semanaDe = (n) => Math.floor((DESDE - n + dowDesde) / 7) + 1;
+
+    // [dias atrás, peso, cintura, % de gordura]. A 2ª é uma quinta-feira da 8ª
+    // semana, qualquer que seja o dia de hoje. As do meio passam de sábado e
+    // domingo para a segunda seguinte; a 1ª (o dia do vínculo) e a última (ontem)
+    // ficam onde caem, porque o anel e o "Peso atual" dependem desses dois dias.
+    const diaUtil = (n) => {
+      const d = dow(dias(n));
+      return d >= 5 ? n - (7 - d) : n;
+    };
+    const CONSULTAS = [
+      [DESDE, 74.6, 92, 34.0],
+      [102 + dowDesde, 73.2, 90.5, 33.0],
+      [diaUtil(78), 72.2, 89, 32.3],
+      [diaUtil(52), 71.6, 87.5, 31.6],
+      [diaUtil(26), 70.9, 86, 31.0],
+      [1, 70.3, 85, 30.4],
+    ];
+    if (semanaDe(CONSULTAS[1][0]) !== SEM_PESAGEM) throw new Error("A 2ª consulta da Helena saiu da semana sem pesagem.");
+    const diasDeConsulta = new Set(CONSULTAS.map(([n]) => n));
+
+    // Os dias de pesagem de casa de cada semana: um molde de 2 a 4 dias
+    // (segunda = 0), sem a 8ª semana e sem os dias de consulta, menos ontem.
+    const MOLDES = [[0, 2, 4], [1, 3, 5], [0, 3], [2, 4, 6], [1, 4], [0, 2, 5, 6], [1, 3, 6], [0, 4]];
+    const livre = (n) => !diasDeConsulta.has(n) && semanaDe(n) !== SEM_PESAGEM;
+    const porSemana = new Map();
+    for (let n = DESDE; n >= 1; n--) {
+      const s = semanaDe(n);
+      const doMolde = MOLDES[(s * 3) % MOLDES.length].includes(dow(dias(n)));
+      if (!(n === 1 || (livre(n) && doMolde))) continue;
+      porSemana.set(s, [...(porSemana.get(s) ?? []), n]);
+    }
+    // Uma consulta tirando um dia de um molde de dois deixaria a semana com uma
+    // pesagem só: completa até duas com os dias que sobram da semana.
+    porSemana.forEach((ns, s) => {
+      for (let n = DESDE; n >= 1 && ns.length < 2; n--) {
+        if (semanaDe(n) === s && livre(n) && !ns.includes(n)) ns.push(n);
+      }
+      ns.sort((a, b) => b - a);
+    });
+    const semanas = [...porSemana.keys()].sort((a, b) => a - b);
+    const primeira = semanas[0], ultima = semanas[semanas.length - 1];
+    // Buraco que não seja a 8ª semana é erro do molde, não da Helena.
+    for (let s = primeira; s <= ultima; s++) {
+      if ((s === SEM_PESAGEM) === porSemana.has(s)) throw new Error(`Semana ${s} da Helena: pesagem onde não devia ou falta onde devia.`);
+    }
+    /** Em décimos de kg, a reta de 74,4 a 70,1 pelo calendário. */
+    const base10 = (s) => Math.round(744 - 43 * ((s - primeira) / (ultima - primeira)));
+    // Décimos que se somam a zero na primeira e na última semana com pesagem
+    // (a média fecha em 74,4 e 70,1); nas do meio, uma oscilação fixa.
+    const RUIDO = [2, -2, 1, -1, 3, -3, 0, 2, -1, 1, -2, 0];
+    let giro = 0;
+    const casa = [];
+    for (const s of semanas) {
+      const ns = porSemana.get(s);
+      let desvios;
+      if (s === primeira || s === ultima) {
+        desvios = [1, -2, 1, 0].slice(0, ns.length - 1);
+        desvios.push(-desvios.reduce((a, b) => a + b, 0));
+      } else {
+        desvios = ns.map(() => RUIDO[giro++ % RUIDO.length]);
+      }
+      const t = (s - primeira) / (ultima - primeira);
+      ns.forEach((n, i) => {
+        const linha = {
+          id: `bm-${k}-${n}`, user_id: uid, date: dias(n), weight_kg: (base10(s) + desvios[i]) / 10,
+          body_fat_pct: null, waist_cm: null, hip_cm: null, arm_cm: null, chest_cm: null,
+          thigh_cm: null, neck_cm: null, calf_cm: null, notes: null,
+          created_at: em(n, "10:30"), measured_by: null, appointment_id: null,
+        };
+        // Cintura (e, em duas delas, % de gordura de uma balança) de casa no
+        // primeiro dia de pesagem de algumas semanas do meio.
+        if (i === 0 && [4, 10, 15, 19].includes(s)) {
+          linha.waist_cm = Math.round((92 - 7 * t) * 2) / 2;
+          if (s === 10 || s === 19) linha.body_fat_pct = Number((34.0 - 3.6 * t + 0.2).toFixed(1));
+        }
+        casa.push(linha);
+      });
+    }
+
+    const naConsulta = CONSULTAS.map(([n, peso, cintura, gordura], i) => ({
+      id: `bm-${k}-c${i + 1}`, user_id: uid, date: dias(n), weight_kg: peso, body_fat_pct: gordura,
+      waist_cm: cintura, hip_cm: null, arm_cm: null, chest_cm: null, thigh_cm: null,
+      neck_cm: null, calf_cm: null, notes: null, created_at: naHora(n, "16:40"),
+      measured_by: NUT, appointment_id: `ap-h${i + 1}`,
+    }));
+    const consultas = CONSULTAS.map(([n], i) =>
+      consulta(`ap-h${i + 1}`, NUT, uid, n, "16:00", {
+        status: "realizada", kind: i === 0 ? "primeira" : "retorno", duration_min: i === 0 ? 60 : 45,
+        // A 1ª foi marcada no dia em que o vínculo começou, e não 10 dias antes.
+        ...(i === 0 ? { created_at: naHora(n, "10:00"), updated_at: naHora(n, "10:00") } : {}),
+      })
+    );
+
+    const LAUDO_1 = 300, LAUDO_2 = 245, LAUDO_3 = 192;
+    const e = (n, d, ...resto) => exame(k, n, uid, d, ...resto);
+    const exames = [
+      e(1, LAUDO_1, "Triglicerídeos", "141", "mg/dL", "< 150", "normal"),
+      e(2, LAUDO_1, "Colesterol LDL", "145", "mg/dL", "< 130", "atencao"),
+      e(3, LAUDO_1, "Vitamina D", "18", "ng/mL", "30 a 100", "alterado"),
+      e(4, LAUDO_1, "Glicose", "101", "mg/dL", "70 a 99", "atencao"),
+      e(5, LAUDO_1, "Colesterol total", "200", "mg/dL", "< 190", "atencao"),
+      e(6, LAUDO_1, "Vitamina B12", "310", "pg/mL", "200 a 900", "normal"),
+      e(7, LAUDO_2, "Vitamina D", "24", "ng/mL", "30 a 100", "atencao"),
+      e(8, LAUDO_2, "Glicemia de jejum", "98", "mg/dL", "70 a 99", "normal"),
+      e(9, LAUDO_2, "Ferritina", "45", "ng/mL", "15 a 150", "normal"),
+      e(10, LAUDO_3, "Triglicerídeos", "168", "mg/dL", "< 150", "atencao"),
+      e(11, LAUDO_3, "Colesterol LDL", "132", "mg/dL", "< 130", "atencao"),
+      e(12, LAUDO_3, "Vitamina D", "38", "ng/mL", "30 a 100", "normal"),
+      e(13, LAUDO_3, "Glicemia de jejum", "92", "mg/dL", "70 a 99", "normal"),
+      e(14, LAUDO_3, "Colesterol total", "190", "mg/dL", "< 190", "atencao"),
+      e(15, LAUDO_3, "VLDL-colesterol", "24", "mg/dL", "< 30", "normal"),
+      // Outro laboratório, que dá a B12 em pmol/L: não se compara com os 310 pg/mL.
+      e(16, LAUDO_3, "Vitamina B12", "235", "pmol/L", "148 a 664", "normal"),
+    ];
+
+    return juntar({
+      profiles: [perfil(uid, "Helena Duarte", "F", "1990-04-09", 164, metas, 160)],
+      patient_links: [vinculo(8, uid, null, DESDE)],
+      prescriptions: [prescricao(k, uid, metas, 150)],
+      meals: refeicoes(k, uid, [1, 2, 3, 4, 5, 6, 7], 1700, 105),
+      daily_logs: diario(k, uid, [0, 1, 2, 3, 4, 5, 6], 2400, 8000),
+      body_measurements: [...casa, ...naConsulta],
+      appointments: consultas,
+      exams: exames,
+    });
+  };
+
   // Consultas: uma situação por paciente, sem mexer nos alertas que as
   // verificações de ferramentas/ já esperam de cada um.
   //   Luiza    realizada há 14 dias (tem "desde a última consulta"), uma em
@@ -639,7 +821,7 @@ function carteira() {
         convite(7, "Marcos Teixeira", "T8N2WD", 1),
       ], appointments: consultas, consultation_records: registros,
       consultation_addenda: adendos, body_measurements: [medidaDoRegistro] },
-      carlos(), beatriz(), joana(), pedro(), luiza()
+      carlos(), beatriz(), joana(), pedro(), luiza(), helena()
     ),
   };
 }

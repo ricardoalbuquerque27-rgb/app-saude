@@ -58,9 +58,9 @@ conta de teste da Maria), e é com esses que `tirar-prints.cjs` e
 O e-mail do login decide quem entra: qualquer um que contenha "nutri" entra
 como o nutricionista, o resto como a Maria.
 
-A `carteira` traz cinco pacientes, um para cada situação, e dois convites
-pendentes. As datas saem do dia em que o mock sobe, então os alertas valem em
-qualquer dia:
+A `carteira` traz seis pacientes, cinco para uma situação cada e a Helena, dos
+gráficos, e dois convites pendentes. As datas saem do dia em que o mock sobe,
+então os alertas valem em qualquer dia:
 
 - **Carlos Mendes**: dose atrasada, e mais nada.
 - **Beatriz Rocha**: usa 2.200 kcal onde a prescrição diz 1.800 (aviso de meta
@@ -72,6 +72,50 @@ qualquer dia:
 - **Joana Ferreira**: 12 dias sem registrar, com um exame alterado.
 - **Pedro Alves**: acabou de chegar, nunca registrou nada, sem metas.
 - **Luiza Prado**: em dia, sem nenhum alerta.
+- **Helena Duarte**: em dia, sem nenhum alerta (e por isso a fila dos outros
+  fica como estava). É a paciente dos gráficos das abas Corpo e Clínico, logo
+  abaixo.
+
+**Helena, os gráficos.** Os dados dela existem para dar o que ver aos gráficos do
+nutricionista (a Evolução da aba Corpo e o comparativo de exames da aba Clínico),
+e saem todos de `dias(n)`:
+
+- **Corpo.** O vínculo começou há 154 dias (22 semanas). Pesagens de casa de 2 a
+  4 dias por semana, a média semanal caindo de 74,4 (a primeira semana com
+  pesagem) para 70,1 kg (a última). **A 8ª semana não tem pesagem nenhuma**, e a
+  2ª consulta cai nela. Seis consultas realizadas (`ap-h1` a `ap-h6`), cada uma
+  com a medida de peso, cintura e % de gordura (74,6 / 92 / 34,0 até 70,3 / 85 /
+  30,4); a primeira é no dia do vínculo, e por isso o peso inicial do anel é o
+  dela, 74,6 (o anel diz 4,3 de 8,6 kg, 50%, com a meta de 66 kg). **Ontem é o
+  único dia com as duas medidas**: a consulta (70,3) e uma pesagem de casa (um
+  pouco abaixo), e é o último dia com peso, então o "Peso atual" diz "na
+  consulta". Cintura e % de gordura de casa aparecem em quatro semanas do meio
+  (os pontos vazados), nunca antes da primeira consulta nem depois da última: a
+  variação (−7 cm, −3,6 pontos) é a das consultas.
+- **Clínico.** Três laudos, todos de **mais de 180 dias atrás**: a fila conta
+  como "N exames fora da referência" qualquer exame de status diferente de
+  "normal" dos últimos 180 dias, e triglicerídeos 168 ou LDL 132 são "atencao" de
+  verdade (é o que o app grava); mais novos, a Helena entraria na fila.
+  Triglicerídeos 141 → 168 mg/dL (saiu da faixa), LDL 145 → 132 (mais perto),
+  vitamina D 18 → 24 → 38 ng/mL (entrou, com minigráfico), "Glicose" 101 e
+  "Glicemia de jejum" 98 e 92 mg/dL (uma linha só, com minigráfico), colesterol
+  total 200 → 190 mg/dL (ref. "< 190") e VLDL-colesterol 24 mg/dL (ref. "< 30")
+  **no mesmo dia do 190**, que tem de continuar uma linha à parte, ferritina 45
+  ng/mL (um resultado, a data mais antiga das linhas de um resultado só, para
+  ficar por último) e vitamina B12 310 pg/mL → 235 pmol/L (unidade diferente
+  entre os dois resultados). Cada exame tem a faixa do laudo em `reference_range`.
+  A tabela do app daria "atencao" para o colesterol de 190, mas a comparação
+  trata a borda da faixa como dentro, e a linha diz "entrou na faixa".
+- **Dias da semana.** A 8ª semana fica sem pesagem em qualquer dia, mas as
+  pontas dependem do dia em que o mock sobe: no domingo a 1ª semana é só o dia do
+  vínculo (a consulta, sem pesagem de casa), e na segunda a semana em curso é só
+  hoje (sem pesagem). As consultas do meio nunca caem no fim de semana.
+- **O mock devolve a linha inteira**, qualquer que seja a lista de colunas do
+  `select` (veja "O mock ignora a lista de colunas", abaixo): uma coluna
+  esquecida ou escrita errada numa leitura nova do Corpo ou do Clínico passa
+  nos dados da Helena e só aparece no banco de verdade. A ordem
+  (`order=date.asc&order=created_at.asc`, ou as duas numa lista) o mock já
+  entende.
 
 E as consultas (`appointments`), uma situação por paciente sem mudar os
 alertas acima:
@@ -84,6 +128,9 @@ alertas acima:
 - **Carlos**: agendada amanhã às 09:00, com pedido de remarcação.
 - **Joana**: agendada há 5 dias e nunca fechada (sem desfecho).
 - **Pedro**: 1ª consulta amanhã às 11:00.
+- **Helena**: as seis realizadas, todas no passado (a 1ª há 154 dias, a última
+  ontem), sem registro de prontuário; a medida de cada uma está em
+  `body_measurements` com `measured_by` e `appointment_id`.
 
 E os registros da consulta (prontuário: `consultation_records`, os adendos em
 `consultation_addenda` e a avaliação física em `body_measurements`):
