@@ -1,6 +1,7 @@
 import { ChevronDown } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { formatDate, idadeEm, todayISO } from "@/lib/date";
+import { comSinal, numeroBR } from "@/lib/numeros";
 import type { ExamContext } from "@/lib/examRanges";
 import {
   avisosDaLinha,
@@ -33,11 +34,8 @@ const STATUS_EXAME: Record<string, { rotulo: string; caixa: string }> = {
 const situacaoDoExame = (status: string | null) => (status ? STATUS_EXAME[status] : undefined);
 const comMaiuscula = (texto: string) => texto.charAt(0).toUpperCase() + texto.slice(1);
 
-/** "5,9": vírgula decimal e sem separador de milhar, como o resultado é gravado. */
-const numero = (n: number) =>
-  n.toLocaleString("pt-BR", { maximumFractionDigits: 3, useGrouping: false });
-/** "+27", "−13" (sinal de menos de verdade, como nos gráficos) ou "0". */
-const comSinal = (n: number) => (n === 0 ? "0" : `${n < 0 ? "−" : "+"}${numero(Math.abs(n))}`);
+/** "5,9": até 3 casas (os exames têm), sem separador de milhar, como o resultado é gravado. */
+const numero = (n: number) => numeroBR(n, 3);
 
 type Exame = ExameDoPaciente;
 
@@ -368,7 +366,7 @@ function ComparativoDosExames({
                   </td>
                   <td className="px-2 py-3 align-top">
                     {l.diferenca != null && (
-                      <span className="block font-semibold">{comSinal(l.diferenca)}</span>
+                      <span className="block font-semibold">{comSinal(l.diferenca, 3)}</span>
                     )}
                     {/* Piorou (saiu ou ficou mais longe da faixa): o par
                         perigo/perigo-fundo, com a palavra, não só a cor. */}

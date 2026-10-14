@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type PointerEvent as EventoDoPonteiro, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import {
   CartesianGrid,
   ComposedChart,
@@ -11,19 +11,32 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { dataCurta } from "@/lib/consultas";
 import {
   diasEntre,
-  marcasDeMes,
   marcasDoEixo,
+  rotuloDoPeso,
   type escalaDoPeso,
   type PontoDeConsulta,
   type SemanaDePeso,
   type TituloDoPeso,
 } from "@/lib/evolucao";
+import { comSinal, numeroBR } from "@/lib/numeros";
+import {
+  ALTURA_X,
+  CaixaDaDica,
+  COR,
+  FOLGA,
+  LARGURA_Y,
+  MARGEM,
+  marcasDoEixoX,
+  TICK,
+  useGrafico,
+} from "./base";
 
-// O gráfico do peso da aba Corpo (média semanal, pontos da consulta, meta) e
-// as peças que o GraficoMedida reaproveita: medir a largura, a geometria, a
-// dica e as marcas do eixo X.
+// O gráfico do peso da aba Corpo (média semanal, pontos da consulta, meta). As
+// peças que ele divide com o GraficoMedida (medir a largura, a geometria, a
+// dica e as marcas do eixo X) moram em ./base.
 //
 // Só variáveis do tema clínico (`var(--clin-*)`): o escuro funciona sem uma
 // segunda lista de cores, e os pares têm contraste testado em
@@ -36,147 +49,6 @@ import {
 // semana é cortada pelo período, não é a semana do dia sob o cursor. Aqui o
 // dia sai da posição do ponteiro (a mesma geometria que o gráfico usa) e a
 // semana é a que contém o dia.
-
-export const COR = {
-  texto: "var(--clin-texto)",
-  texto2: "var(--clin-texto-2)",
-  chao: "var(--clin-chao)",
-  linha: "var(--clin-linha)",
-  campo: "var(--clin-campo)",
-  primaria: "var(--clin-primaria)",
-  fundoDaPrimaria: "var(--clin-primaria-fundo)",
-};
-
-export const TICK = { fontSize: 11, fill: COR.texto2 };
-
-export const MARGEM = { top: 12, right: 10, bottom: 0, left: 0 };
-export const LARGURA_Y = 34;
-export const ALTURA_X = 24;
-/** Folga do eixo X, em px, nas duas pontas: o ponto do dia 0 não encosta nos números do eixo Y. */
-export const FOLGA = 10;
-/** Abaixo disto o gráfico é de celular: menos marcas, menos altura. */
-export const LARGURA_COMPACTA = 520;
-
-/** Onde o gráfico desenha, em px dentro da caixa: o recharts usa a mesma conta. */
-export function geometria(largura: number, altura: number) {
-  return {
-    esq: MARGEM.left + LARGURA_Y + FOLGA,
-    dir: largura - MARGEM.right - FOLGA,
-    topo: MARGEM.top,
-    base: altura - MARGEM.bottom - ALTURA_X,
-  };
-}
-
-/** "70,3": vírgula, no máximo uma casa. */
-export const numeroBR = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
-
-/** "+1,2" ou "−4,3" (menos de verdade, U+2212). */
-export const comSinal = (n: number) => `${n < 0 ? "−" : "+"}${numeroBR(Math.abs(n))}`;
-
-/** "13/10" de "2026-10-13". */
-export function ddmm(iso: string): string {
-  const [, m, d] = iso.split("-");
-  return `${d}/${m}`;
-}
-
-/**
- * Marcas do eixo X: o dia 1 de cada mês. Com menos de duas (período curto), as
- * duas pontas em dd/mm: um eixo sem rótulo não diz de quando é o gráfico.
- */
-export function marcasDoEixoX(inicio: string, fim: string, total: number): { dia: number; rotulo: string }[] {
-  const meses = marcasDeMes(inicio, fim);
-  return meses.length >= 2
-    ? meses
-    : [
-        { dia: 0, rotulo: ddmm(inicio) },
-        { dia: total, rotulo: ddmm(fim) },
-      ];
-}
-
-/**
- * A caixa do gráfico: mede a largura (o recharts desenha em px) e guarda onde
- * o ponteiro está, em dias. Mouse: segue o cursor e some ao sair. Toque: um
- * toque mostra a dica e ela fica até outro toque fora do gráfico (o dedo
- * levantado dispara `pointerleave`, e apagar ali tiraria a dica na hora).
- * `touch-action: pan-y` deixa a página rolar na vertical e arrastar na
- * horizontal passa o dedo pelas semanas.
- */
-export function useGrafico(total: number, alturaDe: (compacto: boolean) => number) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [largura, setLargura] = useState(0);
-  const [ponteiro, setPonteiro] = useState<{ dia: number; x: number } | null>(null);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const medir = () => setLargura(Math.floor(el.getBoundingClientRect().width));
-    medir();
-    const observador = new ResizeObserver(medir);
-    observador.observe(el);
-    return () => observador.disconnect();
-  }, []);
-
-  const aberta = ponteiro !== null;
-  useEffect(() => {
-    if (!aberta) return;
-    const fora = (e: PointerEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setPonteiro(null);
-    };
-    document.addEventListener("pointerdown", fora);
-    return () => document.removeEventListener("pointerdown", fora);
-  }, [aberta]);
-
-  const compacto = largura > 0 && largura < LARGURA_COMPACTA;
-  const altura = alturaDe(compacto);
-  const g = geometria(largura, altura);
-
-  function ler(e: EventoDoPonteiro<HTMLDivElement>) {
-    const caixa = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - caixa.left;
-    const y = e.clientY - caixa.top;
-    if (x < g.esq - FOLGA || x > g.dir + FOLGA || y < 0 || y > g.base) return null;
-    const dia = Math.round(((x - g.esq) / (g.dir - g.esq)) * total);
-    return { dia: Math.min(total, Math.max(0, dia)), x };
-  }
-  const aoPonteiro = (e: EventoDoPonteiro<HTMLDivElement>) => {
-    const p = ler(e);
-    if (p) setPonteiro(p);
-    else if (e.pointerType === "mouse") setPonteiro(null);
-  };
-  const aoSair = (e: EventoDoPonteiro<HTMLDivElement>) => {
-    if (e.pointerType === "mouse") setPonteiro(null);
-  };
-
-  return {
-    ref,
-    largura,
-    altura,
-    compacto,
-    g,
-    ponteiro,
-    /** x de um dia, em px dentro da caixa. */
-    xDe: (dia: number) => g.esq + (dia / total) * (g.dir - g.esq),
-    eventos: { onPointerMove: aoPonteiro, onPointerDown: aoPonteiro, onPointerLeave: aoSair },
-  };
-}
-
-const LARGURA_DA_DICA = 224;
-
-/** A caixa da dica, ao lado do ponteiro e sempre dentro do gráfico. */
-export function CaixaDaDica({ x, largura, children }: { x: number; largura: number; children: ReactNode }) {
-  let esquerda = x + 16;
-  if (esquerda + LARGURA_DA_DICA > largura) esquerda = x - 16 - LARGURA_DA_DICA;
-  esquerda = Math.max(0, Math.min(esquerda, largura - LARGURA_DA_DICA));
-  return (
-    <div
-      role="tooltip"
-      style={{ left: esquerda, top: 4, width: LARGURA_DA_DICA }}
-      className="pointer-events-none absolute z-10 rounded-md border border-clin-linha bg-clin-chao px-3 py-2 text-[13px] leading-snug tabular-nums text-clin-texto shadow-md"
-    >
-      {children}
-    </div>
-  );
-}
 
 function Amostra({ children }: { children: ReactNode }) {
   return (
@@ -275,6 +147,8 @@ export function GraficoPeso({
 
   const { variacao } = titulo;
   const origem = titulo.rotulo === "média da semana" ? "1ª semana" : "1ª consulta";
+  // "média da semana de dd/mm" quando a média não é desta semana nem da anterior.
+  const rotulo = rotuloDoPeso(semanas, titulo);
   const textoDaVariacao =
     variacao == null ? null : variacao === 0 ? `igual à ${origem}` : `${comSinal(variacao)} kg desde a ${origem}`;
 
@@ -284,7 +158,7 @@ export function GraficoPeso({
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
           <span className="text-[15px] font-semibold text-clin-texto">Peso</span>
           <span className="text-[14px] tabular-nums text-clin-texto-2">
-            {titulo.rotulo}{" "}
+            {rotulo}{" "}
             <strong className="font-semibold text-clin-texto">{numeroBR(titulo.valor)} kg</strong>
             {textoDaVariacao ? ` · ${textoDaVariacao}` : ""}
           </span>
@@ -354,7 +228,7 @@ export function GraficoPeso({
                 type="number"
                 domain={[escala.min, escala.max]}
                 ticks={marcasY}
-                tickFormatter={numeroBR}
+                tickFormatter={(v: number) => numeroBR(v)}
                 tick={TICK}
                 tickLine={false}
                 axisLine={false}
@@ -370,13 +244,15 @@ export function GraficoPeso({
                   ifOverflow="hidden"
                 />
               )}
+              {/* Em `campo`, o par com 3:1 sobre o fundo (PARES_GRAFICO): em
+                  `linha` a marca de cada consulta dava 1,24:1 e quase sumia. */}
               {diasDeConsulta.map((d) => (
                 <ReferenceLine
                   key={d}
                   x={d}
                   className="linha-de-consulta"
-                  stroke={COR.linha}
-                  strokeWidth={1.5}
+                  stroke={COR.campo}
+                  strokeWidth={1}
                   strokeDasharray="3 3"
                 />
               ))}
@@ -419,9 +295,10 @@ export function GraficoPeso({
                 data={consultas}
                 dataKey="valor"
                 isAnimationActive={false}
+                // Sem `key`: o recharts embrulha cada ponto num grupo próprio,
+                // com a chave pela posição.
                 shape={(p: any) => (
                   <circle
-                    key={`${p.payload.data}`}
                     className="ponto-consulta"
                     cx={p.cx}
                     cy={p.cy}
@@ -473,7 +350,7 @@ export function GraficoPeso({
             {ponteiro && faixaAtiva && (
               <CaixaDaDica x={ponteiro.x} largura={largura}>
                 <p className="font-semibold">
-                  Semana de {ddmm(faixaAtiva.s.inicio)} a {ddmm(faixaAtiva.s.fim)}
+                  Semana de {dataCurta(faixaAtiva.s.inicio)} a {dataCurta(faixaAtiva.s.fim)}
                 </p>
                 {faixaAtiva.s.emCurso && <p className="text-clin-texto-2">semana em curso</p>}
                 {faixaAtiva.s.media != null ? (
@@ -489,9 +366,9 @@ export function GraficoPeso({
                 ) : (
                   <p className="text-clin-texto-2">sem pesagem em casa</p>
                 )}
-                {consultasDaFaixa.map((c) => (
-                  <p key={c.data} className="mt-1 border-t border-clin-linha pt-1">
-                    consulta de {ddmm(c.data)}: <strong className="font-semibold">{numeroBR(c.valor)} kg</strong>
+                {consultasDaFaixa.map((c, i) => (
+                  <p key={`${c.data}-${i}`} className="mt-1 border-t border-clin-linha pt-1">
+                    consulta de {dataCurta(c.data)}: <strong className="font-semibold">{numeroBR(c.valor)} kg</strong>
                   </p>
                 ))}
               </CaixaDaDica>

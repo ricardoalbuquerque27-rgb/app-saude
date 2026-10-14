@@ -16,6 +16,9 @@ import {
   marcasDoEixo,
   pesoInicialDoPeriodo,
   progressoDaMeta,
+  textoDoAnel,
+  rotuloDoPeso,
+  limitadoEmUmAno,
   type LinhaDoCorpo,
   type SemanaDePeso,
   type PontoDeConsulta,
@@ -120,6 +123,31 @@ describe("inicioDoPeriodo", () => {
     expect(inicioDoPeriodo({ accepted_at: "2026-10-20T15:00:00Z", created_at: "2026-10-20T15:00:00Z" }, hoje)).toBe(
       hoje
     );
+  });
+});
+
+describe("limitadoEmUmAno", () => {
+  // O Corpo refazia `accepted_at ?? created_at` por fora de inicioDoPeriodo
+  // para dizer "Últimos 12 meses": duas contas do mesmo começo.
+  const hoje = "2026-10-14";
+
+  it("o acompanhamento começou antes dos 12 meses: o período foi cortado", () => {
+    expect(limitadoEmUmAno({ accepted_at: "2025-01-10T12:00:00Z", created_at: "2025-01-01T12:00:00Z" }, hoje)).toBe(true);
+  });
+
+  it("começou dentro dos 12 meses, no piso ou no futuro: não foi cortado", () => {
+    const piso = limitesDaJanela(hoje, 365).desde;
+    expect(limitadoEmUmAno({ accepted_at: "2026-05-12T13:00:00Z", created_at: "2026-05-01T10:00:00Z" }, hoje)).toBe(false);
+    expect(limitadoEmUmAno({ accepted_at: `${piso}T15:00:00Z`, created_at: `${piso}T15:00:00Z` }, hoje)).toBe(false);
+    expect(limitadoEmUmAno({ accepted_at: "2026-10-20T15:00:00Z", created_at: "2026-10-20T15:00:00Z" }, hoje)).toBe(false);
+  });
+
+  it("pelo dia de São Paulo, como o início", () => {
+    // 02:00 UTC do dia seguinte ao piso ainda é o dia do piso em São Paulo.
+    const piso = limitesDaJanela(hoje, 365).desde;
+    const [a, m, d] = piso.split("-").map(Number);
+    const seguinte = new Date(Date.UTC(a, m - 1, d + 1, 2)).toISOString();
+    expect(limitadoEmUmAno({ accepted_at: seguinte, created_at: seguinte }, hoje)).toBe(false);
   });
 });
 
@@ -772,6 +800,94 @@ describe("pesoInicialDoPeriodo", () => {
   it("sem peso no período, nulo", () => {
     expect(pesoInicialDoPeriodo([], "2026-05-12")).toBeNull();
     expect(pesoInicialDoPeriodo([casa("2026-05-01", 80)], "2026-05-12")).toBeNull();
+  });
+});
+
+describe("rotuloDoPeso", () => {
+  // A média do título é a da última semana com pesagem. Quem não se pesa há
+  // um mês tinha o título "média da semana 70,1 kg" como se fosse desta.
+  const semanas = [
+    semana("2026-08-31", "2026-09-06", 72.0),
+    semana("2026-09-07", "2026-09-13", 71.4),
+    semana("2026-09-14", "2026-09-20", null),
+    semana("2026-09-21", "2026-09-27", null),
+    semana("2026-09-28", "2026-10-04", null),
+    semana("2026-10-05", "2026-10-11", null),
+    semana("2026-10-12", "2026-10-14", null, { emCurso: true }),
+  ];
+
+  it("média de semana antiga: diz de qual semana é", () => {
+    const t = tituloDoPeso(semanas, [])!;
+    expect(t.valor).toBe(71.4);
+    expect(rotuloDoPeso(semanas, t)).toBe("média da semana de 07/09");
+  });
+
+  it("média desta semana ou da anterior: só 'média da semana'", () => {
+    const desta = [...semanas.slice(0, -1), semana("2026-10-12", "2026-10-14", 70.1, { emCurso: true })];
+    expect(rotuloDoPeso(desta, tituloDoPeso(desta, [])!)).toBe("média da semana");
+    const daAnterior = [...semanas.slice(0, -2), semana("2026-10-05", "2026-10-11", 70.4), semanas[semanas.length - 1]];
+    expect(rotuloDoPeso(daAnterior, tituloDoPeso(daAnterior, [])!)).toBe("média da semana");
+  });
+
+  it("sem pesagem de casa, a última medida da consulta continua 'última medida'", () => {
+    const vazias = semanas.map((s) => ({ ...s, media: null, dias: 0, menor: null, maior: null }));
+    const t = tituloDoPeso(vazias, [{ data: "2026-05-12", valor: 74.6 }, { data: "2026-09-01", valor: 72 }])!;
+    expect(rotuloDoPeso(vazias, t)).toBe("última medida");
+  });
+});
+
+describe("textoDoAnel", () => {
+  // O texto do anel morava no componente, sem teste: a conta do arco tinha
+  // teste (progressoDaMeta), as frases ao lado dele não.
+  it("progresso: a meta, a porcentagem e 'N de M kg desde dd/mm'", () => {
+    const t = textoDoAnel(progressoDaMeta(74.6, 70.3, 66)!, 66, "2026-05-12");
+    expect(t).toEqual({
+      fracao: 0.5,
+      principal: "66 kg · 50%",
+      secundaria: "4,3 de 8,6 kg desde 12/05",
+      atencao: false,
+      rotulo: "Progresso até a meta: 4,3 de 8,6 kg, 50%",
+    });
+  });
+
+  it("nunca 100% sem a meta atingida: o teto é 99%", () => {
+    // 8,6 de 8,7 kg é 98,9%, e 8,65 de 8,7 arredondaria para 100% ao lado de
+    // "faltam 0,1 kg".
+    const t = textoDoAnel({ tipo: "progresso", fracao: 0.996, feito: 8.7, total: 8.73 }, 66, "2026-05-12");
+    expect(t.principal).toBe("66 kg · 99%");
+    expect(t.rotulo).toBe("Progresso até a meta: 8,7 de 8,7 kg, 99%");
+    expect(t.fracao).toBe(0.996);
+  });
+
+  it("atingida: anel cheio e 'meta atingida'", () => {
+    const t = textoDoAnel(progressoDaMeta(74.6, 66, 66)!, 66, "2026-05-12");
+    expect(t).toEqual({
+      fracao: 1,
+      principal: "66 kg · meta atingida",
+      secundaria: null,
+      atencao: false,
+      rotulo: "Progresso até a meta: meta atingida",
+    });
+  });
+
+  it("passou mais de 0,5 kg: 'passou da meta em N kg'", () => {
+    const t = textoDoAnel(progressoDaMeta(74.6, 65.2, 66)!, 66, "2026-05-12");
+    expect(t.fracao).toBe(1);
+    expect(t.principal).toBe("66 kg · passou da meta em 0,8 kg");
+    expect(t.rotulo).toBe("Progresso até a meta: passou da meta em 0,8 kg");
+  });
+
+  it("lado errado: anel vazio, a diferença em atenção, com espaço sem quebra antes do kg", () => {
+    const acima = textoDoAnel(progressoDaMeta(74.6, 75.8, 66)!, 66, "2026-05-12");
+    expect(acima).toEqual({
+      fracao: 0,
+      principal: "66 kg",
+      secundaria: "acima do peso inicial (+1,2\u00a0kg)",
+      atencao: true,
+      rotulo: "Progresso até a meta: acima do peso inicial (+1,2\u00a0kg)",
+    });
+    const abaixo = textoDoAnel(progressoDaMeta(50, 49, 56)!, 56, "2026-05-12");
+    expect(abaixo.secundaria).toBe("abaixo do peso inicial (\u22121\u00a0kg)");
   });
 });
 

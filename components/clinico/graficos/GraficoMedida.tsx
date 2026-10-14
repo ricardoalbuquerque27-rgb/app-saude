@@ -1,21 +1,20 @@
 "use client";
 
 import { ComposedChart, Line, ReferenceLine, CartesianGrid, XAxis, YAxis } from "recharts";
+import { dataCurta } from "@/lib/consultas";
 import { diasEntre, marcasDoEixo, variacaoDaMedida, type PontoDeMedida } from "@/lib/evolucao";
+import { comSinal, comUnidade, numeroBR } from "@/lib/numeros";
 import {
   ALTURA_X,
   CaixaDaDica,
   COR,
-  ddmm,
   FOLGA,
   LARGURA_Y,
   MARGEM,
-  comSinal,
   marcasDoEixoX,
-  numeroBR,
   TICK,
   useGrafico,
-} from "./GraficoPeso";
+} from "./base";
 
 // Cintura ou % de gordura: o mesmo desenho do gráfico do peso, menor. Uma
 // linha por todas as medidas; o ponto cheio é a da consulta (o nutri mediu), o
@@ -58,13 +57,13 @@ export function GraficoMedida({
   const variacao = variacaoDaMedida(pontos);
   // % de gordura varia em pontos percentuais; cintura, na própria unidade.
   const unidadeDaVariacao = unidade === "%" ? "pontos" : unidade;
-  const valorDoTitulo = unidade === "%" ? `${numeroBR(ultimo)}%` : `${numeroBR(ultimo)} ${unidade}`;
+  const valorDoTitulo = comUnidade(ultimo, unidade);
   const textoDaVariacao =
     variacao == null
       ? null
       : variacao === 0
-        ? `igual a ${ddmm(inicio)}`
-        : `${comSinal(variacao)} ${unidadeDaVariacao} desde ${ddmm(inicio)}`;
+        ? `igual a ${dataCurta(inicio)}`
+        : `${comSinal(variacao)} ${unidadeDaVariacao} desde ${dataCurta(inicio)}`;
 
   return (
     <figure className="min-w-0">
@@ -119,7 +118,7 @@ export function GraficoMedida({
                 type="number"
                 domain={[min, max]}
                 ticks={marcasY}
-                tickFormatter={numeroBR}
+                tickFormatter={(v: number) => numeroBR(v)}
                 tick={TICK}
                 tickLine={false}
                 axisLine={false}
@@ -164,11 +163,9 @@ export function GraficoMedida({
 
             {ponteiro && ativo && (
               <CaixaDaDica x={xDe(ativo.dia)} largura={largura}>
-                <p className="font-semibold">
-                  {numeroBR(ativo.valor)} {unidade}
-                </p>
+                <p className="font-semibold">{comUnidade(ativo.valor, unidade)}</p>
                 <p className="text-clin-texto-2">
-                  {ativo.daConsulta ? "medida na consulta" : "medida de casa"} · {ddmm(ativo.data)}
+                  {ativo.daConsulta ? "medida na consulta" : "medida de casa"} · {dataCurta(ativo.data)}
                 </p>
               </CaixaDaDica>
             )}

@@ -109,6 +109,9 @@ export const PARES_TEXTO: [NomeCor, NomeCor][] = [
 export const PARES_GRAFICO: [NomeCor, NomeCor][] = [
   ["primaria", "linha"],
   ["atencao", "linha"],
+  // Também a linha vertical de cada consulta no GraficoPeso (em `linha` ela
+  // dava 1,24:1 e quase sumia), a meta tracejada e as bordas da faixa do
+  // MiniGrafico.
   ["campo", "chao"],
   // Aba Corpo, a Evolução (components/clinico/graficos/): a linha da média e o
   // arco do anel sobre o fundo da página, o ponto da consulta (e o texto dos

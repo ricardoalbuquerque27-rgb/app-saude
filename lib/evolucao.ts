@@ -1,4 +1,6 @@
 import { addDaysISO, dataNoBrasil, limitesDaJanela, weekStartISO } from "@/lib/date";
+import { dataCurta } from "@/lib/consultas";
+import { numeroBR } from "@/lib/numeros";
 import { pesoDoDia } from "@/lib/nutri";
 
 /**
@@ -62,10 +64,28 @@ export function inicioDoPeriodo(
   vinculo: { accepted_at: string | null; created_at: string },
   hoje: string
 ): string {
-  const comeco = dataNoBrasil(vinculo.accepted_at ?? vinculo.created_at);
+  const comeco = comecoDoAcompanhamento(vinculo);
   const piso = limitesDaJanela(hoje, 365).desde;
   if (comeco > hoje) return hoje;
   return comeco < piso ? piso : comeco;
+}
+
+/** O dia (em São Paulo) em que o acompanhamento começou: o aceite, ou a criação do vínculo. */
+function comecoDoAcompanhamento(vinculo: { accepted_at: string | null; created_at: string }): string {
+  return dataNoBrasil(vinculo.accepted_at ?? vinculo.created_at);
+}
+
+/**
+ * O período do gráfico foi cortado nos 12 meses (o acompanhamento começou
+ * antes)? É o "Últimos 12 meses" no lugar de "Desde dd/mm, o início do
+ * acompanhamento". O Corpo refazia `accepted_at ?? created_at` por fora:
+ * duas contas do mesmo começo, que podiam discordar.
+ */
+export function limitadoEmUmAno(
+  vinculo: { accepted_at: string | null; created_at: string },
+  hoje: string
+): boolean {
+  return comecoDoAcompanhamento(vinculo) < inicioDoPeriodo(vinculo, hoje);
 }
 
 // ---------------------------------------------------------------------------
@@ -237,6 +257,24 @@ export function tituloDoPeso(
   return null;
 }
 
+/**
+ * O rótulo do valor no título do gráfico. "média da semana" quando a média é
+ * desta semana ou da anterior; mais velha que isso, "média da semana de dd/mm"
+ * (o início dela): quem não se pesa há um mês tinha o título "média da semana
+ * 70,1 kg", como se fosse desta. `semanas` é a lista de `semanasDePeso`, que
+ * termina na semana de hoje. Sem semana com média, "última medida".
+ */
+export function rotuloDoPeso(semanas: SemanaDePeso[], titulo: TituloDoPeso): string {
+  if (titulo.rotulo !== "média da semana") return titulo.rotulo;
+  let ultima = -1;
+  semanas.forEach((s, i) => {
+    if (s.media != null) ultima = i;
+  });
+  return ultima >= 0 && ultima < semanas.length - 2
+    ? `média da semana de ${dataCurta(semanas[ultima].inicio)}`
+    : "média da semana";
+}
+
 /** Tendência precisa de dois pontos: 2+ semanas com média ou 2+ medidas da consulta. */
 export function temGraficoDePeso(
   semanas: SemanaDePeso[],
@@ -329,6 +367,55 @@ export function progressoDaMeta(
     feito: feitoMostrado,
     total: totalMostrado,
   };
+}
+
+/** O que o anel da meta escreve: o arco, a linha principal, a de baixo e o `aria-label`. */
+export type TextoDoAnel = {
+  /** Quanto do arco pintar, de 0 a 1. */
+  fracao: number;
+  principal: string;
+  secundaria: string | null;
+  /** A linha de baixo em `clin-atencao`: foi para o lado errado. */
+  atencao: boolean;
+  rotulo: string;
+};
+
+/**
+ * As frases do anel do "Meta de peso", de `progressoDaMeta`. `inicio` é o dia
+ * do peso inicial ("desde 12/05").
+ *
+ * - progresso: "66 kg · 50%" e "4,3 de 8,6 kg desde 12/05". O teto é 99%:
+ *   100% só quando a meta foi atingida, e 99,6% arredondaria para "100%" ao
+ *   lado de "faltam 0,1 kg";
+ * - atingida: anel cheio, "meta atingida" ou "passou da meta em N kg";
+ * - lado errado: anel vazio e "acima (ou abaixo) do peso inicial (+1,2 kg)",
+ *   com espaço sem quebra antes do "kg" (na coluna estreita, "(+0,2" ficava
+ *   numa linha e "kg)" na outra).
+ */
+export function textoDoAnel(
+  progresso: NonNullable<ProgressoDaMeta>,
+  meta: number,
+  inicio: string
+): TextoDoAnel {
+  const kg = `${numeroBR(meta)} kg`;
+  if (progresso.tipo === "progresso") {
+    const pct = Math.min(99, Math.round(progresso.fracao * 100));
+    const caminho = `${numeroBR(progresso.feito)} de ${numeroBR(progresso.total)} kg`;
+    return {
+      fracao: Math.min(1, progresso.fracao),
+      principal: `${kg} · ${pct}%`,
+      secundaria: `${caminho} desde ${dataCurta(inicio)}`,
+      atencao: false,
+      rotulo: `Progresso até a meta: ${caminho}, ${pct}%`,
+    };
+  }
+  if (progresso.tipo === "atingida") {
+    const frase = progresso.passou != null ? `passou da meta em ${numeroBR(progresso.passou)} kg` : "meta atingida";
+    return { fracao: 1, principal: `${kg} · ${frase}`, secundaria: null, atencao: false, rotulo: `Progresso até a meta: ${frase}` };
+  }
+  const sinal = progresso.diferenca > 0 ? "+" : "\u2212";
+  const frase = `${progresso.diferenca > 0 ? "acima" : "abaixo"} do peso inicial (${sinal}${numeroBR(Math.abs(progresso.diferenca))}\u00a0kg)`;
+  return { fracao: 0, principal: kg, secundaria: frase, atencao: true, rotulo: `Progresso até a meta: ${frase}` };
 }
 
 // ---------------------------------------------------------------------------

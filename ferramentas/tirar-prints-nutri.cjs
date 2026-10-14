@@ -2056,6 +2056,10 @@ async function transbordo(page) {
       const txt = (await textoDe(marcadas.first())).replace(/\s+/g, " ");
       ok(txt.includes(diaBR(14)) && txt.includes("66,4"), "e é a da consulta: o dia dela e os 66,4 kg", txt);
       ok((await linhas.filter({ hasNotText: MARCA }).count()) === 4, "as quatro medidas dela ficam sem a marca");
+      // O Peso atual diz de onde veio: a de hoje é dela, de casa (spec, "dizendo qual").
+      const topo = (await textoDe(page.locator("#corpo dl").first())).replace(/\s+/g, " ");
+      ok(topo.includes("65,4 kg") && topo.includes(`em ${diaBR(0)}, em casa`),
+        `o Peso atual da Luiza diz "em ${diaBR(0)}, em casa"`, topo);
       await fotografar(page, `${OUT}/corpo-na-consulta-desktop-claro.png`, COMPUTADOR);
       await page.close();
     }
@@ -2243,6 +2247,7 @@ async function transbordo(page) {
         const fundo = rgb(getComputedStyle(document.body).backgroundColor);
         const linha = document.querySelector("#corpo figure path.recharts-line-curve");
         const ponto = document.querySelector("#corpo figure circle.ponto-consulta");
+        const marca = document.querySelector("#corpo figure .linha-de-consulta line");
         const cs = (el) => getComputedStyle(el);
         return {
           fundo: cs(document.body).backgroundColor,
@@ -2250,10 +2255,16 @@ async function transbordo(page) {
           preenchimento: cs(ponto).fill,
           razaoLinha: razao(rgb(cs(linha).stroke), fundo),
           razaoPonto: razao(rgb(cs(ponto).fill), fundo),
+          razaoMarca: razao(rgb(cs(marca).stroke), fundo),
+          espessuraMarca: cs(marca).strokeWidth,
         };
       });
       ok(cores.razaoLinha >= 3 && cores.razaoPonto >= 3,
         `a linha e os pontos da consulta contrastam com o fundo (${tema}): linha ${cores.razaoLinha.toFixed(1)}:1, ponto ${cores.razaoPonto.toFixed(1)}:1`,
+        JSON.stringify(cores));
+      // A linha vertical de cada consulta era `linha` (1,24:1) e quase sumia.
+      ok(cores.razaoMarca >= 3 && cores.espessuraMarca === "1px",
+        `as linhas das consultas (1 px, tracejadas) contrastam com o fundo (${tema}): ${cores.razaoMarca.toFixed(1)}:1`,
         JSON.stringify(cores));
 
       // a dica: o mouse no computador, o toque no celular
@@ -2310,6 +2321,10 @@ async function transbordo(page) {
       ok(txt.includes("Ainda não dá para ver tendência"), 'Pedro: no lugar do gráfico, "Ainda não dá para ver tendência"', txt);
       ok((await corpo(page).locator("figure svg.recharts-surface").count()) === 0, "e nenhum gráfico de peso, cintura ou gordura");
       ok((await corpo(page).locator('[role="img"][aria-label^="Progresso"]').count()) === 0, "e nenhum anel (sem meta nem peso)");
+      // Sem meta não há o que editar (spec): o link diz "definir nas metas".
+      ok((await corpo(page).getByRole("link", { name: "definir nas metas" }).count()) === 1 &&
+        (await corpo(page).getByRole("link", { name: "editar nas metas" }).count()) === 0,
+        'e, sem meta, o link diz "definir nas metas" (e não "editar")', txt);
       ok(txt.includes("Cintura") && txt.includes("% de gordura"), "e a linha diz que cintura e % de gordura ficaram de fora", txt);
       await fotografar(page, `${OUT}/corpo-pouco-dado-desktop-claro.png`, COMPUTADOR);
       await page.close();

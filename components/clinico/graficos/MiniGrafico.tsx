@@ -76,10 +76,17 @@ export function MiniGrafico({
   // As bordas: só a que a faixa tem (sem teto, só a de baixo; sem piso, só a de
   // cima) e só a que cai dentro do desenho. Faixa que passa da borda do
   // desenho não ganha linha na borda do desenho.
-  const bordas = [faixa?.max, faixa?.min]
-    .filter((v): v is number => v != null)
-    .map(y)
-    .filter((yDaBorda) => yDaBorda > 0 && yDaBorda < ALTURA);
+  // Cada uma com o nome do lado: na faixa de um ponto só (min === max) as duas
+  // caem no mesmo y, e a chave pelo y se repetia.
+  const bordas = (
+    [
+      ["max", faixa?.max],
+      ["min", faixa?.min],
+    ] as const
+  )
+    .filter((b): b is readonly ["max" | "min", number] => b[1] != null)
+    .map(([lado, v]) => ({ lado, y: y(v) }))
+    .filter((b) => b.y > 0 && b.y < ALTURA);
 
   return (
     <svg
@@ -100,14 +107,14 @@ export function MiniGrafico({
           fill={COR.faixa}
         />
       )}
-      {bordas.map((yDaBorda) => (
+      {bordas.map((b) => (
         <line
-          key={yDaBorda}
+          key={b.lado}
           className="borda-da-faixa"
           x1={0}
           x2={LARGURA}
-          y1={casa(yDaBorda)}
-          y2={casa(yDaBorda)}
+          y1={casa(b.y)}
+          y2={casa(b.y)}
           stroke={COR.borda}
           strokeWidth={1}
           shapeRendering="crispEdges"

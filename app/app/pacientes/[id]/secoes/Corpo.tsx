@@ -1,14 +1,15 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { hrefDaAba } from "@/lib/abas";
-import { dataNoBrasil, formatDate, todayISO } from "@/lib/date";
+import { formatDate, todayISO } from "@/lib/date";
+import { numeroBR } from "@/lib/numeros";
 import {
   pesoDoDia,
   textoVariacaoPeso,
   type MetasPrescritas,
   type PatientSummary,
 } from "@/lib/nutri";
-import { diaDaConsulta } from "@/lib/consultas";
+import { dataCurta, diaDaConsulta } from "@/lib/consultas";
 import { getConsultasDoPaciente, type Res } from "@/lib/consultasDb";
 import { getEvolucaoDoCorpo, getInicioDoAcompanhamento } from "@/lib/evolucaoDb";
 import {
@@ -16,6 +17,7 @@ import {
   descricaoDoPeso,
   escalaDoPeso,
   inicioDoPeriodo,
+  limitadoEmUmAno,
   pesoInicialDoPeriodo,
   pontosDaConsulta,
   progressoDaMeta,
@@ -37,19 +39,11 @@ import { CLASSE_SELO } from "@/components/consultas/aparencia";
 
 const TITULO_BLOCO = "text-[15px] font-semibold leading-snug text-clin-texto";
 
-/** "68,4" — medida com no máximo uma casa, vírgula decimal. */
+/** "68,4" — medida com no máximo uma casa, vírgula decimal; sem medida, "—". */
 function medida(v: unknown): string {
   if (v == null || v === "") return "—";
   const n = Number(v);
-  return Number.isFinite(n)
-    ? n.toLocaleString("pt-BR", { maximumFractionDigits: 1 })
-    : "—";
-}
-
-/** "13/10" de "2026-10-13". */
-function ddmm(iso: string): string {
-  const [, m, d] = iso.split("-");
-  return `${d}/${m}`;
+  return Number.isFinite(n) ? numeroBR(n) : "—";
 }
 
 // Peso atual, variação, meta de peso (com o anel do caminho já feito), a
@@ -154,7 +148,7 @@ export async function Corpo({
 
   // ---- Evolução: o período, o peso inicial do anel e os três gráficos ----
   const desde = inicioDoPeriodo(vinculo.data, hoje);
-  const limitadoEmUmAno = dataNoBrasil(vinculo.data.accepted_at ?? vinculo.data.created_at) < desde;
+  const cortadoEmUmAno = limitadoEmUmAno(vinculo.data, hoje);
   const doPeriodo = evolucao.data;
   const semanas = semanasDePeso(doPeriodo, desde, hoje);
   const pesosDaConsulta = pontosDaConsulta(doPeriodo, "weight_kg");
@@ -200,8 +194,9 @@ export async function Corpo({
             {peso != null ? `${medida(peso)} kg` : "—"}
           </dd>
           {dataDoPeso && (
+            // Sempre dizendo qual (spec): a da consulta ou a de casa.
             <dd className="text-[13px] tabular-nums text-clin-texto-2">
-              {`em ${formatDate(dataDoPeso)}${pesoNaConsulta ? ", na consulta" : ""}`}
+              {`em ${formatDate(dataDoPeso)}, ${pesoNaConsulta ? "na consulta" : "em casa"}`}
             </dd>
           )}
         </div>
@@ -232,9 +227,9 @@ export async function Corpo({
           )}
           <dd>
             {/* A meta de peso se edita junto das outras metas, na aba
-                Alimentação. */}
+                Alimentação. Sem meta não há o que editar: "definir". */}
             <Link href={hrefDaAba(uid, "alimentacao")} className={`inline-flex ${LINK}`}>
-              editar nas metas
+              {alvo != null ? "editar nas metas" : "definir nas metas"}
             </Link>
           </dd>
         </div>
@@ -245,7 +240,7 @@ export async function Corpo({
           Evolução
         </h3>
         <p className="mt-0.5 text-[13px] text-clin-texto-2">
-          {limitadoEmUmAno
+          {cortadoEmUmAno
             ? `Últimos 12 meses, desde ${formatDate(desde)}.`
             : `Desde ${formatDate(desde)}, o início do acompanhamento.`}
         </p>
@@ -273,14 +268,16 @@ export async function Corpo({
               </p>
               {pesosDaConsulta.length + semanasComMedia.length > 0 ? (
                 <ul className="mt-2 space-y-0.5 text-[14px] tabular-nums text-clin-texto">
-                  {pesosDaConsulta.map((p) => (
-                    <li key={`c-${p.data}`}>
-                      Consulta de {ddmm(p.data)}: {medida(p.valor)} kg
+                  {/* A chave leva a posição: duas medidas da consulta no
+                      mesmo dia davam a mesma. */}
+                  {pesosDaConsulta.map((p, i) => (
+                    <li key={`c-${i}-${p.data}`}>
+                      Consulta de {dataCurta(p.data)}: {medida(p.valor)} kg
                     </li>
                   ))}
                   {semanasComMedia.map((sem) => (
                     <li key={`s-${sem.inicio}`}>
-                      Semana de {ddmm(sem.inicio)} a {ddmm(sem.fim)}: média {medida(sem.media)} kg ({sem.dias}
+                      Semana de {dataCurta(sem.inicio)} a {dataCurta(sem.fim)}: média {medida(sem.media)} kg ({sem.dias}
                       {"\u00a0"}
                       {sem.dias === 1 ? "pesagem" : "pesagens"})
                     </li>
