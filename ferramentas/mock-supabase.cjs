@@ -590,18 +590,30 @@ function carteira() {
   // referência" da fila olha os 180 dias e conta qualquer status que não seja
   // "normal", e triglicerídeos 168 ou LDL 132 são "atencao" de verdade (é o que
   // o app grava). Mais recentes, a Helena entraria na fila com um alerta. São os
-  // exames que ela trouxe de antes do vínculo, em três laudos:
+  // exames que ela trouxe de antes do vínculo, em três laudos e um resultado
+  // sem número:
   //   300 dias  triglicerídeos 141, LDL 145, vitamina D 18, "Glicose" 101,
   //             colesterol total 200, vitamina B12 310 pg/mL
   //   245 dias  vitamina D 24, "Glicemia de jejum" 98, ferritina 45
-  //   192 dias  triglicerídeos 168 (saiu), LDL 132 (mais perto), vitamina D 38
-  //             (entrou, com minigráfico), "Glicemia de jejum" 92 (a mesma linha
-  //             da Glicose, com minigráfico), colesterol total 190, VLDL-
-  //             colesterol 24 (NO MESMO DIA do 190: tem de continuar uma linha
-  //             à parte, e não somar ao colesterol total), vitamina B12 235
-  //             pmol/L (unidade diferente da anterior)
+  //   192 dias  triglicerídeos 168 (saiu), e um 165 lançado antes no mesmo dia
+  //             (a linha avisa "mais de um resultado"), LDL 132 (mais perto),
+  //             vitamina D 38 (entrou, com minigráfico), "Glicemia de jejum" 92
+  //             (a mesma linha da Glicose, com minigráfico), colesterol total
+  //             190 (mais perto: o "< 190" do laudo é estrito), VLDL-colesterol
+  //             24 (NO MESMO DIA do 190: tem de continuar uma linha à parte, e
+  //             não somar ao colesterol total), vitamina B12 235 pmol/L
+  //             (unidade diferente da anterior)
+  //   185 dias  "Glicemia de jejum" sem número, "Amostra hemolisada": a linha
+  //             da glicemia continua no 92 e diz "depois: Amostra hemolisada"
   // A ferritina tem um resultado só e a data mais antiga das linhas de um
   // resultado só (o VLDL é outra), para continuar por último na tabela.
+  //
+  // Dois `status` são os que o app ANTIGO gravava, de propósito: a B12 de 235
+  // pmol/L como "atencao" (o classifyExam a julgava pela tabela em pg/mL) e o
+  // VLDL com a referência "< 190 mg/dL", que é o texto da faixa do colesterol
+  // total (o casamento frouxo achava "colesterol" no nome). O comparativo não
+  // lê o status gravado (o selo da B12 sai do laudo: "Normal") e não toma o
+  // texto da tabela por laudo (o VLDL fica sem faixa).
   const helena = () => {
     const uid = P.helena, k = "he";
     const metas = { kcal: 1700, prot: 105, agua: 2500, peso: 66 };
@@ -720,9 +732,13 @@ function carteira() {
       e(12, LAUDO_3, "Vitamina D", "38", "ng/mL", "30 a 100", "normal"),
       e(13, LAUDO_3, "Glicemia de jejum", "92", "mg/dL", "70 a 99", "normal"),
       e(14, LAUDO_3, "Colesterol total", "190", "mg/dL", "< 190", "atencao"),
-      e(15, LAUDO_3, "VLDL-colesterol", "24", "mg/dL", "< 30", "normal"),
+      // A referência é a da tabela do colesterol total, gravada pelo app antigo.
+      e(15, LAUDO_3, "VLDL-colesterol", "24", "mg/dL", "< 190 mg/dL", "normal"),
       // Outro laboratório, que dá a B12 em pmol/L: não se compara com os 310 pg/mL.
       e(16, LAUDO_3, "Vitamina B12", "235", "pmol/L", "148 a 664", "atencao"),
+      // Lançado antes do 168 no mesmo dia (às 11:00; o 168 é das 12:00): vale o 168.
+      { ...e(17, LAUDO_3, "Triglicerídeos", "165", "mg/dL", "< 150", "atencao"), created_at: em(LAUDO_3, "11:00") },
+      e(18, 185, "Glicemia de jejum", "Amostra hemolisada", null, "70 a 99", "normal"),
     ];
 
     return juntar({

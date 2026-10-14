@@ -2333,26 +2333,34 @@ async function transbordo(page) {
   // ---- Clínico: o comparativo dos exames (Helena, Joana e Pedro) ----
   etapa = "Clínico: comparativo dos exames";
   {
-    // Do mock (ferramentas/LEIAME.md): a Helena tem 16 resultados de 8 exames, em
-    // três laudos de 300, 245 e 192 dias atrás. O que a tela tem de dizer, na
-    // ordem em que a lógica (lib/exames.ts) os põe: Triglicerídeos (saiu da
-    // faixa), LDL (mais perto), depois os que estão dentro (Colesterol total,
-    // Glicemia de jejum, Vitamina B12, Vitamina D), depois os de um resultado só
-    // (VLDL-colesterol, a ferritina por último). "Glicose" e "Glicemia de
-    // jejum" são uma linha só, com minigráfico, e a Vitamina D também; os
-    // outros dizem "N resultados".
+    // Do mock (ferramentas/LEIAME.md): a Helena tem 18 resultados de 8 exames, em
+    // três laudos de 300, 245 e 192 dias atrás e um resultado sem número de 185
+    // dias. O que a tela tem de dizer, na ordem em que a lógica (lib/exames.ts)
+    // os põe: Triglicerídeos (saiu da faixa), LDL e Colesterol total (mais perto:
+    // o "< 190" do laudo é estrito, e o 190 ainda está fora), depois os que estão
+    // dentro (Glicemia de jejum, Vitamina B12, Vitamina D), depois os de um
+    // resultado só (VLDL-colesterol, a ferritina por último). "Glicose" e
+    // "Glicemia de jejum" são uma linha só, com minigráfico, e a Vitamina D
+    // também; os outros dizem "N resultados".
     //
-    // O que NÃO se confere: o texto de "O que mudou" do Colesterol total. O
-    // laudo diz "< 190", e o parser lê isso como máximo inclusivo (o 190 "entra
-    // na faixa"); a correção prevista o trata como exclusivo, e a linha passa a
-    // dizer outra coisa. Que ele é uma linha à parte do VLDL-colesterol, do
-    // mesmo dia, confere.
-    const LAUDO_1 = 300, LAUDO_2 = 245, LAUDO_3 = 192;
-    const dm = (n) => diaBR(n).slice(0, 5);
+    // O selo do Último sai da faixa da linha, não do status gravado: a B12 está
+    // gravada "atencao" (o app antigo a julgava pela tabela em pg/mL) e o selo
+    // diz "Normal" (235 dentro de 148 a 664); o VLDL tem gravada a referência
+    // da tabela do colesterol total ("< 190 mg/dL") e fica sem faixa nem selo.
+    //
+    // A data leva o ano quando não é o de hoje (o laudo de 300 dias atrás, e os
+    // outros conforme o dia em que o mock sobe): `dm`.
+    const LAUDO_1 = 300, LAUDO_2 = 245, LAUDO_3 = 192, HEMOLISADA = 185;
+    const dm = (n) => {
+      const [d, m, a] = diaBR(n).split("/");
+      return a === diaBR(0).split("/")[2] ? `${d}/${m}` : `${d}/${m}/${a.slice(2)}`;
+    };
     const limpo = async (loc) => (await textoDe(loc)).replace(/\s+/g, " ").trim();
     const painel = (page) => page.locator("#clinico");
     const tabela = (page) => page.getByRole("region", { name: "Comparativo dos exames" });
     const lista = (page) => page.getByRole("list", { name: "Resultados dos exames" });
+    // A mesma ordem de antes do "<" estrito: o Colesterol total passou de
+    // primeiro dos que estão dentro a último dos que seguem fora.
     const ORDEM = ["Triglicerídeos", "Colesterol LDL", "Colesterol total", "Glicemia de jejum", "Vitamina B12", "Vitamina D", "VLDL-colesterol", "Ferritina"];
     const VAZIA = { nome: "", ref: "", ultimo: "", anterior: "", mudou: "", tendencia: "", graficos: 0 };
 
@@ -2398,24 +2406,30 @@ async function transbordo(page) {
       const l = (nome) => linhas.find((x) => x.nome === nome) || VAZIA;
 
       const trig = l("Triglicerídeos");
-      ok(trig.ref === "ref. < 150" && trig.ultimo.includes("168 mg/dL") && trig.ultimo.includes("Atenção") && trig.ultimo.includes(dm(LAUDO_3)),
-        `Triglicerídeos: ref. < 150, último 168 mg/dL com o selo Atenção e a data ${dm(LAUDO_3)} (${rot})`, JSON.stringify(trig));
+      ok(trig.ref === "ref. < 150" && trig.ultimo.includes("168 mg/dL") && trig.ultimo.includes("Alterado") && trig.ultimo.includes(dm(LAUDO_3)),
+        `Triglicerídeos: ref. < 150, último 168 mg/dL com o selo Alterado (fora da faixa do laudo) e a data ${dm(LAUDO_3)} (${rot})`, JSON.stringify(trig));
+      ok(trig.ultimo.includes(`mais de um resultado em ${dm(LAUDO_3)}`),
+        `e avisa "mais de um resultado em ${dm(LAUDO_3)}" (o 165 do mesmo dia) (${rot})`, JSON.stringify(trig));
       ok(trig.anterior === `141 · ${dm(LAUDO_1)}` && trig.mudou.includes("+27") && trig.mudou.includes("saiu da faixa") && trig.tendencia === "2 resultados" && trig.graficos === 0,
         `Triglicerídeos: anterior "141 · ${dm(LAUDO_1)}", +27, "saiu da faixa" e "2 resultados" no lugar do gráfico (${rot})`, JSON.stringify(trig));
       const ldl = l("Colesterol LDL");
-      ok(ldl.ultimo.includes("132 mg/dL") && ldl.anterior === `145 · ${dm(LAUDO_1)}` && ldl.mudou.includes("−13") && ldl.mudou.includes("mais perto da faixa"),
-        `LDL: 132 mg/dL, anterior "145 · ${dm(LAUDO_1)}", −13 e "mais perto da faixa" (${rot})`, JSON.stringify(ldl));
+      ok(ldl.ultimo.includes("132 mg/dL") && ldl.ultimo.includes("Alterado") && ldl.anterior === `145 · ${dm(LAUDO_1)}` && ldl.mudou.includes("−13") && ldl.mudou.includes("mais perto da faixa"),
+        `LDL: 132 mg/dL Alterado, anterior "145 · ${dm(LAUDO_1)}", −13 e "mais perto da faixa" (${rot})`, JSON.stringify(ldl));
       const vitD = l("Vitamina D");
       ok(vitD.ultimo.includes("38 ng/mL") && vitD.ultimo.includes("Normal") && vitD.anterior === `24 · ${dm(LAUDO_2)}` && vitD.mudou.includes("+14") && vitD.mudou.includes("entrou na faixa"),
         `Vitamina D: 38 ng/mL Normal, anterior "24 · ${dm(LAUDO_2)}", +14 e "entrou na faixa" (${rot})`, JSON.stringify(vitD));
       const glic = l("Glicemia de jejum");
-      ok(glic.ultimo.includes("92 mg/dL") && glic.anterior === `98 · ${dm(LAUDO_2)}` && glic.mudou.includes("−6") && glic.mudou.includes("segue na faixa"),
-        `Glicemia de jejum: 92 mg/dL, anterior "98 · ${dm(LAUDO_2)}" (a série de 3 junta Glicose e Glicemia), −6 e "segue na faixa" (${rot})`, JSON.stringify(glic));
+      ok(glic.ultimo.includes("92 mg/dL") && glic.ultimo.includes("Normal") && glic.anterior === `98 · ${dm(LAUDO_2)}` && glic.mudou.includes("−6") && glic.mudou.includes("segue na faixa"),
+        `Glicemia de jejum: 92 mg/dL Normal, anterior "98 · ${dm(LAUDO_2)}" (a série de 3 junta Glicose e Glicemia), −6 e "segue na faixa" (${rot})`, JSON.stringify(glic));
+      ok(glic.ultimo.includes(`depois: Amostra hemolisada em ${dm(HEMOLISADA)}`),
+        `e diz o resultado sem número que veio depois: "depois: Amostra hemolisada em ${dm(HEMOLISADA)}" (${rot})`, JSON.stringify(glic));
       // O anterior da B12 está em outra unidade (310 pg/mL contra 235 pmol/L): sem
       // unidade, o 310 pareceria estar em pmol/L. A coluna não mostra o número.
+      // O selo é "Normal" (235 dentro de 148 a 664), e não o "atencao" gravado.
       const b12 = l("Vitamina B12");
-      ok(b12.ultimo.includes("235 pmol/L") && b12.ultimo.includes("Atenção") && b12.mudou === "unidade diferente do anterior" && b12.tendencia === "2 resultados",
-        `Vitamina B12: 235 pmol/L com o selo Atenção, "unidade diferente do anterior", sem diferença numérica (${rot})`, JSON.stringify(b12));
+      ok(b12.ref === "ref. 148 a 664" && b12.ultimo.includes("235 pmol/L") && b12.ultimo.includes("Normal") && !b12.ultimo.includes("Atenção") &&
+        b12.mudou === "unidade diferente do anterior" && b12.tendencia === "2 resultados",
+        `Vitamina B12: 235 pmol/L com o selo Normal (da faixa do laudo, não o status gravado), "unidade diferente do anterior", sem diferença numérica (${rot})`, JSON.stringify(b12));
       ok(b12.anterior === dm(LAUDO_1) && !b12.anterior.includes("310") && !b12.anterior.includes("pg"),
         `e o Anterior da B12 mostra só a data ${dm(LAUDO_1)}, sem o 310 (${rot})`, b12.anterior);
       // Colesterol total e VLDL-colesterol caem no mesmo dia: duas linhas.
@@ -2423,8 +2437,20 @@ async function transbordo(page) {
       const vldl = l("VLDL-colesterol");
       ok(colTotal.ultimo.includes("190 mg/dL") && colTotal.anterior === `200 · ${dm(LAUDO_1)}` && vldl.ultimo.includes("24 mg/dL"),
         `Colesterol total (190, anterior 200) e VLDL-colesterol (24) do mesmo dia são duas linhas (${rot})`, JSON.stringify({ colTotal, vldl }));
+      ok(colTotal.ref === "ref. < 190" && colTotal.ultimo.includes("Alterado") && colTotal.mudou.includes("−10") && colTotal.mudou.includes("mais perto da faixa"),
+        `Colesterol total: com "< 190" o 190 ainda está fora, Alterado, −10 e "mais perto da faixa" (${rot})`, JSON.stringify(colTotal));
       ok(vldl.mudou === "primeiro resultado" && vldl.anterior === "—" && vldl.tendencia === "1 resultado",
         `VLDL-colesterol: "primeiro resultado", anterior "—" e "1 resultado" (${rot})`, JSON.stringify(vldl));
+      ok(vldl.ref === "sem faixa de referência" && !/Normal|Atenção|Alterado/.test(vldl.ultimo),
+        `e a referência gravada "< 190 mg/dL" (a da tabela do colesterol total) não vale como laudo: sem faixa e sem selo (${rot})`, JSON.stringify(vldl));
+      // Os avisos em clin-atencao sobre o fundo: par de texto testado (4,5:1).
+      const avisos = await caixa.locator(".aviso-do-exame").evaluateAll((els) =>
+        els.map((el) => ({ texto: el.textContent, cor: getComputedStyle(el).color }))
+      );
+      const fundoDoAviso = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+      ok(avisos.length === 2 && avisos.every((a) => razao(a.cor, fundoDoAviso) >= 4.5),
+        `os dois avisos da tabela contrastam com o fundo (${tema}): ${avisos.map((a) => razao(a.cor, fundoDoAviso).toFixed(1)).join(" e ")}:1`,
+        JSON.stringify({ avisos, fundoDoAviso }));
       const ferr = l("Ferritina");
       ok(ferr.ultimo.includes("45 ng/mL") && ferr.ultimo.includes(dm(LAUDO_2)) && ferr.mudou === "primeiro resultado" && ferr.tendencia === "1 resultado",
         `Ferritina, por último: 45 ng/mL em ${dm(LAUDO_2)}, "primeiro resultado" e "1 resultado" (${rot})`, JSON.stringify(ferr));
@@ -2506,20 +2532,20 @@ async function transbordo(page) {
       }
 
       // "Ver todos os resultados (N)": a lista de sempre, do mais novo ao mais velho
-      const verTodos = painel(page).locator("summary", { hasText: "Ver todos os resultados (16)" });
+      const verTodos = painel(page).locator("summary", { hasText: "Ver todos os resultados (18)" });
       const todos = lista(page);
-      ok((await apareceu(verTodos, 5000)) && !(await todos.isVisible()), `"Ver todos os resultados (16)" começa fechado (${rot})`);
+      ok((await apareceu(verTodos, 5000)) && !(await todos.isVisible()), `"Ver todos os resultados (18)" começa fechado (${rot})`);
       await verTodos.scrollIntoViewIfNeeded();
       await verTodos.click();
       const abriu = await apareceu(todos, 5000);
-      ok(abriu, `clicar em "Ver todos os resultados (16)" abre a lista (${rot})`);
+      ok(abriu, `clicar em "Ver todos os resultados (18)" abre a lista (${rot})`);
       if (abriu) {
         const itens = await todos.locator("li").evaluateAll((lis) => lis.map((li) => li.innerText.replace(/\s+/g, " ").trim()));
         const datas = itens.map((t) => (t.match(/(\d{2})\/(\d{2})\/(\d{4})/) || []).slice(1).reverse().join(""));
-        ok(itens.length === 16 && datas.every(Boolean) && datas.every((d, i) => i === 0 || d <= datas[i - 1]),
-          `a lista tem os 16 resultados, do mais novo ao mais velho (${rot})`, itens.join(" | "));
-        ok(itens[0].includes(diaBR(LAUDO_3)) && itens[itens.length - 1].includes(diaBR(LAUDO_1)),
-          `começa em ${diaBR(LAUDO_3)} e acaba em ${diaBR(LAUDO_1)} (${rot})`, `${itens[0]} ... ${itens[itens.length - 1]}`);
+        ok(itens.length === 18 && datas.every(Boolean) && datas.every((d, i) => i === 0 || d <= datas[i - 1]),
+          `a lista tem os 18 resultados, do mais novo ao mais velho (${rot})`, itens.join(" | "));
+        ok(itens[0].includes(diaBR(HEMOLISADA)) && itens[0].includes("Amostra hemolisada") && itens[itens.length - 1].includes(diaBR(LAUDO_1)),
+          `começa no "Amostra hemolisada" de ${diaBR(HEMOLISADA)} e acaba em ${diaBR(LAUDO_1)} (${rot})`, `${itens[0]} ... ${itens[itens.length - 1]}`);
         ok(itens.some((t) => t.includes("Glicose") && t.includes("101 mg/dL")),
           `e a lista traz o "Glicose" de 101, que a tabela juntou à Glicemia de jejum (${rot})`);
         ok((await limpo(painel(page).locator("summary", { hasText: "Esconder resultados" }))).includes("Esconder resultados"),

@@ -1,13 +1,14 @@
 import { ChevronDown } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { dataCurta } from "@/lib/consultas";
 import { formatDate, idadeEm, todayISO } from "@/lib/date";
-import { chaveDoExame, parseExamNumber, type ExamContext } from "@/lib/examRanges";
+import type { ExamContext } from "@/lib/examRanges";
 import {
+  avisosDaLinha,
   compararExames,
+  dataDoComparativo,
   descricaoDaSerie,
+  fraseSemComparacao,
   resumoDoComparativo,
-  type LinhaDeExame,
   type LinhaDoComparativo,
 } from "@/lib/exames";
 import { getExamesDoPaciente, type ExameDoPaciente } from "@/lib/examesDb";
@@ -39,27 +40,6 @@ const numero = (n: number) =>
 const comSinal = (n: number) => (n === 0 ? "0" : `${n < 0 ? "−" : "+"}${numero(Math.abs(n))}`);
 
 type Exame = ExameDoPaciente;
-
-/**
- * Em quantos dias cada exame tem resultado com número: o "N resultados" da
- * coluna Tendência quando não há minigráfico. A linha do comparativo só traz a
- * série com 3 resultados ou mais na MESMA unidade, então "2 resultados" para
- * todo exame sem série mentiria sobre o que tem três e um deles em outra
- * unidade. Mesma regra de `compararExames`: sem número fica fora, e dois
- * resultados no mesmo dia contam um.
- */
-function resultadosPorExame(exames: LinhaDeExame[]): Map<string, number> {
-  const dias = new Map<string, Set<string>>();
-  for (const e of exames) {
-    if (parseExamNumber(e.result_value) == null) continue;
-    const chave = chaveDoExame((e.title ?? "").trim());
-    if (!chave) continue;
-    const datas = dias.get(chave) ?? new Set<string>();
-    datas.add(e.date);
-    dias.set(chave, datas);
-  }
-  return new Map(Array.from(dias, ([chave, datas]) => [chave, datas.size]));
-}
 
 // Tratamento, próxima dose, exames e efeitos colaterais. Só leitura: são
 // registros do paciente, e o nutricionista não os altera.
@@ -132,10 +112,9 @@ export async function Clinico({
     age: idadeEm(nascimento, hoje),
   };
   const comparativo = compararExames(exames, contexto);
-  // Todos com um resultado só (ou nenhum com número): não há o que comparar, e
-  // a tela diz isso e mostra a lista de sempre, em vez de uma tabela de
-  // "primeiro resultado".
-  const semComparacao = comparativo.every((l) => l.mudanca === "primeiro resultado");
+  // Nenhum exame com o que comparar: a tela diz por quê (fraseSemComparacao) e
+  // mostra a lista de sempre, em vez de uma tabela de "primeiro resultado".
+  const semComparacao = fraseSemComparacao(exames, comparativo);
 
   return (
     <Secao id="clinico" titulo="Clínico">
@@ -203,17 +182,13 @@ export async function Clinico({
         <p className="mt-2 text-[14px] text-clin-texto-2">Nenhum exame registrado.</p>
       ) : semComparacao ? (
         <>
-          <p className="mt-2 text-[14px] text-clin-texto-2">
-            {comparativo.length === 0
-              ? "Sem comparação ainda: nenhum resultado tem número para comparar."
-              : "Sem comparação ainda: cada exame tem um resultado só."}
-          </p>
+          <p className="mt-2 text-[14px] text-clin-texto-2">{semComparacao}</p>
           <div className="mt-2">
             <ListaDeExames exames={exames} />
           </div>
         </>
       ) : (
-        <ComparativoDosExames comparativo={comparativo} exames={exames} />
+        <ComparativoDosExames comparativo={comparativo} exames={exames} hoje={hoje} />
       )}
 
       {efeitos.length > 0 && (
@@ -306,12 +281,15 @@ function ListaDeExames({ exames }: { exames: Exame[] }) {
 function ComparativoDosExames({
   comparativo,
   exames,
+  hoje,
 }: {
   comparativo: LinhaDoComparativo[];
   exames: Exame[];
+  /** Para a data com ano quando o ano não é o de hoje (dataDoComparativo). */
+  hoje: string;
 }) {
   const { melhores, piores, umResultado } = resumoDoComparativo(comparativo);
-  const resultados = resultadosPorExame(exames);
+  const data = (iso: string) => dataDoComparativo(iso, hoje);
 
   return (
     <div className="mt-2">
@@ -343,8 +321,10 @@ function ComparativoDosExames({
           </thead>
           <tbody>
             {comparativo.map((l) => {
-              const st = situacaoDoExame(l.ultimo.status);
-              const n = resultados.get(l.chave) ?? (l.anterior ? 2 : 1);
+              // O selo sai da faixa da linha (lib/exames.ts, `situacao`), não
+              // do status gravado: assim nunca contradiz a referência ao lado.
+              const st = situacaoDoExame(l.situacao);
+              const avisos = avisosDaLinha(l, hoje);
               return (
                 <tr key={l.chave} className="border-b border-clin-linha text-clin-texto last:border-b-0">
                   <th scope="row" className="min-w-[150px] py-3 pl-3.5 pr-2 text-left align-top font-medium">
@@ -359,8 +339,19 @@ function ComparativoDosExames({
                       <span className={`${CLASSE_SELO} mt-0.5 ${st.caixa}`}>{comMaiuscula(st.rotulo)}</span>
                     )}
                     <time dateTime={l.ultimo.data} className="block text-[13px] text-clin-texto-2">
-                      {dataCurta(l.ultimo.data)}
+                      {data(l.ultimo.data)}
                     </time>
+                    {/* O que a conta deixou de lado, dito na linha: o
+                        resultado sem número que veio depois e o dia com mais
+                        de um resultado (vale o último lançado). */}
+                    {avisos.map((a) => (
+                      <span
+                        key={a}
+                        className="aviso-do-exame mt-0.5 block min-w-[10rem] text-[13px] leading-snug text-clin-atencao dark:text-clin-atencao"
+                      >
+                        {a}
+                      </span>
+                    ))}
                   </td>
                   {/* Sem quebra de linha: "141 ·" numa linha e "18/12" na outra
                       não se lê, e o resultado com a unidade ("235 pmol/L")
@@ -372,8 +363,8 @@ function ComparativoDosExames({
                     {!l.anterior
                       ? "—"
                       : l.mudanca === "unidade diferente do anterior"
-                        ? dataCurta(l.anterior.data)
-                        : `${numero(l.anterior.valor)} · ${dataCurta(l.anterior.data)}`}
+                        ? data(l.anterior.data)
+                        : `${numero(l.anterior.valor)} · ${data(l.anterior.data)}`}
                   </td>
                   <td className="px-2 py-3 align-top">
                     {l.diferenca != null && (
@@ -391,10 +382,10 @@ function ComparativoDosExames({
                   </td>
                   <td className="py-3 pl-2 pr-3.5 align-top">
                     {l.serie ? (
-                      <MiniGrafico serie={l.serie} faixa={l.faixa} descricao={descricaoDaSerie(l)} />
+                      <MiniGrafico serie={l.serie} faixa={l.faixa} descricao={descricaoDaSerie(l, hoje)} />
                     ) : (
                       <span className="text-[13px] text-clin-texto-2">
-                        {n} {n === 1 ? "resultado" : "resultados"}
+                        {l.resultados} {l.resultados === 1 ? "resultado" : "resultados"}
                       </span>
                     )}
                   </td>
@@ -408,8 +399,8 @@ function ComparativoDosExames({
       <p className="mt-3 text-[13px] leading-snug text-clin-texto-2">
         Ordem: primeiro o que piorou, depois o que segue fora da faixa ou sem comparação, depois o que está
         dentro da faixa e, por último, os de um resultado só. A faixa é a do laudo; sem ela, a da tabela do
-        app. O minigráfico aparece com 3 resultados ou mais na mesma unidade, e a faixa sombreada nele é a de
-        referência.
+        app, e o selo do último resultado sai dessa mesma faixa. O minigráfico aparece com 3 resultados ou
+        mais na mesma unidade, e a faixa sombreada nele é a de referência.
       </p>
 
       {/* <details> nativo, como o "Ver histórico": abre com teclado e leitor de

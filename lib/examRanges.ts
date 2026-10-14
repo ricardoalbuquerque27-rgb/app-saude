@@ -570,20 +570,20 @@ export function unidadeDoExame(nome: string, unidade: string | null | undefined)
 
 // A faixa de referência da tabela do app para o exame, pelo mesmo casamento de
 // `chaveDoExame` (nome com uma palavra que a entrada não tem não leva a faixa
-// dela), com a unidade em que a entrada está. Só quando a `unidade` do
+// dela), com a unidade em que a entrada está e a situação do `valor` nela (os
+// três níveis da entrada: é o selo do comparativo). Só quando a `unidade` do
 // resultado é vazia ou da entrada (`naUnidadeDaEntrada`). Exame que depende do
-// sexo, sem o sexo, fica sem faixa: não chutamos, como no `classifyExam`. O
-// `valor` entra porque a entrada é uma função do valor, embora o texto da faixa
-// não mude com ele.
+// sexo, sem o sexo, fica sem faixa: não chutamos, como no `classifyExam`.
 export function faixaDaTabela(
   nome: string,
   valor: number,
   ctx: ExamContext,
   unidade: string | null = null
-): { faixa: string; unidade: string } | null {
+): { faixa: string; unidade: string; situacao: ExamLevel } | null {
   const def = entradaDaTabela(nome);
   if (!def || (def.sexDependent && !ctx.sex) || !naUnidadeDaEntrada(def, unidade)) return null;
-  return { faixa: def.classify(valor, ctx).faixa, unidade: def.unit };
+  const r = def.classify(valor, ctx);
+  return { faixa: r.faixa, unidade: def.unit, situacao: r.status };
 }
 
 const STATUS_LABEL: Record<ExamLevel, string> = {

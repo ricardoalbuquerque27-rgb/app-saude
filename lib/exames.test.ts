@@ -1,12 +1,18 @@
 import { describe, it, expect } from "vitest";
 import { chaveDoExame } from "./examRanges";
 import {
+  avisosDaLinha,
   compararExames,
+  dataDoComparativo,
+  fraseSemComparacao,
   resumoDoComparativo,
   descricaoDaSerie,
   type LinhaDeExame,
   type LinhaDoComparativo,
 } from "./exames";
+
+/** O "hoje" dos testes de data: 2026, o mesmo ano dos resultados de 2026. */
+const HOJE = "2026-10-14";
 
 /** Um resultado de exame; só o que o teste quer dizer vai nos argumentos. */
 function ex(
@@ -162,7 +168,7 @@ describe("compararExames: o que mudou", () => {
     expect(min("30", "35")).toBe("mais perto da faixa");
   });
 
-  it("a situação e o texto do último vêm do último resultado", () => {
+  it("o texto do último vem do último resultado; o status gravado não entra", () => {
     const [l] = compararExames(
       [
         ex("2026-07-10", FORA_DA_TABELA, "88", { status: "normal", unit: "mg/dL" }),
@@ -170,12 +176,12 @@ describe("compararExames: o que mudou", () => {
       ],
       {}
     );
-    expect(l.ultimo).toEqual({ valor: 92, texto: "92 mg/dL", data: "2026-10-02", status: "atencao" });
+    expect(l.ultimo).toEqual({ valor: 92, texto: "92 mg/dL", data: "2026-10-02" });
   });
 
-  it("o último sem unidade e sem situação fica só com o texto do valor", () => {
+  it("o último sem unidade fica só com o texto do valor", () => {
     const [l] = compararExames([ex("2026-10-02", FORA_DA_TABELA, " 92 ")], {});
-    expect(l.ultimo).toEqual({ valor: 92, texto: "92", data: "2026-10-02", status: null });
+    expect(l.ultimo).toEqual({ valor: 92, texto: "92", data: "2026-10-02" });
   });
 });
 
@@ -1123,7 +1129,7 @@ describe("descricaoDaSerie", () => {
     )[0];
 
   it("os pontos em dd/mm e a faixa", () => {
-    expect(descricaoDaSerie(vitD())).toBe(
+    expect(descricaoDaSerie(vitD(), HOJE)).toBe(
       "Vitamina D: 18 em 15/01, 24 em 10/07, 38 em 02/10; faixa de 30 a 100."
     );
   });
@@ -1137,7 +1143,7 @@ describe("descricaoDaSerie", () => {
       ],
       {}
     );
-    expect(descricaoDaSerie(l)).toBe("TSH: 2,35 em 15/01, 3,1 em 10/07, 1,9 em 02/10; faixa de 0,4 a 4.");
+    expect(descricaoDaSerie(l, HOJE)).toBe("TSH: 2,35 em 15/01, 3,1 em 10/07, 1,9 em 02/10; faixa de 0,4 a 4.");
   });
 
   it("faixa de um lado só", () => {
@@ -1150,10 +1156,10 @@ describe("descricaoDaSerie", () => {
         ],
         {}
       )[0];
-    expect(descricaoDaSerie(tres("até 20"))).toBe(
+    expect(descricaoDaSerie(tres("até 20"), HOJE)).toBe(
       "Marcador Zeta: 10 em 15/01, 12 em 10/07, 14 em 02/10; faixa até 20."
     );
-    expect(descricaoDaSerie(tres(">= 5"))).toBe(
+    expect(descricaoDaSerie(tres(">= 5"), HOJE)).toBe(
       "Marcador Zeta: 10 em 15/01, 12 em 10/07, 14 em 02/10; faixa a partir de 5."
     );
   });
@@ -1168,10 +1174,10 @@ describe("descricaoDaSerie", () => {
         ],
         {}
       )[0];
-    expect(descricaoDaSerie(tres("< 20"))).toBe(
+    expect(descricaoDaSerie(tres("< 20"), HOJE)).toBe(
       "Marcador Zeta: 10 em 15/01, 12 em 10/07, 14 em 02/10; faixa abaixo de 20."
     );
-    expect(descricaoDaSerie(tres("> 5"))).toBe(
+    expect(descricaoDaSerie(tres("> 5"), HOJE)).toBe(
       "Marcador Zeta: 10 em 15/01, 12 em 10/07, 14 em 02/10; faixa acima de 5."
     );
   });
@@ -1185,11 +1191,267 @@ describe("descricaoDaSerie", () => {
       ],
       {}
     );
-    expect(descricaoDaSerie(l)).toBe("Marcador Zeta: 10 em 15/01, 12 em 10/07, 14 em 02/10.");
+    expect(descricaoDaSerie(l, HOJE)).toBe("Marcador Zeta: 10 em 15/01, 12 em 10/07, 14 em 02/10.");
   });
 
   it("linha sem série descreve o último resultado", () => {
     const [l] = compararExames([ex("2026-10-02", "Ferritina", "45")], {});
-    expect(descricaoDaSerie(l)).toBe("Ferritina: 45 em 02/10.");
+    expect(descricaoDaSerie(l, HOJE)).toBe("Ferritina: 45 em 02/10.");
+  });
+});
+
+describe("compararExames: referência gravada que é o texto da tabela", () => {
+  // O casamento frouxo antigo do classifyExam gravava em `reference_range` o
+  // texto da entrada que ele achava: o VLDL-colesterol saía com "< 190 mg/dL"
+  // (o do colesterol total), a glicose pós-prandial com "70–99 mg/dL (jejum)".
+  // Lido como laudo, o VLDL de 24 para 35 "seguia na faixa".
+  it("VLDL 24 → 35 com 'ref. < 190 mg/dL' gravada: sem faixa para comparar", () => {
+    const [l] = compararExames(
+      [
+        ex("2026-03-01", "VLDL-colesterol", "24", { unit: "mg/dL", reference_range: "< 190 mg/dL", status: "normal" }),
+        ex("2026-09-01", "VLDL-colesterol", "35", { unit: "mg/dL", reference_range: "< 190 mg/dL", status: "normal" }),
+      ],
+      {}
+    );
+    expect(l.mudanca).toBe("sem faixa para comparar");
+    expect(l.faixa).toBeNull();
+    expect(l.faixaTexto).toBeNull();
+    expect(l.situacao).toBeNull();
+  });
+
+  it("Glicose pós-prandial com o texto da glicose de jejum: sem faixa", () => {
+    const [l] = compararExames(
+      [
+        ex("2026-03-01", "Glicose pós-prandial", "120", { unit: "mg/dL", reference_range: "70–99 mg/dL (jejum)" }),
+        ex("2026-09-01", "Glicose pós-prandial", "135", { unit: "mg/dL", reference_range: " 70–99 mg/dL (jejum) " }),
+      ],
+      {}
+    );
+    expect(l.mudanca).toBe("sem faixa para comparar");
+  });
+
+  it("o texto da tabela vale como a tabela, com a regra estrita e a unidade", () => {
+    // Para a glicose em mg/dL, é a faixa dela mesma; em mmol/L, nenhuma.
+    const [mg] = compararExames(
+      [ex("2026-09-01", "Glicose", "92", { unit: "mg/dL", reference_range: "70–99 mg/dL (jejum)" })],
+      {}
+    );
+    expect(mg.faixa).toEqual({ min: 70, max: 99 });
+    expect(mg.faixaTexto).toBe("70–99 mg/dL (jejum)");
+    const [mmol] = compararExames(
+      [ex("2026-09-01", "Glicose", "5,1", { unit: "mmol/L", reference_range: "70–99 mg/dL (jejum)" })],
+      {}
+    );
+    expect(mmol.faixa).toBeNull();
+  });
+});
+
+describe("compararExames: a situação (o selo do último)", () => {
+  // O selo vinha do `status` gravado, que o classifyExam antigo calculava pela
+  // tabela em outra unidade: a B12 de 235 pmol/L aparecia "Atenção" ao lado
+  // de "ref. 148 a 664", que a põe dentro. Agora sai da mesma faixa da linha.
+  it("faixa do laudo: dentro é normal, mesmo com 'atencao' gravado (B12 em pmol/L)", () => {
+    const [l] = compararExames(
+      [
+        ex("2026-03-01", "Vitamina B12", "310", { unit: "pg/mL", reference_range: "200 a 900", status: "normal" }),
+        ex("2026-09-01", "Vitamina B12", "235", { unit: "pmol/L", reference_range: "148 a 664", status: "atencao" }),
+      ],
+      {}
+    );
+    expect(l.situacao).toBe("normal");
+    expect(l.mudanca).toBe("unidade diferente do anterior");
+  });
+
+  it("faixa do laudo: fora é alterado ('Colesterol não-HDL 170, ref < 160')", () => {
+    const [l] = compararExames(
+      [
+        ex("2026-03-01", "Colesterol não-HDL", "150", { unit: "mg/dL", reference_range: "< 160" }),
+        ex("2026-09-01", "Colesterol não-HDL", "170", { unit: "mg/dL", reference_range: "< 160", status: "normal" }),
+      ],
+      {}
+    );
+    expect(l.situacao).toBe("alterado");
+    // na borda estrita também
+    const [borda] = compararExames([ex("2026-09-01", FORA_DA_TABELA, "190", { reference_range: "< 190" })], {});
+    expect(borda.situacao).toBe("alterado");
+  });
+
+  it("faixa da tabela: os três níveis da entrada", () => {
+    const glicose = (v: string) => compararExames([ex("2026-09-01", "Glicose", v, { unit: "mg/dL" })], {})[0].situacao;
+    expect(glicose("92")).toBe("normal");
+    expect(glicose("110")).toBe("atencao");
+    expect(glicose("130")).toBe("alterado");
+  });
+
+  it("sem faixa: sem selo", () => {
+    const [l] = compararExames([ex("2026-09-01", FORA_DA_TABELA, "12", { status: "alterado" })], {});
+    expect(l.situacao).toBeNull();
+  });
+});
+
+describe("compararExames: quantos resultados", () => {
+  it("os com número, um por dia, em qualquer unidade", () => {
+    const [l] = compararExames(
+      [
+        ex("2026-01-15", "Vitamina D", "45", { unit: "nmol/L" }),
+        ex("2026-04-01", "Vitamina D", "indetectável", { unit: "ng/mL" }),
+        ex("2026-07-10", "Vitamina D", "24", { unit: "ng/mL" }),
+        ex("2026-07-10", "Vitamina D", "25", { unit: "ng/mL" }),
+        ex("2026-10-02", "Vitamina D", "38", { unit: "ng/mL" }),
+      ],
+      {}
+    );
+    // 45 nmol/L, 25 e 38: a série (só a unidade do último) teria 2 e não sai;
+    // "2 resultados" mentiria sobre os três.
+    expect(l.resultados).toBe(3);
+    expect(l.serie).toBeNull();
+  });
+
+  it("um resultado: 1", () => {
+    expect(compararExames([ex("2026-10-02", "Ferritina", "45")], {})[0].resultados).toBe(1);
+  });
+});
+
+describe("compararExames: resultado sem número mais novo que o último", () => {
+  // O resultado sem número ficava fora em silêncio: com 92, 95 e depois
+  // "Amostra hemolisada", a linha dizia "95, segue na faixa" e não contava
+  // que veio um resultado depois.
+  const glicose = [
+    ex("2026-03-01", "Glicose", "92", { unit: "mg/dL" }),
+    ex("2026-06-01", "Glicose", "95", { unit: "mg/dL" }),
+    ex("2026-09-01", "Glicose", "Amostra hemolisada", { unit: "mg/dL" }),
+  ];
+
+  it("a linha diz o que veio depois, e a comparação segue entre os números", () => {
+    const [l] = compararExames(glicose, {});
+    expect(l.ultimo.valor).toBe(95);
+    expect(l.mudanca).toBe("segue na faixa");
+    expect(l.depois).toEqual({ texto: "Amostra hemolisada", data: "2026-09-01" });
+    expect(avisosDaLinha(l, HOJE)).toEqual(["depois: Amostra hemolisada em 01/09"]);
+  });
+
+  it("o sem número do mesmo dia do último, ou de antes, não é 'depois'", () => {
+    const mesmoDia = compararExames(
+      [ex("2026-06-01", "Glicose", "95"), ex("2026-06-01", "Glicose", "ver laudo")],
+      {}
+    )[0];
+    expect(mesmoDia.depois).toBeNull();
+    const antes = compararExames([ex("2026-03-01", "Glicose", "negativo"), ex("2026-06-01", "Glicose", "95")], {})[0];
+    expect(antes.depois).toBeNull();
+    expect(avisosDaLinha(antes, HOJE)).toEqual([]);
+  });
+
+  it("vale o mais novo dos sem número; sem texto, 'sem resultado'", () => {
+    const [l] = compararExames(
+      [
+        ex("2026-06-01", "Glicose", "95"),
+        ex("2026-08-01", "Glicose", "Amostra hemolisada"),
+        ex("2026-09-01", "Glicose", null),
+      ],
+      {}
+    );
+    expect(l.depois).toEqual({ texto: "sem resultado", data: "2026-09-01" });
+  });
+});
+
+describe("compararExames: mais de um resultado no mesmo dia", () => {
+  // Dois laudos lançados no mesmo dia (a IA grava a data de hoje quando não
+  // acha a do laudo): vale o último lançado, e o outro sumia sem aviso.
+  it("valores diferentes na mesma data: a linha avisa", () => {
+    const [l] = compararExames(
+      [
+        ex("2026-07-10", "Glicose", "98"),
+        ex("2026-10-02", "Glicose", "110"),
+        ex("2026-10-02", "Glicose", "92"),
+      ],
+      {}
+    );
+    expect(l.ultimo.valor).toBe(92);
+    expect(l.maisDeUmNoDia).toEqual(["2026-10-02"]);
+    expect(avisosDaLinha(l, HOJE)).toEqual(["mais de um resultado em 02/10"]);
+  });
+
+  it("também no dia do anterior; dois dias numa frase só", () => {
+    const [l] = compararExames(
+      [
+        ex("2026-07-10", "Glicose", "98"),
+        ex("2026-07-10", "Glicose", "101"),
+        ex("2026-10-02", "Glicose", "110"),
+        ex("2026-10-02", "Glicose", "92"),
+      ],
+      {}
+    );
+    expect(l.maisDeUmNoDia).toEqual(["2026-07-10", "2026-10-02"]);
+    expect(avisosDaLinha(l, HOJE)).toEqual(["mais de um resultado em 10/07 e 02/10"]);
+  });
+
+  it("o mesmo valor lançado duas vezes não é aviso", () => {
+    const [l] = compararExames([ex("2026-10-02", "Glicose", "92"), ex("2026-10-02", "Glicose", "92,0")], {});
+    expect(l.maisDeUmNoDia).toEqual([]);
+  });
+});
+
+describe("dataDoComparativo", () => {
+  it("dd/mm no ano de hoje; dd/mm/aa em outro ano", () => {
+    expect(dataDoComparativo("2026-02-11", HOJE)).toBe("11/02");
+    expect(dataDoComparativo("2025-12-18", HOJE)).toBe("18/12/25");
+    expect(dataDoComparativo("2027-01-02", HOJE)).toBe("02/01/27");
+  });
+
+  it("descricaoDaSerie e os avisos usam a mesma regra", () => {
+    const [l] = compararExames(
+      [
+        ex("2025-12-18", "Vitamina D", "18"),
+        ex("2026-02-11", "Vitamina D", "24"),
+        ex("2026-04-05", "Vitamina D", "38"),
+        ex("2026-04-05", "Vitamina D", "39"),
+      ],
+      {}
+    );
+    expect(descricaoDaSerie(l, HOJE)).toBe("Vitamina D: 18 em 18/12/25, 24 em 11/02, 39 em 05/04; faixa de 30 a 100.");
+    expect(avisosDaLinha(l, "2027-01-05")).toEqual(["mais de um resultado em 05/04/26"]);
+  });
+});
+
+describe("fraseSemComparacao", () => {
+  it("há comparação: nula", () => {
+    const linhas = [ex("2026-07-10", "Glicose", "98"), ex("2026-10-02", "Glicose", "92")];
+    expect(fraseSemComparacao(linhas, compararExames(linhas, {}))).toBeNull();
+  });
+
+  it("cada exame com um resultado só: diz isso", () => {
+    const linhas = [ex("2026-10-02", "Glicose", "92"), ex("2026-09-01", "Ferritina", "45")];
+    expect(fraseSemComparacao(linhas, compararExames(linhas, {}))).toBe(
+      "Sem comparação ainda: cada exame tem um resultado só."
+    );
+  });
+
+  it("nenhum resultado com número", () => {
+    const linhas = [ex("2026-10-02", "Anti-HCV", "não reagente")];
+    expect(fraseSemComparacao(linhas, compararExames(linhas, {}))).toBe(
+      "Sem comparação ainda: nenhum resultado tem número para comparar."
+    );
+  });
+
+  it("um exame só com resultado sem número, ou com um sem número além do número: não diz 'um resultado só'", () => {
+    // "Cada exame tem um resultado só" seria falso: o Anti-HCV tem dois, e a
+    // glicose tem o 92 e um "Amostra hemolisada".
+    const linhas = [
+      ex("2026-07-10", "Anti-HCV", "não reagente"),
+      ex("2026-10-02", "Anti-HCV", "não reagente"),
+      ex("2026-07-10", "Glicose", "Amostra hemolisada"),
+      ex("2026-10-02", "Glicose", "92"),
+    ];
+    const frase = fraseSemComparacao(linhas, compararExames(linhas, {}));
+    expect(frase).toBe(
+      "Sem comparação ainda: nenhum exame tem dois resultados com número em dias diferentes, e resultado sem número não se compara."
+    );
+  });
+
+  it("dois resultados com número no mesmo dia: não diz 'um resultado só'", () => {
+    const linhas = [ex("2026-10-02", "Glicose", "110"), ex("2026-10-02", "Glicose", "92")];
+    expect(fraseSemComparacao(linhas, compararExames(linhas, {}))).toBe(
+      "Sem comparação ainda: nenhum exame tem dois resultados com número em dias diferentes."
+    );
   });
 });

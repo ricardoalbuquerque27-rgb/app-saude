@@ -420,12 +420,12 @@ describe("chaveDoExame", () => {
 
 describe("faixaDaTabela", () => {
   it("devolve o texto da faixa e a unidade da entrada", () => {
-    expect(faixaDaTabela("Glicose", 92, {})).toEqual({ faixa: "70–99 mg/dL (jejum)", unidade: "mg/dL" });
+    expect(faixaDaTabela("Glicose", 92, {})).toEqual({ faixa: "70–99 mg/dL (jejum)", unidade: "mg/dL", situacao: "normal" });
     expect(faixaDaTabela("Glicemia de jejum", 92, {})?.unidade).toBe("mg/dL");
   });
 
   it("a faixa também vale para as palavras todas de uma entrada só", () => {
-    expect(faixaDaTabela("Hemoglobina glicada (HbA1c)", 5.6, {})).toEqual({ faixa: "< 5,7%", unidade: "%" });
+    expect(faixaDaTabela("Hemoglobina glicada (HbA1c)", 5.6, {})).toEqual({ faixa: "< 5,7%", unidade: "%", situacao: "normal" });
     expect(faixaDaTabela("Glicose (jejum)", 92, {})?.faixa).toBe("70–99 mg/dL (jejum)");
   });
 
@@ -454,6 +454,11 @@ describe("faixaDaTabela", () => {
     expect(faixaDaTabela("VLDL-colesterol", 24, {})).toBeNull();
     expect(faixaDaTabela("Hemoglobina corpuscular média", 30, {})).toBeNull();
     expect(faixaDaTabela("Capacidade total de ligação do ferro", 300, {})).toBeNull();
+  });
+
+  it("a situação do valor nos três níveis da entrada", () => {
+    expect(faixaDaTabela("Glicose", 110, {})?.situacao).toBe("atencao");
+    expect(faixaDaTabela("Glicose", 130, {})?.situacao).toBe("alterado");
   });
 
   it("só na unidade da entrada (ou sem unidade); potássio e sódio aceitam mmol/L", () => {
