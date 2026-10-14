@@ -1,0 +1,711 @@
+import { describe, it, expect } from "vitest";
+import { chaveDoExame } from "./examRanges";
+import {
+  compararExames,
+  resumoDoComparativo,
+  descricaoDaSerie,
+  type LinhaDeExame,
+  type LinhaDoComparativo,
+} from "./exames";
+
+/** Um resultado de exame; só o que o teste quer dizer vai nos argumentos. */
+function ex(
+  date: string,
+  title: string,
+  result_value: string | null,
+  extra: Partial<LinhaDeExame> = {}
+): LinhaDeExame {
+  return {
+    date,
+    title,
+    result_value,
+    unit: null,
+    reference_range: null,
+    status: null,
+    ...extra,
+  };
+}
+
+/**
+ * Um exame que NÃO está na tabela do app: a faixa só pode vir do laudo, e o
+ * teste não muda de resposta se a tabela ganhar mais entradas.
+ */
+const FORA_DA_TABELA = "Marcador Zeta";
+
+/** O comparativo de um exame só, de dois resultados, com a faixa do laudo. */
+function dois(anterior: string, ultimo: string, faixa: string | null = "70 a 99") {
+  const [linha] = compararExames(
+    [
+      ex("2026-07-10", FORA_DA_TABELA, anterior, { reference_range: faixa }),
+      ex("2026-10-02", FORA_DA_TABELA, ultimo, { reference_range: faixa }),
+    ],
+    {}
+  );
+  return linha;
+}
+
+describe("chaveDoExame", () => {
+  it("as grafias da mesma entrada da tabela dão a mesma chave", () => {
+    const a = chaveDoExame("Glicose");
+    expect(chaveDoExame("Glicemia de jejum")).toBe(a);
+    expect(chaveDoExame("glicose em jejum")).toBe(a);
+    expect(chaveDoExame("  GLICEMIA ")).toBe(a);
+  });
+
+  it("a chave da tabela é a primeira chave da entrada", () => {
+    expect(chaveDoExame("Glicemia de jejum")).toBe("glicose");
+    expect(chaveDoExame("25 OH Vitamina D")).toBe("vitamina d");
+    expect(chaveDoExame("Triglicerídeos")).toBe("triglicerideos");
+  });
+
+  it("não confunde o exame com outro que contém o nome dele", () => {
+    expect(chaveDoExame("Hemoglobina")).not.toBe(chaveDoExame("Hemoglobina glicada"));
+  });
+
+  it("fora da tabela, a chave é o nome sem acento, caixa nem pontuação", () => {
+    expect(chaveDoExame("Ácido Fólico")).toBe("acido folico");
+    expect(chaveDoExame("  ácido   FÓLICO! ")).toBe("acido folico");
+  });
+});
+
+describe("compararExames: o que mudou", () => {
+  // A tabela "O que mudou" da spec, com a faixa 70 a 99 nas duas pontas.
+  it.each([
+    // [anterior, último, mudança, diferença, grupo]
+    ["90", "92", "segue na faixa", 2, 3],
+    ["105", "92", "entrou na faixa", -13, 3],
+    ["92", "105", "saiu da faixa", 13, 1],
+    ["120", "110", "mais perto da faixa", -10, 2],
+    ["110", "120", "mais longe da faixa", 10, 1],
+    ["110", "110", "igual ao anterior", 0, 2],
+  ] as const)("%s -> %s: %s", (anterior, ultimo, mudanca, diferenca, grupo) => {
+    const l = dois(anterior, ultimo);
+    expect(l.mudanca).toBe(mudanca);
+    expect(l.diferenca).toBe(diferenca);
+    expect(l.grupo).toBe(grupo);
+    expect(l.anterior).toEqual({ valor: Number(anterior), data: "2026-07-10" });
+    expect(l.ultimo.valor).toBe(Number(ultimo));
+  });
+
+  it("sem faixa no laudo e fora da tabela: só a diferença, no grupo 2", () => {
+    const l = dois("10", "12", null);
+    expect(l.mudanca).toBe("sem faixa para comparar");
+    expect(l.diferenca).toBe(2);
+    expect(l.grupo).toBe(2);
+    expect(l.faixa).toBeNull();
+    expect(l.faixaTexto).toBeNull();
+  });
+
+  it("um resultado só: primeiro resultado, no grupo 4", () => {
+    const [l] = compararExames([ex("2026-10-02", FORA_DA_TABELA, "92", { reference_range: "70 a 99" })], {});
+    expect(l.mudanca).toBe("primeiro resultado");
+    expect(l.anterior).toBeNull();
+    expect(l.diferenca).toBeNull();
+    expect(l.grupo).toBe(4);
+    expect(l.serie).toBeNull();
+  });
+
+  it("as bordas da faixa estão dentro", () => {
+    expect(dois("70", "99").mudanca).toBe("segue na faixa");
+    expect(dois("99.5", "99").mudanca).toBe("entrou na faixa");
+    expect(dois("99", "99.5").mudanca).toBe("saiu da faixa");
+  });
+
+  it("a diferença não leva o ruído do ponto flutuante", () => {
+    // 5,6 - 5,3 dá 0.2999999999999998 em ponto flutuante
+    expect(dois("5.3", "5.6", null).diferenca).toBe(0.3);
+    expect(dois("5.6", "5.6", null).diferenca).toBe(0);
+    expect(Object.is(dois("5.6", "5.6", null).diferenca, 0)).toBe(true);
+  });
+
+  it("a distância à faixa não leva o ruído: 0,1 e 0,1 são a mesma distância", () => {
+    // 0,1 - 0 é 0.1 e 0,4 - 0,3 é 0.10000000000000003: sem arredondar, o
+    // "igual" virava "mais longe da faixa" (e subia para o grupo 1).
+    const l = dois("0", "0.4", "0,1 a 0,3");
+    expect(l.mudanca).toBe("igual ao anterior");
+  });
+
+  it("o mesmo, com o ruído do lado de baixo da faixa", () => {
+    // 0,6 - 0,2 é 0.39999999999999997 e 1,3 - 0,9 é 0.4
+    expect(dois("0.2", "1.3", "0,6 a 0,9").mudanca).toBe("igual ao anterior");
+  });
+
+  it("os dois fora, um de cada lado e à mesma distância: igual ao anterior", () => {
+    // Pela régua da spec (distância até a faixa). A diferença mostra o salto.
+    const l = dois("60", "109");
+    expect(l.mudanca).toBe("igual ao anterior");
+    expect(l.diferenca).toBe(49);
+  });
+
+  it("faixa de um lado só ('< 200' e '>= 40')", () => {
+    const max = (a: string, u: string) => dois(a, u, "< 200").mudanca;
+    expect(max("250", "180")).toBe("entrou na faixa");
+    expect(max("150", "250")).toBe("saiu da faixa");
+    const min = (a: string, u: string) => dois(a, u, ">= 40").mudanca;
+    expect(min("35", "45")).toBe("entrou na faixa");
+    expect(min("45", "35")).toBe("saiu da faixa");
+    expect(min("30", "35")).toBe("mais perto da faixa");
+  });
+
+  it("a situação e o texto do último vêm do último resultado", () => {
+    const [l] = compararExames(
+      [
+        ex("2026-07-10", FORA_DA_TABELA, "88", { status: "normal", unit: "mg/dL" }),
+        ex("2026-10-02", FORA_DA_TABELA, "92", { status: "atencao", unit: "mg/dL" }),
+      ],
+      {}
+    );
+    expect(l.ultimo).toEqual({ valor: 92, texto: "92 mg/dL", data: "2026-10-02", status: "atencao" });
+  });
+
+  it("o último sem unidade e sem situação fica só com o texto do valor", () => {
+    const [l] = compararExames([ex("2026-10-02", FORA_DA_TABELA, " 92 ")], {});
+    expect(l.ultimo).toEqual({ valor: 92, texto: "92", data: "2026-10-02", status: null });
+  });
+});
+
+describe("compararExames: unidades", () => {
+  const glicose = (
+    anterior: { v: string; u: string | null },
+    ultimo: { v: string; u: string | null }
+  ) =>
+    compararExames(
+      [
+        ex("2026-07-10", "Glicose", anterior.v, { unit: anterior.u }),
+        ex("2026-10-02", "Glicose", ultimo.v, { unit: ultimo.u }),
+      ],
+      {}
+    )[0];
+
+  it("mmol/L contra mg/dL: não se compara, sem diferença", () => {
+    const l = glicose({ v: "5,1", u: "mmol/L" }, { v: "92", u: "mg/dL" });
+    expect(l.mudanca).toBe("unidade diferente do anterior");
+    expect(l.diferenca).toBeNull();
+    expect(l.anterior).toEqual({ valor: 5.1, data: "2026-07-10" });
+  });
+
+  it("o grupo vai pelo último: dentro da faixa é 3, fora ou sem faixa é 2", () => {
+    // Glicose: a tabela dá 70-99 mg/dL
+    expect(glicose({ v: "5,1", u: "mmol/L" }, { v: "92", u: "mg/dL" }).grupo).toBe(3);
+    expect(glicose({ v: "5,1", u: "mmol/L" }, { v: "110", u: "mg/dL" }).grupo).toBe(2);
+    const semFaixa = compararExames(
+      [
+        ex("2026-07-10", FORA_DA_TABELA, "5,1", { unit: "mmol/L" }),
+        ex("2026-10-02", FORA_DA_TABELA, "92", { unit: "mg/dL" }),
+      ],
+      {}
+    )[0];
+    expect(semFaixa.mudanca).toBe("unidade diferente do anterior");
+    expect(semFaixa.grupo).toBe(2);
+  });
+
+  it("espaço e caixa não fazem unidade diferente", () => {
+    const l = glicose({ v: "90", u: "mg/dL" }, { v: "92", u: " MG / DL " });
+    expect(l.mudanca).toBe("segue na faixa");
+    expect(l.diferenca).toBe(2);
+  });
+
+  it("o sinal de micro e a letra grega mi são a mesma unidade", () => {
+    // O laudo copiado de um PDF traz um ou outro (U+00B5 e U+03BC).
+    const l = compararExames(
+      [
+        ex("2026-07-10", "Ferro", "70", { unit: "µg/dL" }),
+        ex("2026-10-02", "Ferro", "80", { unit: "μg/dL" }),
+      ],
+      {}
+    )[0];
+    expect(l.mudanca).toBe("segue na faixa");
+  });
+
+  it("unidade que falta de um lado conta como a mesma (laudo que omite)", () => {
+    expect(glicose({ v: "90", u: null }, { v: "92", u: "mg/dL" }).mudanca).toBe("segue na faixa");
+    expect(glicose({ v: "90", u: "mg/dL" }, { v: "92", u: null }).mudanca).toBe("segue na faixa");
+    expect(glicose({ v: "90", u: "" }, { v: "92", u: "  " }).mudanca).toBe("segue na faixa");
+  });
+});
+
+describe("compararExames: o valor", () => {
+  it("tira o número do texto: '< 0,5' é 0,5 e '5,6 %' é 5,6", () => {
+    const [a] = compararExames([ex("2026-10-02", "Marcador A", "< 0,5")], {});
+    expect(a.ultimo.valor).toBe(0.5);
+    expect(a.ultimo.texto).toBe("< 0,5");
+    const [b] = compararExames([ex("2026-10-02", "Marcador B", "5,6 %")], {});
+    expect(b.ultimo.valor).toBe(5.6);
+  });
+
+  it("resultado sem número fica fora: exame só com 'reagente' não aparece", () => {
+    const linhas = compararExames(
+      [
+        ex("2026-10-02", "Anti-HCV", "reagente"),
+        ex("2026-07-10", "Anti-HCV", "Não reagente"),
+        ex("2026-10-02", "Glicose", null),
+        ex("2026-10-02", "Ferro", ""),
+      ],
+      {}
+    );
+    expect(linhas).toEqual([]);
+  });
+
+  it("o resultado sem número no meio dos outros não vira o último nem o anterior", () => {
+    const [l] = compararExames(
+      [
+        ex("2026-04-01", "Marcador A", "40"),
+        ex("2026-07-10", "Marcador A", "negativo"),
+        ex("2026-10-02", "Marcador A", "44"),
+      ],
+      {}
+    );
+    expect(l.ultimo.data).toBe("2026-10-02");
+    expect(l.anterior).toEqual({ valor: 40, data: "2026-04-01" });
+  });
+
+  it("exame sem nome não entra (não tem como saber de qual é)", () => {
+    expect(compararExames([ex("2026-10-02", "   ", "90"), ex("2026-10-02", "???", "90")], {})).toEqual([]);
+  });
+});
+
+describe("compararExames: mesmo exame, grafias e datas", () => {
+  it("Glicose e Glicemia de jejum numa linha só, com o nome do último", () => {
+    const linhas = compararExames(
+      [
+        ex("2026-01-15", "Glicose", "101"),
+        ex("2026-07-10", "Glicemia de jejum", "98"),
+        ex("2026-10-02", "glicose em jejum", "92"),
+        ex("2026-10-02", "Ferritina", "45", { reference_range: "30 a 400" }),
+      ],
+      {}
+    );
+    expect(linhas).toHaveLength(2);
+    const g = linhas.find((l) => l.chave === "glicose")!;
+    expect(g.nome).toBe("glicose em jejum");
+    expect(g.serie).toHaveLength(3);
+    expect(g.anterior).toEqual({ valor: 98, data: "2026-07-10" });
+  });
+
+  it("nome fora da tabela: grafias que só diferem em acento e caixa são o mesmo exame", () => {
+    const linhas = compararExames(
+      [ex("2026-07-10", "Ácido Fólico", "8"), ex("2026-10-02", "acido folico", "9")],
+      {}
+    );
+    expect(linhas).toHaveLength(1);
+    expect(linhas[0].chave).toBe("acido folico");
+    expect(linhas[0].diferenca).toBe(1);
+  });
+
+  it("dois resultados no mesmo dia: vale o último da entrada, e o anterior é de outro dia", () => {
+    const [l] = compararExames(
+      [
+        ex("2026-10-02", "Glicose", "95"),
+        ex("2026-10-02", "Glicose", "92"),
+        ex("2026-07-10", "Glicose", "98"),
+      ],
+      {}
+    );
+    expect(l.ultimo.valor).toBe(92);
+    expect(l.anterior).toEqual({ valor: 98, data: "2026-07-10" });
+  });
+
+  it("a ordem da entrada não muda a conta: o último é o de data maior", () => {
+    const [l] = compararExames(
+      [
+        ex("2026-10-02", "Glicose", "92"),
+        ex("2026-01-15", "Glicose", "101"),
+        ex("2026-07-10", "Glicose", "98"),
+      ],
+      {}
+    );
+    expect(l.ultimo.data).toBe("2026-10-02");
+    expect(l.anterior?.data).toBe("2026-07-10");
+  });
+
+  it("só resultados do mesmo dia: é primeiro resultado (nunca anterior do mesmo dia)", () => {
+    const [l] = compararExames(
+      [ex("2026-10-02", "Glicose", "95"), ex("2026-10-02", "Glicose", "92")],
+      {}
+    );
+    expect(l.ultimo.valor).toBe(92);
+    expect(l.anterior).toBeNull();
+    expect(l.mudanca).toBe("primeiro resultado");
+    expect(l.grupo).toBe(4);
+  });
+
+  it("o resultado sem número do mesmo dia não apaga o que tem número", () => {
+    const [l] = compararExames(
+      [ex("2026-10-02", "Marcador A", "44"), ex("2026-10-02", "Marcador A", "ver laudo")],
+      {}
+    );
+    expect(l.ultimo.valor).toBe(44);
+  });
+});
+
+describe("compararExames: a faixa", () => {
+  it("a do laudo do último resultado, com o texto e os números", () => {
+    const [l] = compararExames(
+      [
+        ex("2026-07-10", FORA_DA_TABELA, "92", { reference_range: "10 a 20" }),
+        ex("2026-10-02", FORA_DA_TABELA, "92", { reference_range: " 70 a 99 " }),
+      ],
+      {}
+    );
+    expect(l.faixa).toEqual({ min: 70, max: 99 });
+    expect(l.faixaTexto).toBe("70 a 99");
+  });
+
+  it("a mesma faixa (a do último) vale para os dois valores", () => {
+    // O laudo do anterior dizia '10 a 20'; se essa régua valesse para ele, o 15
+    // estaria dentro e o 92 (fora de 10 a 20) seria "saiu da faixa". Com a do
+    // último, 70 a 99, o 15 está fora e o 92 dentro: "entrou".
+    const [l] = compararExames(
+      [
+        ex("2026-07-10", FORA_DA_TABELA, "15", { reference_range: "10 a 20" }),
+        ex("2026-10-02", FORA_DA_TABELA, "92", { reference_range: "70 a 99" }),
+      ],
+      {}
+    );
+    expect(l.mudanca).toBe("entrou na faixa");
+  });
+
+  it("sem faixa no último, a da tabela; a do laudo antigo não vale", () => {
+    const [l] = compararExames(
+      [
+        ex("2026-07-10", "Vitamina D", "18", { reference_range: "10 a 20" }),
+        ex("2026-10-02", "Vitamina D", "38"),
+      ],
+      {}
+    );
+    expect(l.faixa).toEqual({ min: 30, max: 100 });
+    expect(l.faixaTexto).toBe("30–100 ng/mL");
+    expect(l.mudanca).toBe("entrou na faixa");
+  });
+
+  it("a faixa do laudo vence a da tabela", () => {
+    const [l] = compararExames(
+      [
+        ex("2026-07-10", "Glicose", "85"),
+        ex("2026-10-02", "Glicose", "92", { reference_range: "80 a 90" }),
+      ],
+      {}
+    );
+    expect(l.faixa).toEqual({ min: 80, max: 90 });
+    expect(l.mudanca).toBe("saiu da faixa");
+  });
+
+  it("laudo que não dá para ler cai na tabela", () => {
+    const [l] = compararExames(
+      [ex("2026-10-02", "Vitamina D", "38", { reference_range: "ver tabela do laboratório" })],
+      {}
+    );
+    expect(l.faixa).toEqual({ min: 30, max: 100 });
+  });
+
+  it("a tabela pelo sexo do paciente", () => {
+    const hdl = [ex("2026-07-10", "Colesterol HDL", "42"), ex("2026-10-02", "Colesterol HDL", "45")];
+    const mulher = compararExames(hdl, { sex: "F" })[0];
+    expect(mulher.faixa).toEqual({ min: 50 });
+    expect(mulher.mudanca).toBe("mais perto da faixa");
+    const homem = compararExames(hdl, { sex: "M" })[0];
+    expect(homem.faixa).toEqual({ min: 40 });
+    expect(homem.mudanca).toBe("segue na faixa");
+  });
+
+  it("exame que depende do sexo, sem o sexo e sem laudo: sem faixa (não chuta)", () => {
+    const [l] = compararExames(
+      [ex("2026-07-10", "Colesterol HDL", "42"), ex("2026-10-02", "Colesterol HDL", "45")],
+      { sex: null }
+    );
+    expect(l.faixa).toBeNull();
+    expect(l.mudanca).toBe("sem faixa para comparar");
+    expect(l.diferenca).toBe(3);
+  });
+
+  it("faixa com duas vírgulas decimais não perde a segunda casa", () => {
+    // O parseReferenceRange troca só a PRIMEIRA vírgula: '0,9 a 1,7' virava
+    // 0,9 a 1 e o 1,5 normal aparecia como 'saiu da faixa'.
+    const laudo = compararExames(
+      [
+        ex("2026-07-10", FORA_DA_TABELA, "1.0", { reference_range: "0,9 a 1,7" }),
+        ex("2026-10-02", FORA_DA_TABELA, "1,5", { reference_range: "0,9 a 1,7" }),
+      ],
+      {}
+    )[0];
+    expect(laudo.faixa).toEqual({ min: 0.9, max: 1.7 });
+    expect(laudo.mudanca).toBe("segue na faixa");
+    // O mesmo para a tabela do app ('3,5–5,1 mEq/L' do potássio).
+    const tabela = compararExames(
+      [ex("2026-07-10", "Potássio", "4,0"), ex("2026-10-02", "Potássio", "5,1")],
+      {}
+    )[0];
+    expect(tabela.faixa).toEqual({ min: 3.5, max: 5.1 });
+    expect(tabela.mudanca).toBe("segue na faixa");
+  });
+
+  it("a faixa também sai com um resultado só (o minigráfico e a coluna 'ref.' pedem)", () => {
+    const [l] = compararExames([ex("2026-10-02", "Ferritina", "45")], { sex: "M" });
+    expect(l.faixa).toEqual({ min: 30, max: 400 });
+    expect(l.faixaTexto).toBe("30–400 ng/mL (homens)");
+  });
+});
+
+describe("compararExames: a ordem", () => {
+  // TG saiu (1), LDL mais perto (2), Vit D entrou (3), ferritina primeiro (4).
+  // A entrada vem embaralhada de propósito.
+  const linhas = [
+    ex("2026-10-02", "Ferritina", "45"),
+    ex("2026-01-15", "Vitamina D", "18"),
+    ex("2026-07-10", "Vitamina D", "24"),
+    ex("2026-10-02", "Vitamina D", "38"),
+    ex("2026-07-10", "Triglicerídeos", "141"),
+    ex("2026-10-02", "Triglicerídeos", "168"),
+    ex("2026-07-10", "LDL", "145"),
+    ex("2026-10-02", "LDL", "132"),
+  ];
+
+  it("saiu, depois mais perto, depois entrou, depois o resultado único", () => {
+    const r = compararExames(linhas, { sex: "M" });
+    expect(r.map((l) => l.chave)).toEqual(["triglicerideos", "ldl", "vitamina d", "ferritina"]);
+    expect(r.map((l) => l.grupo)).toEqual([1, 2, 3, 4]);
+    expect(r.map((l) => l.mudanca)).toEqual([
+      "saiu da faixa",
+      "mais perto da faixa",
+      "entrou na faixa",
+      "primeiro resultado",
+    ]);
+  });
+
+  it("no mesmo grupo, o de último resultado mais recente primeiro", () => {
+    const r = compararExames(
+      [
+        ex("2026-07-10", "Colesterol total", "230"),
+        ex("2026-08-01", "Colesterol total", "220"), // mais perto, 01/08
+        ex("2026-07-10", "LDL", "145"),
+        ex("2026-10-02", "LDL", "132"), // mais perto, 02/10
+        ex("2026-06-01", "Triglicerídeos", "160"),
+        ex("2026-09-05", "Triglicerídeos", "155"), // mais perto, 05/09
+      ],
+      {}
+    );
+    expect(r.map((l) => l.grupo)).toEqual([2, 2, 2]);
+    expect(r.map((l) => l.ultimo.data)).toEqual(["2026-10-02", "2026-09-05", "2026-08-01"]);
+  });
+
+  it("mesmo grupo e mesma data: pelo nome, para a ordem não depender da entrada", () => {
+    const entrada = [
+      ex("2026-07-10", "Zinco", "70", { reference_range: "60 a 120" }),
+      ex("2026-10-02", "Zinco", "75", { reference_range: "60 a 120" }),
+      ex("2026-07-10", "Cobre", "90", { reference_range: "70 a 140" }),
+      ex("2026-10-02", "Cobre", "95", { reference_range: "70 a 140" }),
+    ];
+    const a = compararExames(entrada, {}).map((l) => l.nome);
+    const b = compararExames([...entrada].reverse(), {}).map((l) => l.nome);
+    expect(a).toEqual(["Cobre", "Zinco"]);
+    expect(b).toEqual(a);
+  });
+
+  it("mesmo grupo e mesma data: o nome decide, não a chave", () => {
+    // 'Colesterol HDL' tem a chave 'hdl' e 'Creatinina' a chave 'creatinina':
+    // pela chave a Creatinina viria primeiro; pelo nome que o nutri lê, não.
+    const r = compararExames(
+      [
+        ex("2026-07-10", "Creatinina", "1,0"),
+        ex("2026-10-02", "Creatinina", "1,1"),
+        ex("2026-07-10", "Colesterol HDL", "42"),
+        ex("2026-10-02", "Colesterol HDL", "45"),
+      ],
+      { sex: "M" }
+    );
+    expect(r.map((l) => l.grupo)).toEqual([3, 3]);
+    expect(r.map((l) => l.nome)).toEqual(["Colesterol HDL", "Creatinina"]);
+  });
+
+  it("'sem faixa' e 'unidade diferente' com o último fora ou sem faixa vão no grupo 2; dentro, no 3", () => {
+    const r = compararExames(
+      [
+        // sem faixa para comparar -> 2
+        ex("2026-07-10", "Marcador A", "10"),
+        ex("2026-10-02", "Marcador A", "12"),
+        // unidade diferente, último dentro da faixa da tabela -> 3
+        ex("2026-07-10", "Glicose", "5,1", { unit: "mmol/L" }),
+        ex("2026-10-02", "Glicose", "92", { unit: "mg/dL" }),
+        // segue fora (mais perto) -> 2
+        ex("2026-07-10", "LDL", "145"),
+        ex("2026-10-02", "LDL", "132"),
+      ],
+      {}
+    );
+    const g = Object.fromEntries(r.map((l) => [l.chave, l.grupo]));
+    expect(g).toEqual({ "marcador a": 2, glicose: 3, ldl: 2 });
+  });
+});
+
+describe("compararExames: a série do minigráfico", () => {
+  const vitD = (...v: [string, string, string | null][]) =>
+    v.map(([d, valor, unit]) => ex(d, "Vitamina D", valor, { unit }));
+
+  it("3 resultados: 3 pontos, em ordem de data, com o valor numérico", () => {
+    const [l] = compararExames(
+      vitD(["2026-10-02", "38", "ng/mL"], ["2026-01-15", "18", "ng/mL"], ["2026-07-10", "24", "ng/mL"]),
+      {}
+    );
+    expect(l.serie).toEqual([
+      { data: "2026-01-15", valor: 18 },
+      { data: "2026-07-10", valor: 24 },
+      { data: "2026-10-02", valor: 38 },
+    ]);
+  });
+
+  it("2 resultados: sem série", () => {
+    const [l] = compararExames(vitD(["2026-07-10", "24", "ng/mL"], ["2026-10-02", "38", "ng/mL"]), {});
+    expect(l.serie).toBeNull();
+  });
+
+  it("3 resultados, um em outra unidade: sem série", () => {
+    const [l] = compararExames(
+      vitD(["2026-01-15", "45", "nmol/L"], ["2026-07-10", "24", "ng/mL"], ["2026-10-02", "38", "ng/mL"]),
+      {}
+    );
+    expect(l.serie).toBeNull();
+  });
+
+  it("4 resultados, um em outra unidade: a série fica com os 3 da unidade do último", () => {
+    const [l] = compararExames(
+      vitD(
+        ["2025-10-02", "45", "nmol/L"],
+        ["2026-01-15", "18", "ng/mL"],
+        ["2026-07-10", "24", "ng/mL"],
+        ["2026-10-02", "38", "NG/ML"]
+      ),
+      {}
+    );
+    expect(l.serie?.map((p) => p.valor)).toEqual([18, 24, 38]);
+  });
+
+  it("resultado sem unidade entra na série (laudo que omite)", () => {
+    const [l] = compararExames(
+      vitD(["2026-01-15", "18", null], ["2026-07-10", "24", "ng/mL"], ["2026-10-02", "38", "ng/mL"]),
+      {}
+    );
+    expect(l.serie).toHaveLength(3);
+  });
+
+  it("dois no mesmo dia contam um ponto só (3 resultados em 2 dias: sem série)", () => {
+    const [l] = compararExames(
+      vitD(["2026-07-10", "24", "ng/mL"], ["2026-10-02", "30", "ng/mL"], ["2026-10-02", "38", "ng/mL"]),
+      {}
+    );
+    expect(l.serie).toBeNull();
+  });
+
+  it("resultado sem número não entra na série", () => {
+    const [l] = compararExames(
+      vitD(
+        ["2026-01-15", "18", "ng/mL"],
+        ["2026-04-01", "indetectável", "ng/mL"],
+        ["2026-07-10", "24", "ng/mL"]
+      ),
+      {}
+    );
+    expect(l.serie).toBeNull();
+  });
+});
+
+describe("resumoDoComparativo", () => {
+  it("melhores: entrou, segue, mais perto; piores: saiu, mais longe; e os de um resultado", () => {
+    const r = compararExames(
+      [
+        ex("2026-10-02", "Ferritina", "45"),
+        ex("2026-07-10", "Vitamina D", "18"),
+        ex("2026-10-02", "Vitamina D", "38"),
+        ex("2026-07-10", "Triglicerídeos", "141"),
+        ex("2026-10-02", "Triglicerídeos", "168"),
+        ex("2026-07-10", "LDL", "145"),
+        ex("2026-10-02", "LDL", "132"),
+      ],
+      { sex: "M" }
+    );
+    expect(resumoDoComparativo(r)).toEqual({ melhores: 2, piores: 1, umResultado: 1 });
+  });
+
+  it("igual, sem faixa e unidade diferente não contam nem como melhor nem como pior", () => {
+    const r = compararExames(
+      [
+        ex("2026-07-10", "Marcador A", "10"),
+        ex("2026-10-02", "Marcador A", "12"),
+        ex("2026-07-10", "Marcador B", "110", { reference_range: "70 a 99" }),
+        ex("2026-10-02", "Marcador B", "110", { reference_range: "70 a 99" }),
+        ex("2026-07-10", "Glicose", "5,1", { unit: "mmol/L" }),
+        ex("2026-10-02", "Glicose", "92", { unit: "mg/dL" }),
+      ],
+      {}
+    );
+    expect(resumoDoComparativo(r)).toEqual({ melhores: 0, piores: 0, umResultado: 0 });
+  });
+
+  it("sem linhas: tudo zero", () => {
+    expect(resumoDoComparativo([])).toEqual({ melhores: 0, piores: 0, umResultado: 0 });
+  });
+});
+
+describe("descricaoDaSerie", () => {
+  const vitD = (): LinhaDoComparativo =>
+    compararExames(
+      [
+        ex("2026-01-15", "Vitamina D", "18"),
+        ex("2026-07-10", "Vitamina D", "24"),
+        ex("2026-10-02", "Vitamina D", "38"),
+      ],
+      {}
+    )[0];
+
+  it("os pontos em dd/mm e a faixa", () => {
+    expect(descricaoDaSerie(vitD())).toBe(
+      "Vitamina D: 18 em 15/01, 24 em 10/07, 38 em 02/10; faixa de 30 a 100."
+    );
+  });
+
+  it("valor com decimais sai com vírgula", () => {
+    const [l] = compararExames(
+      [
+        ex("2026-01-15", "TSH", "2.35"),
+        ex("2026-07-10", "TSH", "3,1"),
+        ex("2026-10-02", "TSH", "1.9"),
+      ],
+      {}
+    );
+    expect(descricaoDaSerie(l)).toBe("TSH: 2,35 em 15/01, 3,1 em 10/07, 1,9 em 02/10; faixa de 0,4 a 4.");
+  });
+
+  it("faixa de um lado só", () => {
+    const tres = (ref: string) =>
+      compararExames(
+        [
+          ex("2026-01-15", FORA_DA_TABELA, "10", { reference_range: ref }),
+          ex("2026-07-10", FORA_DA_TABELA, "12", { reference_range: ref }),
+          ex("2026-10-02", FORA_DA_TABELA, "14", { reference_range: ref }),
+        ],
+        {}
+      )[0];
+    expect(descricaoDaSerie(tres("< 20"))).toBe(
+      "Marcador Zeta: 10 em 15/01, 12 em 10/07, 14 em 02/10; faixa até 20."
+    );
+    expect(descricaoDaSerie(tres(">= 5"))).toBe(
+      "Marcador Zeta: 10 em 15/01, 12 em 10/07, 14 em 02/10; faixa a partir de 5."
+    );
+  });
+
+  it("sem faixa, a frase termina nos pontos", () => {
+    const [l] = compararExames(
+      [
+        ex("2026-01-15", FORA_DA_TABELA, "10"),
+        ex("2026-07-10", FORA_DA_TABELA, "12"),
+        ex("2026-10-02", FORA_DA_TABELA, "14"),
+      ],
+      {}
+    );
+    expect(descricaoDaSerie(l)).toBe("Marcador Zeta: 10 em 15/01, 12 em 10/07, 14 em 02/10.");
+  });
+
+  it("linha sem série descreve o último resultado", () => {
+    const [l] = compararExames([ex("2026-10-02", "Ferritina", "45")], {});
+    expect(descricaoDaSerie(l)).toBe("Ferritina: 45 em 02/10.");
+  });
+});

@@ -336,6 +336,16 @@ function findDef(name: string): RangeDef | null {
   return best?.def ?? null;
 }
 
+// A chave que junta as grafias do mesmo exame: a primeira chave da entrada da
+// tabela a que o nome corresponde ("Glicose", "Glicemia de jejum" e "glicose em
+// jejum" são todas "glicose"). Sem isso o comparativo do nutricionista teria
+// uma linha por grafia, cada uma com um resultado só e sem nada para comparar.
+// Fora da tabela vale o nome normalizado (sem acento, caixa nem pontuação).
+// Só lê a tabela: não muda a classificação.
+export function chaveDoExame(nome: string): string {
+  return findDef(nome)?.keys[0] ?? norm(nome);
+}
+
 const STATUS_LABEL: Record<ExamLevel, string> = {
   normal: "Normal",
   atencao: "Atenção",
