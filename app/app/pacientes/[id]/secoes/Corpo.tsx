@@ -68,11 +68,14 @@ function ddmm(iso: string): string {
 // tendência" diria a quem pesa todo dia que não há tendência.
 export async function Corpo({
   uid,
+  nutriId,
   perfil,
   resumo,
   prescricao,
 }: {
   uid: string;
+  /** O nutricionista logado: o vínculo de onde a Evolução começa é o dele. */
+  nutriId: string;
   perfil: MetasPrescritas;
   resumo: Promise<{ resumos: PatientSummary[]; falhou: boolean }>;
   prescricao: Promise<{ data: MetasPrescritas | null; error: unknown }>;
@@ -82,7 +85,7 @@ export async function Corpo({
 
   // A Evolução começa no vínculo, e a leitura do período precisa do começo:
   // ela encadeia na do vínculo, mas corre junto das outras.
-  const vinculoP = getInicioDoAcompanhamento(supabase, uid);
+  const vinculoP = getInicioDoAcompanhamento(supabase, uid, nutriId);
   const evolucaoP: Promise<Res<LinhaDoCorpo[]>> = vinculoP.then((v) =>
     // Sem vínculo ativo a página nem chegaria aqui (o perfil do paciente
     // voltaria nulo): data nula sem erro é leitura que não bateu, e não

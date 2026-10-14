@@ -1393,8 +1393,12 @@ const srv = http.createServer((req, res) => {
 
       let out = aplicaOrdem(aplicaFiltros(linhas, params), params);
       const total = out.length;
+      // `.range(de, ate)` do supabase-js vira `offset` e `limit`: as leituras
+      // dos exames e do Corpo pedem em páginas (lib/paginacao.ts). Sem o
+      // `offset`, a 2ª página repetiria a 1ª.
+      const desde = Number(url.searchParams.get("offset") || 0);
       const limite = url.searchParams.get("limit");
-      if (limite) out = out.slice(0, Number(limite));
+      out = out.slice(desde, limite ? desde + Number(limite) : undefined);
 
       const prefer = req.headers["prefer"] || "";
       const cabecalhos = prefer.includes("count=")

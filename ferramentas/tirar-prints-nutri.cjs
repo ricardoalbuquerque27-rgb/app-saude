@@ -2564,7 +2564,9 @@ async function transbordo(page) {
       await page.close();
     }
 
-    // leitura que falha: o erro da aba, nunca "Sem comparação ainda" nem "Nenhum exame"
+    // leitura dos exames que falha: o erro só no bloco Exames, nunca "Sem
+    // comparação ainda" nem "Nenhum exame". O tratamento continua: antes, o
+    // erro derrubava a aba inteira (e com 200 exames, para sempre).
     {
       await fetch(MOCK + "/__falhar", {
         method: "POST", headers: { "content-type": "application/json" },
@@ -2572,9 +2574,11 @@ async function transbordo(page) {
       });
       const page = await abrir(pc, aba("helena", "clinico"));
       const txt = await limpo(painel(page));
-      ok(txt.includes("Não foi possível carregar os dados clínicos") && !txt.includes("Sem comparação ainda") &&
-        !txt.includes("Nenhum exame registrado") && (await tabela(page).count()) === 0,
-        "exams falha: o erro da aba, e não \"Sem comparação ainda\", \"Nenhum exame\" nem tabela", txt);
+      ok(txt.includes("Não foi possível carregar os exames") && !txt.includes("Não foi possível carregar os dados clínicos") &&
+        !txt.includes("Sem comparação ainda") && !txt.includes("Nenhum exame registrado") && (await tabela(page).count()) === 0,
+        "exams falha: o erro só do bloco Exames, e não o da aba, \"Sem comparação ainda\", \"Nenhum exame\" nem tabela", txt);
+      ok(txt.includes("Tratamento") && (txt.includes("Sem tratamento ativo") || txt.includes("Próxima dose")),
+        "e o Tratamento continua na tela", txt);
       await page.close();
       await fetch(MOCK + "/__reset", { method: "POST" });
     }

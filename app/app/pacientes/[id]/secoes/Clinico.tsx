@@ -10,6 +10,7 @@ import {
   type LinhaDeExame,
   type LinhaDoComparativo,
 } from "@/lib/exames";
+import { getExamesDoPaciente, type ExameDoPaciente } from "@/lib/examesDb";
 import { MiniGrafico } from "@/components/clinico/graficos/MiniGrafico";
 import { Secao } from "@/components/clinico/Secao";
 import { ErroSecao } from "@/components/clinico/ErroSecao";
@@ -31,21 +32,13 @@ const STATUS_EXAME: Record<string, { rotulo: string; caixa: string }> = {
 const situacaoDoExame = (status: string | null) => (status ? STATUS_EXAME[status] : undefined);
 const comMaiuscula = (texto: string) => texto.charAt(0).toUpperCase() + texto.slice(1);
 
-/**
- * Quantos exames a leitura traz, no máximo. O PostgREST corta em silêncio no
- * limite, sem erro: com 200 linhas não dá para saber se há mais, e um
- * comparativo montado sobre um pedaço do histórico diria "primeiro resultado"
- * para quem tem dez. Exatamente o limite conta como leitura que falhou.
- */
-const LIMITE_DE_EXAMES = 200;
-
 /** "5,9": vírgula decimal e sem separador de milhar, como o resultado é gravado. */
 const numero = (n: number) =>
   n.toLocaleString("pt-BR", { maximumFractionDigits: 3, useGrouping: false });
 /** "+27", "−13" (sinal de menos de verdade, como nos gráficos) ou "0". */
 const comSinal = (n: number) => (n === 0 ? "0" : `${n < 0 ? "−" : "+"}${numero(Math.abs(n))}`);
 
-type Exame = LinhaDeExame & { notes: string | null };
+type Exame = ExameDoPaciente;
 
 /**
  * Em quantos dias cada exame tem resultado com número: o "N resultados" da
@@ -88,17 +81,9 @@ export async function Clinico({
   const hoje = todayISO();
 
   const [examesRes, tratamentoRes, dosesRes, efeitosRes] = await Promise.all([
-    // Do mais velho ao mais novo, e no mesmo dia pela ordem de gravação:
-    // compararExames fica com o ÚLTIMO da entrada quando dois resultados do
-    // mesmo exame caem no mesmo dia. A lista "Ver todos" inverte, para ficar
-    // como sempre foi, do mais novo ao mais velho.
-    supabase
-      .from("exams")
-      .select("date, title, result_value, unit, reference_range, status, notes")
-      .eq("user_id", uid)
-      .order("date", { ascending: true })
-      .order("created_at", { ascending: true })
-      .limit(LIMITE_DE_EXAMES),
+    // Todos, em páginas, do mais velho ao mais novo (lib/examesDb.ts). A lista
+    // "Ver todos" inverte, para ficar como sempre foi, do mais novo ao mais velho.
+    getExamesDoPaciente(supabase, uid),
     // Nada impede dois tratamentos ativos ao mesmo tempo, e `.maybeSingle()`
     // sozinho FALHA com duas linhas: a aba antiga dizia "Nenhum tratamento
     // ativo" justamente para quem tinha dois. Vale o mais recente.
@@ -124,9 +109,10 @@ export async function Clinico({
       .limit(12),
   ]);
 
-  // Leitura que volta cheia (200) é leitura cortada, e conta como falha.
-  const exameCheio = (examesRes.data?.length ?? 0) >= LIMITE_DE_EXAMES;
-  if (examesRes.error || exameCheio || tratamentoRes.error || dosesRes.error || efeitosRes.error) {
+  // A leitura dos exames que falha derruba só o bloco Exames, mais abaixo: o
+  // tratamento e os efeitos não dependem dela. Com 200 exames a aba inteira
+  // dizia "Não foi possível carregar os dados clínicos", o tratamento junto.
+  if (tratamentoRes.error || dosesRes.error || efeitosRes.error) {
     return (
       <Secao id="clinico" titulo="Clínico">
         <ErroSecao secao="os dados clínicos" />
@@ -134,7 +120,7 @@ export async function Clinico({
     );
   }
 
-  const exames = (examesRes.data ?? []) as Exame[];
+  const exames: Exame[] = examesRes.data;
   const tratamento = tratamentoRes.data as any;
   const doses = (dosesRes.data ?? []) as any[];
   const efeitos = (efeitosRes.data ?? []) as any[];
@@ -209,7 +195,11 @@ export async function Clinico({
       )}
 
       <h3 className={`mt-6 ${TITULO_BLOCO}`}>Exames</h3>
-      {exames.length === 0 ? (
+      {examesRes.falhou ? (
+        <div className="mt-2">
+          <ErroSecao secao="os exames" />
+        </div>
+      ) : exames.length === 0 ? (
         <p className="mt-2 text-[14px] text-clin-texto-2">Nenhum exame registrado.</p>
       ) : semComparacao ? (
         <>

@@ -176,6 +176,7 @@ export default async function PacienteDetalhe({
           <Suspense fallback={<SkelCard />}>
             <Corpo
               uid={uid}
+              nutriId={nutriId}
               perfil={{
                 daily_calorie_goal: perfil.daily_calorie_goal,
                 protein_goal_g: perfil.protein_goal_g,
