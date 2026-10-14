@@ -202,14 +202,26 @@ celular). A Verificação 19 confere a medida da consulta na aba Corpo
 da Luiza (a marca "na consulta" só na linha do prontuário, e sem transbordo no
 celular) e o campo "CRN (aparece no prontuário)" do Perfil do nutri: aparece, aceita até 30
 caracteres, salva sem os espaços das pontas, reaparece ao recarregar e grava nulo
-quando em branco. A Verificação 20 confere a aba Corpo da Helena (o anel com
-50% e "4,3 de 8,6 kg", a média semanal com a lacuna e o "sem pesagem", os seis
-pontos de consulta, a meta, a dica ao passar o mouse e ao tocar, cintura e % de
-gordura, o contraste da linha e dos pontos nos dois temas e o celular sem
-transbordo), o "Ainda não dá para ver tendência" do Pedro e o erro da aba
-quando `body_measurements`, `patient_links` ou `appointments` falham
-(`/__falhar`). Ele descobre os ids dos pacientes perguntando
-ao mock (`/__cenario`), e recusa rodar se o mock subiu com outro cenário.
+quando em branco. A Verificação 20 confere as abas Corpo e Clínico. No Corpo, a
+da Helena (o anel com 50% e "4,3 de 8,6 kg", a média semanal com a lacuna e o
+"sem pesagem", os seis pontos de consulta, a meta, a dica ao passar o mouse e ao
+tocar, cintura e % de gordura, o contraste da linha e dos pontos nos dois temas e
+o celular sem transbordo), o "Ainda não dá para ver tendência" do Pedro e o erro
+da aba quando `body_measurements`, `patient_links` ou `appointments` falham
+(`/__falhar`). No Clínico, a da Helena (a linha de resumo e a tabela do
+comparativo na ordem, uma linha por exame: "Glicose" e "Glicemia de jejum" numa
+só, o Colesterol total e o VLDL-colesterol do mesmo dia em duas, a B12 em
+"unidade diferente do anterior" sem o número antigo; o minigráfico só nas duas
+linhas com 3 resultados, com o tamanho, as bordas da faixa e o contraste da
+linha e dos pontos nos dois temas; a nota da ordem; a caixa da tabela com foco e
+rolagem por teclado no celular, sem transbordo da página; e "Ver todos os
+resultados (16)", que abre a lista de sempre, do mais novo ao mais velho), a da
+Joana ("Sem comparação ainda", com a lista aberta e sem tabela nem minigráfico),
+a do Pedro ("Nenhum exame registrado.") e o erro da aba quando `exams` falha
+(`/__falhar`): a tela diz "Não foi possível carregar os dados clínicos" e não
+"Sem comparação ainda", "Nenhum exame registrado" nem tabela. Ele descobre os
+ids dos pacientes perguntando ao mock (`/__cenario`), e recusa rodar se o mock
+subiu com outro cenário.
 Sem `OUT`, os PNGs vão para `prints-nutri` no diretório temporário do
 sistema.
 
@@ -232,9 +244,17 @@ peça o que pedir. Um erro de digitação numa lista de colunas
 esquecida passa em todas as verificações de tela e só aparece no banco de
 verdade: coluna que não existe dá 400 no PostgREST, e a esquecida chega
 ausente. Filtro numa coluna que a tabela não tem também passa aqui e dá 400
-lá. Quem confere a lista de colunas das leituras de `lib/nutri.ts` é o
-Supabase em memória de `lib/nutri.test.ts`, que devolve só as colunas
-pedidas.
+lá. Nenhuma ferramenta daqui confere que a lista existe na tabela. O que chega
+mais perto é o Supabase em memória de `lib/nutri.test.ts` (as leituras do
+resumo, da linha do tempo e da série de `lib/nutri.ts`): o `select` dele devolve
+só as colunas pedidas, então a coluna esquecida chega ausente, e só aparece se um
+teste depender do valor dela. Mais que isso ele não faz: não sabe quais colunas a
+tabela tem (a escrita errada volta `undefined`, sem o 400 do PostgREST, e um
+filtro numa coluna que não existe também passa); não aplica a RLS; nunca devolve
+`error`, então a leitura que falha não passa por ele; e só cobre as leituras que
+têm teste lá (`getEvolucaoDoCorpo`, a tabela do Corpo e a leitura dos exames do
+Clínico, não). O de `lib/registroDb.test.ts` é mais simples: o `select` ignora a
+lista de colunas, e ele só confere filtro, ordem e `limit`.
 
 Duas escritas pelo PostgREST também têm estado (o `/__reset` desfaz):
 
