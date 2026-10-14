@@ -182,6 +182,48 @@ describe("montarResumos — peso", () => {
     expect(r.weightLast).toBe(78.4);
     expect(r.weightDelta30).toBe(-1.6);
   });
+
+  // No dia com a pesagem de casa e a medida da consulta, o resumo pegava uma
+  // das duas ao acaso (a que o banco trouxe por último) e o "Peso atual" do
+  // Corpo, outra: a mesma página mostrava dois pesos para o mesmo dia. A regra
+  // é a de pesoDoDia: vale a da consulta, mesmo lançada antes da de casa.
+  describe("no dia com a pesagem de casa e a medida da consulta", () => {
+    const casa = (date: string, weight_kg: number, hora: string) => ({
+      user_id: A, date, weight_kg, measured_by: null, created_at: `${date}T${hora}:00Z`,
+    });
+    const consulta = (date: string, weight_kg: number, hora: string) => ({
+      user_id: A, date, weight_kg, measured_by: "nutri", created_at: `${date}T${hora}:00Z`,
+    });
+
+    it("o peso atual é o da consulta, em qualquer ordem de chegada", () => {
+      const d = "2026-10-07";
+      const emCasaPrimeiro = resumo({ body: [casa(d, 71.2, "08:00"), consulta(d, 70.8, "07:00")] });
+      const consultaPrimeiro = resumo({ body: [consulta(d, 70.8, "07:00"), casa(d, 71.2, "08:00")] });
+      expect(emCasaPrimeiro.weightLast).toBe(70.8);
+      expect(consultaPrimeiro.weightLast).toBe(70.8);
+    });
+
+    it("a variação em 30 dias usa um valor por dia", () => {
+      // O dia 18/09 tem 72,0 em casa e 71,6 na consulta; hoje, 70,9 em casa.
+      // Com o valor do dia sendo o da consulta, a variação é 70,9 - 71,6.
+      const d0 = "2026-09-18";
+      const d1 = HOJE;
+      const emCasaPrimeiro = resumo({
+        body: [casa(d0, 72, "08:00"), consulta(d0, 71.6, "07:00"), casa(d1, 70.9, "08:00")],
+      });
+      const consultaPrimeiro = resumo({
+        body: [consulta(d0, 71.6, "07:00"), casa(d0, 72, "08:00"), casa(d1, 70.9, "08:00")],
+      });
+      expect(emCasaPrimeiro.weightDelta30).toBe(-0.7);
+      expect(consultaPrimeiro.weightDelta30).toBe(-0.7);
+    });
+
+    it("duas medidas no mesmo dia são um dia só: não inventam variação", () => {
+      const d = "2026-10-07";
+      const r = resumo({ body: [casa(d, 71.2, "08:00"), consulta(d, 70.8, "07:00")] });
+      expect(r.weightDelta30).toBeNull();
+    });
+  });
 });
 
 describe("montarResumos — plano de treino", () => {
@@ -785,6 +827,23 @@ describe("leituras do banco — medida da consulta", () => {
     );
     expect(comRefeicao.resumos[0].lastActivity).toBe(addDaysISO(hoje, -45));
     expect(comRefeicao.resumos[0].alerts).toContain("45 dias sem registrar");
+  });
+
+  it("resumirPacientes: a leitura traz o created_at que desempata o peso do dia", async () => {
+    // Sem `created_at` no select, as duas pesagens de casa do mesmo dia
+    // chegam sem hora e o peso do dia vira o da que o banco trouxe por último.
+    // A mais tarde (69,9) vem primeiro na tabela de propósito.
+    const ontem = addDaysISO(hoje, -1);
+    const casa = (weight_kg: number, hora: string): Linha => ({
+      user_id: A, date: ontem, weight_kg, measured_by: null, appointment_id: null,
+      created_at: `${ontem}T${hora}:00Z`,
+    });
+    const { resumos } = await resumirPacientes(
+      bancoFalso({ body_measurements: [casa(69.9, "20:00"), casa(70.3, "08:00")] }),
+      [A],
+      { [A]: "Ana" }
+    );
+    expect(resumos[0].weightLast).toBe(69.9);
   });
 
   it("getPatientActivity: a linha do tempo marca a medida da consulta", async () => {

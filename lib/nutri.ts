@@ -127,10 +127,11 @@ export async function resumirPacientes(
         .select("user_id, date, water_ml")
         .in("user_id", ids)
         .gte("date", d30),
-      // `measured_by` separa a medida da consulta (montarResumos).
+      // `measured_by` separa a medida da consulta, e `created_at` desempata as
+      // pesagens de casa do mesmo dia (montarResumos, via pesoDoDia).
       supabase
         .from("body_measurements")
-        .select("user_id, date, weight_kg, measured_by")
+        .select("user_id, date, weight_kg, measured_by, created_at")
         .in("user_id", ids)
         .not("weight_kg", "is", null)
         .gte("date", d30)
@@ -244,7 +245,8 @@ export type DadosResumo = {
   logs: any[];
   /**
    * Só medidas com peso, em ordem crescente de data, com `measured_by`
-   * (preenchido na medida da consulta).
+   * (preenchido na medida da consulta) e `created_at` (que desempata o dia
+   * com mais de uma pesagem, em pesoDoDia).
    */
   body: any[];
   /** Só exames fora do normal. */
@@ -326,11 +328,24 @@ export function montarResumos(
     // Peso de 30 dias contados com naJanela: a consulta traz `>= hoje-30`
     // (31 dias) e sem teto, e uma medida lançada com data futura virava o
     // "peso atual" e a ponta da variação.
-    const pesos30 = myBody.filter((b) => naJanela(b.date, today, 30));
-    const weightLast = pesos30.length
-      ? Number(pesos30[pesos30.length - 1].weight_kg)
-      : null;
-    const weightFirst = pesos30.length ? Number(pesos30[0].weight_kg) : null;
+    //
+    // Um valor por dia, pela regra de pesoDoDia (a da consulta vence a de
+    // casa). Antes, `weightLast` e `weightFirst` pegavam a última e a primeira
+    // linha da lista: num dia com as duas medidas, uma das duas ao acaso (a
+    // ordem dentro do dia é a que o banco trouxe), e o "Peso atual" do Corpo
+    // podia mostrar a outra. Contar dias, e não linhas, também impede que duas
+    // medidas do mesmo dia virem uma "variação".
+    const porDia = new Map<string, any[]>();
+    for (const b of myBody) {
+      if (!naJanela(b.date, today, 30)) continue;
+      porDia.set(b.date, [...(porDia.get(b.date) ?? []), b]);
+    }
+    const pesos30 = Array.from(porDia.keys())
+      .sort()
+      .map((dia) => pesoDoDia(porDia.get(dia)!))
+      .filter((p): p is number => p != null);
+    const weightLast = pesos30.length ? pesos30[pesos30.length - 1] : null;
+    const weightFirst = pesos30.length ? pesos30[0] : null;
     const weightDelta30 =
       weightLast != null && weightFirst != null && pesos30.length > 1
         ? Number((weightLast - weightFirst).toFixed(1))

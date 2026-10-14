@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { hrefDaAba } from "@/lib/abas";
 import { formatDate, todayISO } from "@/lib/date";
 import {
+  pesoDoDia,
   textoVariacaoPeso,
   type MetasPrescritas,
   type PatientSummary,
@@ -50,7 +51,7 @@ export async function Corpo({
     // Com teto em hoje: medida lançada com data futura não é o "peso atual".
     supabase
       .from("body_measurements")
-      .select("date, weight_kg, body_fat_pct, waist_cm, hip_cm, chest_cm, arm_cm, measured_by")
+      .select("date, weight_kg, body_fat_pct, waist_cm, hip_cm, chest_cm, arm_cm, measured_by, created_at")
       .eq("user_id", uid)
       .lte("date", hoje)
       .order("date", { ascending: false })
@@ -71,8 +72,20 @@ export async function Corpo({
 
   const [s] = r.resumos;
   const linhas = (medidasRes.data ?? []) as any[];
-  const ultimaComPeso = linhas.find((r) => r.weight_kg != null);
-  const peso = ultimaComPeso ? Number(ultimaComPeso.weight_kg) : null;
+  // O peso atual é o do dia mais recente com peso, pela mesma regra do resumo
+  // e da série (pesoDoDia). Pegar a primeira linha daquela data mostrava a
+  // pesagem de casa ou a da consulta ao acaso, conforme a ordem em que o banco
+  // trouxe, e a variação ao lado (resumirPacientes) podia partir de outro peso.
+  const dataDoPeso: string | null =
+    linhas.find((r) => r.weight_kg != null)?.date ?? null;
+  const doDia =
+    dataDoPeso != null
+      ? linhas.filter((r) => r.date === dataDoPeso && r.weight_kg != null)
+      : [];
+  const peso = pesoDoDia(doDia);
+  // pesoDoDia dá a vez à medida da consulta sempre que o dia tem uma com peso:
+  // é essa a condição de o valor mostrado ser o dela.
+  const pesoNaConsulta = doDia.some((r) => r.measured_by != null);
   const alvoBruto = (presc.data ?? perfil).weight_goal_kg;
   const alvo = alvoBruto == null ? null : Number(alvoBruto);
   const distancia =
@@ -86,9 +99,9 @@ export async function Corpo({
           <dd className="mt-0.5 text-[15px] font-semibold tabular-nums text-clin-texto">
             {peso != null ? `${medida(peso)} kg` : "—"}
           </dd>
-          {ultimaComPeso && (
+          {dataDoPeso && (
             <dd className="text-[13px] tabular-nums text-clin-texto-2">
-              em {formatDate(ultimaComPeso.date)}
+              {`em ${formatDate(dataDoPeso)}${pesoNaConsulta ? ", na consulta" : ""}`}
             </dd>
           )}
         </div>
