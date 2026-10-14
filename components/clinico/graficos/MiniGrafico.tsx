@@ -17,6 +17,14 @@ import type { FaixaNumerica } from "@/lib/exames";
 // para cima, e uma série inteira dentro da faixa fica toda sombreada. A faixa é
 // a `faixa` da linha (numérica, já lida), nunca relida do texto.
 //
+// O preenchimento da faixa sozinho não basta: `primaria-fundo` contra o fundo
+// da página dá cerca de 1,14:1 no claro e 1,22:1 no escuro, e o limite da faixa
+// é informação (WCAG 1.4.11 pede 3:1 para ela). Por isso a borda de cima e a de
+// baixo, as que existirem e caírem dentro do desenho, são linhas de 1 px em
+// `campo`, o par `campo` sobre `chao` que já passa 3:1 (PARES_GRAFICO). O
+// preenchimento fica como está, e o par da linha e dos pontos sobre ele
+// (`texto` sobre `primaria-fundo`) também está em PARES_GRAFICO.
+//
 // Só variáveis do tema clínico: a mesma cor serve ao claro e ao escuro.
 
 const LARGURA = 120;
@@ -28,6 +36,7 @@ const COR = {
   linha: "var(--clin-texto)",
   anel: "var(--clin-chao)",
   faixa: "var(--clin-primaria-fundo)",
+  borda: "var(--clin-campo)",
 };
 
 const casa = (n: number) => n.toFixed(1);
@@ -64,6 +73,13 @@ export function MiniGrafico({
   const topoDaFaixa = Math.max(0, faixa?.max != null ? y(faixa.max) : 0);
   const baseDaFaixa = Math.min(ALTURA, faixa?.min != null ? y(faixa.min) : ALTURA);
   const comFaixa = faixa != null && topoDaFaixa < baseDaFaixa;
+  // As bordas: só a que a faixa tem (sem teto, só a de baixo; sem piso, só a de
+  // cima) e só a que cai dentro do desenho. Faixa que passa da borda do
+  // desenho não ganha linha na borda do desenho.
+  const bordas = [faixa?.max, faixa?.min]
+    .filter((v): v is number => v != null)
+    .map(y)
+    .filter((yDaBorda) => yDaBorda > 0 && yDaBorda < ALTURA);
 
   return (
     <svg
@@ -84,6 +100,19 @@ export function MiniGrafico({
           fill={COR.faixa}
         />
       )}
+      {bordas.map((yDaBorda) => (
+        <line
+          key={yDaBorda}
+          className="borda-da-faixa"
+          x1={0}
+          x2={LARGURA}
+          y1={casa(yDaBorda)}
+          y2={casa(yDaBorda)}
+          stroke={COR.borda}
+          strokeWidth={1}
+          shapeRendering="crispEdges"
+        />
+      ))}
       <polyline
         className="linha-do-exame"
         points={pontos.map((p) => `${casa(p.cx)},${casa(p.cy)}`).join(" ")}

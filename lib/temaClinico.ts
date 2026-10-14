@@ -112,11 +112,16 @@ export const PARES_GRAFICO: [NomeCor, NomeCor][] = [
   ["campo", "chao"],
   // Aba Corpo, a Evolução (components/clinico/graficos/): a linha da média e o
   // arco do anel sobre o fundo da página, o ponto da consulta (e o texto dos
-  // eixos, que pede mais: está em PARES_TEXTO) e a faixa do exame, que é o
-  // `primaria` sobre o `primaria-fundo` do selo "normal".
+  // eixos, que pede mais: está em PARES_TEXTO) e a linha da média sobre a
+  // semana que a dica destaca (GraficoPeso pinta a semana de `primaria-fundo`).
   ["primaria", "chao"],
   ["texto", "chao"],
   ["primaria", "primaria-fundo"],
+  // Aba Clínico, o MiniGrafico dos exames: a linha e os pontos (`texto`) sobre
+  // a faixa de referência sombreada (`primaria-fundo`). As bordas da faixa são
+  // `campo` sobre o fundo da página, par que já está acima: o preenchimento
+  // sozinho dá ~1,1:1 contra a página, e o limite da faixa é informação.
+  ["texto", "primaria-fundo"],
 ];
 
 function bloco(tema: Record<NomeCor, string>): string {

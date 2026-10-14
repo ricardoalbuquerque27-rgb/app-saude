@@ -2445,6 +2445,10 @@ async function transbordo(page) {
             faixa: estilo(s.querySelector("rect.faixa-do-exame"), "fill"),
             linha: estilo(s.querySelector(".linha-do-exame"), "stroke"),
             ponto: estilo(s.querySelector("circle.ponto-do-exame"), "fill"),
+            bordas: [...s.querySelectorAll("line.borda-da-faixa")].map((l) => ({
+              traco: getComputedStyle(l).stroke,
+              espessura: getComputedStyle(l).strokeWidth,
+            })),
           };
         })
       );
@@ -2458,6 +2462,17 @@ async function transbordo(page) {
       ok(!!caixaDoSvg && Math.abs(caixaDoSvg.width - 120) < 1.5 && Math.abs(caixaDoSvg.height - 36) < 1.5,
         `e desenhado em 120×36 px (${rot})`, JSON.stringify(caixaDoSvg));
       const fundo = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+      // As bordas da faixa: o preenchimento sozinho dá ~1,1:1 contra a página, e o
+      // limite da faixa é informação (WCAG 1.4.11, 3:1). Cada minigráfico da
+      // Helena tem uma borda dentro do desenho: a de cima na Glicemia (99, a
+      // faixa passa do piso) e a de baixo na Vitamina D (30, a faixa passa do
+      // teto); a outra cai fora da escala e não ganha linha.
+      ok(minis.length === 2 && minis.every((m) => m.bordas.length === 1 && m.bordas[0].espessura === "1px"),
+        `cada minigráfico tem uma borda de faixa de 1 px (a outra cai fora do desenho) (${rot})`, JSON.stringify(minis.map((m) => m.bordas)));
+      const rb = minis.map((m) => (m.bordas[0] ? razao(m.bordas[0].traco, fundo) : 0));
+      ok(rb.length === 2 && rb.every((r) => r >= 3),
+        `as bordas da faixa contrastam com o fundo da página (${tema}): ${rb.map((r) => r.toFixed(1)).join(" e ")}:1`,
+        JSON.stringify({ bordas: minis.map((m) => m.bordas), fundo }));
       const rz = minis.map((m) => ({
         linhaNaFaixa: razao(m.linha, m.faixa),
         pontoNaFaixa: razao(m.ponto, m.faixa),
