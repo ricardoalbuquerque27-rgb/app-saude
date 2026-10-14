@@ -1,9 +1,12 @@
 import {
   chaveDoExame,
+  dentroDaFaixa,
   faixaDaTabela,
   parseExamNumber,
   parseReferenceRange,
+  unidadeDoExame,
   type ExamContext,
+  type FaixaDeReferencia,
 } from "@/lib/examRanges";
 
 /**
@@ -34,7 +37,8 @@ export type Mudanca =
   | "primeiro resultado"
   | "unidade diferente do anterior";
 
-export type FaixaNumerica = { min?: number; max?: number };
+/** A faixa em número, com a borda estrita do "<" e do ">" (`parseReferenceRange`). */
+export type FaixaNumerica = FaixaDeReferencia;
 
 export type LinhaDoComparativo = {
   /** Junta as grafias do mesmo exame (`chaveDoExame`). */
@@ -88,43 +92,6 @@ function diaMes(data: string): string {
 }
 
 /**
- * Uma parte da unidade (o que fica de cada lado da barra), na forma comparável:
- *  - UI, IU e U são a mesma unidade internacional, com ou sem prefixo ("mUI",
- *    "µUI", "uUI", "mIU"); o prefixo micro (u, µ, mc) vira µ e o mili fica m;
- *  - em qualquer outra unidade, o prefixo micro inicial (u, µ, mc) vira µ:
- *    "mcg", "ug" e "µg" são o micrograma, "umol" o micromol, "uL" o microlitro.
- * Parte que não começa assim (mg, ng, mmol, dL, mL...) passa como está.
- */
-function parteDaUnidade(parte: string): string {
-  const internacional = parte.match(/^(m|\u03bc|u|mc)?(?:ui|iu|u)$/);
-  if (internacional) {
-    const prefixo = internacional[1];
-    return (prefixo === undefined ? "" : prefixo === "m" ? "m" : "\u03bc") + "u";
-  }
-  return parte.replace(/^(?:\u03bc|u|mc)(?=[a-z])/, "\u03bc");
-}
-
-/**
- * A unidade para comparar: sem espaço e sem caixa ("mg/dL" e " MG / DL " são
- * a mesma). O NFKC junta o sinal de micro (U+00B5) e a letra grega mi
- * (U+03BC), que o laudo copiado de PDF traz um ou outro; `parteDaUnidade`
- * junta mcg, ug, µg e UI, IU, U. Por fim, µUI/mL e mUI/L são o mesmo número (1
- * µUI/mL = 1 mUI/L, e a TSH aparece de um jeito ou do outro), então a
- * primeira vira a segunda. Só essas equivalências: µg/mL e mg/L, por exemplo,
- * não são tratadas como iguais.
- */
-function unidadeNormalizada(unidade: string | null): string {
-  const u = (unidade ?? "")
-    .normalize("NFKC")
-    .replace(/\s+/g, "")
-    .toLowerCase()
-    .split("/")
-    .map(parteDaUnidade)
-    .join("/");
-  return u === "\u03bcu/ml" ? "mu/l" : u;
-}
-
-/**
  * Unidade que falta de um lado conta como a mesma: o laudo muitas vezes
  * omite, e tratar "sem unidade" como "unidade diferente" tiraria da
  * comparação quase todo exame digitado à mão.
@@ -145,7 +112,14 @@ function faixaDoTexto(texto: string | null | undefined): FaixaNumerica | null {
   return faixa;
 }
 
-/** Zero dentro da faixa (as bordas são dentro); fora, a distância até a borda mais próxima. */
+/** Dentro da faixa: a borda conta como dentro, menos a estrita ("< 190" deixa o 190 fora). */
+const dentro = dentroDaFaixa;
+
+/**
+ * A distância até a borda mais próxima; zero entre as bordas E na borda. Por
+ * isso não diz se o valor está dentro (`dentro` diz): o 190 com "< 190" está
+ * fora a uma distância zero, e o 200 → 190 é "mais perto da faixa".
+ */
 function distanciaAFaixa(valor: number, faixa: FaixaNumerica): number {
   if (faixa.min != null && valor < faixa.min) return limpa(faixa.min - valor);
   if (faixa.max != null && valor > faixa.max) return limpa(valor - faixa.max);
@@ -162,6 +136,7 @@ type Resultado = {
   titulo: string;
   valor: number;
   texto: string;
+  /** Normalizada; nas entradas com equivalentes, a principal (`unidadeDoExame`: mmol/L do potássio vira mEq/L). */
   unidade: string;
   referencia: string | null;
   status: string | null;
@@ -170,13 +145,17 @@ type Resultado = {
 };
 
 /**
- * A faixa do último resultado: a do laudo; sem ela (ou ilegível), a da tabela
- * do app para o sexo do paciente, e só quando o nome é igual ao de uma entrada
- * dela (`faixaDaTabela`: "VLDL-colesterol" não leva a do colesterol total) e a
- * unidade do resultado é a da entrada ou está em branco. Glicose de 5,1
- * mmol/L contra 70-99 mg/dL seria "abaixo da faixa" para um valor normal; sem
- * faixa, a linha diz "sem faixa para comparar". A prioridade é a da spec, a do
- * laudo antes da tabela.
+ * A faixa do último resultado, que é a régua da linha inteira:
+ *  1. a do laudo dele (`reference_range`), se `parseReferenceRange` a lê: uma
+ *     faixa ou um limite só, fora de parênteses, sem palavra de estrato;
+ *  2. senão, a da tabela do app (`faixaDaTabela`), só quando o nome casa com
+ *     uma entrada pela regra estrita ("VLDL-colesterol" não leva a do
+ *     colesterol total), a unidade do resultado está em branco ou é uma da
+ *     entrada (glicose de 5,1 mmol/L contra 70–99 mg/dL seria "abaixo da
+ *     faixa" para um valor normal), e o exame não depende do sexo ou o sexo é
+ *     conhecido;
+ *  3. senão, nenhuma, e a linha diz "sem faixa para comparar".
+ * A prioridade é a da spec, a do laudo antes da tabela.
  */
 function faixaDoUltimo(
   ultimo: Resultado,
@@ -185,11 +164,8 @@ function faixaDoUltimo(
   const doLaudo = faixaDoTexto(ultimo.referencia);
   if (doLaudo) return { faixa: doLaudo, texto: (ultimo.referencia ?? "").trim() };
 
-  const daTabela = faixaDaTabela(ultimo.titulo, ultimo.valor, ctx);
-  if (
-    daTabela &&
-    (ultimo.unidade === "" || ultimo.unidade === unidadeNormalizada(daTabela.unidade))
-  ) {
+  const daTabela = faixaDaTabela(ultimo.titulo, ultimo.valor, ctx, ultimo.unidade);
+  if (daTabela) {
     const faixa = faixaDoTexto(daTabela.faixa);
     if (faixa) return { faixa, texto: daTabela.faixa };
   }
@@ -211,8 +187,8 @@ function compararComOAnterior(
   // "melhora" falsa. Sem saber se piorou, o grupo vai pelo último: fora da
   // faixa ou sem faixa pede atenção (2), dentro não (3).
   if (!mesmaUnidade(ultimo.unidade, anterior.unidade)) {
-    const dentro = faixa != null && distanciaAFaixa(ultimo.valor, faixa) === 0;
-    return { mudanca: "unidade diferente do anterior", diferenca: null, grupo: dentro ? 3 : 2 };
+    const ultimoDentro = faixa != null && dentro(ultimo.valor, faixa);
+    return { mudanca: "unidade diferente do anterior", diferenca: null, grupo: ultimoDentro ? 3 : 2 };
   }
 
   const diferenca = limpa(ultimo.valor - anterior.valor);
@@ -220,14 +196,16 @@ function compararComOAnterior(
   // seguem fora (2) e não entre os que pioraram.
   if (!faixa) return { mudanca: "sem faixa para comparar", diferenca, grupo: 2 };
 
-  const antes = distanciaAFaixa(anterior.valor, faixa);
-  const agora = distanciaAFaixa(ultimo.valor, faixa);
-  if (antes === 0) {
-    return agora === 0
+  // Dentro ou fora decide primeiro, e a distância só compara dois de fora: na
+  // borda estrita a distância é zero e o valor está fora.
+  if (dentro(anterior.valor, faixa)) {
+    return dentro(ultimo.valor, faixa)
       ? { mudanca: "segue na faixa", diferenca, grupo: 3 }
       : { mudanca: "saiu da faixa", diferenca, grupo: 1 };
   }
-  if (agora === 0) return { mudanca: "entrou na faixa", diferenca, grupo: 3 };
+  if (dentro(ultimo.valor, faixa)) return { mudanca: "entrou na faixa", diferenca, grupo: 3 };
+  const antes = distanciaAFaixa(anterior.valor, faixa);
+  const agora = distanciaAFaixa(ultimo.valor, faixa);
   if (agora < antes) return { mudanca: "mais perto da faixa", diferenca, grupo: 2 };
   if (agora > antes) return { mudanca: "mais longe da faixa", diferenca, grupo: 1 };
   // Mesma distância, mesmo de lados opostos (60 e 109 numa faixa de 70 a 99):
@@ -265,7 +243,7 @@ export function compararExames(linhas: LinhaDeExame[], ctx: ExamContext): LinhaD
       titulo,
       valor,
       texto: [l.result_value?.trim(), l.unit?.trim()].filter(Boolean).join(" "),
-      unidade: unidadeNormalizada(l.unit),
+      unidade: unidadeDoExame(titulo, l.unit),
       referencia: l.reference_range,
       status: l.status,
       ordem,
@@ -348,14 +326,15 @@ export function descricaoDaSerie(linha: LinhaDoComparativo): string {
   if (!linha.serie) return `${linha.nome}: ${br(linha.ultimo.valor)} em ${diaMes(linha.ultimo.data)}.`;
 
   const pontos = linha.serie.map((p) => `${br(p.valor)} em ${diaMes(p.data)}`).join(", ");
-  const { min, max } = linha.faixa ?? {};
+  const { min, max, minExclusivo, maxExclusivo } = linha.faixa ?? {};
+  // "até 20" diria que o 20 está dentro; com "< 20", não está.
   const faixa =
     min != null && max != null
       ? `; faixa de ${br(min)} a ${br(max)}`
       : max != null
-        ? `; faixa até ${br(max)}`
+        ? `; faixa ${maxExclusivo ? "abaixo de" : "até"} ${br(max)}`
         : min != null
-          ? `; faixa a partir de ${br(min)}`
+          ? `; faixa ${minExclusivo ? "acima de" : "a partir de"} ${br(min)}`
           : "";
   return `${linha.nome}: ${pontos}${faixa}.`;
 }

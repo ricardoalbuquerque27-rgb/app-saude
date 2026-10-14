@@ -137,6 +137,21 @@ describe("compararExames: o que mudou", () => {
     expect(l.diferenca).toBe(49);
   });
 
+  it("'<' é estrito: 200 → 190 com '< 190' fica mais perto, e não entra", () => {
+    // O 190 "entrava na faixa" com o '<' lido como "até": o colesterol total
+    // da Helena (200 → 190, ref. "< 190") aparecia entre os que estão dentro.
+    const perto = dois("200", "190", "< 190");
+    expect(perto.mudanca).toBe("mais perto da faixa");
+    expect(perto.grupo).toBe(2);
+    expect(dois("190", "180", "< 190").mudanca).toBe("entrou na faixa");
+    expect(dois("180", "190", "< 190").mudanca).toBe("saiu da faixa");
+    expect(dois("40", "45", "> 40").mudanca).toBe("entrou na faixa");
+    expect(dois("45", "40", "> 40").mudanca).toBe("saiu da faixa");
+    // com "≤" e "até" a borda continua dentro
+    expect(dois("200", "190", "≤ 190").mudanca).toBe("entrou na faixa");
+    expect(dois("200", "190", "até 190").mudanca).toBe("entrou na faixa");
+  });
+
   it("faixa de um lado só ('< 200' e '>= 40')", () => {
     const max = (a: string, u: string) => dois(a, u, "< 200").mudanca;
     expect(max("250", "180")).toBe("entrou na faixa");
@@ -430,6 +445,109 @@ describe("compararExames: mesmo exame, grafias e datas", () => {
       {}
     );
     expect(l.ultimo.valor).toBe(44);
+  });
+});
+
+describe("compararExames: referência em níveis", () => {
+  // Lida pela primeira faixa que a expressão achava, a referência em níveis
+  // virava uma conclusão errada em piora: a hemoglobina glicada de 5,4 para 6,0
+  // com "Normal: < 5,7; Pré-diabetes: 5,7 a 6,4; ..." ia contra 5,7–6,4 e
+  // "entrava na faixa", e a glicose de 92 para 112 com "inferior a 100;
+  // alterada: 100 a 125" idem.
+  const NIVEIS_A1C = "Normal: < 5,7 %; Pré-diabetes: 5,7 a 6,4 %; Diabetes: ≥ 6,5 %";
+  const NIVEIS_GLICOSE =
+    "Normal: inferior a 100 mg/dL; Glicemia de jejum alterada: 100 a 125 mg/dL; Diabetes: igual ou superior a 126";
+
+  it("hemoglobina glicada 5,4 → 6,0: vale a tabela (< 5,7%), e saiu da faixa", () => {
+    const [l] = compararExames(
+      [
+        ex("2026-03-01", "Hemoglobina glicada", "5,4", { unit: "%", reference_range: NIVEIS_A1C }),
+        ex("2026-09-01", "Hemoglobina glicada", "6,0", { unit: "%", reference_range: NIVEIS_A1C }),
+      ],
+      {}
+    );
+    expect(l.mudanca).toBe("saiu da faixa");
+    expect(l.grupo).toBe(1);
+    expect(l.faixaTexto).toBe("< 5,7%");
+  });
+
+  it("glicose 92 → 112: vale a tabela (70–99), e saiu da faixa", () => {
+    const [l] = compararExames(
+      [
+        ex("2026-03-01", "Glicose", "92", { unit: "mg/dL", reference_range: NIVEIS_GLICOSE }),
+        ex("2026-09-01", "Glicose", "112", { unit: "mg/dL", reference_range: NIVEIS_GLICOSE }),
+      ],
+      {}
+    );
+    expect(l.mudanca).toBe("saiu da faixa");
+    expect(l.grupo).toBe(1);
+  });
+
+  it("fora da tabela, a referência em níveis fica sem faixa para comparar", () => {
+    const [l] = compararExames(
+      [
+        ex("2026-03-01", FORA_DA_TABELA, "8", { reference_range: "Masculino: 8 a 61; Feminino: 5 a 36" }),
+        ex("2026-09-01", FORA_DA_TABELA, "40", { reference_range: "Masculino: 8 a 61; Feminino: 5 a 36" }),
+      ],
+      { sex: "F" }
+    );
+    expect(l.mudanca).toBe("sem faixa para comparar");
+    expect(l.faixa).toBeNull();
+  });
+});
+
+describe("compararExames: TSH ultrassensível e as unidades de potássio e sódio", () => {
+  it("TSH e TSH ultrassensível são uma linha só", () => {
+    const linhas = compararExames(
+      [
+        ex("2026-03-01", "TSH", "2,1", { unit: "\u00b5UI/mL" }),
+        ex("2026-09-01", "TSH ultrassensível", "5,1", { unit: "mUI/L" }),
+      ],
+      {}
+    );
+    expect(linhas).toHaveLength(1);
+    expect(linhas[0].mudanca).toBe("saiu da faixa");
+    expect(linhas[0].faixaTexto).toBe("0,4–4,0 \u00b5UI/mL");
+  });
+
+  it("K 4,0 mEq/L depois 5,6 mmol/L: compara (é o mesmo número), saiu da faixa", () => {
+    const [l] = compararExames(
+      [
+        ex("2026-03-01", "Potássio", "4,0", { unit: "mEq/L" }),
+        ex("2026-09-01", "Potássio", "5,6", { unit: "mmol/L" }),
+      ],
+      {}
+    );
+    expect(l.mudanca).toBe("saiu da faixa");
+    expect(l.grupo).toBe(1);
+    expect(l.diferenca).toBe(1.6);
+    expect(l.faixa).toEqual({ min: 3.5, max: 5.1 });
+  });
+
+  it("sódio em mmol/L usa a faixa da tabela (mEq/L), e a série junta as duas grafias", () => {
+    const [l] = compararExames(
+      [
+        ex("2026-01-01", "Sódio", "138", { unit: "mEq/L" }),
+        ex("2026-05-01", "Sódio", "141", { unit: "mmol/L" }),
+        ex("2026-09-01", "Sódio", "147", { unit: "mmol/L" }),
+      ],
+      {}
+    );
+    expect(l.faixa).toEqual({ min: 135, max: 145 });
+    expect(l.mudanca).toBe("saiu da faixa");
+    expect(l.serie?.map((p) => p.valor)).toEqual([138, 141, 147]);
+  });
+
+  it("a equivalência é só de potássio e sódio: cálcio em mEq/L e mmol/L não se compara", () => {
+    // 1 mmol/L de cálcio são 2 mEq/L: a regra geral daria uma "melhora" falsa.
+    const [l] = compararExames(
+      [
+        ex("2026-03-01", "Cálcio iônico", "2,4", { unit: "mEq/L" }),
+        ex("2026-09-01", "Cálcio iônico", "1,2", { unit: "mmol/L" }),
+      ],
+      {}
+    );
+    expect(l.mudanca).toBe("unidade diferente do anterior");
   });
 });
 
@@ -1032,11 +1150,29 @@ describe("descricaoDaSerie", () => {
         ],
         {}
       )[0];
-    expect(descricaoDaSerie(tres("< 20"))).toBe(
+    expect(descricaoDaSerie(tres("até 20"))).toBe(
       "Marcador Zeta: 10 em 15/01, 12 em 10/07, 14 em 02/10; faixa até 20."
     );
     expect(descricaoDaSerie(tres(">= 5"))).toBe(
       "Marcador Zeta: 10 em 15/01, 12 em 10/07, 14 em 02/10; faixa a partir de 5."
+    );
+  });
+
+  it("borda estrita: 'abaixo de' e 'acima de', não 'até' e 'a partir de'", () => {
+    const tres = (ref: string) =>
+      compararExames(
+        [
+          ex("2026-01-15", FORA_DA_TABELA, "10", { reference_range: ref }),
+          ex("2026-07-10", FORA_DA_TABELA, "12", { reference_range: ref }),
+          ex("2026-10-02", FORA_DA_TABELA, "14", { reference_range: ref }),
+        ],
+        {}
+      )[0];
+    expect(descricaoDaSerie(tres("< 20"))).toBe(
+      "Marcador Zeta: 10 em 15/01, 12 em 10/07, 14 em 02/10; faixa abaixo de 20."
+    );
+    expect(descricaoDaSerie(tres("> 5"))).toBe(
+      "Marcador Zeta: 10 em 15/01, 12 em 10/07, 14 em 02/10; faixa acima de 5."
     );
   });
 
