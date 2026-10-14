@@ -558,6 +558,46 @@ describe("compararExames: o nome do exame e a tabela", () => {
     expect(linhas.find((l) => l.chave === "glicose pos prandial")!.faixa).toBeNull();
   });
 
+  it("T4 sozinho não é T4 livre: chave própria e sem a faixa do livre", () => {
+    const [l] = compararExames([ex("2026-10-02", "T4", "8,1")], {});
+    expect(l.chave).toBe("t4");
+    expect(l.faixa).toBeNull();
+    const livre = compararExames([ex("2026-10-02", "T4 livre", "1,2")], {})[0];
+    expect(livre.chave).toBe("t4 livre");
+    expect(livre.faixa).toEqual({ min: 0.9, max: 1.7 });
+  });
+
+  it("Potássio sérico junta com Potássio e usa a faixa da tabela", () => {
+    const linhas = compararExames(
+      [ex("2026-07-10", "Potássio", "5,4"), ex("2026-10-02", "Potássio sérico", "4,8")],
+      {}
+    );
+    expect(linhas).toHaveLength(1);
+    expect(linhas[0].chave).toBe("potassio");
+    expect(linhas[0].faixa).toEqual({ min: 3.5, max: 5.1 });
+    expect(linhas[0].mudanca).toBe("entrou na faixa");
+  });
+
+  it("Glicose plasmática junta com Glicose; Glicose na urina fica separada, sem a faixa da glicose", () => {
+    const linhas = compararExames(
+      [
+        ex("2026-07-10", "Glicose", "98"),
+        ex("2026-10-02", "Glicose plasmática", "92"),
+        ex("2026-10-02", "Glicose na urina", "0"),
+      ],
+      {}
+    );
+    expect(linhas.map((l) => l.chave).sort()).toEqual(["glicose", "glicose na urina"]);
+    expect(linhas.find((l) => l.chave === "glicose")!.ultimo.valor).toBe(92);
+    expect(linhas.find((l) => l.chave === "glicose na urina")!.faixa).toBeNull();
+  });
+
+  it("'Soro' sozinho não casa com a tabela", () => {
+    const [l] = compararExames([ex("2026-10-02", "Soro", "92")], {});
+    expect(l.chave).toBe("soro");
+    expect(l.faixa).toBeNull();
+  });
+
   it("palavra que cabe em duas entradas ('Vitamina'): sem faixa da tabela", () => {
     const [l] = compararExames([ex("2026-10-02", "Vitamina", "30")], {});
     expect(l.chave).toBe("vitamina");

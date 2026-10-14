@@ -345,12 +345,30 @@ const PALAVRAS_DAS_ENTRADAS: Set<string>[] = TABLE.map(
   (def) => new Set(def.keys.flatMap((k) => norm(k).split(" ")))
 );
 
+// Palavras que dizem de onde veio a amostra e não de qual exame se trata
+// ("Potássio sérico", "Glicose plasmática"): não contam contra o nome na
+// cobertura. Já normalizadas, sem acento. Sem "urina" e "urinária" de
+// propósito: glicose na urina é outro exame, e a glicose do sangue não é a
+// faixa dela.
+const PALAVRAS_DE_AMOSTRA = new Set([
+  "soro",
+  "serico",
+  "serica",
+  "plasma",
+  "plasmatico",
+  "plasmatica",
+  "sangue",
+  "sanguineo",
+]);
+
 // A entrada da tabela a que o nome do exame se refere, ou nenhuma. O nome
 // casa quando:
 //   1. é IGUAL (depois do `norm`) a uma das keys de uma entrada; a exata vence; ou
-//   2. TODAS as suas palavras aparecem entre as palavras de UMA ÚNICA entrada.
-//      Se mais de uma qualificar, não há casamento: não dá para saber de qual
-//      o laudo fala, e a faixa da entrada errada é pior que nenhuma.
+//   2. TODAS as suas palavras (menos as de amostra) aparecem entre as palavras
+//      de UMA ÚNICA entrada E o nome contém inteira, como expressão, pelo
+//      menos uma key dela (o jeito do `findDef`: " nome " inclui " key ").
+//      Se mais de uma entrada qualificar, não há casamento: não dá para saber
+//      de qual o laudo fala, e a faixa da entrada errada é pior que nenhuma.
 //
 // Não é o casamento do `findDef`, que aceita a key como palavra solta dentro
 // de qualquer nome e juntava exames diferentes: "VLDL-colesterol" e
@@ -360,15 +378,25 @@ const PALAVRAS_DAS_ENTRADAS: Set<string>[] = TABLE.map(
 // diferencia o exame ("vldl", "corpuscular", "prandial", "vitamina") nunca
 // está nas keys da entrada errada, então o nome não casa com ela. Já o sufixo
 // redundante ("Hemoglobina glicada (HbA1c)", "Glicose (jejum)") tem só
-// palavras da própria entrada e junta. Fica de fora quem só tem uma palavra
-// de uma entrada que também serve a outro exame ("T4" é a entrada do T4 livre).
+// palavras da própria entrada, e a key inteira, e junta.
+//
+// A exigência da key inteira tira o nome que só tem PALAVRAS da entrada: "T4"
+// é palavra da entrada do T4 livre, mas T4 sozinho pode ser o total, e
+// "Jejum" é palavra da glicose sem ser exame nenhum ("Livre" e "Hormônio"
+// também). Sem key inteira, a chave é o próprio nome e não há faixa.
 function entradaDaTabela(nome: string): RangeDef | null {
   const n = norm(nome);
   if (!n) return null;
   const exata = TABLE.find((def) => def.keys.some((k) => norm(k) === n));
   if (exata) return exata;
-  const palavras = n.split(" ");
-  const cobrem = TABLE.filter((_, i) => palavras.every((p) => PALAVRAS_DAS_ENTRADAS[i].has(p)));
+  const palavras = n.split(" ").filter((p) => !PALAVRAS_DE_AMOSTRA.has(p));
+  if (palavras.length === 0) return null;
+  const nomeComBordas = ` ${n} `;
+  const cobrem = TABLE.filter(
+    (def, i) =>
+      palavras.every((p) => PALAVRAS_DAS_ENTRADAS[i].has(p)) &&
+      def.keys.some((k) => nomeComBordas.includes(` ${norm(k)} `))
+  );
   return cobrem.length === 1 ? cobrem[0] : null;
 }
 

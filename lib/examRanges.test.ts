@@ -89,12 +89,42 @@ describe("chaveDoExame", () => {
     expect(chaveDoExame("Colesterol LDL")).toBe("ldl");
   });
 
-  it("palavras que cabem em mais de uma entrada, sem exata: não casa com nenhuma", () => {
+  it("todas as palavras numa entrada só, mas sem nenhuma key inteira: não casa", () => {
+    // 'T4' é palavra da entrada do T4 livre, mas T4 sozinho pode ser o total;
+    // 'jejum', 'livre' e 'hormônio' são palavras soltas de glicose, T4 livre e TSH.
+    expect(chaveDoExame("T4")).toBe("t4");
+    expect(chaveDoExame("Jejum")).toBe("jejum");
+    expect(chaveDoExame("Em jejum")).toBe("em jejum");
+    expect(chaveDoExame("Livre")).toBe("livre");
+    expect(chaveDoExame("Hormônio")).toBe("hormonio");
+    // com a key inteira, casa
+    expect(chaveDoExame("T4 livre")).toBe("t4 livre");
+    expect(chaveDoExame("Tiroxina livre (T4)")).toBe("t4 livre");
+  });
+
+  it("palavras de entradas diferentes ou de mais de uma entrada: não casa com nenhuma", () => {
     // 'vitamina' está na D e na B12; 'total' no colesterol total e na testosterona.
     expect(chaveDoExame("Vitamina")).toBe("vitamina");
     expect(chaveDoExame("Total")).toBe("total");
     // as palavras estão na tabela, mas em entradas diferentes
     expect(chaveDoExame("Testosterona livre")).toBe("testosterona livre");
+  });
+
+  it("palavra de amostra (soro, plasma, sangue) não conta contra o nome", () => {
+    expect(chaveDoExame("Potássio sérico")).toBe("potassio");
+    expect(chaveDoExame("Glicose plasmática")).toBe("glicose");
+    expect(chaveDoExame("Sódio, soro")).toBe("sodio");
+    // urina é outro exame: não entra na lista
+    expect(chaveDoExame("Glicose na urina")).toBe("glicose na urina");
+    expect(chaveDoExame("Glicose urina")).toBe("glicose urina"); // sem a preposição também
+    expect(chaveDoExame("Glicose urinária")).toBe("glicose urinaria");
+    expect(chaveDoExame("Creatinina urinária")).toBe("creatinina urinaria");
+  });
+
+  it("palavra de amostra sozinha não casa, e com ela a key inteira continua sendo exigida", () => {
+    expect(chaveDoExame("Soro")).toBe("soro");
+    expect(chaveDoExame("Sangue")).toBe("sangue");
+    expect(chaveDoExame("Soro plasma")).toBe("soro plasma");
   });
 
   it("a exata vence a que só cobre as palavras", () => {
@@ -125,6 +155,19 @@ describe("faixaDaTabela", () => {
   it("a faixa também vale para as palavras todas de uma entrada só", () => {
     expect(faixaDaTabela("Hemoglobina glicada (HbA1c)", 5.6, {})).toEqual({ faixa: "< 5,7%", unidade: "%" });
     expect(faixaDaTabela("Glicose (jejum)", 92, {})?.faixa).toBe("70–99 mg/dL (jejum)");
+  });
+
+  it("nome sem key inteira, ou só com palavra de amostra, não tem faixa", () => {
+    expect(faixaDaTabela("T4", 1.2, {})).toBeNull();
+    expect(faixaDaTabela("Jejum", 92, {})).toBeNull();
+    expect(faixaDaTabela("Soro", 92, {})).toBeNull();
+    expect(faixaDaTabela("T4 livre", 1.2, {})?.faixa).toBe("0,9–1,7 ng/dL");
+  });
+
+  it("palavra de amostra não tira a faixa; urina tira", () => {
+    expect(faixaDaTabela("Potássio sérico", 4.2, {})?.faixa).toBe("3,5–5,1 mEq/L");
+    expect(faixaDaTabela("Glicose plasmática", 92, {})?.faixa).toBe("70–99 mg/dL (jejum)");
+    expect(faixaDaTabela("Glicose na urina", 0, {})).toBeNull();
   });
 
   it("nome com uma palavra que a entrada não tem não leva a faixa dela", () => {
