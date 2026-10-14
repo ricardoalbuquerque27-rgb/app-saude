@@ -223,12 +223,21 @@ página sai.
    - agendada com remarcação pedida: o mesmo, mais "· remarcação pedida";
    - pedido aberto: "Consulta pedida" e "ter., 20/10 às 14:00 · aguardando
      Ricardo";
+   - agendada e, ao mesmo tempo, um pedido aberto (o nutricionista marcou
+     sem responder ao pedido): a linha da agendada, mais "· e um pedido
+     aguardando";
+   - cancelada pelo nutricionista nos últimos 7 dias, sem outra marcada:
+     "Consulta de qua., 21/10 cancelada por Ricardo". Sem essa linha, quem
+     não abre "Meu plano" iria à consulta. É a mesma regra do cartão;
    - nenhuma: a linha não aparece;
    - leitura que falhou: "Não deu para carregar a consulta", e nunca o
      silêncio do "nenhuma".
 
-   A situação e os textos de data saem de `lib/consultas.ts`, das mesmas
-   funções do cartão; a linha não refaz a conta. O `CartaoConsulta` sai da
+   **A escolha da situação** (próxima, pedido, cancelada pelo nutricionista)
+   sai do `CartaoConsulta` para uma função pura e testada em
+   `lib/consultas.ts`, `estadoDaConsulta(consultas, agora)`. O cartão e a
+   linha usam essa mesma função, e os textos de data saem das funções que já
+   existem lá (`rotuloDaConsulta`, `ROTULO_MODO`). A linha não refaz a conta. O `CartaoConsulta` sai da
    Início e fica só em "Meu plano", onde ganha `id="consulta"`.
 3. **Para hoje.** Um cartão só. O título "Para hoje" vem com "N pendentes" à
    direita (ou "em dia"). Dentro, linhas separadas por traço, nesta ordem:
