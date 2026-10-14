@@ -293,9 +293,13 @@ página sai.
      que você registrou hoje e nesta semana."
    - **O pilar sem registro diz que é padrão.** Hoje o sono sem registro
      conta 60, a alimentação sem refeição conta 40 e o humor sem registro
-     conta 60 (dentro de "Hidratação e bem-estar"). Na explicação, a linha
-     desse pilar diz "sem registro hoje · conta 60", em vez de parecer
-     medida. Para isso, `ScorePillar` ganha `semRegistro: boolean`.
+     conta 60 dentro de "Hidratação e bem-estar". Na explicação, a linha do
+     pilar sem nenhum registro diz "sem registro hoje · conta {valor do
+     pilar}", em vez de parecer medida. Para isso, `ScorePillar` ganha
+     `semRegistro: boolean`: o sono sem horas; a nutrição sem refeição; e a
+     hidratação e bem-estar sem água, humor e energia. Esse último pilar,
+     vazio, vale 24 (60% de água zero, mais 40% de 60). O movimento nunca é
+     "sem registro", porque zero treino na semana é dado.
      `lib/healthScore.ts` não tem teste hoje e passa a ter: os valores
      atuais, travados antes da mudança, e a marca nova.
    - A dica principal (`topTip`) fica, numa linha abaixo dos anéis, menos
@@ -384,6 +388,7 @@ sugestaoDeProteina(e: {
   consumido: number;            // soma de protein_g das refeições de hoje
   itens: ItemDoPlano[];         // meal_plan_items do cardápio ativo
   tiposRegistrados: string[];   // meal_type das refeições de hoje
+  vinculoAtivo: boolean;        // há nutricionista acompanhando agora
 }): { faltam: number; refeicao: string; descricao: string; proteina: number } | null
 ```
 
@@ -399,7 +404,7 @@ sugestaoDeProteina(e: {
 - "Hoje" é `todayISO()` (São Paulo). Na Dieta, só com a data em hoje.
 - **Calorias ficam de fora**, e isso é decisão: "faltam 600 kcal" empurra
   quem está emagrecendo a comer sem fome, e o excesso já aparece no anel
-  ("acima da meta").
+  ("acima do limite").
 
 ## Água em um toque
 
@@ -529,7 +534,9 @@ alta tirada, os degradês tirados e o texto de apoio direto no chão em
   - `pesoDe30Dias`: dia com as duas medidas, janela de 30 dias contada por
     `naJanela`, data futura fora e um dia só sem variação. Os testes atuais
     de `weightDelta30` também passam.
-  - `ProgressRing`: `avisoAcima` só com `pct > 1`.
+  - O rótulo e o aviso do anel (`rotuloDoAnel` e `avisoDoAnel`, em
+    `lib/anel.ts`, que o `ProgressRing` usa; o vitest só roda em `lib/`): o
+    aviso só com `avisoAcima` e `pct > 1`.
   - `papelDasCalorias`: acima e abaixo da meta por mais de 0,5 kg, a borda
     de 0,5 kg, e sem peso ou sem meta.
   - `adicionarAgua`: os casos de "Água em um toque".
