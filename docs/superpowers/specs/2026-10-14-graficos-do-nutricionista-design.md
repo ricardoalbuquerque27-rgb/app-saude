@@ -53,6 +53,7 @@ E nenhuma leitura que falha vira "sem dado" (regra do CLAUDE.md).
 | Período: desde o início do acompanhamento, com teto de 12 meses. Consulta realizada marcada no tempo. | Meu, apresentado e aceito |
 | Semana de segunda a domingo; um valor por dia (a última pesagem de casa do dia) antes da média. | Meu (abaixo, com o porquê) |
 | Faixa de referência: a do laudo; sem ela, a da tabela do app (`lib/examRanges.ts`). | Meu, apresentado e aceito |
+| Anel de progresso (o mesmo desenho do anel de calorias do app do paciente) **só** no "Meta de peso" da aba Corpo: quanto do caminho do peso inicial até a meta já foi feito. Não na Alimentação (seria a pergunta "está comendo o prescrito?", fora deste projeto), nem em pizza de macros. | Dono do produto (recomendação aceita) |
 
 ## Fora do escopo
 
@@ -161,6 +162,28 @@ motivo.
   logo abaixo mostraria a outra. Fecha a pendência deixada pela revisão
   final do registro da consulta (CLAUDE.md diz que a regra vale em todo
   lugar; hoje só vale na série).
+- **Anel no "Meta de peso"** (no lugar do "faltam N kg"): o anel com a
+  parte do caminho já feita, e ao lado "66 kg · 50%" e "4,3 de 8,6 kg desde
+  12/05", mais o link "editar nas metas" de hoje.
+  - **Peso inicial:** o primeiro dia com peso no período, pela regra de
+    `pesoDoDia` (no dia com as duas, a da consulta). **Atual:** o Peso atual
+    do topo. Os dois pela mesma regra, para "4,3 de 8,6" bater com o Peso
+    atual ao lado.
+  - **Direção pela meta:** meta abaixo do inicial é perder; acima, ganhar. A
+    conta é a mesma nos dois sentidos (quanto do caminho foi feito).
+  - **Foi para o lado errado** (mais pesado que o inicial, querendo perder,
+    ou o contrário): anel vazio e o texto "acima do peso inicial (+1,2 kg)"
+    (ou "abaixo"), em `clin-atencao`.
+  - **Passou da meta:** anel cheio e "meta atingida"; passou mais de 0,5 kg,
+    "passou da meta em N kg".
+  - **Sem anel**, só o texto de hoje: sem meta ("—" e "definir nas metas"),
+    sem peso no período, ou meta igual ao peso inicial.
+  - A meta é a de agora, mesmo que tenha mudado no meio do período: é a que
+    o nutri vai cobrar.
+  - Cores: arco `clin-primaria` sobre trilho `clin-linha`; `role="img"` com
+    "Progresso até a meta: 4,3 de 8,6 kg, 50%". O `ProgressRing` do paciente
+    usa a paleta do app dele (`slate`, cor por classe): a versão do nutri
+    usa as variáveis do tema clínico, sem copiar a conta do arco.
 - **Bloco "Evolução"**, entre o topo e "Ver medidas registradas":
   - **Peso:** título com "média da semana X kg · ±Y kg desde a 1ª semana"
     (a primeira semana com pesagem no período); legenda com "média da
@@ -247,6 +270,9 @@ motivo.
   - semana sem pesagem vira lacuna, não zero nem interpolação;
   - medida da consulta fora da média e como ponto;
   - meta dentro ou fora da escala (5 kg);
+  - o anel da meta: perder e ganhar, lado errado, meta atingida e passada,
+    sem meta, meta igual ao inicial, peso inicial e atual pela regra de
+    `pesoDoDia`;
   - "desde a 1ª semana" e a variação de cintura e % de gordura;
   - a frase do `aria-label`;
   - chave do exame (grafias da tabela juntas; nome fora da tabela pela
@@ -257,7 +283,8 @@ motivo.
   - minigráfico só com 3 resultados na mesma unidade.
 - **Contraste:** os pares novos em `lib/temaClinico.test.ts`.
 - **Tela (`ferramentas/tirar-prints-nutri.cjs`, uma Verificação nova):**
-  o bloco Evolução com a linha, os pontos da consulta, a lacuna e a meta;
+  o anel da meta com a porcentagem e o "N de M kg"; o bloco Evolução com a
+  linha, os pontos da consulta, a lacuna e a meta;
   cintura e % de gordura; a dica no hover; o comparativo na ordem certa; o
   minigráfico só onde há 3 resultados; pouco dado; leitura que falha
   (`/__falhar`); celular sem transbordo; tema escuro. O Supabase falso
