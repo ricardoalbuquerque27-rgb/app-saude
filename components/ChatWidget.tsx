@@ -146,38 +146,34 @@ export default function ChatWidget() {
         <button
           onClick={() => setOpen(true)}
           aria-label="Abrir a Gaia"
-          className={`fixed bottom-20 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-lg shadow-brand-600/30 transition duration-200 hover:scale-105 active:scale-95 lg:bottom-6 lg:right-6 ${
+          className={`fixed bottom-20 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-app-primaria text-app-sobre-primaria transition duration-200 hover:scale-105 active:scale-95 lg:bottom-6 lg:right-6 ${
             escondido
               ? "pointer-events-none translate-y-24 opacity-0 focus-visible:translate-y-0 focus-visible:opacity-100"
               : "translate-y-0 opacity-100"
           }`}
         >
           <Leaf className="h-6 w-6" />
-          <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-400 opacity-60" />
-            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-brand-300" />
-          </span>
         </button>
       )}
 
       {/* Painel do chat */}
       {open && (
-        <div className="fixed inset-x-2 bottom-20 top-16 z-50 flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950 sm:inset-x-auto sm:right-4 sm:top-auto sm:h-[70vh] sm:max-h-[640px] sm:w-[400px] lg:bottom-6 lg:right-6">
+        <div className="fixed inset-x-2 bottom-20 top-16 z-50 flex flex-col overflow-hidden rounded-[14px] border border-app-linha bg-app-cartao shadow-2xl sm:inset-x-auto sm:right-4 sm:top-auto sm:h-[70vh] sm:max-h-[640px] sm:w-[400px] lg:bottom-6 lg:right-6">
           {/* Cabeçalho */}
-          <div className="flex items-center justify-between gap-2 border-b border-slate-200 bg-gradient-to-r from-brand-600 to-brand-700 px-4 py-3 text-white dark:border-slate-800">
-            <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/15">
+          <div className="flex items-center justify-between gap-2 border-b border-app-linha bg-app-cartao px-4 py-3">
+            <div className="flex items-center gap-2.5">
+              <div className="icon-badge">
                 <Leaf className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-sm font-semibold leading-tight">Gaia</p>
-                <p className="text-[11px] text-brand-50/80">Sua companheira de saúde</p>
+                <p className="text-[15px] font-semibold leading-tight text-app-texto">Gaia</p>
+                <p className="text-[13px] text-app-texto-2">Sua companheira de saúde</p>
               </div>
             </div>
             <button
               onClick={() => setOpen(false)}
               aria-label="Fechar"
-              className="rounded-lg p-1.5 text-white/90 transition hover:bg-white/15"
+              className="rounded-lg p-1.5 text-app-texto-2 transition hover:bg-app-primaria-fundo"
             >
               <X className="h-5 w-5" />
             </button>
@@ -186,12 +182,12 @@ export default function ChatWidget() {
           {/* Mensagens */}
           <div
             ref={scrollRef}
-            className="flex-1 space-y-3 overflow-y-auto bg-slate-50 p-3 dark:bg-slate-900/40"
+            className="flex-1 space-y-3 overflow-y-auto bg-app-pagina p-3"
           >
             {messages.length === 0 && (
               <div>
-                <div className="rounded-xl bg-white p-3 text-sm text-slate-700 shadow-sm dark:bg-slate-900 dark:text-slate-300">
-                  <p className="font-medium text-slate-900 dark:text-white">
+                <div className="rounded-xl border border-app-linha bg-app-cartao p-3 text-sm text-app-texto-2">
+                  <p className="font-medium text-app-texto">
                     Oi, eu sou a Gaia 🌱
                   </p>
                   <p className="mt-1">
@@ -200,7 +196,7 @@ export default function ChatWidget() {
                     (treino, refeição, água, peso, exames e a dose da caneta).
                   </p>
                 </div>
-                <p className="mb-1.5 mt-3 flex items-center gap-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                <p className="mb-1.5 mt-3 flex items-center gap-1 text-[13px] font-medium text-app-texto-2">
                   <Sparkles className="h-3 w-3" /> Sugestões
                 </p>
                 <div className="space-y-1.5">
@@ -208,7 +204,7 @@ export default function ChatWidget() {
                     <button
                       key={s}
                       onClick={() => send(s)}
-                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-xs text-slate-700 transition hover:border-brand-400 hover:bg-brand-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-brand-700 dark:hover:bg-brand-950/30"
+                      className="w-full rounded-lg border border-app-linha bg-app-cartao px-3 py-2 text-left text-[13px] text-app-texto transition hover:border-app-campo hover:bg-app-primaria-fundo"
                     >
                       {s}
                     </button>
@@ -225,8 +221,8 @@ export default function ChatWidget() {
                 <div
                   className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
                     m.role === "user"
-                      ? "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200"
-                      : "bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300"
+                      ? "bg-app-linha text-app-texto-2"
+                      : "bg-app-primaria-fundo text-app-primaria"
                   }`}
                 >
                   {m.role === "user" ? (
@@ -238,13 +234,13 @@ export default function ChatWidget() {
                 <div
                   className={`max-w-[80%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm ${
                     m.role === "user"
-                      ? "bg-brand-700 text-white"
-                      : "bg-white text-slate-800 shadow-sm dark:bg-slate-900 dark:text-slate-200"
+                      ? "bg-app-primaria text-app-sobre-primaria"
+                      : "border border-app-linha bg-app-cartao text-app-texto"
                   }`}
                 >
                   {m.content ||
                     (loading && i === messages.length - 1 ? (
-                      <Loader2 className="h-4 w-4 animate-spin text-slate-500" />
+                      <Loader2 className="h-4 w-4 animate-spin text-app-texto-2" />
                     ) : (
                       ""
                     ))}
@@ -253,16 +249,16 @@ export default function ChatWidget() {
             ))}
 
             {error && (
-              <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
+              <p className="rounded-lg bg-app-perigo-fundo px-3 py-2 text-[13px] text-app-perigo">
                 {error}
               </p>
             )}
           </div>
 
           {/* Entrada */}
-          <div className="flex items-end gap-2 border-t border-slate-200 bg-white p-2.5 dark:border-slate-800 dark:bg-slate-950">
+          <div className="flex items-end gap-2 border-t border-app-linha bg-app-cartao p-2.5">
             <textarea
-              className="input max-h-24 min-h-[40px] flex-1 resize-none py-2 text-sm"
+              className="input max-h-24 min-h-[44px] flex-1 resize-none py-2 text-sm"
               rows={1}
               placeholder="Escreva sua pergunta…"
               value={input}
@@ -273,7 +269,7 @@ export default function ChatWidget() {
             <button
               onClick={() => send(input)}
               disabled={loading || !input.trim()}
-              className="btn-primary h-10 w-10 shrink-0 justify-center px-0"
+              className="btn-primary h-11 w-11 shrink-0 justify-center px-0"
               aria-label="Enviar"
             >
               {loading ? (

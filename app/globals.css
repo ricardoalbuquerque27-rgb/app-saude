@@ -112,19 +112,25 @@ input[type="number"] {
   .label {
     @apply mb-1.5 block text-[13px] font-medium text-app-texto-2;
   }
+  /* Foco por teclado: contorno sólido de 2 px em `primaria`, com folga de
+     2 px. O anel de antes (brand-500 a 25%) era uma cor fora da paleta e,
+     com 25% de opacidade, quase não aparecia sobre o cartão. O `outline-none`
+     fica só para o foco do mouse (o que não é `focus-visible`). */
   .btn {
     @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition
-      outline-none focus-visible:ring-4 focus-visible:ring-brand-500/25
+      outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2
+      focus-visible:outline-app-primaria
       active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60;
   }
   .chip {
     @apply inline-flex items-center gap-1.5 rounded-full border border-app-linha bg-app-cartao px-3 py-1 text-xs font-medium text-app-texto-2;
   }
   /* Sólido, sem degradê nem sombra: o texto é `sobre-primaria`, que passa
-     4,5:1 sobre `primaria` nos dois temas (o branco sobre o verde claro de
-     antes, brand-500, dava 2,61:1). O hover escurece por filtro, o mesmo
-     gesto do clínico. 44 px de altura mínima: é a ação principal, e
-     `min-height` (não `height`) deixa o botão crescer com o texto quebrado. */
+     4,5:1 sobre `primaria` nos dois temas (o degradê de antes, brand-600 a
+     brand-700, com texto branco, ia de 3,83:1 na ponta clara a 5,71:1). O
+     hover escurece por filtro, o mesmo gesto do clínico. 44 px de altura
+     mínima: é a ação principal, e `min-height` (não `height`) deixa o botão
+     crescer com o texto quebrado. */
   .btn-primary {
     @apply btn min-h-[44px] bg-app-primaria text-app-sobre-primaria
       hover:[filter:brightness(0.94)];
@@ -258,7 +264,8 @@ input[type="number"] {
   .tappable {
     @apply transition duration-200 ease-out
       active:scale-[0.97] active:duration-75
-      focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-500/25;
+      focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2
+      focus-visible:outline-app-primaria;
   }
   /* Card clicável: o mesmo afundar ao toque, e no hover só a borda passa a
      `campo`. Não sobe nem faz sombra: o `translateY` do hover fazia o card
@@ -358,9 +365,12 @@ input[type="number"] {
     color: var(--clin-primaria);
   }
 
-  /* `background` (e não background-color) zera o gradiente do botão
-     global; sem gradiente, o hover dele (que só troca as cores do
-     gradiente) não faria nada, então o hover escurece por filtro. */
+  /* Redundante hoje, como as cópias `.dark`: o botão global já é sólido, sem
+     sombra, e escurece por filtro no hover, e `--clin-primaria` e
+     `--app-primaria` são o mesmo tom (o app importa a paleta do clínico). A
+     cópia fica para o botão do clínico não depender da paleta do app e para
+     o `background` (shorthand, que zera também uma imagem de fundo) segurar
+     um degradê que um dia volte à global. */
   :where(.tema-clinico) .btn-primary,
   :where(.tema-clinico) .btn-primary:hover {
     background: var(--clin-primaria);
@@ -383,11 +393,14 @@ input[type="number"] {
   }
 
   /* Alvo de toque: ação principal com 44 px e secundária com 40 px, no
-     mínimo. Os formulários movidos usam `.btn-primary py-2 text-sm` (36 px)
-     e `.btn-ghost py-1.5 text-xs` (30 px), e reescrevê-los fugiria do R3.
-     Vai em `min-height` (e não `height`) para o botão crescer com o texto
-     quebrado em duas linhas, e no mesmo escopo `:where` em camada: um
-     utilitário na própria tag (`min-h-[48px]`) continua vencendo. */
+     mínimo. As globais têm hoje o mesmo piso (44 e 40), então a cópia é
+     redundante e fica só para o clínico não depender delas. Foi ela que
+     pôs no alvo os formulários movidos, que usam `.btn-primary py-2
+     text-sm` (36 px) e `.btn-ghost py-1.5 text-xs` (30 px) e não seriam
+     reescritos (R3). Vai em `min-height` (e não `height`) para o botão
+     crescer com o texto quebrado em duas linhas, e no mesmo escopo
+     `:where` em camada: um utilitário na própria tag (`min-h-[48px]`)
+     continua vencendo. */
   :where(.tema-clinico) .btn-primary {
     min-height: 44px;
   }
@@ -395,8 +408,10 @@ input[type="number"] {
     min-height: 40px;
   }
 
-  /* Foco por teclado nos botões: o anel global é brand-500 a 25%, fora da
-     paleta e fraco. Contorno sólido na cor primária, com folga. */
+  /* Foco por teclado nos botões: contorno sólido na cor primária, com folga.
+     As globais (`.btn`, `.tappable`) fazem o mesmo hoje com `--app-primaria`
+     (antes era um anel brand-500 a 25%, fora da paleta e fraco); a cópia
+     fica para o clínico não depender da paleta do app. */
   :where(.tema-clinico) .btn-primary:focus-visible,
   :where(.tema-clinico) .btn-ghost:focus-visible {
     outline: 2px solid var(--clin-primaria);

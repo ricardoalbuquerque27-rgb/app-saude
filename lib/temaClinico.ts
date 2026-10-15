@@ -140,8 +140,11 @@ function bloco(tema: Record<NomeCor, string>): string {
  * O `body:has(...)` pinta a página inteira com o chão do tema. Só a caixa do
  * conteúdo tinha esse fundo; em volta dela ficava o do app (outra cor, com o
  * brilho verde), e a página do paciente parecia uma caixa solta, com uma
- * faixa vazia entre ela e o menu. O `background` (e não `background-color`)
- * apaga também o brilho, que o `.dark body` de globals.css põe.
+ * faixa vazia entre ela e o menu. O `background` (shorthand, e não
+ * `background-color`) zera também uma imagem de fundo do body. Hoje é só
+ * defensivo: o brilho verde que o `.dark body` de globals.css punha saiu, e o
+ * body tem apenas `background-color`; se um dia voltar uma imagem ali, a
+ * página clínica continua lisa.
  */
 export function cssDoTemaClinico(): string {
   return (
