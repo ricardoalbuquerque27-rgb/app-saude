@@ -83,7 +83,7 @@ export default function MealPlanView({
   if (itens.length === 0) return null;
 
   return (
-    <div className={compacto ? "" : "card card-accent mb-5 pl-6"}>
+    <div className={compacto ? "" : "card mb-5"}>
       {!compacto && (
         <>
           <h2 className="section-title mb-1">

@@ -354,7 +354,7 @@ export default async function DashboardPage() {
       {/* ----------------------------------------------------------------
           1. HOJE — o que precisa da ação da pessoa agora
       ---------------------------------------------------------------- */}
-      <section className="card card-accent pl-6">
+      <section className="card">
         <h2 className="section-title mb-3">
           <span className="icon-badge">
             <CalendarDays className="h-4 w-4" />

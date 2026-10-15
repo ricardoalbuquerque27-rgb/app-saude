@@ -2,38 +2,27 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: 249 250 251;
-  --foreground: 15 23 42;
-}
-
-.dark {
-  --background: 7 11 17;
-  --foreground: 226 232 240;
-}
-
 html {
   -webkit-text-size-adjust: 100%;
   scroll-behavior: smooth;
 }
 
+/* O chão da página é `app-pagina`, liso: o brilho verde de canto que havia
+   aqui (e o `.dark body` com dois brilhos) era enfeite sem função. As
+   variáveis --app-* vêm de cssDoTemaApp() no layout raiz e já trocam no
+   escuro. A página do nutricionista e a agenda continuam com o chão do tema
+   clínico por `body:has(.tema-clinico)` (lib/temaClinico.ts), que vence esta
+   regra por especificidade. */
 body {
-  background-color: rgb(var(--background));
-  color: rgb(var(--foreground));
+  background-color: var(--app-pagina);
+  color: var(--app-texto);
   min-height: 100dvh;
-  background-image: radial-gradient(
-    900px 460px at 100% -5%,
-    rgba(24, 184, 94, 0.05),
-    transparent 60%
-  );
-  background-attachment: fixed;
-  background-repeat: no-repeat;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
 ::selection {
-  background-color: rgba(24, 184, 94, 0.22);
+  background-color: var(--app-primaria-fundo);
 }
 
 /* Números com largura fixa (métricas, gráficos) ficam mais estáveis */
@@ -87,19 +76,6 @@ body {
   }
 }
 
-.dark body {
-  background-image: radial-gradient(
-      920px 520px at 100% -8%,
-      rgba(24, 184, 94, 0.12),
-      transparent 60%
-    ),
-    radial-gradient(
-      760px 460px at -10% 112%,
-      rgba(24, 184, 94, 0.06),
-      transparent 55%
-    );
-}
-
 /* Esconde as setas dos inputs numéricos */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {
@@ -115,9 +91,9 @@ input[type="number"] {
   h2,
   h3,
   .font-display {
-    font-family: var(--font-display), var(--font-inter), system-ui, sans-serif;
-    letter-spacing: -0.02em;
-    font-feature-settings: "ss01", "cv01";
+    font-family: var(--font-sans), system-ui, sans-serif;
+    letter-spacing: -0.01em;
+    font-feature-settings: normal;
   }
   h1 {
     text-wrap: balance;
@@ -125,14 +101,16 @@ input[type="number"] {
 }
 
 @layer components {
+  /* O par claro/escuro de cada cor está na variável --app-*: nenhuma destas
+     classes leva `dark:`. A borda do campo é `campo` (a antiga slate-300 dava
+     1,48:1 sobre branco e reprovava o WCAG 1.4.11, que pede 3:1). */
   .input {
-    @apply w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition
-      placeholder:text-slate-400
-      focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15
-      dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-100 dark:placeholder:text-slate-500;
+    @apply w-full rounded-[10px] border border-app-campo bg-app-cartao px-3.5 py-2.5 text-sm text-app-texto outline-none transition
+      placeholder:text-app-texto-2
+      focus:border-app-primaria focus:ring-4 focus:ring-app-primaria-fundo;
   }
   .label {
-    @apply mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-400;
+    @apply mb-1.5 block text-[13px] font-medium text-app-texto-2;
   }
   .btn {
     @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition
@@ -140,29 +118,26 @@ input[type="number"] {
       active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60;
   }
   .chip {
-    @apply inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white/70 px-3 py-1 text-xs font-medium text-slate-600
-      dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-slate-300;
+    @apply inline-flex items-center gap-1.5 rounded-full border border-app-linha bg-app-cartao px-3 py-1 text-xs font-medium text-app-texto-2;
   }
-  /* O verde claro não carrega texto branco: branco sobre brand-500 dá
-     2.61:1 e sobre brand-600 dá 3.83:1 — abaixo do mínimo de 4.5:1 para
-     texto de 14px semibold. brand-700 dá 5.71:1 e brand-800, 7.97:1. O
-     hover escurece (em vez de clarear) e a elevação fica por conta da
-     sombra, que é o que já dava a sensação de relevo. */
+  /* Sólido, sem degradê nem sombra: o texto é `sobre-primaria`, que passa
+     4,5:1 sobre `primaria` nos dois temas (o branco sobre o verde claro de
+     antes, brand-500, dava 2,61:1). O hover escurece por filtro, o mesmo
+     gesto do clínico. 44 px de altura mínima: é a ação principal, e
+     `min-height` (não `height`) deixa o botão crescer com o texto quebrado. */
   .btn-primary {
-    @apply btn bg-gradient-to-b from-brand-600 to-brand-700 text-white
-      shadow-[0_8px_20px_-10px_rgba(12,150,75,0.85)]
-      hover:from-brand-700 hover:to-brand-800
-      hover:shadow-[0_10px_26px_-10px_rgba(24,184,94,0.9)];
+    @apply btn min-h-[44px] bg-app-primaria text-app-sobre-primaria
+      hover:[filter:brightness(0.94)];
   }
+  /* O secundário: fundo de cartão e borda `campo`, 40 px. */
   .btn-ghost {
-    @apply btn border border-slate-200 bg-white text-slate-700 hover:bg-slate-50
-      dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-slate-200 dark:hover:bg-white/[0.07];
+    @apply btn min-h-[40px] border border-app-campo bg-app-cartao text-app-texto
+      hover:bg-app-primaria-fundo;
   }
+  /* Um nível só: borda de 1 px e nada mais. Sem sombra nem degradê, o
+     cartão se destaca da página por `cartao` contra `pagina`. */
   .card {
-    @apply rounded-2xl border border-slate-200/70 bg-white p-5
-      shadow-[0_1px_2px_rgba(16,24,40,0.04),0_12px_28px_-18px_rgba(16,24,40,0.12)]
-      dark:border-white/[0.06] dark:bg-slate-900/50
-      dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.03),0_18px_44px_-26px_rgba(0,0,0,0.85)];
+    @apply rounded-[14px] border border-app-linha bg-app-cartao p-5;
   }
 }
 
@@ -238,10 +213,9 @@ input[type="number"] {
 .pf-skel {
   position: relative;
   overflow: hidden;
-  background-color: rgb(226 232 240 / 0.7);
+  background-color: var(--app-linha);
   border-radius: 0.75rem;
 }
-.dark .pf-skel { background-color: rgb(30 41 59 / 0.7); }
 .pf-skel::after {
   content: "";
   position: absolute;
@@ -286,52 +260,30 @@ input[type="number"] {
       active:scale-[0.97] active:duration-75
       focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-500/25;
   }
-  /* Card clicável: o mesmo, com elevação no hover (só em ponteiro fino,
-     para não "pular" no celular). */
+  /* Card clicável: o mesmo afundar ao toque, e no hover só a borda passa a
+     `campo`. Não sobe nem faz sombra: o `translateY` do hover fazia o card
+     "pular" sob o dedo, e a sombra era o segundo nível que o cartão deixou
+     de ter. */
   .card-interactive {
-    @apply tappable cursor-pointer
-      hover:border-brand-300/70
-      hover:shadow-[0_2px_4px_rgba(16,24,40,0.05),0_18px_36px_-20px_rgba(16,24,40,0.22)]
-      dark:hover:border-brand-800/70;
-  }
-  @media (hover: hover) and (pointer: fine) {
-    .card-interactive:hover {
-      transform: translateY(-2px);
-    }
+    @apply tappable cursor-pointer hover:border-app-campo;
   }
 
   /* ---- Hierarquia visual ----------------------------------------- */
 
-  /* Cartão em destaque. Antes isso era um gradiente vertical, que em tema
-     escuro clareava o topo e derrubava o contraste do texto secundário.
-     Agora é uma superfície de tom único (alpha sobre o fundo, então
-     funciona nos dois temas) com uma barra de acento à esquerda. */
-  .card-accent {
-    @apply relative overflow-hidden border-brand-200 bg-brand-50/60
-      dark:border-brand-800/50 dark:bg-brand-500/[0.07];
-  }
-  .card-accent::before {
-    content: "";
-    @apply absolute inset-y-0 left-0 w-1
-      bg-gradient-to-b from-brand-400 to-brand-600;
-  }
-
-  /* O verde do título vira um selo atrás do ícone, em vez de texto verde
-     sobre fundo colorido. Legível nos dois temas e mais bonito. */
+  /* Selo atrás do ícone, onde o ícone diz algo (estado vazio, linha de
+     lista). Os títulos de seção do paciente não o levam mais. */
   .icon-badge {
     @apply flex h-8 w-8 shrink-0 items-center justify-center rounded-xl
-      bg-brand-100 text-brand-700
-      dark:bg-brand-500/15 dark:text-brand-300;
+      bg-app-primaria-fundo text-app-primaria;
   }
   .section-title {
-    @apply flex items-center gap-2.5 font-semibold tracking-tight
-      text-slate-900 dark:text-white;
+    @apply flex items-center gap-2.5 text-[17px] font-semibold text-app-texto;
   }
-  /* Rótulo pequeno acima de um bloco. Contraste suficiente para ser lido
-     — o slate-400 anterior sumia sobre superfícies tingidas. */
+  /* Rótulo pequeno acima de um bloco, em frase normal: a caixa alta com
+     tracking largo de antes era de difícil leitura e não cabia na voz do
+     app. `texto-2` passa 4,5:1 sobre o cartão e sobre a página. */
   .eyebrow {
-    @apply text-[11px] font-semibold uppercase tracking-wider
-      text-slate-600 dark:text-slate-300;
+    @apply text-[13px] font-medium text-app-texto-2;
   }
 }
 
@@ -343,7 +295,8 @@ input[type="number"] {
    .label, .btn-primary, .btn-ghost, .section-title, .icon-badge). Em vez
    de reescrever cada formulário, estas regras refazem essas classes SÓ
    dentro de .tema-clinico, com as variáveis --clin-* (lib/temaClinico.ts).
-   As regras globais acima não mudam: o resto do app fica como estava.
+   As regras globais acima usam as variáveis --app-* (o visual do app do
+   paciente); o que está aqui existe para o lado clínico não mudar com elas.
 
    Dentro de `@layer components`, no FIM da camada, e com o escopo em
    `:where(.tema-clinico)` (especificidade zero). Isso faz duas coisas:
@@ -357,7 +310,9 @@ input[type="number"] {
    O seletor `.dark :where(.tema-clinico)` repetido existe porque as
    regras globais têm variantes dark: (`.dark .input` etc., especificidade
    maior); as variáveis já trocam de valor sozinhas, mas é preciso empatar
-   com elas para a ordem decidir.
+   com elas para a ordem decidir. As globais de hoje já não têm `dark:`
+   (o par está na variável), então estas cópias `.dark` ficam redundantes;
+   seguem como estão para o clínico não mudar.
    =================================================================== */
 @layer components {
   :where(.tema-clinico) .card,
@@ -449,16 +404,39 @@ input[type="number"] {
     --tw-ring-color: transparent;
   }
 
-  /* Os títulos globais (h1, h2, h3, em @layer base) usam a fonte de
-     exibição, e ela vencia o font-clinico herdado do wrapper: "Instrument
-     Sans em tudo" só valia para o texto corrido. Os ajustes de glifo e
-     espaçamento do base são da Sora; aqui voltam ao normal, com um aperto
-     leve só nos títulos. A classe `font-display` fica de fora de
-     propósito: é utilitário do Tailwind, pedido explícito de Sora, e
-     utilitário vence esta regra (como deve). */
-  :where(.tema-clinico) :is(h1, h2, h3) {
-    font-family: var(--font-clinico), system-ui, sans-serif;
-    font-feature-settings: normal;
-    letter-spacing: -0.01em;
+  /* O que a linguagem nova do app (cartão de 14 px, campo de 10, rótulo de
+     13 px em frase normal, título de seção de 17 px) tirou das globais e o
+     clínico ainda mostra do jeito antigo: a página do nutricionista e a
+     agenda "não mudam na tela" (conferido em pixels contra as fotos de
+     antes). Sem estas linhas, os cartões da conversa perdiam 2 px de raio,
+     o campo 2 px, o rótulo do editor de metas crescia de 12 para 13 px (o
+     formulário ficava 10 px mais alto) e o `eyebrow` do editor de treino e do
+     cardápio passava de caixa alta pequena a frase normal. Se o clínico um
+     dia adotar a linguagem nova, estas regras saem juntas. Os valores são os
+     das globais de antes: rounded-2xl, rounded-xl, text-xs, tracking-tight e
+     slate-600/300 (em rgb, para não depender da escala do Tailwind). */
+  :where(.tema-clinico) .card {
+    border-radius: 1rem;
+  }
+  :where(.tema-clinico) .input {
+    border-radius: 0.75rem;
+  }
+  :where(.tema-clinico) .label {
+    font-size: 0.75rem;
+    line-height: 1rem;
+  }
+  :where(.tema-clinico) .section-title {
+    font-size: inherit;
+    letter-spacing: -0.025em;
+  }
+  :where(.tema-clinico) .eyebrow {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: rgb(71 85 105);
+  }
+  .dark :where(.tema-clinico) .eyebrow {
+    color: rgb(203 213 225);
   }
 }

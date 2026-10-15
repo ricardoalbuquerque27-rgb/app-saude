@@ -296,7 +296,7 @@ function Componentes() {
 
         <div>
           <p className="eyebrow mb-1.5">Cartão em destaque</p>
-          <div className="card card-accent pl-6">
+          <div className="card">
             <h3 className="section-title mb-1">
               <span className="icon-badge">
                 <span className="text-xs">★</span>

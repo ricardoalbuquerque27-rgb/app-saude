@@ -43,14 +43,12 @@ const config: Config = {
         ),
       },
       fontFamily: {
-        sans: ["var(--font-inter)", "system-ui", "sans-serif"],
-        display: [
-          "var(--font-display)",
-          "var(--font-inter)",
-          "system-ui",
-          "sans-serif",
-        ],
-        clinico: ["var(--font-clinico)", "system-ui", "sans-serif"],
+        // Uma letra só: as três famílias apontam para a mesma variável, que o
+        // layout raiz define. `font-display` e `font-clinico` ficam como
+        // nomes (há usos nos componentes), mas já não trocam de fonte.
+        sans: ["var(--font-sans)", "system-ui", "sans-serif"],
+        display: ["var(--font-sans)", "system-ui", "sans-serif"],
+        clinico: ["var(--font-sans)", "system-ui", "sans-serif"],
       },
     },
   },
