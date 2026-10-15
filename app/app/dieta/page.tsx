@@ -222,14 +222,18 @@ export default function DietaPage() {
     carregarContexto();
   }, [carregarContexto]);
 
-  // Recarrega quando a IA registra uma refeição ("dieta"). O peso e as metas,
-  // que ela grava por conta própria, saem com outras áreas: o peso com "medidas"
-  // e as metas com "perfil" (lib/aiActions.ts). Sem ouvir as duas, o papel das
-  // calorias ficava o de antes da conversa até alguém recarregar a página.
+  // Recarrega quando a IA mexe no que a tela mostra (lib/aiActions.ts):
+  //  - "dieta": a refeição que ela registra. A ferramenta de metas também avisa
+  //    por aqui (area: ["dieta", "medidas", "habitos"]), então as metas já vêm
+  //    por este ouvinte;
+  //  - "medidas": o peso (registrar_peso, atualizar_peso), que decide o papel das
+  //    calorias. Era o que faltava: sem ele, o papel ficava o de antes da conversa
+  //    até alguém recarregar a página.
+  // O "perfil" não entra: só sai de atualizar_perfil (sexo, altura, nascimento),
+  // que a Dieta não lê.
   useLiveRefresh("dieta", load);
   useLiveRefresh("dieta", carregarContexto);
   useLiveRefresh("medidas", carregarContexto);
-  useLiveRefresh("perfil", carregarContexto);
 
   // Os atalhos da Início ("Refeição" e "Foto do prato") apontavam os dois
   // para /app/dieta sem parâmetro: caíam na página com o formulário
@@ -481,11 +485,13 @@ export default function DietaPage() {
                   setDate(v > todayStr ? todayStr : v);
                 }}
               />
-              {/* O nome diz o que o botão faz, e começa pelo texto visível. */}
+              {/* O nome diz o que o botão faz, e começa pelo texto visível; o
+                  title é a dica de quem usa o mouse. */}
               <button
                 type="button"
                 onClick={abrirSeletor}
                 aria-label={`${rotuloDoDia(date, todayStr)}, escolher outra data`}
+                title="Escolher outra data"
                 className="tappable flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[10px] px-2 text-[15px] font-semibold text-app-texto hover:bg-app-primaria-fundo peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-app-primaria"
               >
                 <CalendarDays aria-hidden="true" className="h-4 w-4 shrink-0 text-app-texto-2" />

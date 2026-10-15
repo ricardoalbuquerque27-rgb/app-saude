@@ -308,6 +308,16 @@ async function entrar(ctx, email = "maria.teste@exemplo.com") {
     await p.waitForTimeout(400);
     const depois = await p.evaluate(() => window.__showPicker);
     ok(depois === antes + 1, `tocar no rótulo chama showPicker() do input de data (${antes} → ${depois})`);
+    // O foco fica no botão, e o contorno que segue o input escondido
+    // (peer-focus-visible) não acende com o mouse: o seletor nativo não leva o
+    // foco para o input, nem ao escolher nem ao descartar (conferido à mão no
+    // Chromium com janela, pelo seletor de verdade).
+    const apos = await p.evaluate(() => ({
+      ativo: document.activeElement?.tagName.toLowerCase() === "button",
+      input: document.querySelector('main input[type="date"]').matches(":focus"),
+    }));
+    const contorno = await rotuloDoDia.evaluate((e) => getComputedStyle(e).outlineStyle);
+    ok(apos.ativo && !apos.input && contorno === "none", `e o foco segue no botão, sem contorno de teclado (botão ativo ${apos.ativo}, input focado ${apos.input}, contorno ${contorno})`);
     await p.keyboard.press("Escape");
   });
 
@@ -570,11 +580,13 @@ async function entrar(ctx, email = "maria.teste@exemplo.com") {
   }));
 
   // O assistente grava o peso e as metas por conta própria e avisa a tela por
-  // "pf-data-changed": o peso sai com a área "medidas" e as metas com "perfil"
-  // (lib/aiActions.ts). Sem ouvir as duas, a Dieta mostrava o papel das
-  // calorias de antes da conversa até alguém recarregar.
+  // "pf-data-changed" (lib/aiActions.ts): o peso sai com a área "medidas", e a
+  // ferramenta de metas com ["dieta", "medidas", "habitos"]. O "perfil" só sai
+  // de atualizar_perfil (sexo, altura, nascimento), que a Dieta não lê. Sem
+  // ouvir "medidas", a Dieta mostrava o papel das calorias de antes da conversa
+  // até alguém recarregar.
   await etapa("a Gaia muda a meta ou o peso, sem recarregar", () => comEstado(async () => {
-    const avisar = (area) => p.evaluate((a) => window.dispatchEvent(new CustomEvent("pf-data-changed", { detail: { areas: [a] } })), area);
+    const avisar = (...areas) => p.evaluate((a) => window.dispatchEvent(new CustomEvent("pf-data-changed", { detail: { areas: a } })), areas);
     const rotuloDasCalorias = () => anel("Calorias").locator("figcaption").innerText().then((t) => t.trim());
     const esperar = (esperado) =>
       p.waitForFunction((e) => {
@@ -586,17 +598,22 @@ async function entrar(ctx, email = "maria.teste@exemplo.com") {
     const sessao = await entrarComoMaria();
     const autorizacao = { "content-type": "application/json", authorization: `Bearer ${sessao.access_token}` };
     await fetch(`${MOCK}/rest/v1/profiles`, { method: "POST", headers: autorizacao, body: JSON.stringify({ id: sessao.user.id, weight_goal_kg: 80 }) });
-    await avisar("perfil");
-    ok(await esperar("Calorias · meta"), 'a meta de peso muda pela Gaia ("perfil"): o anel passa a "Calorias · meta" sem recarregar');
+    await avisar("dieta", "medidas", "habitos");
+    ok(await esperar("Calorias · meta"), 'a meta de peso muda pela Gaia (a ferramenta de metas avisa "dieta", "medidas" e "habitos"): o anel passa a "Calorias · meta" sem recarregar');
     await fetch(`${MOCK}/rest/v1/profiles`, { method: "POST", headers: autorizacao, body: JSON.stringify({ id: sessao.user.id, weight_goal_kg: 62 }) });
-    await avisar("perfil");
-    ok(await esperar("Calorias · limite"), "e volta ao limite quando a meta volta");
+    await avisar("dieta");
+    ok(await esperar("Calorias · limite"), 'e volta ao limite quando a meta volta, só com "dieta" (é o ouvinte que cobre as metas)');
     // O peso: a pesagem mais recente da Maria passa a 50 kg, abaixo da meta.
     const linhas = await (await fetch(`${MOCK}/rest/v1/body_measurements?weight_kg=not.is.null&measured_by=is.null&order=date.desc&limit=1`, { headers: autorizacao })).json();
     const r = await fetch(`${MOCK}/rest/v1/body_measurements?id=eq.${linhas[0].id}`, { method: "PATCH", headers: autorizacao, body: JSON.stringify({ weight_kg: 50 }) });
     ok(r.status === 204 || r.status === 200, `preparo: a última pesagem passa a 50 kg no mock (${r.status})`);
     await avisar("medidas");
     ok(await esperar("Calorias · meta"), 'o peso muda pela Gaia ("medidas"): o anel passa a "Calorias · meta" sem recarregar');
+    // Cada evento também faz o AppShell dar router.refresh(): sair da página com
+    // um deles em voo aborta o pedido, e o Next registra "Failed to fetch RSC
+    // payload" no console (que o roteiro conta como erro).
+    await p.waitForLoadState("networkidle");
+    await p.waitForTimeout(1000);
   }));
 
   // =========================================================================

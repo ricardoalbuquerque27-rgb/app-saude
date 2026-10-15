@@ -79,7 +79,8 @@ sugestão é inventado e que o plano diz que não carregou. Com `meals` falhando
 o plano também não oferece "Comi isso" nem marca "feito" (diz que não carregou as
 refeições do dia). Também: o nome e o foco do botão do dia (o `input` escondido
 fora da ordem de tab, o contorno de foco no botão), o papel das calorias mudando
-por `pf-data-changed` ("perfil" e "medidas", como a Gaia avisa), a descrição da
+por `pf-data-changed` (o peso por "medidas" e as metas por "dieta", como a Gaia
+avisa: o "perfil" é só de sexo, altura e nascimento), a descrição da
 sugestão cortada em duas linhas na Dieta (com a leitura do plano interceptada
 pelo `page.route`) e na Início, e a rolagem até
 `#plano` (direto e pelo link da sugestão da Início), o cardápio de Meu plano
