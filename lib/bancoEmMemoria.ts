@@ -8,7 +8,11 @@
 // manda), `limit` e `maybeSingle`, que falha com duas linhas. E o que os
 // outros Supabases falsos dos testes não fazem: uma chamada pode devolver
 // `error` (`falhar`), que é o caso da leitura que falha no meio das páginas,
-// e cada chamada fica anotada em `chamadas`, com os filtros e o intervalo.
+// o `count: "exact"` do `select` (o total das linhas que passam nos filtros,
+// antes do `range`, como o Content-Range do PostgREST) e o `max-rows` do
+// projeto (`maxRows`): o PostgREST corta a resposta nele SEM erro, e é isso
+// que a conferência da contagem em `lerEmPaginas` pega. Cada chamada fica
+// anotada em `chamadas`, com os filtros, o intervalo e a contagem pedida.
 // Não sabe quais colunas a tabela tem e não aplica a RLS.
 
 type Linha = Record<string, any>;
@@ -17,17 +21,23 @@ export type Chamada = {
   tabela: string;
   filtros: [string, string, unknown][];
   range: [number, number] | null;
+  /** O `count` que o `select` pediu, ou nulo. */
+  contagem: "exact" | null;
 };
 
 export function bancoEmMemoria(
   tabelas: Record<string, Linha[]>,
-  opcoes: { falhar?: (chamada: Chamada, indice: number) => boolean } = {}
+  opcoes: {
+    falhar?: (chamada: Chamada, indice: number) => boolean;
+    /** O teto de linhas por resposta do projeto (o padrão da Supabase é 1.000). Sem ele, não há corte. */
+    maxRows?: number;
+  } = {}
 ) {
   const chamadas: Chamada[] = [];
   return {
     chamadas,
     from(tabela: string) {
-      const chamada: Chamada = { tabela, filtros: [], range: null };
+      const chamada: Chamada = { tabela, filtros: [], range: null, contagem: null };
       let colunas: string[] | null = null;
       const testes: ((l: Linha) => boolean)[] = [];
       const ordens: { col: string; asc: boolean }[] = [];
@@ -39,7 +49,11 @@ export function bancoEmMemoria(
         return q;
       };
       const q: any = {
-        select: (c: string) => ((colunas = c.trim() === "*" ? null : c.split(",").map((x) => x.trim())), q),
+        select: (c: string, o?: { count?: string }) => (
+          (colunas = c.trim() === "*" ? null : c.split(",").map((x) => x.trim())),
+          (chamada.contagem = o?.count === "exact" ? "exact" : null),
+          q
+        ),
         eq: (c: string, v: unknown) => filtro("eq", c, v, (l) => l[c] === v),
         gte: (c: string, v: string) => filtro("gte", c, v, (l) => l[c] >= v),
         lte: (c: string, v: string) => filtro("lte", c, v, (l) => l[c] <= v),
@@ -47,7 +61,7 @@ export function bancoEmMemoria(
         limit: (n: number) => ((teto = n), q),
         range: (de: number, ate: number) => ((chamada.range = [de, ate]), q),
         maybeSingle: () => ((umaSo = true), q),
-        then: (resolve: (r: { data: any; error: unknown }) => void, reject?: (e: unknown) => void) => {
+        then: (resolve: (r: { data: any; error: unknown; count?: number | null }) => void, reject?: (e: unknown) => void) => {
           try {
             const indice = chamadas.length;
             chamadas.push(chamada);
@@ -63,19 +77,21 @@ export function bancoEmMemoria(
               }
               return 0;
             });
+            const total = out.length;
             if (chamada.range) out = out.slice(chamada.range[0], chamada.range[1] + 1);
             if (teto != null) out = out.slice(0, teto);
+            if (opcoes.maxRows != null) out = out.slice(0, opcoes.maxRows);
             const lista = colunas;
             const linhas = lista ? out.map((l) => Object.fromEntries(lista.map((c) => [c, l[c]]))) : out;
             if (umaSo) {
               if (linhas.length > 1) {
                 resolve({ data: null, error: { message: "JSON object requested, multiple rows returned", code: "PGRST116" } });
               } else {
-                resolve({ data: linhas[0] ?? null, error: null });
+                resolve({ data: linhas[0] ?? null, error: null, count: chamada.contagem ? total : null });
               }
               return;
             }
-            resolve({ data: linhas, error: null });
+            resolve({ data: linhas, error: null, count: chamada.contagem ? total : null });
           } catch (e) {
             reject?.(e);
           }

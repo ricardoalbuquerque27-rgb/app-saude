@@ -20,17 +20,19 @@ export const TETO_DE_EXAMES = 5000;
  * Sem janela de data: o comparativo precisa do resultado anterior de cada
  * exame, que pode ser de anos atrás. Por isso lê em páginas, até o fim, em vez
  * de contar "vir cheio" como falha: numa leitura que só cresce, isso era uma
- * quebra que nunca se desfazia.
+ * quebra que nunca se desfazia. A 1ª página pede a contagem (`count: "exact"`):
+ * se a soma das páginas não bate com ela, o projeto cortou a página abaixo de
+ * 1.000 e a leitura é falha.
  */
 export async function getExamesDoPaciente(
   supabase: any,
   pacienteId: string
 ): Promise<Res<ExameDoPaciente[]>> {
   return lerEmPaginas<ExameDoPaciente>(
-    (de, ate) =>
+    (de, ate, contar) =>
       supabase
         .from("exams")
-        .select("date, title, result_value, unit, reference_range, status, notes")
+        .select("date, title, result_value, unit, reference_range, status, notes", contar ? { count: "exact" } : undefined)
         .eq("user_id", pacienteId)
         .order("date", { ascending: true })
         .order("created_at", { ascending: true })

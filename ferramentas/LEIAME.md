@@ -127,7 +127,9 @@ e saem todos de `dias(n)`:
   nos dados da Helena e só aparece no banco de verdade. A ordem
   (`order=date.asc&order=created_at.asc`, ou as duas numa lista) o mock já
   entende, e o `offset` também: as leituras dos exames e do Corpo pedem em
-  páginas (`.range()`), e sem ele a 2ª página repetiria a 1ª.
+  páginas (`.range()`), e sem ele a 2ª página repetiria a 1ª. A 1ª página
+  pede `Prefer: count=exact` (`lerEmPaginas` confere a soma com o total), e o
+  mock o devolve no `Content-Range`, como o PostgREST.
 
 E as consultas (`appointments`), uma situação por paciente sem mudar os
 alertas acima:

@@ -64,7 +64,8 @@ Isso não é óbvio lendo a árvore de arquivos.
   em `lib/nutri.test.ts`, o "antes" das medidas em `lib/registroDb.test.ts`
   e as leituras em páginas do Corpo e dos exames em `lib/evolucaoDb.test.ts`
   e `lib/examesDb.test.ts` (o banco delas, `lib/bancoEmMemoria.ts`, tem
-  `range` e devolve `error` quando o teste pede).
+  `range`, `count: "exact"` e o `max-rows` do projeto, e devolve `error` quando
+  o teste pede).
 
 Toda segurança é por **RLS no Postgres**, nunca por service role no app.
 Ao mexer em política, teste com `BEGIN ... ROLLBACK` e
@@ -149,7 +150,13 @@ teto, ou erro numa página, é falha. Era `.limit(200)` nos exames com "vir
 cheio é falha": numa leitura que só cresce, oito laudos derrubavam a aba
 Clínico para sempre, tratamento junto. A falha dos exames mostra o erro só no
 bloco Exames. "Ainda não dá para ver tendência" só vale com leitura que deu
-certo.
+certo. **O tamanho da página supõe o `max-rows` padrão da Supabase (1.000).**
+Se o projeto o baixasse, o PostgREST cortaria a página sem erro e a leitura
+pararia nela, tomada por "curta"; por isso a 1ª página pede `count: "exact"`
+(a consulta recebe `contar`) e a soma das páginas tem de bater com ele, senão
+é falha (só na 1ª, porque o `count` custa uma contagem por pedido). Resposta
+sem contagem não tem o que conferir, e vale o que veio. Leitura nova em
+páginas pede a contagem do mesmo jeito.
 
 **Comparativo dos exames.** Compara o último resultado de cada exame com o
 anterior, um resultado por dia (vale o último da leitura, que por isso vem em
@@ -317,7 +324,7 @@ antiga faria a instrução velha passar por atual.
 
 ```bash
 npm run dev      # desenvolvimento
-npm test         # 722 testes unitários (vitest)
+npm test         # 836 testes unitários (vitest)
 ferramentas/testar-sql.sh   # migrações e testes SQL num Postgres local
 npm run build    # produção
 ```

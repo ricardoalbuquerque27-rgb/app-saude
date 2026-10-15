@@ -53,7 +53,9 @@ export async function getInicioDoAcompanhamento(
  * Em páginas (`lerEmPaginas`): o PostgREST corta em 1.000 linhas SEM erro, e
  * um ano cortado se desenharia como se fosse inteiro (a lacuna no começo, o
  * peso inicial errado). Antes era `.limit(1000)` com "vir 1.000 é falha", e
- * quem pesa três vezes por dia perdia a aba Corpo inteira.
+ * quem pesa três vezes por dia perdia a aba Corpo inteira. A 1ª página pede a
+ * contagem (`count: "exact"`): a soma das páginas tem de bater com ela, senão
+ * o `max-rows` do projeto cortou a página e a leitura é falha.
  */
 export async function getEvolucaoDoCorpo(
   supabase: any,
@@ -62,10 +64,13 @@ export async function getEvolucaoDoCorpo(
   ate: string
 ): Promise<Res<LinhaDoCorpo[]>> {
   return lerEmPaginas<LinhaDoCorpo>(
-    (de, fim) =>
+    (de, fim, contar) =>
       supabase
         .from("body_measurements")
-        .select("date, weight_kg, waist_cm, body_fat_pct, measured_by, created_at")
+        .select(
+          "date, weight_kg, waist_cm, body_fat_pct, measured_by, created_at",
+          contar ? { count: "exact" } : undefined
+        )
         .eq("user_id", pacienteId)
         .gte("date", desde)
         .lte("date", ate)

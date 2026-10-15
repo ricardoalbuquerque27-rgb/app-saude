@@ -51,6 +51,28 @@ describe("getExamesDoPaciente", () => {
     expect(r.falhou).toBe(true);
   });
 
+  it("pede a contagem na primeira página e só nela", async () => {
+    const banco = bancoEmMemoria({ exams: exames(2500) });
+    const r = await getExamesDoPaciente(banco, PACIENTE);
+    expect(r.falhou).toBe(false);
+    expect(banco.chamadas.map((c) => c.contagem)).toEqual(["exact", null, null]);
+  });
+
+  it("projeto com max-rows menor que a página (500): é falha, e não os exames cortados como se fossem todos", async () => {
+    // A 1ª página chega com 500 linhas e parece "curta"; sem a contagem, o
+    // comparativo ficaria sem os exames mais novos (ou os mais velhos), calado.
+    const banco = bancoEmMemoria({ exams: exames(1200) }, { maxRows: 500 });
+    const r = await getExamesDoPaciente(banco, PACIENTE);
+    expect(r.falhou).toBe(true);
+    expect(r.data).toEqual([]);
+  });
+
+  it("com o max-rows padrão de 1.000, mais de mil exames são lidos inteiros", async () => {
+    const r = await getExamesDoPaciente(bancoEmMemoria({ exams: exames(2500) }, { maxRows: 1000 }), PACIENTE);
+    expect(r.falhou).toBe(false);
+    expect(r.data).toHaveLength(2500);
+  });
+
   it("só do paciente, por data e, no mesmo dia, pela gravação; com as colunas do comparativo e da lista", async () => {
     const base = exames(1)[0];
     const banco = bancoEmMemoria({

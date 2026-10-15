@@ -73,8 +73,86 @@ describe("lerEmPaginas", () => {
   });
 });
 
+describe("lerEmPaginas: a contagem da primeira página", () => {
+  // O PostgREST corta a resposta no `max-rows` do projeto SEM erro. Se o
+  // projeto baixar o teto de 1.000 para 500, a 1ª página chega com 500 linhas,
+  // parece "curta" e a leitura parava ali como se fosse o fim: o histórico
+  // cortado desenhado como inteiro. O `count: "exact"` da 1ª página diz o
+  // total, e a soma das páginas tem de bater com ele.
+  const comContagem =
+    (total: number, contagem: number | null | undefined = total, pedidos: boolean[] = [], teto = LINHAS_POR_PAGINA) =>
+    (de: number, ate: number, contar: boolean) => {
+      pedidos.push(contar);
+      const fim = Math.min(ate + 1, total, de + teto);
+      return Promise.resolve({
+        data: Array.from({ length: Math.max(0, fim - de) }, (_, i) => de + i),
+        error: null,
+        count: contar ? contagem : null,
+      });
+    };
+
+  it("pede a contagem na primeira página e só nela", async () => {
+    const pedidos: boolean[] = [];
+    const r = await lerEmPaginas(comContagem(2500, 2500, pedidos), 5000);
+    expect(r.falhou).toBe(false);
+    expect(r.data).toHaveLength(2500);
+    expect(pedidos).toEqual([true, false, false]);
+  });
+
+  it.each([0, 999, 1000, 1001, 2500])("%i linhas, e a contagem diz %i: leitura inteira", async (total) => {
+    const r = await lerEmPaginas(comContagem(total), 5000);
+    expect(r.falhou).toBe(false);
+    expect(r.data).toHaveLength(total);
+  });
+
+  it("a soma abaixo da contagem é falha: o PostgREST cortou a página abaixo de 1.000", async () => {
+    // 1.200 linhas no banco, mas o projeto só devolve 500 por resposta.
+    const r = await lerEmPaginas(comContagem(1200, 1200, [], 500), 5000);
+    expect(r.falhou).toBe(true);
+    expect(r.data).toEqual([]);
+  });
+
+  it("a soma acima da contagem também é falha: algo mudou no meio da leitura", async () => {
+    const r = await lerEmPaginas(comContagem(1500, 1499), 5000);
+    expect(r.falhou).toBe(true);
+    expect(r.data).toEqual([]);
+  });
+
+  it.each([null, undefined])("resposta sem contagem (%s): não há o que conferir, vale o que veio", async (contagem) => {
+    const r = await lerEmPaginas(comContagem(1500, contagem), 5000);
+    expect(r.falhou).toBe(false);
+    expect(r.data).toHaveLength(1500);
+  });
+
+  it("o teto continua sendo falha, com ou sem contagem", async () => {
+    expect((await lerEmPaginas(comContagem(5001), 5000)).falhou).toBe(true);
+    expect((await lerEmPaginas(comContagem(5000), 5000)).falhou).toBe(true);
+  });
+});
+
 describe("getEvolucaoDoCorpo", () => {
   const DESDE = addDaysISO(HOJE, -364);
+
+  it("pede a contagem na primeira página e só nela", async () => {
+    const banco = bancoEmMemoria({ body_measurements: pesagens(2500) });
+    const r = await getEvolucaoDoCorpo(banco, PACIENTE, DESDE, HOJE);
+    expect(r.falhou).toBe(false);
+    expect(banco.chamadas.map((c) => c.contagem)).toEqual(["exact", null, null]);
+  });
+
+  it("projeto com max-rows menor que a página (500): é falha, e não o período cortado como se fosse inteiro", async () => {
+    const banco = bancoEmMemoria({ body_measurements: pesagens(1200) }, { maxRows: 500 });
+    const r = await getEvolucaoDoCorpo(banco, PACIENTE, DESDE, HOJE);
+    expect(r.falhou).toBe(true);
+    expect(r.data).toEqual([]);
+  });
+
+  it("com o max-rows padrão de 1.000, um período maior que ele é lido inteiro", async () => {
+    const banco = bancoEmMemoria({ body_measurements: pesagens(2500) }, { maxRows: 1000 });
+    const r = await getEvolucaoDoCorpo(banco, PACIENTE, DESDE, HOJE);
+    expect(r.falhou).toBe(false);
+    expect(r.data).toHaveLength(2500);
+  });
 
   it.each([999, 1000, 1001])("%i medidas no período: todas, e não é falha", async (n) => {
     const banco = bancoEmMemoria({ body_measurements: pesagens(n) });

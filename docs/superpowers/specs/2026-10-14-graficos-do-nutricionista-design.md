@@ -94,13 +94,16 @@ pode ficar de fora. Exatamente 200 também conta como falha, pelo mesmo
 motivo.
 
 > **Emenda da revisão final (2026-10-14), leitura cheia.** A regra "leitura
-> cheia = falha" vale para leitura com janela, que não cresce sem fim (o
-> período do Corpo, de até 12 meses). A leitura sem janela (os exames) só
-> cresce: com ela, oito laudos derrubavam a aba Clínico para sempre. Ela
-> pagina com `.range()` em páginas de 1.000 até uma página curta, com teto de
-> 5.000 linhas, e só o teto ou um erro é falha, mostrada só no bloco Exames
-> (Tratamento e Efeitos continuam). A leitura do Corpo usa a mesma paginação
-> e o mesmo teto (`lerEmPaginas`).
+> cheia = falha" não vale para nenhuma das duas leituras: em ambas, só o
+> teto, ou um erro numa página, é falha. Os exames não têm janela e só
+> crescem (com ela, oito laudos derrubavam a aba Clínico para sempre), e o
+> período do Corpo passa de 1.000 linhas para quem pesa três vezes por dia.
+> As duas paginam com `.range()` em páginas de 1.000 até uma página curta, com
+> teto de 5.000 linhas (`lerEmPaginas`). A falha dos exames aparece só no
+> bloco Exames (Tratamento e Efeitos continuam). A 1ª página pede
+> `count: "exact"`, e a soma das páginas tem de bater com ele: com o
+> `max-rows` do projeto abaixo de 1.000, o PostgREST cortaria a página sem
+> erro e a leitura pararia nela.
 
 ### Média semanal do peso
 
