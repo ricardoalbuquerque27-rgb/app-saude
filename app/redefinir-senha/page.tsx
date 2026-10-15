@@ -4,6 +4,12 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Dumbbell, Loader2, Check, Eye, EyeOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import {
+  AJUDA_DA_SENHA,
+  SENHA_MINIMO,
+  ehErroDeSenhaFraca,
+  problemaDaSenha,
+} from "@/lib/senha";
 
 export default function RedefinirSenhaPage() {
   const [ready, setReady] = useState(false);
@@ -42,8 +48,9 @@ export default function RedefinirSenhaPage() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (password.length < 6) {
-      setError("A senha deve ter pelo menos 6 caracteres.");
+    const problema = problemaDaSenha(password);
+    if (problema) {
+      setError(problema);
       return;
     }
     setLoading(true);
@@ -52,8 +59,12 @@ export default function RedefinirSenhaPage() {
     const { error } = await supabase.auth.updateUser({ password });
     setLoading(false);
     if (error) {
+      // Senha que o servidor recusa por fraca não é link vencido: dizer
+      // "expirou" mandaria a pessoa pedir outro link sem mudar a senha.
       setError(
-        "Não foi possível redefinir. O link pode ter expirado — solicite um novo."
+        ehErroDeSenhaFraca(error)
+          ? AJUDA_DA_SENHA
+          : "Não foi possível redefinir. O link pode ter expirado — solicite um novo."
       );
       return;
     }
@@ -112,7 +123,8 @@ export default function RedefinirSenhaPage() {
                       className="input pr-11"
                       type={showPw ? "text" : "password"}
                       required
-                      minLength={6}
+                      minLength={SENHA_MINIMO}
+                      aria-describedby="ajuda-da-senha"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••"
@@ -131,6 +143,12 @@ export default function RedefinirSenhaPage() {
                       )}
                     </button>
                   </div>
+                  <p
+                    id="ajuda-da-senha"
+                    className="mt-1.5 text-[13px] text-slate-600 dark:text-slate-400"
+                  >
+                    {AJUDA_DA_SENHA}
+                  </p>
                 </div>
                 {error && (
                   <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">

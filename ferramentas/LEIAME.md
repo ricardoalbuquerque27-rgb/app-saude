@@ -47,8 +47,8 @@ novo.
 ## Cenários do mock
 
 `CENARIO` escolhe os dados que o mock devolve. Sem ele, valem os de sempre (a
-conta de teste da Maria), e é com esses que `tirar-prints.cjs` e
-`conferir-inicio.cjs` rodam.
+conta de teste da Maria), e é com esses que `tirar-prints.cjs`,
+`conferir-inicio.cjs` e `conferir-dieta.cjs` rodam.
 
 `conferir-inicio.cjs` confere a Início da Maria em 390 px e acusa com código de
 saída 1: a ordem das seções, a saudação pela hora de São Paulo, a contagem do
@@ -61,6 +61,32 @@ escrita ou a leitura de `daily_logs` falhando), o "Não deu para carregar os
 números de hoje" com `meals`, `daily_logs` ou `profiles` falhando, o Progresso
 de 30 dias e o "Não deu para carregar o peso", os alvos de 44 px, os links, nenhuma caixa alta nem degradê, nenhuma rolagem lateral e a
 Instrument Sans (também no `NutriHome`).
+
+`conferir-dieta.cjs` faz o mesmo com a Dieta da Maria (mock sem cenário, dev no
+ar; `SO=regex` roda só as etapas cujo nome casa): o rótulo do dia ("Hoje, qui. 15/10") que abre o seletor de data pelo
+`showPicker()` e o `input type="date"` escondido (`max` em hoje, data futura e
+campo limpo sem efeito), as setas, o chip "Hoje", os alvos de 44 px (medidos
+com `elementFromPoint`, porque o "Comi isso" tem 40 px visíveis e 44 de
+toque), "Calorias · limite" e "· meta" pelo peso e pela meta de peso, a barra de
+macros (três segmentos, 2 px entre eles, a legenda com gramas), a sugestão de
+proteína só em hoje, o plano num cartão só (`#plano`, "de Ricardo, seu
+nutricionista", "· feito", "comi", "Comi isso" com a gravação falhando), as
+refeições registradas (excluir incluído) e o "Nenhuma refeição neste dia.". Com
+`meals`, `profiles`, `body_measurements`, `patient_links`, `meal_plans` e
+`meal_plan_items` falhando (`/__falhar`, sempre por `comFalha`, que desfaz no
+`finally`), confere que nenhum anel vira "0", nenhum papel das calorias nem
+sugestão é inventado e que o plano diz que não carregou. Com `meals` falhando,
+o plano também não oferece "Comi isso" nem marca "feito" (diz que não carregou as
+refeições do dia). Também: o nome e o foco do botão do dia (o `input` escondido
+fora da ordem de tab, o contorno de foco no botão), o papel das calorias mudando
+por `pf-data-changed` (o peso por "medidas" e as metas por "dieta", como a Gaia
+avisa: o "perfil" é só de sexo, altura e nascimento), a descrição da
+sugestão cortada em duas linhas na Dieta (com a leitura do plano interceptada
+pelo `page.route`) e na Início, e a rolagem até
+`#plano` (direto e pelo link da sugestão da Início), o cardápio de Meu plano
+(sem o "ver em Meu plano"), o formulário de refeição (só a linguagem mudou), os
+atalhos `?novo=1` e `?foto=1`, nenhuma caixa alta nem classe da paleta antiga e
+nenhuma rolagem lateral.
 
 | `CENARIO`  | Quem entra          | Para quê |
 |------------|---------------------|----------|
@@ -304,8 +330,10 @@ Quatro escritas pelo PostgREST também têm estado (o `/__reset` desfaz):
 - `POST` em `daily_logs` (o upsert de `adicionarAgua`) junta as colunas enviadas
   à linha do dia, como o `merge-duplicates` do PostgREST, e cria a linha que não
   existe: sem isto o "+250 ml" da Início gravava e o anel não subia.
-- `POST` em `meals` guarda a refeição (o "Comi isso" da Dieta também fica).
-  Nas duas, linha de outro usuário leva 403.
+- `POST` em `meals` guarda a refeição (o "Comi isso" da Dieta também fica), e
+  o `DELETE` a apaga (o excluir da Dieta). Como no banco, o `DELETE` só enxerga
+  a refeição de quem pede: a dos outros afeta zero linhas, sem erro.
+  Nos `POST`, linha de outro usuário leva 403.
 
 Dois endereços que não são do Supabase (além do `/__cenario`):
 

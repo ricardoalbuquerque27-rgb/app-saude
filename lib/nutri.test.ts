@@ -6,6 +6,7 @@ import {
   idleDays,
   pesoDoDia,
   pesoDe30Dias,
+  pesoMaisRecente,
   resumirPacientes,
   getPatientActivity,
   getPatientSeries,
@@ -856,6 +857,50 @@ describe("pesoDoDia", () => {
 
   it("dia sem medida, nulo", () => {
     expect(pesoDoDia([])).toBeNull();
+  });
+});
+
+describe("pesoMaisRecente", () => {
+  // O "último peso" da Dieta e da Início: o do dia mais recente com peso, até
+  // hoje, pela mesma regra nas duas telas. Devolve também a data, porque a
+  // Início diz "em dd/mm" quando a última pesagem é anterior à janela.
+  const casa = (date: string, weight_kg: number | string | null, hora = "08:00") => ({
+    date, weight_kg, measured_by: null, created_at: `${date}T${hora}:00Z`,
+  });
+  const consulta = (date: string, weight_kg: number, hora = "13:00") => ({
+    date, weight_kg, measured_by: "nutri-1", created_at: `${date}T${hora}:00Z`,
+  });
+
+  it("o do dia mais recente, com a data dele, seja qual for a ordem das linhas", () => {
+    const linhas = [casa("2026-10-05", 67.2), casa("2026-10-09", 65.8), casa("2026-10-07", 66.4)];
+    expect(pesoMaisRecente(linhas, "2026-10-09")).toEqual({ data: "2026-10-09", peso: 65.8 });
+    expect(pesoMaisRecente([...linhas].reverse(), "2026-10-09")).toEqual({ data: "2026-10-09", peso: 65.8 });
+  });
+
+  it("no dia com as duas medidas, a da consulta vence a de casa", () => {
+    const linhas = [casa("2026-10-09", 65.9, "22:00"), consulta("2026-10-09", 66.4)];
+    expect(pesoMaisRecente(linhas, "2026-10-09")).toEqual({ data: "2026-10-09", peso: 66.4 });
+  });
+
+  it("não vale a medida de data futura: o teto é hoje", () => {
+    // Um peso lançado com data de amanhã não pode virar o "peso atual".
+    const linhas = [casa("2026-10-08", 66.1), casa("2026-10-12", 60.0)];
+    expect(pesoMaisRecente(linhas, "2026-10-09")).toEqual({ data: "2026-10-08", peso: 66.1 });
+  });
+
+  it("não tem janela: a última pesagem vale mesmo com meses", () => {
+    expect(pesoMaisRecente([casa("2026-04-01", 70.2)], "2026-10-09")).toEqual({ data: "2026-04-01", peso: 70.2 });
+  });
+
+  it("o dia sem número de peso não conta como o mais recente", () => {
+    const linhas = [casa("2026-10-09", null), casa("2026-10-08", "66.1")];
+    expect(pesoMaisRecente(linhas, "2026-10-09")).toEqual({ data: "2026-10-08", peso: 66.1 });
+  });
+
+  it("sem nenhuma pesagem, nulo", () => {
+    expect(pesoMaisRecente([], "2026-10-09")).toBeNull();
+    expect(pesoMaisRecente([casa("2026-10-09", null)], "2026-10-09")).toBeNull();
+    expect(pesoMaisRecente([casa("2026-10-20", 60)], "2026-10-09")).toBeNull();
   });
 });
 

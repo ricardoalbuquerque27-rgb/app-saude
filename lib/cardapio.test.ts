@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { sugestaoDeProteina, textoDaSugestao, type ItemDoPlano } from "./cardapio";
+import { partesDaSugestao, sugestaoDeProteina, textoDaSugestao, type ItemDoPlano } from "./cardapio";
 
 // O cardápio da Maria no mock (ferramentas/mock-supabase.cjs, meal_plan_items),
 // só com as colunas que a sugestão lê.
@@ -236,5 +236,26 @@ describe("textoDaSugestao", () => {
     expect(
       textoDaSugestao({ faltam: 12, refeicao: "Pré-treino TP", descricao: "Shake", proteina: 30 })
     ).toContain("pré-treino TP, 30 g (Shake)");
+  });
+});
+
+describe("partesDaSugestao", () => {
+  // A tela corta a descrição da opção em duas linhas (spec "Sugestão para
+  // fechar a meta"), então precisa da frase e da descrição em separado. O texto
+  // inteiro continua sendo o de `textoDaSugestao`, que sai daqui.
+  const s = { faltam: 40, refeicao: "Lanche da tarde", descricao: "1 scoop de whey + 1 maçã", proteina: 25 };
+
+  it("separa a frase da descrição, sem os parênteses nem o ponto final", () => {
+    expect(partesDaSugestao(s)).toEqual({
+      frase: "Faltam 40 g de proteína para a meta de hoje. Próxima refeição do seu plano: lanche da tarde, 25 g",
+      descricao: "1 scoop de whey + 1 maçã",
+    });
+  });
+
+  it("frase, espaço e descrição entre parênteses dão exatamente o textoDaSugestao", () => {
+    for (const x of [s, { faltam: 12, refeicao: "Pré-treino TP", descricao: "Shake", proteina: 30 }]) {
+      const { frase, descricao } = partesDaSugestao(x);
+      expect(`${frase} (${descricao}).`).toBe(textoDaSugestao(x));
+    }
   });
 });
