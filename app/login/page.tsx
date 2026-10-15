@@ -40,6 +40,12 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
+  // Senha recusada (pela regra do app ou pelo Supabase) não ganha uma segunda
+  // caixa com a mesma frase: a ajuda fixa embaixo do campo muda de cor, e a
+  // frase não aparece duas vezes na tela. Só no cadastro, único modo em que
+  // essa ajuda existe; fora dele, o erro segue na caixa de sempre.
+  const ajudaEmDestaque = mode === "signup" && error === AJUDA_DA_SENHA;
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -311,17 +317,30 @@ export default function LoginPage() {
                   </button>
                 </div>
                 {mode === "signup" && (
+                  // aria-live: a frase é a mesma antes e depois do erro, e
+                  // leitor de tela só anuncia o que muda; o prefixo só para
+                  // ele (sr-only) entra com o erro e faz a ajuda ser lida.
+                  // `font-medium` junto da cor: cor sozinha não basta.
                   <p
                     id="ajuda-da-senha"
-                    className="mt-1.5 text-[13px] text-slate-600 dark:text-slate-400"
+                    aria-live="polite"
+                    aria-atomic="true"
+                    className={
+                      ajudaEmDestaque
+                        ? "mt-1.5 text-[13px] font-medium text-amber-700 dark:text-amber-400"
+                        : "mt-1.5 text-[13px] text-slate-600 dark:text-slate-400"
+                    }
                   >
+                    {ajudaEmDestaque && (
+                      <span className="sr-only">Senha não aceita. </span>
+                    )}
                     {AJUDA_DA_SENHA}
                   </p>
                 )}
               </div>
             )}
 
-            {error && (
+            {error && !ajudaEmDestaque && (
               <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
                 {error}
               </p>

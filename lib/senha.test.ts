@@ -30,8 +30,11 @@ describe("problemaDaSenha", () => {
     expect(problemaDaSenha("12345678")).toBe(AJUDA_DA_SENHA);
   });
 
-  it("letra acentuada conta como letra", () => {
+  it("acento não atrapalha, mas só a-z e A-Z contam como letra", () => {
+    // tem `a` e `o` (ASCII) no meio das acentuadas
     expect(problemaDaSenha("ação1234")).toBeNull();
+    // só letras acentuadas: o "Letters and digits" do Supabase recusaria
+    expect(problemaDaSenha("ãéíõ1234")).toBe(AJUDA_DA_SENHA);
   });
 
   it("espaço conta como caractere, mas não como letra nem número", () => {
@@ -72,11 +75,19 @@ describe("ehErroDeSenhaFraca", () => {
     ).toBe(true);
   });
 
+  it("reconhece a mensagem quando o erro é só o texto", () => {
+    expect(ehErroDeSenhaFraca("Password should be at least 8 characters.")).toBe(true);
+    expect(
+      ehErroDeSenhaFraca("Password should contain at least one character of each: 0123456789")
+    ).toBe(true);
+  });
+
   it("não confunde com outros erros", () => {
     expect(ehErroDeSenhaFraca({ message: "Invalid login credentials" })).toBe(false);
     expect(ehErroDeSenhaFraca(null)).toBe(false);
     expect(ehErroDeSenhaFraca(undefined)).toBe(false);
     expect(ehErroDeSenhaFraca("texto")).toBe(false);
+    expect(ehErroDeSenhaFraca("Invalid login credentials")).toBe(false);
     expect(ehErroDeSenhaFraca({})).toBe(false);
     expect(ehErroDeSenhaFraca({ message: 42 })).toBe(false);
   });
