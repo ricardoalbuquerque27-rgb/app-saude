@@ -13,8 +13,9 @@ import {
 } from "@/lib/consultas";
 import { useAcaoConsulta } from "@/components/consultas/acoes";
 
-// A consulta do lado do paciente, na Início e em "Meu plano" (spec de
-// consultas, "Lado do paciente"). O paciente vê a próxima, cancela, pede
+// A consulta do lado do paciente, em "Meu plano" (spec de consultas, "Lado do
+// paciente"). A Início só tem a linha (LinhaDaConsulta), que leva a este cartão
+// (#consulta); as ações moram aqui. O paciente vê a próxima, cancela, pede
 // para remarcar e pede uma consulta nova. Não há aviso fora do app (falta
 // Web Push), então o que o nutricionista fez aparece aqui: pedido aceito
 // vira a próxima consulta; recusado ou cancelado, uma linha dizendo isso.
