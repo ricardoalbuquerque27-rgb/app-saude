@@ -150,3 +150,40 @@ describe("computeHealthScore: dicas sem emoji", () => {
     expect(proteina?.tip).toBe("Meta de proteína batida.");
   });
 });
+
+// A Início esconde a dica principal quando a sugestão de proteína aparece e o
+// pilar mais fraco é a Nutrição. Ela achava esse pilar comparando o texto da
+// dica (`p.tip === topTip`); agora a conta diz qual pilar a dica é.
+describe("computeHealthScore: topPilar", () => {
+  it("é o pilar mais fraco, o mesmo de onde sai a topTip", () => {
+    for (const entrada of [DIA_VAZIO, DIA_PARCIAL, { ...DIA_PARCIAL, proteinToday: 120 }]) {
+      const r = computeHealthScore(entrada);
+      const menor = Math.min(...r.pillars.map((p) => p.value));
+      const pilar = r.pillars.find((p) => p.key === r.topPilar);
+      expect(pilar?.value).toBe(menor);
+      expect(pilar?.tip).toBe(r.topTip);
+    }
+  });
+
+  it("dia vazio: o movimento (15) é o mais fraco", () => {
+    expect(computeHealthScore(DIA_VAZIO).topPilar).toBe("movimento");
+  });
+
+  it("sem refeição, com o resto em dia: a nutrição", () => {
+    expect(
+      computeHealthScore({ ...DIA_PARCIAL, mealsLoggedToday: 0, workoutsWeek: 4, waterToday: 2500 }).topPilar
+    ).toBe("nutricao");
+  });
+
+  it("empate: vale o primeiro na ordem dos pilares, como a topTip", () => {
+    // Sono sem registro (60) e bem-estar 60 (água 1500 de 2500 = 60%, humor
+    // neutro 60); movimento e nutrição em 100.
+    const r = computeHealthScore({
+      ...DIA_VAZIO, sleepHours: null, workoutsWeek: 4, mealsLoggedToday: 3, proteinGoal: null,
+      waterToday: 1500, mood: "neutro",
+    });
+    expect(r.pillars.find((p) => p.key === "sono")?.value).toBe(60);
+    expect(r.pillars.find((p) => p.key === "bemestar")?.value).toBe(60);
+    expect(r.topPilar).toBe("sono");
+  });
+});

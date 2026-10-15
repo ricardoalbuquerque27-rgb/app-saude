@@ -100,7 +100,7 @@ export function ParaHoje({
                       completions={completions}
                       doNutri={l.doNutri}
                       nota={notaEm === l.id}
-                      compact
+                      linha
                     />
                   );
                 }

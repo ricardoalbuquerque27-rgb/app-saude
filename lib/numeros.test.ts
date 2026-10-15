@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { comSinal, comUnidade, numeroBR } from "./numeros";
+import { comSinal, comUnidade, numeroBR, numeroFixo } from "./numeros";
 
 describe("numeroBR", () => {
   it("vírgula decimal, no máximo uma casa, sem zero sobrando", () => {
@@ -30,5 +30,21 @@ describe("comUnidade", () => {
     expect(comUnidade(30.4, "%")).toBe("30,4%");
     expect(comUnidade(85, "cm")).toBe("85 cm");
     expect(comUnidade(70.3, "kg")).toBe("70,3 kg");
+  });
+});
+
+// O peso da Início ("65,8 kg") e a linha dele: uma casa SEMPRE. O numeroBR
+// tira o zero ("66"), e "66 kg" ao lado de "−2,6 kg em 30 dias" parecia outro
+// número, menos preciso.
+describe("numeroFixo", () => {
+  it("vírgula e sempre as casas pedidas, com zero", () => {
+    expect(numeroFixo(65.8)).toBe("65,8");
+    expect(numeroFixo(66)).toBe("66,0");
+    expect(numeroFixo(68.45)).toBe("68,5");
+    expect(numeroFixo(1.2, 2)).toBe("1,20");
+  });
+
+  it("sem separador de milhar, como o numeroBR", () => {
+    expect(numeroFixo(1234.5)).toBe("1234,5");
   });
 });

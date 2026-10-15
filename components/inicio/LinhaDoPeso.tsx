@@ -1,4 +1,5 @@
 import { dataCurta } from "@/lib/consultas";
+import { numeroFixo } from "@/lib/numeros";
 
 // A linha fina do peso dos últimos 30 dias, no Progresso da Início (spec
 // "Início (paciente)", item 6): um `polyline` em `app-primaria`, sem eixo nem
@@ -12,11 +13,6 @@ import { dataCurta } from "@/lib/consultas";
 const LARGURA = 320;
 const ALTURA = 64;
 const FOLGA = 4;
-
-/** "65,8": uma casa sempre, como o número grande do Progresso. */
-export function kg(n: number): string {
-  return n.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-}
 
 const dia = (data: string) => Date.parse(data + "T12:00:00Z");
 
@@ -41,7 +37,7 @@ export function LinhaDoPeso({ pontos }: { pontos: { data: string; peso: number }
         viewBox={`0 0 ${LARGURA} ${ALTURA}`}
         preserveAspectRatio="none"
         role="img"
-        aria-label={`Peso dos últimos 30 dias, de ${kg(primeiro.peso)} para ${kg(ultimo.peso)} kg.`}
+        aria-label={`Peso dos últimos 30 dias, de ${numeroFixo(primeiro.peso)} para ${numeroFixo(ultimo.peso)} kg.`}
         className="block h-16 w-full"
       >
         <polyline

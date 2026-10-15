@@ -69,11 +69,13 @@ export default function AdicionarAgua({ uid }: { uid: string }) {
         {mensagem === "registrado" && (
           <>
             <span className="text-app-texto-2">+250 ml registrado · </span>
+            {/* 44 px de alvo; as margens negativas devolvem a altura que o
+                min-h acrescenta, e a linha fica do tamanho do texto. */}
             <button
               type="button"
               onClick={() => gravar(-COPO)}
               disabled={gravando}
-              className="font-semibold text-app-primaria hover:underline disabled:opacity-60"
+              className="-my-3 inline-flex min-h-[44px] items-center px-1.5 align-middle font-semibold text-app-primaria hover:underline disabled:opacity-60"
             >
               Desfazer
             </button>

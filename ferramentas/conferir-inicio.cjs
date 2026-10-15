@@ -52,10 +52,23 @@ async function etapa(nome, fn) {
 }
 
 const reset = () => fetch(MOCK + "/__reset", { method: "POST" });
+/** Largura e altura da caixa de um elemento (o alvo de toque), em px. */
+const caixa = async (loc) => {
+  const r = await loc.boundingBox();
+  return r ? { w: Math.round(r.width * 10) / 10, h: Math.round(r.height * 10) / 10 } : null;
+};
+const alvo44 = (c) => !!c && c.w >= 44 && c.h >= 44;
+/** O token da Maria, para o que o roteiro grava no mock sem passar pela tela. */
+const entrarComoMaria = async () =>
+  (await fetch(`${MOCK}/auth/v1/token?grant_type=password`, {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email: "maria.teste@exemplo.com", password: "senha-de-mentira" }),
+  })).json();
 /** Roda `fn` com os GET de `tabela` dando 500, e SEMPRE volta o mock depois. */
-async function comFalha(tabela, fn) {
+// Com `{ escrita: true }`, só as escritas da tabela falham (as leituras seguem).
+async function comFalha(tabela, fn, extra = {}) {
   await fetch(MOCK + "/__falhar", {
-    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ tabela }),
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ tabela, ...extra }),
   });
   try {
     return await fn();
@@ -196,6 +209,26 @@ async function clicar(loc) {
     const feitas = await s.locator("ul > li", { has: p.locator('[aria-pressed="true"]') }).count();
     ok(!!m && Number(m[1]) === linhas - feitas,
       `"N pendentes" igual às linhas pendentes: ${m ? m[0] : "(sem contagem)"} · ${linhas} linhas, ${feitas} feitas`);
+    // A hierarquia da maquete no treino do nutricionista ainda sem resposta:
+    // "Fui" sólido (primária) e "Não fui" secundário, 40 px e letra de 14 px.
+    const linhaDoNutri = s.locator("ul > li", { hasText: "do seu nutricionista" }).first();
+    const estilos = await linhaDoNutri.evaluate((li) => {
+      const cor = (v) => {
+        const ref = document.createElement("span");
+        ref.style.backgroundColor = `var(${v})`;
+        document.body.appendChild(ref);
+        const c = getComputedStyle(ref).backgroundColor;
+        ref.remove();
+        return c;
+      };
+      const botao = (nome) => [...li.querySelectorAll("button")].find((b) => b.textContent.trim() === nome);
+      const ler = (b) => b && { fundo: getComputedStyle(b).backgroundColor, h: b.getBoundingClientRect().height, letra: getComputedStyle(b).fontSize };
+      return { fui: ler(botao("Fui")), naoFui: ler(botao("Não fui")), primaria: cor("--app-primaria"), cartao: cor("--app-cartao") };
+    });
+    ok(!!estilos.fui && estilos.fui.fundo === estilos.primaria && !!estilos.naoFui && estilos.naoFui.fundo === estilos.cartao,
+      '"Fui" sólido em app-primaria e "Não fui" secundário (fundo de cartão)', JSON.stringify(estilos));
+    ok(!!estilos.fui && !!estilos.naoFui && estilos.fui.h >= 40 && estilos.naoFui.h >= 40 && estilos.fui.letra === "14px" && estilos.naoFui.letra === "14px",
+      `os dois com 40 px e letra de 14 px (${estilos.fui && estilos.fui.h}/${estilos.naoFui && estilos.naoFui.h} px, ${estilos.fui && estilos.fui.letra})`);
   });
   await etapa("Para hoje com leitura falhando", async () => {
     await comFalha("patient_notes", async () => {
@@ -238,10 +271,7 @@ async function clicar(loc) {
     // Uma refeição de 2.400 kcal hoje passa da meta de 1.800: com o papel
     // "limite", o anel diz "acima do limite". A proteína (150 g, meta 110)
     // também passa e NÃO avisa: proteína nunca avisa acima.
-    const sessao = await (await fetch(`${MOCK}/auth/v1/token?grant_type=password`, {
-      method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email: "maria.teste@exemplo.com", password: "senha-de-mentira" }),
-    })).json();
+    const sessao = await entrarComoMaria();
     try {
       const r = await fetch(`${MOCK}/rest/v1/meals`, {
         method: "POST",
@@ -284,6 +314,8 @@ async function clicar(loc) {
     const pilares = ["Sono", "Movimento", "Nutrição", "Hidratação e bem-estar"];
     ok(pilares.every((n) => t.includes(n)), `aberto, mostra os quatro pilares (${pilares.filter((n) => t.includes(n)).join(", ")})`);
     ok(t.includes("O score é a média dos quatro"), 'e "O score é a média dos quatro…"');
+    const alvo = await caixa(resumo);
+    ok(alvo44(alvo), `o "score" tem 44 px de alvo (${JSON.stringify(alvo)})`);
     // A Maria não registrou refeição hoje: o pilar da Nutrição é o padrão.
     ok(/sem registro hoje · conta \d+/.test(t), 'o pilar sem registro diz "sem registro hoje · conta N"');
     await p.screenshot({ path: `${OUT}/score-aberto.png`, fullPage: true });
@@ -327,6 +359,8 @@ async function clicar(loc) {
     const depois = await numeroDoAnel("Água");
     ok(Math.abs(depois - antes - 0.25) < 0.001, `o anel de água sobe 0,25 L (${antes} → ${depois})`);
     ok((await regiao.count()) === 1, 'a mensagem "+250 ml registrado · Desfazer" está numa região aria-live="polite"');
+    const alvoDesfazer = await caixa(p.getByRole("button", { name: "Desfazer", exact: true }));
+    ok(alvo44(alvoDesfazer), `"Desfazer" tem 44 px de alvo (${JSON.stringify(alvoDesfazer)})`);
     await anel("Água").locator("xpath=..").screenshot({ path: `${OUT}/agua-registrada.png` });
     await clicar(p.getByRole("button", { name: "Desfazer", exact: true }));
     await p.waitForFunction((a) => {
@@ -357,6 +391,8 @@ async function clicar(loc) {
     const recarregado = await numeroDoAnel("Água");
     ok(Math.abs(naTela - recarregado) < 0.001, `dois toques rápidos e recarregar: a tela mostrava ${naTela} L e o banco tem ${recarregado} L`);
   }));
+  // Só a ESCRITA de daily_logs falha: com a leitura falhando, o "Seu dia" nem
+  // desenharia o anel (ele diz que não carregou, abaixo).
   await etapa("+250 ml com a gravação falhando", async () => {
     await carregar();
     const botao = p.getByRole("button", { name: "+250 ml", exact: true });
@@ -365,13 +401,64 @@ async function clicar(loc) {
     await comFalha("daily_logs", async () => {
       await botao.click();
       const aviso = p.getByText("Não deu para registrar a água", { exact: true });
-      ok(await aviso.waitFor({ timeout: 15000 }).then(() => true, () => false), 'falhando: aparece "Não deu para registrar a água"');
+      ok(await aviso.waitFor({ timeout: 15000 }).then(() => true, () => false), 'gravação falhando: aparece "Não deu para registrar a água"');
       await p.waitForTimeout(800);
       const depois = await numeroDoAnel("Água");
       ok(depois === antes, `e o anel não muda (${antes} → ${depois})`);
       await anel("Água").locator("xpath=..").screenshot({ path: `${OUT}/agua-falhou.png` });
+    }, { escrita: true });
+  });
+  // A leitura do total, dentro de adicionarAgua, falhando depois de a página
+  // carregar: também não grava, e a tela diz o mesmo.
+  await etapa("+250 ml com a leitura do total falhando", async () => {
+    await carregar();
+    const botao = p.getByRole("button", { name: "+250 ml", exact: true });
+    await hidratado(botao);
+    const antes = await numeroDoAnel("Água");
+    await comFalha("daily_logs", async () => {
+      await botao.click();
+      const aviso = p.getByText("Não deu para registrar a água", { exact: true });
+      ok(await aviso.waitFor({ timeout: 15000 }).then(() => true, () => false), 'leitura do total falhando: aparece "Não deu para registrar a água"');
+      await p.waitForTimeout(800);
+      ok((await numeroDoAnel("Água")) === antes, "e o anel não muda");
     });
   });
+
+  console.log("\nSeu dia com leitura falhando");
+  // Cada leitura que alimenta o "Seu dia" falhando: o bloco diz que não
+  // carregou, em app-atencao, e nenhum anel aparece (nem "0", nem a meta padrão
+  // de 2,5 L), nem o Score, nem a sugestão, nem o "Definir metas".
+  for (const tabela of ["meals", "daily_logs", "profiles"]) {
+    await etapa(`Seu dia com ${tabela} falhando`, async () => {
+      await comFalha(tabela, async () => {
+        await carregar();
+        const s = secao("Seu dia");
+        const t = await s.innerText().catch(() => "");
+        const aviso = s.getByText("Não deu para carregar os números de hoje.", { exact: true });
+        ok((await aviso.count()) === 1, `${tabela} falhando: "Não deu para carregar os números de hoje."`, t.slice(0, 160));
+        if (await aviso.count()) {
+          const [cor, atencao] = await aviso.evaluate((e) => {
+            const ref = document.createElement("span");
+            ref.style.color = "var(--app-atencao)";
+            document.body.appendChild(ref);
+            const c = getComputedStyle(ref).color;
+            ref.remove();
+            return [getComputedStyle(e).color, c];
+          });
+          ok(cor === atencao, `e em app-atencao (${cor})`);
+        }
+        const aneis = await s.locator("figure").count();
+        const zeros = await s.locator(".tabular", { hasText: /^0$/ }).count();
+        ok(t !== "" && aneis === 0 && zeros === 0, `e nenhum anel (${aneis}) nem "0" (${zeros}) no Seu dia`);
+        ok(!/score \d+/.test(t) && !t.includes("Faltam") && !(await p.getByText("Definir metas").count()),
+          "nem o Score, nem a sugestão, nem o \"Definir metas\"");
+        if (tabela === "profiles") {
+          ok(!(await p.locator("main").innerText()).includes("2,5 L"), "e sem a meta padrão de 2,5 L em lugar nenhum");
+        }
+        await p.screenshot({ path: `${OUT}/seu-dia-${tabela}-falhou.png`, fullPage: true });
+      });
+    });
+  }
 
   console.log("\nProgresso e links");
   await etapa("Progresso", async () => {
@@ -382,7 +469,26 @@ async function clicar(loc) {
     const rotulo = (await linha.count()) ? await linha.getAttribute("aria-label") : null;
     ok(!!rotulo && /^Peso dos últimos 30 dias, de \d+,\d para \d+,\d kg\.$/.test(rotulo),
       `a linha do peso tem role="img" e o aria-label com vírgula ("${rotulo}")`);
+    const alvo = await caixa(p.locator('a[href="/app/medidas"]', { hasText: "Ver medidas" }));
+    ok(alvo44(alvo), `"Ver medidas" tem 44 px de alvo (${JSON.stringify(alvo)})`);
   });
+  // A Maria tem as metas: o "Definir metas" só aparece sem a de calorias. O
+  // perfil é gravado no mock (o upsert da página Perfil tem estado) e volta no
+  // `finally`.
+  await etapa("Definir metas", () => comEstado(async () => {
+    const sessao = await entrarComoMaria();
+    const r = await fetch(`${MOCK}/rest/v1/profiles`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${sessao.access_token}` },
+      body: JSON.stringify({ id: sessao.user.id, daily_calorie_goal: null }),
+    });
+    ok(r.status === 201, `preparo: a Maria sem meta de calorias no mock (${r.status})`);
+    await carregar();
+    const link = p.locator('a[href="/app/perfil"]', { hasText: "Definir metas" });
+    ok((await link.count()) === 1, 'sem meta de calorias, o "Definir metas" aparece');
+    const alvo = await caixa(link);
+    ok(alvo44(alvo), `e tem 44 px de alvo (${JSON.stringify(alvo)})`);
+  }));
   await etapa("Progresso com a leitura falhando", async () => {
     await comFalha("body_measurements", async () => {
       await carregar();

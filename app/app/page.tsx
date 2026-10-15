@@ -9,13 +9,13 @@ import { montarParaHoje } from "@/lib/paraHoje";
 import { sugestaoDeProteina, textoDaSugestao } from "@/lib/cardapio";
 import { papelDasCalorias, pesoDe30Dias, pesoDoDia, textoVariacaoPeso } from "@/lib/nutri";
 import { dataCurta } from "@/lib/consultas";
-import { numeroBR } from "@/lib/numeros";
+import { numeroBR, numeroFixo } from "@/lib/numeros";
 import NutriHome from "@/components/NutriHome";
 import { LinhaDaConsulta } from "@/components/LinhaDaConsulta";
 import { ParaHoje } from "@/components/inicio/ParaHoje";
 import { ScoreExplicado } from "@/components/inicio/ScoreExplicado";
 import AdicionarAgua from "@/components/inicio/AdicionarAgua";
-import { LinhaDoPeso, kg } from "@/components/inicio/LinhaDoPeso";
+import { LinhaDoPeso } from "@/components/inicio/LinhaDoPeso";
 import { getConsultasDoCartao } from "@/lib/consultasDb";
 
 // A Início do paciente (spec do visual do app do paciente, "Início
@@ -142,7 +142,7 @@ export default async function DashboardPage() {
       .limit(5),
     supabase
       .from("meal_plans")
-      .select("id, name, notes")
+      .select("id")
       .eq("patient_id", uid)
       .eq("active", true)
       .order("created_at", { ascending: false })
@@ -160,7 +160,9 @@ export default async function DashboardPage() {
   ]);
 
   const profile = profileRes.data as any;
-  const firstName = (profile?.full_name || "Atleta").split(" ")[0];
+  // Com a leitura do perfil falhando, o nome vem da conta, como no menu
+  // (app/app/layout.tsx), e não o "Atleta" de quem nunca preencheu.
+  const firstName = (profile?.full_name || user?.user_metadata?.full_name || "Atleta").split(" ")[0];
   const cardapio = cardapioRes.data as any;
   const vinculo = vinculoRes.data as any;
   const peso30 = pesoRes.error ? null : pesoDe30Dias((pesoRes.data ?? []) as any, today);
@@ -262,9 +264,19 @@ export default async function DashboardPage() {
         });
   // A dica principal sai quando a sugestão aparece e o pilar mais fraco é a
   // Nutrição: as duas diriam "faltam N g de proteína" uma embaixo da outra.
-  const pilarDaDica = health.pillars.find((p) => p.tip === health.topTip);
   const mostraDica =
-    health.hasData && !!health.topTip && !(sugestao && pilarDaDica?.key === "nutricao");
+    health.hasData && !!health.topTip && !(sugestao && health.topPilar === "nutricao");
+
+  // "Seu dia" inteiro sai das refeições de hoje, do registro do dia, do perfil
+  // (as metas) e dos treinos (o movimento do Score). Com qualquer um falhando,
+  // os anéis e o Score mostrariam zeros, ou a meta padrão de 2,5 L e o
+  // "Definir metas" para quem já definiu: o bloco diz que não carregou.
+  const seuDiaFalhou =
+    !!mealsTodayRes.error ||
+    !!dailyTodayRes.error ||
+    !!profileRes.error ||
+    !!workoutsWeekRes.error ||
+    !!recentWorkoutsRes.error;
 
   // "1.800" e "1,45": números de anel em pt-BR. A água leva até duas casas,
   // porque um copo é 0,25 L e "1,2" depois de "+250 ml" não mudaria.
@@ -404,66 +416,75 @@ export default async function DashboardPage() {
           <h2 id="seu-dia" className="section-title h-7">
             Seu dia
           </h2>
-          {health.hasData && <ScoreExplicado health={health} />}
+          {!seuDiaFalhou && health.hasData && <ScoreExplicado health={health} />}
         </div>
 
-        <div className="card mt-2.5 overflow-hidden p-0">
-          <div className="grid grid-cols-3 gap-1.5 px-2.5 py-4">
-            <ProgressRing
-              pct={calorieGoal ? caloriesToday / calorieGoal : 0}
-              centerMain={kcal(caloriesToday)}
-              centerSub={calorieGoal ? `/ ${kcal(calorieGoal)}` : "kcal"}
-              label="Calorias"
-              papel={papel}
-              avisoAcima={papel === "limite"}
-            />
-            <div className="flex flex-col items-center">
+        {seuDiaFalhou ? (
+          // Leitura que falha não é "não tem": sem isto, os anéis diziam "0"
+          // de quem comeu e bebeu, e o Score descia junto.
+          <p className="card mt-2.5 px-4 py-3.5 text-[15px] text-app-atencao">
+            Não deu para carregar os números de hoje.
+          </p>
+        ) : (
+          <div className="card mt-2.5 overflow-hidden p-0">
+            <div className="grid grid-cols-3 gap-1.5 px-2.5 py-4">
               <ProgressRing
-                pct={waterGoal ? waterToday / waterGoal : 0}
-                centerMain={litros(waterToday)}
-                centerSub={`/ ${litros(waterGoal)} L`}
-                label="Água"
+                pct={calorieGoal ? caloriesToday / calorieGoal : 0}
+                centerMain={kcal(caloriesToday)}
+                centerSub={calorieGoal ? `/ ${kcal(calorieGoal)}` : "kcal"}
+                label="Calorias"
+                papel={papel}
+                avisoAcima={papel === "limite"}
               />
-              <AdicionarAgua uid={uid} />
+              <div className="flex flex-col items-center">
+                <ProgressRing
+                  pct={waterGoal ? waterToday / waterGoal : 0}
+                  centerMain={litros(waterToday)}
+                  centerSub={`/ ${litros(waterGoal)} L`}
+                  label="Água"
+                />
+                <AdicionarAgua uid={uid} />
+              </div>
+              <ProgressRing
+                pct={proteinGoal ? proteinToday / proteinGoal : 0}
+                centerMain={`${Math.round(proteinToday)}`}
+                centerSub={proteinGoal ? `/ ${proteinGoal} g` : "g"}
+                label="Proteína"
+              />
             </div>
-            <ProgressRing
-              pct={proteinGoal ? proteinToday / proteinGoal : 0}
-              centerMain={`${Math.round(proteinToday)}`}
-              centerSub={proteinGoal ? `/ ${proteinGoal} g` : "g"}
-              label="Proteína"
-            />
-          </div>
 
-          {sugestao && (
-            <Link
-              href="/app/dieta#plano"
-              className="tappable flex items-center gap-3 border-t border-app-linha px-4 py-3.5 hover:bg-app-primaria-fundo"
-            >
-              <span className="min-w-0 flex-1 text-[15px] text-app-texto">{textoDaSugestao(sugestao)}</span>
-              <ChevronRight aria-hidden="true" className="h-5 w-5 shrink-0 text-app-texto-2" />
-            </Link>
-          )}
-          {mostraDica && (
-            <p className="border-t border-app-linha px-4 py-3.5 text-[15px] text-app-texto-2">
-              {health.topTip}
-            </p>
-          )}
-          {!health.hasData && (
-            <p className="border-t border-app-linha px-4 py-3.5 text-[15px] text-app-texto-2">
-              Registre uma refeição, a água ou o sono para o Score do dia aparecer.
-            </p>
-          )}
-          {(!calorieGoal || !proteinGoal) && (
-            <div className="border-t border-app-linha px-4 py-3">
+            {sugestao && (
               <Link
-                href="/app/perfil"
-                className="inline-flex min-h-[32px] items-center text-[15px] font-semibold text-app-primaria hover:underline"
+                href="/app/dieta#plano"
+                className="tappable flex items-center gap-3 border-t border-app-linha px-4 py-3.5 hover:bg-app-primaria-fundo"
               >
-                Definir metas
+                <span className="min-w-0 flex-1 text-[15px] text-app-texto">{textoDaSugestao(sugestao)}</span>
+                <ChevronRight aria-hidden="true" className="h-5 w-5 shrink-0 text-app-texto-2" />
               </Link>
-            </div>
-          )}
-        </div>
+            )}
+            {mostraDica && (
+              <p className="border-t border-app-linha px-4 py-3.5 text-[15px] text-app-texto-2">
+                {health.topTip}
+              </p>
+            )}
+            {!health.hasData && (
+              <p className="border-t border-app-linha px-4 py-3.5 text-[15px] text-app-texto-2">
+                Registre uma refeição, a água ou o sono para o Score do dia aparecer.
+              </p>
+            )}
+            {(!calorieGoal || !proteinGoal) && (
+              <div className="border-t border-app-linha px-4 py-1.5">
+                {/* 44 px de alvo; a linha continua do tamanho do texto. */}
+                <Link
+                  href="/app/perfil"
+                  className="inline-flex min-h-[44px] items-center text-[15px] font-semibold text-app-primaria hover:underline"
+                >
+                  Definir metas
+                </Link>
+              </div>
+            )}
+          </div>
+        )}
       </section>
 
       {/* 6. Progresso */}
@@ -472,9 +493,11 @@ export default async function DashboardPage() {
           <h2 id="progresso" className="section-title">
             Progresso
           </h2>
+          {/* 44 px de alvo sem empurrar a linha do título: a margem negativa
+              devolve o que o min-h acrescenta. */}
           <Link
             href="/app/medidas"
-            className="text-[15px] font-semibold text-app-primaria hover:underline"
+            className="-my-2.5 -mr-1 inline-flex min-h-[44px] items-center px-1 text-[15px] font-semibold text-app-primaria hover:underline"
           >
             Ver medidas
           </Link>
@@ -488,7 +511,7 @@ export default async function DashboardPage() {
             <div className="flex flex-col gap-2.5">
               <p className="flex flex-wrap items-baseline gap-x-2">
                 <span className="tabular text-[22px] font-semibold text-app-texto">
-                  {kg(peso30.atual)} kg
+                  {numeroFixo(peso30.atual)} kg
                 </span>
                 {peso30.variacao != null && (
                   <span className="text-[15px] text-app-texto-2">
@@ -508,7 +531,7 @@ export default async function DashboardPage() {
             <div className="flex flex-col gap-1.5">
               <p className="flex flex-wrap items-baseline gap-x-2">
                 <span className="tabular text-[22px] font-semibold text-app-texto">
-                  {kg(pesoAnterior.peso)} kg
+                  {numeroFixo(pesoAnterior.peso)} kg
                 </span>
                 <span className="text-[15px] text-app-texto-2">em {dataCurta(pesoAnterior.data)}</span>
               </p>

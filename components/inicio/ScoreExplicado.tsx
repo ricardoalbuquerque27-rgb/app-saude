@@ -13,11 +13,13 @@ import type { HealthScore } from "@/lib/healthScore";
 //
 // O `summary` fica por cima da linha do título (posição absoluta, à direita) e
 // o conteúdo aberto desce na largura toda, entre o título e o cartão dos
-// anéis. Quem usa põe o título e este componente juntos num `relative`.
+// anéis. Quem usa põe o título (28 px de altura) e este componente juntos num
+// `relative`. O `summary` tem 44 px de alvo, centrado na linha do título:
+// sobra 8 px acima e abaixo, e a posição absoluta não empurra nada.
 export function ScoreExplicado({ health }: { health: HealthScore }) {
   return (
     <details className="group">
-      <summary className="tappable absolute right-0 top-0 flex h-7 cursor-pointer list-none items-center gap-1 rounded-lg px-1 text-[13px] text-app-texto-2 [&::-webkit-details-marker]:hidden">
+      <summary className="tappable absolute -top-2 right-0 flex h-11 cursor-pointer list-none items-center gap-1 rounded-lg px-1 text-[13px] text-app-texto-2 [&::-webkit-details-marker]:hidden">
         score {health.score} · {health.label.toLowerCase()}
         <ChevronDown aria-hidden="true" className="h-4 w-4 transition group-open:rotate-180" />
       </summary>

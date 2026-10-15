@@ -56,9 +56,10 @@ saída 1: a ordem das seções, a saudação pela hora de São Paulo, a contagem
 "Calorias · limite" e o "acima do limite" (com uma refeição de 2.400 kcal que o
 roteiro grava no mock), o centro dos anéis em `tabular-nums`, o Score que abre
 nos quatro pilares, a sugestão de proteína, o "+250 ml" (sobe, "Desfazer",
-uma gravação só com dois toques, e "Não deu para registrar a água" com
-`daily_logs` falhando), o Progresso de 30 dias e o "Não deu para carregar o
-peso", os links, nenhuma caixa alta nem degradê, nenhuma rolagem lateral e a
+uma gravação só com dois toques, e "Não deu para registrar a água" com a
+escrita ou a leitura de `daily_logs` falhando), o "Não deu para carregar os
+números de hoje" com `meals`, `daily_logs` ou `profiles` falhando, o Progresso
+de 30 dias e o "Não deu para carregar o peso", os alvos de 44 px, os links, nenhuma caixa alta nem degradê, nenhuma rolagem lateral e a
 Instrument Sans (também no `NutriHome`).
 
 | `CENARIO`  | Quem entra          | Para quê |
@@ -314,7 +315,10 @@ Dois endereços que não são do Supabase (além do `/__cenario`):
 - `POST /__falhar` com `{ "tabela": "consultation_records" }` faz os `GET` nessa
   tabela devolverem 500 até o próximo `/__reset`. As leituras da página são do
   servidor do Next, que o `page.route` do Playwright não intercepta; sem isto
-  não há como ver a tela de "não carregou".
+  não há como ver a tela de "não carregou". Com `"escrita": true` (`{ "tabela":
+  "daily_logs", "escrita": true }`) só as escritas (`POST`, `PATCH`, `DELETE`)
+  dão 500 e as leituras seguem: é a gravação que falha numa tela que, com a
+  leitura falhando, nem mostraria o botão (o "+250 ml" da Início).
 
 ## Funções e regras do banco (SQL)
 

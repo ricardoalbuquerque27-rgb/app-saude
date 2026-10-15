@@ -15,7 +15,7 @@
 // nem se apaga, e o banco recusa sem erro), o upsert da água do dia
 // (daily_logs) e o insert de refeição (meals). POST
 // /__reset volta tudo ao que o cenário subiu; POST /__falhar derruba os GET de
-// uma tabela (500) até o próximo /__reset.
+// uma tabela (500) até o próximo /__reset, ou só as escritas, com "escrita": true.
 
 const http = require("http");
 
@@ -877,11 +877,18 @@ const ESTADO_INICIAL = JSON.stringify(Object.fromEntries(TABELAS_COM_ESTADO.map(
 // leituras de página são do servidor do Next, que o `page.route` do Playwright
 // não intercepta; é o único jeito de ver a tela de "não carregou".
 const FALHANDO = new Set();
+// Tabelas cujas ESCRITAS (POST, PATCH, DELETE) devolvem 500 até o próximo
+// /__reset, com as leituras normais: `{ "tabela": "daily_logs", "escrita": true }`.
+// É o que deixa ver a gravação que falha numa tela que, com a leitura
+// falhando, nem chegaria a mostrar o botão (o "Seu dia" da Início, sem o
+// registro do dia, diz que não carregou em vez de desenhar o anel de água).
+const FALHANDO_ESCRITA = new Set();
 
 function reiniciar() {
   const inicial = JSON.parse(ESTADO_INICIAL);
   for (const n of TABELAS_COM_ESTADO) T[n] = inicial[n];
   FALHANDO.clear();
+  FALHANDO_ESCRITA.clear();
 }
 
 /**
@@ -1395,10 +1402,16 @@ const srv = http.createServer((req, res) => {
     // até o próximo /__reset. Serve para ver a tela de "não carregou".
     if (url.pathname === "/__falhar") {
       let tabela = "";
-      try { tabela = String(JSON.parse(corpo || "{}").tabela || ""); } catch {}
-      if (req.method !== "POST" || !tabela) return envia(400, { error: 'POST com { "tabela": "<nome>" }' });
-      FALHANDO.add(tabela);
-      return envia(200, { ok: true, falhando: [...FALHANDO] });
+      let escrita = false;
+      try {
+        const pedido = JSON.parse(corpo || "{}");
+        tabela = String(pedido.tabela || "");
+        escrita = pedido.escrita === true;
+      } catch {}
+      if (req.method !== "POST" || !tabela)
+        return envia(400, { error: 'POST com { "tabela": "<nome>" } (e "escrita": true para derrubar só as escritas)' });
+      (escrita ? FALHANDO_ESCRITA : FALHANDO).add(tabela);
+      return envia(200, { ok: true, falhando: [...FALHANDO], falhandoEscrita: [...FALHANDO_ESCRITA] });
     }
 
     // --- GoTrue ---
@@ -1426,6 +1439,8 @@ const srv = http.createServer((req, res) => {
       }
       if (FALHANDO.has(alvo) && (req.method === "GET" || req.method === "HEAD"))
         return envia(500, { code: "XX000", message: `falha sob encomenda em ${alvo} (POST /__falhar)`, details: null, hint: null });
+      if (FALHANDO_ESCRITA.has(alvo) && req.method !== "GET" && req.method !== "HEAD")
+        return envia(500, { code: "XX000", message: `escrita derrubada sob encomenda em ${alvo} (POST /__falhar, escrita)`, details: null, hint: null });
       const linhas = T[alvo] ?? [];
       // HEAD é o que o supabase-js manda em .select(..., { head: true,
       // count: "exact" }) — a contagem vem só no cabeçalho. Sem tratar

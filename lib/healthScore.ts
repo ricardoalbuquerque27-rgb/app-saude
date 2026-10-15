@@ -44,6 +44,13 @@ export type HealthScore = {
   color: "brand" | "amber" | "rose";
   pillars: ScorePillar[];
   topTip: string;
+  /**
+   * O pilar de onde sai a `topTip` (o mais fraco; no empate, o primeiro da
+   * ordem). A Início precisa saber qual é para esconder a dica quando a
+   * sugestão de proteína diz o mesmo; comparar o texto da dica com o de cada
+   * pilar quebraria no dia em que dois pilares tivessem a mesma frase.
+   */
+  topPilar: ScorePillar["key"];
   hasData: boolean;
 };
 
@@ -165,5 +172,5 @@ export function computeHealthScore(i: ScoreInput): HealthScore {
     i.mood != null ||
     i.energy != null;
 
-  return { score, label, color, pillars, topTip: weakest.tip, hasData };
+  return { score, label, color, pillars, topTip: weakest.tip, topPilar: weakest.key, hasData };
 }

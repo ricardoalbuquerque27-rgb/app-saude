@@ -14,6 +14,20 @@ export function numeroBR(n: number, casas = 1): string {
   return n.toLocaleString("pt-BR", { maximumFractionDigits: casas, useGrouping: false });
 }
 
+/**
+ * "65,8", "66,0": sempre `casas` casas, com o zero. É o peso do Progresso da
+ * Início e da linha dele: o numeroBR tiraria o zero ("66"), e o peso parecia
+ * menos preciso que a variação ao lado ("−2,6 kg"). Sem separador de milhar,
+ * como o numeroBR.
+ */
+export function numeroFixo(n: number, casas = 1): string {
+  return n.toLocaleString("pt-BR", {
+    minimumFractionDigits: casas,
+    maximumFractionDigits: casas,
+    useGrouping: false,
+  });
+}
+
 /** "+1,2", "−4,3" (o sinal de menos de verdade, U+2212, como nos gráficos) ou "0". */
 export function comSinal(n: number, casas = 1): string {
   if (n === 0) return "0";
