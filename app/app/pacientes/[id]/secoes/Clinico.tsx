@@ -319,8 +319,11 @@ function ComparativoDosExames({
           </thead>
           <tbody>
             {comparativo.map((l) => {
-              // O selo sai da faixa da linha (lib/exames.ts, `situacao`), não
-              // do status gravado: assim nunca contradiz a referência ao lado.
+              // O selo sai da mesma faixa que a linha mostra em "ref."
+              // (lib/exames.ts, `situacao`), não do status gravado. Com a faixa
+              // do laudo, é normal dentro e alterado fora; com a da tabela do
+              // app, os três níveis dela, e por isso "Atenção" pode vir com
+              // "segue na faixa" (a B12 de 250 pg/mL, a TGO de 32 U/L em mulher).
               const st = situacaoDoExame(l.situacao);
               const avisos = avisosDaLinha(l, hoje);
               return (

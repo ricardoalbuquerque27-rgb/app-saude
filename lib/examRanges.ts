@@ -101,6 +101,27 @@ const ESTRATO =
   /\b(?:homem|homens|mulher|mulheres|masculino|feminino|anos|fase|risco|desejavel|limitrofe|otimo|diabetes)\b|\bpre-/;
 
 /**
+ * O "(" do começo fecha no último caractere? Então o texto inteiro é um
+ * embrulho de parênteses: "(70 a 99)" sim, "(70 a 99) (jejum)" não (são dois
+ * comentários).
+ */
+function embrulhadoPorInteiro(t: string): boolean {
+  let fundo = 0;
+  for (let i = 0; i < t.length; i++) {
+    if (t[i] === "(") fundo++;
+    else if (t[i] === ")" && --fundo === 0) return i === t.length - 1;
+  }
+  return false;
+}
+
+/** "((70 a 99))" é "70 a 99"; o que não é um embrulho só passa como está. */
+function semEmbrulho(texto: string): string {
+  let t = texto.trim();
+  while (t.startsWith("(") && t.endsWith(")") && embrulhadoPorInteiro(t)) t = t.slice(1, -1).trim();
+  return t;
+}
+
+/**
  * Lê a faixa de referência de um texto de laudo: "70 a 99", "70-99", "< 200",
  * "até 150", "> 40", "≥ 30", "inferior a 5,7%"...
  *
@@ -113,13 +134,16 @@ const ESTRATO =
  * mulher. Sem faixa, o comparativo diz "sem faixa para comparar" e o texto
  * inteiro continua na tela. O que está entre parênteses é comentário e não
  * conta: "< 130 mg/dL (ideal < 100)" é "< 130", e "≥ 50 mg/dL (mulheres)" é
- * "≥ 50" (os textos da tabela do app são assim).
+ * "≥ 50" (os textos da tabela do app são assim). Mas quando o texto TODO está
+ * entre parênteses, "(70 a 99)", o que está dentro é a faixa: tirar tudo o
+ * que tem parênteses deixava esse texto vazio e dava `null`, onde antes dava
+ * 70–99.
  */
 export function parseReferenceRange(ref: unknown): FaixaDeReferencia | null {
   if (typeof ref !== "string") return null;
   // Todas as vírgulas: com `replace(",", ".")` só a primeira trocava, e
   // "0,9 a 1,7" virava 0,9 a 1 (o 1,5 normal saía "alterado, acima").
-  const fora = ref
+  const fora = semEmbrulho(ref)
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -268,7 +292,7 @@ const isFemale = (ctx: ExamContext) => ctx.sex === "F";
 
 const TABLE: RangeDef[] = [
   {
-    keys: ["glicose", "glicemia", "glicose jejum", "glicose em jejum", "glicemia de jejum"],
+    keys: ["glicose", "glicemia", "glicose jejum", "glicose em jejum", "glicemia de jejum", "glicose basal"],
     unit: "mg/dL",
     classify: (v) =>
       highConcern(100, 126, "70–99 mg/dL (jejum)", 70)(v),
@@ -279,17 +303,19 @@ const TABLE: RangeDef[] = [
     classify: (v) => highConcern(5.7, 6.5, "< 5,7%")(v),
   },
   {
-    keys: ["colesterol total", "colesterol"],
+    // "e frações" é key, e não palavra neutra: "Hemoglobina e frações" é a
+    // eletroforese, outro exame, e a neutra juntava com a hemoglobina.
+    keys: ["colesterol total", "colesterol", "colesterol total e fracoes", "colesterol e fracoes"],
     unit: "mg/dL",
     classify: (v) => highConcern(190, 240, "< 190 mg/dL")(v),
   },
   {
-    keys: ["ldl", "colesterol ldl", "ldl colesterol"],
+    keys: ["ldl", "colesterol ldl", "ldl colesterol", "ldl c"],
     unit: "mg/dL",
     classify: (v) => highConcern(130, 160, "< 130 mg/dL (ideal < 100)")(v),
   },
   {
-    keys: ["hdl", "colesterol hdl", "hdl colesterol"],
+    keys: ["hdl", "colesterol hdl", "hdl colesterol", "hdl c"],
     unit: "mg/dL",
     sexDependent: true,
     classify: (v, ctx) =>
@@ -303,7 +329,14 @@ const TABLE: RangeDef[] = [
     classify: (v) => highConcern(150, 200, "< 150 mg/dL")(v),
   },
   {
-    keys: ["vitamina d", "25 oh vitamina d", "25 hidroxivitamina d", "vitamina d 25"],
+    keys: [
+      "vitamina d",
+      "25 oh vitamina d",
+      "25 hidroxivitamina d",
+      "vitamina d 25",
+      "25 hidroxi vitamina d",
+      "vitamina d 25 hidroxi",
+    ],
     unit: "ng/mL",
     classify: (v) => {
       if (v > 100) return { status: "atencao", direction: "alto", faixa: "30–100 ng/mL" };
@@ -401,7 +434,15 @@ const TABLE: RangeDef[] = [
     classify: (v) => windowConcern(60, 160, "60–160 µg/dL")(v),
   },
   {
-    keys: ["tgo", "ast", "aspartato aminotransferase"],
+    // "Transaminase oxalacética" é o nome que o laudo dá à TGO/AST, e a "pirúvica"
+    // à TGP/ALT; a palavra sozinha não é key, para não bastar para nada.
+    keys: [
+      "tgo",
+      "ast",
+      "aspartato aminotransferase",
+      "transaminase oxalacetica",
+      "transaminase glutamico oxalacetica",
+    ],
     unit: "U/L",
     sexDependent: true,
     classify: (v, ctx) =>
@@ -410,7 +451,13 @@ const TABLE: RangeDef[] = [
         : highConcern(40, 60, "até 40 U/L (homens)")(v),
   },
   {
-    keys: ["tgp", "alt", "alanina aminotransferase"],
+    keys: [
+      "tgp",
+      "alt",
+      "alanina aminotransferase",
+      "transaminase piruvica",
+      "transaminase glutamico piruvica",
+    ],
     unit: "U/L",
     sexDependent: true,
     classify: (v, ctx) =>
@@ -419,7 +466,17 @@ const TABLE: RangeDef[] = [
         : highConcern(41, 62, "até 41 U/L (homens)")(v),
   },
   {
-    keys: ["pcr", "proteina c reativa", "proteina c-reativa"],
+    keys: [
+      "pcr",
+      "proteina c reativa",
+      "proteina c-reativa",
+      "pcr us",
+      "pcr ultrassensivel",
+      "proteina c reativa ultrassensivel",
+      // como o TSH: o método também chega separado ("ultra-sensível", "ultra sensível")
+      "pcr ultra sensivel",
+      "proteina c reativa ultra sensivel",
+    ],
     unit: "mg/L",
     classify: (v) => highConcern(3, 10, "< 3 mg/L")(v),
   },
@@ -477,6 +534,8 @@ const PALAVRAS_DE_AMOSTRA = new Set([
   "soro",
   "serico",
   "serica",
+  "sericos",
+  "sericas",
   "plasma",
   "plasmatico",
   "plasmatica",
@@ -484,10 +543,31 @@ const PALAVRAS_DE_AMOSTRA = new Set([
   "sanguineo",
 ]);
 
+// Palavras que dizem COMO o resultado foi obtido ou de onde ele vem, e não de
+// qual exame se trata ("Colesterol LDL calculado", "COLESTEROL LDL -
+// FRIEDEWALD", "Glicose basal", "Hemograma - Hemoglobina", "TRANSAMINASE ...
+// (TGO/AST)"): também não contam contra o nome. Sem elas, o nome que o laudo
+// escreve todo dia não casava com a entrada e o `classifyExam` dava
+// `source: "nenhuma"`; pelo chat o LDL-c de 180 era gravado "normal" e saía
+// da fila de triagem. Servem só como "não pesa contra", nunca como prova: o
+// nome precisa de pelo menos uma palavra que conte e da key inteira de uma
+// entrada, então "Calculado" ou "Basal" sozinhos não são exame. Palavra que
+// juntaria exame diferente não entra aqui, e sim como key da entrada que a
+// tem ("e frações", que a hemoglobina também escreve; ver o colesterol total).
+const PALAVRAS_DE_METODO = new Set([
+  "calculado",
+  "calculada",
+  "friedewald",
+  "ultrassensivel",
+  "basal",
+  "hemograma",
+  "transaminase",
+]);
+
 // A entrada da tabela a que o nome do exame se refere, ou nenhuma. O nome
 // casa quando:
 //   1. é IGUAL (depois do `norm`) a uma das keys de uma entrada; a exata vence; ou
-//   2. TODAS as suas palavras (menos as de amostra) aparecem entre as palavras
+//   2. TODAS as suas palavras (menos as de amostra e de método) aparecem entre as palavras
 //      de UMA ÚNICA entrada E o nome contém inteira, como expressão, pelo
 //      menos uma key dela (" nome " inclui " key ").
 //      Se mais de uma entrada qualificar, não há casamento: não dá para saber
@@ -512,7 +592,7 @@ function entradaDaTabela(nome: string): RangeDef | null {
   if (!n) return null;
   const exata = TABLE.find((def) => def.keys.some((k) => norm(k) === n));
   if (exata) return exata;
-  const palavras = n.split(" ").filter((p) => !PALAVRAS_DE_AMOSTRA.has(p));
+  const palavras = n.split(" ").filter((p) => !PALAVRAS_DE_AMOSTRA.has(p) && !PALAVRAS_DE_METODO.has(p));
   if (palavras.length === 0) return null;
   const nomeComBordas = ` ${n} `;
   const cobrem = TABLE.filter(
@@ -640,7 +720,13 @@ export function classifyExam(params: {
   reference?: string | null;
   ctx?: ExamContext;
 }): ExamClassification {
-  const { name, value, reference } = params;
+  const { name, value } = params;
+  // A rota analyze-exam passa o JSON da IA direto, e a IA devolve número,
+  // objeto ou nulo onde se espera texto. `.normalize` e `.trim` num valor que
+  // não é texto lançavam erro e derrubavam a leitura do laudo inteiro; o que
+  // não é texto vale como ausente (a unidade em branco deixa a tabela valer).
+  const unit = typeof params.unit === "string" ? params.unit : null;
+  const reference = typeof params.reference === "string" ? params.reference : null;
   const ctx: ExamContext = params.ctx ?? {};
   const v = parseExamNumber(value);
 
@@ -657,7 +743,7 @@ export function classifyExam(params: {
 
   // 1) Tabela curada (personalizada por sexo/idade), na unidade dela
   const daUnidade = entradaDaTabela(name);
-  const def = daUnidade && naUnidadeDaEntrada(daUnidade, params.unit) ? daUnidade : null;
+  const def = daUnidade && naUnidadeDaEntrada(daUnidade, unit) ? daUnidade : null;
   // Exame que depende de sexo, mas não sabemos o sexo: não chutamos.
   // Tentamos a faixa do laudo; se não houver, pedimos o sexo.
   const faltaSexo = !!def?.sexDependent && !ctx.sex;

@@ -156,8 +156,10 @@ motivo.
   > mg/dL" do colesterol total), e o `status` saía da mesma conta. Texto igual
   > ao de uma faixa da tabela vale como a tabela (com a regra estrita de nome
   > e a unidade), e texto em níveis ("Normal: < 5,7; Pré-diabetes: 5,7 a 6,4;
-  > ..."), ou com mais de uma faixa ou limite fora de parênteses, é ilegível:
-  > "sem faixa para comparar". Pelo mesmo motivo a Situação não é a gravada:
+  > ..."), ou com mais de uma faixa ou limite fora de parênteses, é ilegível
+  > como laudo: a linha cai na faixa da tabela do app quando a tabela tem o
+  > exame e a unidade é compatível, e só senão diz "sem faixa para comparar".
+  > Pelo mesmo motivo a Situação não é a gravada:
   > sai da faixa da linha (tabela, os três níveis da entrada; laudo, normal
   > dentro e alterado fora; sem faixa, sem selo).
 - **Ordem:** primeiro o que piorou (saiu da faixa, mais longe), depois o que

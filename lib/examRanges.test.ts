@@ -6,6 +6,7 @@ import {
   faixaDaTabela,
   parseReferenceRange,
   TEXTOS_DE_FAIXA_DA_TABELA,
+  type ExamLevel,
 } from "./examRanges";
 
 describe("parseReferenceRange", () => {
@@ -121,6 +122,30 @@ describe("parseReferenceRange: referência em níveis é ilegível", () => {
     expect(parseReferenceRange("< 130 mg/dL (ideal < 100)")).toEqual({ max: 130, maxExclusivo: true });
     expect(parseReferenceRange("≥ 50 mg/dL (mulheres)")).toEqual({ min: 50 });
     expect(parseReferenceRange("70–99 mg/dL (jejum)")).toEqual({ min: 70, max: 99 });
+  });
+
+  // Tirar tudo o que está entre parênteses deixava "(70 a 99)", o texto inteiro
+  // embrulhado, sem nada: voltou a dar null, e antes dava 70–99. Quando o
+  // texto TODO está entre parênteses, o que está dentro é a faixa.
+  it("o texto inteiro entre parênteses: lê o que está dentro", () => {
+    expect(parseReferenceRange("(70 a 99)")).toEqual({ min: 70, max: 99 });
+    expect(parseReferenceRange("  (70 - 99 mg/dL)  ")).toEqual({ min: 70, max: 99 });
+    expect(parseReferenceRange("(< 200)")).toEqual({ max: 200, maxExclusivo: true });
+    expect(parseReferenceRange("((≥ 40))")).toEqual({ min: 40 });
+    // dentro dele, o comentário entre parênteses continua não contando
+    expect(parseReferenceRange("(< 130 mg/dL (ideal < 100))")).toEqual({ max: 130, maxExclusivo: true });
+  });
+
+  it("o embrulho não esconde o que o texto de fora já recusaria", () => {
+    expect(parseReferenceRange("(Mulheres: 0,6 a 1,1)")).toBeNull();
+    expect(parseReferenceRange("(Normal: < 5,7 %; Pré-diabetes: 5,7 a 6,4 %)")).toBeNull();
+    expect(parseReferenceRange("(sem referência)")).toBeNull();
+    expect(parseReferenceRange("()")).toBeNull();
+  });
+
+  it("dois grupos entre parênteses não são um embrulho só: continuam sendo comentário", () => {
+    // O primeiro "(" não fecha no último ")": são dois comentários, sem faixa fora deles.
+    expect(parseReferenceRange("(70 a 99) (jejum)")).toBeNull();
   });
 });
 
@@ -313,6 +338,187 @@ describe("classifyExam: o nome casa pela regra estrita, e a tabela só vale na u
   it("potássio e sódio aceitam mmol/L, que é o mesmo número que mEq/L", () => {
     expect(classifyExam({ name: "Potássio", value: "5,6", unit: "mmol/L" }).source).toBe("tabela");
     expect(classifyExam({ name: "Sódio", value: "140", unit: "mmol/L" }).status).toBe("normal");
+  });
+});
+
+describe("classifyExam: unidade e referência que não são texto", () => {
+  // A rota analyze-exam passa o JSON da IA direto (`unit: it?.unidade`,
+  // `reference: it?.referencia`), e a IA devolve número, objeto ou nulo no
+  // lugar do texto. `.normalize` e `.trim` num número lançavam erro e a
+  // leitura do laudo inteiro caía no 500.
+  it.each([
+    ["número", 12],
+    ["nulo", null],
+    ["objeto", { texto: "70 a 99" }],
+    ["lista", ["70", "99"]],
+    ["booleano", true],
+  ])("unidade e referência %s não lançam erro", (_rotulo, valor) => {
+    const entrada = { unit: valor as any, reference: valor as any };
+    // exame da tabela: a unidade que não é texto conta como em branco, e a tabela manda
+    const daTabela = classifyExam({ name: "Glicose", value: 92, ...entrada });
+    expect(daTabela.source).toBe("tabela");
+    expect(daTabela.status).toBe("normal");
+    // exame fora da tabela: sem referência legível, não classifica, sem erro
+    const fora = classifyExam({ name: "Marcador Zeta", value: "1,5", ...entrada });
+    expect(fora.matched).toBe(false);
+    expect(fora.source).toBe("nenhuma");
+    expect(fora.faixa).toBe("");
+  });
+
+  it("referência que não é texto não vira faixa nem some com a que é texto", () => {
+    expect(classifyExam({ name: "Marcador Zeta", value: "1,5", unit: 5 as any, reference: "0,9 a 1,7" }).status).toBe(
+      "normal"
+    );
+  });
+});
+
+describe("grafias comuns do laudo vão para a entrada certa", () => {
+  // O casamento estrito (93a2362) deixou de fora grafias que o laudo escreve
+  // todo dia: "LDL-c" tinha a palavra "c" que a entrada do LDL não tinha, e
+  // "Colesterol LDL calculado" a palavra "calculado". Sem entrada, o
+  // `classifyExam` dava `source: "nenhuma"` e o chat gravava "normal" (o
+  // LDL-c de 180 saía da fila de triagem, que só conta status <> 'normal').
+  // Cada linha: o nome, a primeira key da entrada (a chave do comparativo), um
+  // valor que a tabela julga "alterado" e a faixa dela. Homem, porque HDL, TGO
+  // e hemoglobina mudam por sexo.
+  const ALTERADO: [string, string, number, string, string][] = [
+    // colesterol
+    ["LDL-c", "ldl", 180, "mg/dL", "< 130 mg/dL (ideal < 100)"],
+    ["LDL-COLESTEROL (CALCULADO)", "ldl", 180, "mg/dL", "< 130 mg/dL (ideal < 100)"],
+    ["Colesterol LDL calculado", "ldl", 180, "mg/dL", "< 130 mg/dL (ideal < 100)"],
+    ["COLESTEROL LDL - FRIEDEWALD", "ldl", 180, "mg/dL", "< 130 mg/dL (ideal < 100)"],
+    ["HDL-C", "hdl", 30, "mg/dL", "≥ 40 mg/dL (homens)"],
+    ["Colesterol total e frações", "colesterol total", 260, "mg/dL", "< 190 mg/dL"],
+    ["Colesterol e frações", "colesterol total", 260, "mg/dL", "< 190 mg/dL"],
+    // proteína C reativa
+    ["PCR ultrassensível", "pcr", 12, "mg/L", "< 3 mg/L"],
+    ["PCR-US", "pcr", 12, "mg/L", "< 3 mg/L"],
+    ["Proteína C reativa ultrassensível", "pcr", 12, "mg/L", "< 3 mg/L"],
+    ["PCR ultra-sensível", "pcr", 12, "mg/L", "< 3 mg/L"],
+    ["Proteína C reativa ultra sensível", "pcr", 12, "mg/L", "< 3 mg/L"],
+    // vitamina D
+    ["25-Hidroxi Vitamina D", "vitamina d", 15, "ng/mL", "30–100 ng/mL"],
+    ["VITAMINA D (25-HIDROXI)", "vitamina d", 15, "ng/mL", "30–100 ng/mL"],
+    // outros
+    ["Glicose basal", "glicose", 130, "mg/dL", "70–99 mg/dL (jejum)"],
+    ["Hemograma - Hemoglobina", "hemoglobina", 10, "g/dL", "13–17 g/dL (homens)"],
+    ["Hemoglobina (hemograma)", "hemoglobina", 10, "g/dL", "13–17 g/dL (homens)"],
+    ["TRANSAMINASE OXALACÉTICA (TGO/AST)", "tgo", 70, "U/L", "até 40 U/L (homens)"],
+    ["Transaminase glutâmico oxalacética (TGO)", "tgo", 70, "U/L", "até 40 U/L (homens)"],
+    ["Transaminase pirúvica (TGP/ALT)", "tgp", 70, "U/L", "até 41 U/L (homens)"],
+    ["Transaminase glutâmico pirúvica (TGP)", "tgp", 70, "U/L", "até 41 U/L (homens)"],
+    ["Triglicérides séricos", "triglicerideos", 260, "mg/dL", "< 150 mg/dL"],
+  ];
+
+  it.each(ALTERADO)("'%s' é julgado pela tabela, como 'alterado'", (nome, _chave, valor, unidade, faixa) => {
+    const r = classifyExam({ name: nome, value: valor, unit: unidade, ctx: { sex: "M" } });
+    expect(r.source).toBe("tabela");
+    expect(r.matched).toBe(true);
+    expect(r.faixa).toBe(faixa);
+    const status: ExamLevel = r.status;
+    expect(status).toBe("alterado");
+  });
+
+  it.each(ALTERADO)("'%s' tem a chave da entrada ('%s')", (nome, chave) => {
+    expect(chaveDoExame(nome)).toBe(chave);
+  });
+
+  it("e sem unidade também: o laudo muitas vezes a omite", () => {
+    expect(classifyExam({ name: "LDL-c", value: 180, ctx: { sex: "M" } }).status).toBe("alterado");
+    expect(classifyExam({ name: "PCR-US", value: "12" }).source).toBe("tabela");
+  });
+
+  it("a grafia nova junta com a curta: LDL-c e Colesterol LDL são o mesmo exame", () => {
+    expect(chaveDoExame("LDL-c")).toBe(chaveDoExame("Colesterol LDL"));
+    expect(chaveDoExame("HDL-C")).toBe(chaveDoExame("Colesterol HDL"));
+    expect(chaveDoExame("PCR-US")).toBe(chaveDoExame("Proteína C reativa"));
+    expect(chaveDoExame("25-Hidroxi Vitamina D")).toBe(chaveDoExame("Vitamina D"));
+    expect(chaveDoExame("Glicose basal")).toBe(chaveDoExame("Glicemia de jejum"));
+  });
+
+  it("o laudo sem sexo continua pedindo o sexo (HDL-c, TGO e hemoglobina mudam por sexo)", () => {
+    const r = classifyExam({ name: "HDL-c", value: 30, unit: "mg/dL" });
+    expect(r.needs).toEqual(["sexo"]);
+    expect(classifyExam({ name: "HDL-c", value: 30, unit: "mg/dL", ctx: { sex: "F" } }).faixa).toBe(
+      "≥ 50 mg/dL (mulheres)"
+    );
+  });
+});
+
+describe("as grafias novas não juntam exame diferente", () => {
+  // A regra existe para não inventar conclusão clínica: juntar à toa dá um
+  // resultado que não é do exame, separar à toa só dá duas linhas. As palavras
+  // novas ("calculado", "basal", "ultrassensível", "hemograma"...) não contam
+  // contra o nome, mas a key inteira continua sendo exigida, e a palavra que
+  // diferencia o exame continua a de fora.
+  const SEPARADOS: [string, string][] = [
+    // os de sempre, com as palavras neutras do lado
+    ["VLDL-colesterol", "vldl colesterol"],
+    ["VLDL-colesterol (calculado)", "vldl colesterol calculado"],
+    ["Colesterol (VLDL) calculado", "colesterol vldl calculado"],
+    ["Colesterol não-HDL", "colesterol nao hdl"],
+    ["Colesterol não-HDL calculado", "colesterol nao hdl calculado"],
+    ["Vitamina K", "vitamina k"],
+    ["Vitamina K (25-hidroxi)", "vitamina k 25 hidroxi"],
+    ["Hemoglobina corpuscular média", "hemoglobina corpuscular media"],
+    ["Hemoglobina corpuscular média (hemograma)", "hemoglobina corpuscular media hemograma"],
+    ["HCM", "hcm"],
+    ["Glicose pós-prandial", "glicose pos prandial"],
+    ["Glicose basal pós-prandial", "glicose basal pos prandial"],
+    ["Capacidade total de ligação do ferro", "capacidade total de ligacao do ferro"],
+    ["Capacidade total de ligação do ferro (calculada)", "capacidade total de ligacao do ferro calculada"],
+    ["T4", "t4"],
+    ["T4 basal", "t4 basal"],
+    ["Jejum", "jejum"],
+    ["Jejum basal", "jejum basal"],
+    // a palavra neutra sozinha não é exame
+    ["Calculado", "calculado"],
+    ["Calculada", "calculada"],
+    ["Friedewald", "friedewald"],
+    ["Ultrassensível", "ultrassensivel"],
+    ["Basal", "basal"],
+    ["Hemograma", "hemograma"],
+    ["Transaminase", "transaminase"],
+    ["Séricos", "sericos"],
+    ["Séricas", "sericas"],
+    // "C", "25" e "hidroxi" são palavras de entradas agora: outro exame não pega carona
+    ["Vitamina C", "vitamina c"],
+    ["Proteína C", "proteina c"],
+    ["1,25-Dihidroxivitamina D", "1 25 dihidroxivitamina d"],
+    ["17-Hidroxiprogesterona", "17 hidroxiprogesterona"],
+    // "e frações" é de quem tem a key: a hemoglobina e frações é a eletroforese
+    ["Hemoglobina e frações", "hemoglobina e fracoes"],
+    ["Proteínas totais e frações", "proteinas totais e fracoes"],
+    // o ultrassensível não é o método de qualquer exame
+    ["Troponina ultrassensível", "troponina ultrassensivel"],
+    ["Insulina basal", "insulina basal"],
+    // nome de entradas diferentes
+    ["LDL e HDL", "ldl e hdl"],
+    ["TGO e TGP", "tgo e tgp"],
+  ];
+
+  it.each(SEPARADOS)("'%s' não casa com nenhuma entrada", (nome, chave) => {
+    expect(chaveDoExame(nome)).toBe(chave);
+    const r = classifyExam({ name: nome, value: 5, unit: "mg/dL", ctx: { sex: "M" } });
+    expect(r.source).toBe("nenhuma");
+    expect(r.faixa).toBe("");
+  });
+
+  it("o TSH ultrassensível segue sendo o TSH, e a PCR ultrassensível segue sendo a PCR", () => {
+    expect(chaveDoExame("TSH ultrassensível")).toBe("tsh");
+    expect(chaveDoExame("PCR ultrassensível")).toBe("pcr");
+    expect(chaveDoExame("PCR ultrassensível")).not.toBe(chaveDoExame("TSH ultrassensível"));
+  });
+
+  it("a hemoglobina do hemograma não vira a glicada", () => {
+    expect(chaveDoExame("Hemograma - Hemoglobina")).toBe("hemoglobina");
+    expect(chaveDoExame("Hemoglobina glicada (hemograma)")).toBe("hemoglobina glicada");
+  });
+
+  it("a faixa da tabela não vai para o nome que não casou", () => {
+    expect(faixaDaTabela("Colesterol não-HDL calculado", 130, {})).toBeNull();
+    expect(faixaDaTabela("Hemoglobina e frações", 14, { sex: "M" })).toBeNull();
+    expect(faixaDaTabela("LDL-c", 180, {})?.faixa).toBe("< 130 mg/dL (ideal < 100)");
   });
 });
 

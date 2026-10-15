@@ -398,6 +398,31 @@ describe("compararExames: mesmo exame, grafias e datas", () => {
     expect(g.anterior).toEqual({ valor: 98, data: "2026-07-10" });
   });
 
+  it("LDL-c e Colesterol LDL calculado numa linha só: a grafia do laudo junta com a curta", () => {
+    // O casamento estrito deixou "LDL-c" e "Colesterol LDL calculado" sem
+    // entrada, e o comparativo mostrava uma linha por grafia, cada uma com um
+    // resultado só e nada para comparar.
+    const linhas = compararExames(
+      [
+        ex("2026-01-15", "Colesterol LDL", "158", { unit: "mg/dL" }),
+        ex("2026-07-10", "LDL-COLESTEROL (CALCULADO)", "141", { unit: "mg/dL" }),
+        ex("2026-10-02", "LDL-c", "132", { unit: "mg/dL" }),
+        // outro exame do mesmo laudo, que continua à parte
+        ex("2026-10-02", "VLDL-colesterol", "24", { unit: "mg/dL" }),
+        ex("2026-10-02", "Colesterol não-HDL calculado", "150", { unit: "mg/dL" }),
+      ],
+      {}
+    );
+    expect(linhas.map((l) => l.chave).sort()).toEqual(["colesterol nao hdl calculado", "ldl", "vldl colesterol"]);
+    const ldl = linhas.find((l) => l.chave === "ldl")!;
+    expect(ldl.nome).toBe("LDL-c");
+    expect(ldl.serie).toHaveLength(3);
+    expect(ldl.anterior).toEqual({ valor: 141, data: "2026-07-10" });
+    // e a faixa dele é a da entrada do LDL (o laudo não trouxe), não a do colesterol total
+    expect(ldl.faixaTexto).toBe("< 130 mg/dL (ideal < 100)");
+    expect(ldl.situacao).toBe("atencao");
+  });
+
   it("nome fora da tabela: grafias que só diferem em acento e caixa são o mesmo exame", () => {
     const linhas = compararExames(
       [ex("2026-07-10", "Ácido Fólico", "8"), ex("2026-10-02", "acido folico", "9")],

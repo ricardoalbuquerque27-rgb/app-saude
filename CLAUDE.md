@@ -167,18 +167,33 @@ normal ou alterado), nunca do `status` gravado. `parseReferenceRange` lê "<"
 e ">" como estritos (o 190 com "< 190" está fora; "≤", "até", "≥" e o
 intervalo "a–b" são inclusivos) e devolve nulo para referência em níveis (mais
 de uma faixa fora de parênteses, ou palavra de sexo, idade, fase, risco ou
-nível): lida pela primeira faixa, a glicada que subiu "entrava na faixa".
+nível): lida pela primeira faixa, a glicada que subiu "entrava na faixa". O
+que está entre parênteses é comentário, menos quando o texto TODO é
+"(70 a 99)": aí vale o de dentro. `classifyExam` trata `unit` e `reference`
+que não são texto (o JSON da IA vem direto na rota `analyze-exam`) como
+ausentes, em vez de lançar erro.
 Para dois nomes serem o mesmo exame, `chaveDoExame`, `faixaDaTabela` e o
 `classifyExam` (`lib/examRanges.ts`) exigem nome igual a uma key da tabela, ou
 todas as palavras do nome nas keys de UMA entrada **e** o nome contendo uma
-key inteira; palavra de amostra (soro, sérico, plasma, sangue…) não conta. O
-casamento frouxo antigo (`findDef`, que saiu) juntou o VLDL-colesterol em
-"colesterol total" e a Vitamina K em potássio: juntar à toa inventa uma
-conclusão clínica, separar à toa só dá duas linhas. Na unidade, o prefixo
-micro (u, μ, µ, mc) é um só, UI, IU e U são a mesma, e µUI/mL equivale a mUI/L
-(o TSH chega de um jeito ou do outro); mEq/L ≡ mmol/L só no potássio e no
-sódio (no cálcio a conta é outra), declarado na entrada. Outra unidade diz
-"unidade diferente do anterior" em vez de comparar o número cru.
+key inteira; palavra de amostra (soro, sérico, plasma, sangue…) e de método
+(calculado, Friedewald, ultrassensível, basal, hemograma, transaminase) não
+contam contra o nome, mas nunca bastam: sem uma palavra que conte e uma key
+inteira, "Basal" ou "Calculado" não são exame. O casamento frouxo antigo
+(`findDef`, que saiu) juntou o VLDL-colesterol em "colesterol total" e a
+Vitamina K em potássio: juntar à toa inventa uma conclusão clínica, separar à
+toa só dá duas linhas. O estrito, por sua vez, perdeu grafias que o laudo
+escreve todo dia ("LDL-c", "Colesterol LDL calculado", "PCR-US", "25-Hidroxi
+Vitamina D"), e o chat gravava "normal" para elas (o LDL-c de 180 saía da fila
+de triagem): grafia comum nova entra como key da entrada, ou como palavra de
+método quando é só o jeito de medir. A palavra que juntaria exame diferente
+fica como key, não como neutra: "e frações" é key do colesterol total porque
+"Hemoglobina e frações" é a eletroforese. Cada grafia nova leva um teste em
+`lib/examRanges.test.ts`, junto dos que separam (VLDL, não-HDL, Vitamina K,
+HCM, pós-prandial, capacidade de ligação do ferro, "T4", "Jejum"). Na unidade,
+o prefixo micro (u, μ, µ, mc) é um só, UI, IU e U são a mesma, e µUI/mL
+equivale a mUI/L (o TSH chega de um jeito ou do outro); mEq/L ≡ mmol/L só no
+potássio e no sódio (no cálcio a conta é outra), declarado na entrada. Outra
+unidade diz "unidade diferente do anterior" em vez de comparar o número cru.
 
 **Avisos de meta e de plano.** A Alimentação mostra só os quatro campos de
 meta de `prescription_deviations` (`CAMPOS_META`); o aviso de mudança no
@@ -406,12 +421,17 @@ remove ele. `MODULE_NOT_FOUND` nos scripts de `ferramentas/` é isso.
   a unidade da entrada e o "<" estrito, mas as linhas gravadas antes guardam o
   `status` e a `reference_range` do casamento frouxo, e a página Exames do
   paciente mostra o `status` gravado (a Vitamina K pode seguir "alterado" pela
-  faixa do potássio). O comparativo do nutri não lê nenhum dos dois como
-  verdade; o paciente, sim, até alguém regravar essas linhas. E o formulário e
-  a IA ainda gravam o texto da tabela em `reference_range` quando o laudo não
-  traz faixa: por isso `ehTextoDaTabela` continua necessário. A data `today`
-  que a IA grava quando não acha a do laudo (dois laudos no mesmo dia) também
-  segue em aberto.
+  faixa do potássio), até alguém regravar essas linhas. O comparativo do nutri
+  não lê o `status` gravado (o selo sai da faixa da linha) e lê a
+  `reference_range` como laudo, menos quando ela é, letra por letra, texto da
+  tabela (`ehTextoDaTabela`). Mas a lista "Ver todos os resultados" do mesmo
+  nutri também mostra o `status` gravado, e por isso pode discordar do selo do
+  comparativo na mesma tela. E a IA (`app/api/analyze-exam/route.ts`,
+  `lib/aiActions.ts`) grava o texto da tabela em `reference_range` sempre que a
+  tabela classifica, sobrescrevendo a faixa que o laudo trazia (o formulário só
+  preenche o campo vazio): por isso `ehTextoDaTabela` continua necessário. A
+  data `today` que a IA grava quando não acha a do laudo (dois laudos no mesmo
+  dia) também segue em aberto.
 - **O `persist` de Hábitos (`app/app/habitos/page.tsx`) regrava a linha inteira
   do dia a partir do estado da tela e não confere o `error`.** O que mudou fora
   da tela (o assistente registrando água) pode voltar ao valor velho, e uma
