@@ -122,11 +122,27 @@ export function sugestaoDeProteina(e: {
 }
 
 /**
- * A frase da sugestão. A refeição vem sem artigo e com a inicial minúscula
- * ("lanche da tarde"), para a frase não depender do gênero de cada nome ("o
- * lanche", "a ceia").
+ * A sugestão em duas partes: a frase até os gramas e a descrição da opção. A
+ * tela corta a descrição em duas linhas (spec "Sugestão para fechar a meta"), e
+ * para isso precisa dela em separado; o texto inteiro continua sendo o de
+ * `textoDaSugestao`, que sai daqui, de modo que as duas não divergem.
+ *
+ * A refeição vem sem artigo e com a inicial minúscula ("lanche da tarde"),
+ * para a frase não depender do gênero de cada nome ("o lanche", "a ceia").
+ */
+export function partesDaSugestao(s: SugestaoDeProteina): { frase: string; descricao: string } {
+  const refeicao = s.refeicao.charAt(0).toLowerCase() + s.refeicao.slice(1);
+  return {
+    frase: `Faltam ${s.faltam} g de proteína para a meta de hoje. Próxima refeição do seu plano: ${refeicao}, ${s.proteina} g`,
+    descricao: s.descricao,
+  };
+}
+
+/**
+ * A frase da sugestão inteira, num texto só: "…, 25 g (1 scoop de whey + 1
+ * maçã)." É o que vale onde a descrição não precisa ser cortada.
  */
 export function textoDaSugestao(s: SugestaoDeProteina): string {
-  const refeicao = s.refeicao.charAt(0).toLowerCase() + s.refeicao.slice(1);
-  return `Faltam ${s.faltam} g de proteína para a meta de hoje. Próxima refeição do seu plano: ${refeicao}, ${s.proteina} g (${s.descricao}).`;
+  const { frase, descricao } = partesDaSugestao(s);
+  return `${frase} (${descricao}).`;
 }

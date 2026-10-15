@@ -6,8 +6,8 @@ import { todayISO, addDaysISO, hojeLongo, limitesDaJanela, saudacao } from "@/li
 import { computeHealthScore } from "@/lib/healthScore";
 import { getPending } from "@/lib/pending";
 import { montarParaHoje } from "@/lib/paraHoje";
-import { sugestaoDeProteina, textoDaSugestao } from "@/lib/cardapio";
-import { papelDasCalorias, pesoDe30Dias, pesoDoDia, textoVariacaoPeso } from "@/lib/nutri";
+import { sugestaoDeProteina } from "@/lib/cardapio";
+import { papelDasCalorias, pesoDe30Dias, pesoMaisRecente, textoVariacaoPeso } from "@/lib/nutri";
 import { dataCurta } from "@/lib/consultas";
 import { numeroBR, numeroFixo } from "@/lib/numeros";
 import NutriHome from "@/components/NutriHome";
@@ -16,6 +16,7 @@ import { ParaHoje } from "@/components/inicio/ParaHoje";
 import { ScoreExplicado } from "@/components/inicio/ScoreExplicado";
 import AdicionarAgua from "@/components/inicio/AdicionarAgua";
 import { LinhaDoPeso } from "@/components/inicio/LinhaDoPeso";
+import { TextoDaSugestao } from "@/components/TextoDaSugestao";
 import { getConsultasDoCartao } from "@/lib/consultasDb";
 
 // A Início do paciente (spec do visual do app do paciente, "Início
@@ -201,13 +202,9 @@ export default async function DashboardPage() {
   // um valor por dia, a medida da consulta vence a de casa, teto em hoje).
   // ---------------------------------------------------------------------
   const pesoFalhou = !!pesoRes.error || !!pesoAntesRes?.error;
-  let pesoAnterior: { data: string; peso: number } | null = null;
-  if (pesoAntesRes && !pesoAntesRes.error && pesoAntesRes.data?.length) {
-    const linhas = pesoAntesRes.data as any[];
-    const dia = linhas[0].date as string;
-    const peso = pesoDoDia(linhas.filter((l) => l.date === dia));
-    if (peso != null) pesoAnterior = { data: dia, peso };
-  }
+  // A regra do "último peso" é uma só, a da Dieta também: pesoMaisRecente.
+  const pesoAnterior =
+    pesoAntesRes && !pesoAntesRes.error ? pesoMaisRecente((pesoAntesRes.data ?? []) as any[], today) : null;
   const pesoAtual = peso30?.atual ?? pesoAnterior?.peso ?? null;
 
   // ---------------------------------------------------------------------
@@ -458,7 +455,9 @@ export default async function DashboardPage() {
                 href="/app/dieta#plano"
                 className="tappable flex items-center gap-3 border-t border-app-linha px-4 py-3.5 hover:bg-app-primaria-fundo"
               >
-                <span className="min-w-0 flex-1 text-[15px] text-app-texto">{textoDaSugestao(sugestao)}</span>
+                <span className="min-w-0 flex-1 text-[15px] text-app-texto">
+                  <TextoDaSugestao sugestao={sugestao} />
+                </span>
                 <ChevronRight aria-hidden="true" className="h-5 w-5 shrink-0 text-app-texto-2" />
               </Link>
             )}

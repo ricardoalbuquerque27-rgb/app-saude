@@ -23,7 +23,8 @@ import FoodSearch from "@/components/FoodSearch";
 import MealPlanView, {
   type ItemCardapioPaciente,
 } from "@/components/MealPlanView";
-import { MEAL_TYPES, sugestaoDeProteina, textoDaSugestao } from "@/lib/cardapio";
+import { TextoDaSugestao } from "@/components/TextoDaSugestao";
+import { MEAL_TYPES, sugestaoDeProteina } from "@/lib/cardapio";
 import { rotuloDoDia } from "@/lib/consultas";
 import { papelDasCalorias, pesoMaisRecente } from "@/lib/nutri";
 
@@ -147,12 +148,17 @@ export default function DietaPage() {
   // com o filtro que a RLS não dá: `profiles` sem `.eq("id")` devolve duas
   // linhas para quem tem nutricionista (o dele também é visível) e o
   // `maybeSingle` falha, justo para o caso de uso principal (ver lib/perfil.ts).
+  const pedidoContexto = useRef(0);
   const carregarContexto = useCallback(async () => {
+    // O último pedido vale: um evento com mais de uma área ("dieta" e "medidas")
+    // dispara a leitura duas vezes, e a resposta lenta não pode sobrescrever a nova.
+    const meu = ++pedidoContexto.current;
     const hoje = todayISO();
     const {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) {
+      if (meu !== pedidoContexto.current) return;
       setContexto({
         calorieGoal: null,
         proteinGoal: null,
@@ -199,12 +205,13 @@ export default function DietaPage() {
       : null;
     const nomeCompleto = String((nutriRes?.data as any)?.full_name ?? "").trim();
 
+    if (meu !== pedidoContexto.current) return;
     setContexto({
       calorieGoal: perfil?.daily_calorie_goal ?? null,
       proteinGoal: perfil?.protein_goal_g ?? null,
       metaDePeso: perfil?.weight_goal_kg != null ? Number(perfil.weight_goal_kg) : null,
       perfilFalhou: !!perfilRes.error,
-      pesoAtual: pesoRes.error ? null : pesoMaisRecente((pesoRes.data ?? []) as any, hoje),
+      pesoAtual: pesoRes.error ? null : (pesoMaisRecente((pesoRes.data ?? []) as any, hoje)?.peso ?? null),
       vinculoAtivo: !vinculoRes.error && !!nutriId,
       vinculoFalhou: !!vinculoRes.error,
       nutriNome: nomeCompleto.split(/\s+/)[0] ?? "",
@@ -215,9 +222,14 @@ export default function DietaPage() {
     carregarContexto();
   }, [carregarContexto]);
 
-  // Recarrega quando a IA registra uma refeição (ou muda uma meta ou o peso).
+  // Recarrega quando a IA registra uma refeição ("dieta"). O peso e as metas,
+  // que ela grava por conta própria, saem com outras áreas: o peso com "medidas"
+  // e as metas com "perfil" (lib/aiActions.ts). Sem ouvir as duas, o papel das
+  // calorias ficava o de antes da conversa até alguém recarregar a página.
   useLiveRefresh("dieta", load);
   useLiveRefresh("dieta", carregarContexto);
+  useLiveRefresh("medidas", carregarContexto);
+  useLiveRefresh("perfil", carregarContexto);
 
   // Os atalhos da Início ("Refeição" e "Foto do prato") apontavam os dois
   // para /app/dieta sem parâmetro: caíam na página com o formulário
@@ -444,23 +456,23 @@ export default function DietaPage() {
               <ChevronLeft aria-hidden="true" className="h-5 w-5" />
             </button>
             <div className="relative min-w-0 flex-1">
-              <button
-                type="button"
-                onClick={abrirSeletor}
-                title="Escolher outra data"
-                className="tappable flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[10px] px-2 text-[15px] font-semibold text-app-texto hover:bg-app-primaria-fundo"
-              >
-                <CalendarDays aria-hidden="true" className="h-4 w-4 shrink-0 text-app-texto-2" />
-                {rotuloDoDia(date, todayStr)}
-              </button>
-              {/* O campo de data segue no DOM, escondido da vista mas
-                  focável: é ele que o showPicker() abre. `max` em hoje, e uma
-                  data futura digitada ou o campo limpo não mudam o dia. */}
+              {/* O campo de data segue no DOM, escondido da vista: é ele que o
+                  showPicker() abre. `max` em hoje, e uma data futura digitada
+                  ou o campo limpo não mudam o dia.
+
+                  Fora da ordem de tab (tabIndex -1): o botão do dia cobre o
+                  teclado, porque Enter abre o seletor por showPicker. Um
+                  segundo ponto de parada, num campo que ninguém vê, seria
+                  digitar às cegas. Sobra o recurso de quando showPicker não
+                  existe ou lança: aí o foco vai para este campo por código, e o
+                  contorno de foco aparece no botão do dia (`peer`, que por isso
+                  vem DEPOIS do campo no DOM), já que o campo não se vê. */}
               <input
                 ref={dataRef}
                 type="date"
                 aria-label="Escolher a data"
-                className="sr-only"
+                tabIndex={-1}
+                className="peer sr-only"
                 value={date}
                 max={todayStr}
                 onChange={(e) => {
@@ -469,6 +481,16 @@ export default function DietaPage() {
                   setDate(v > todayStr ? todayStr : v);
                 }}
               />
+              {/* O nome diz o que o botão faz, e começa pelo texto visível. */}
+              <button
+                type="button"
+                onClick={abrirSeletor}
+                aria-label={`${rotuloDoDia(date, todayStr)}, escolher outra data`}
+                className="tappable flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[10px] px-2 text-[15px] font-semibold text-app-texto hover:bg-app-primaria-fundo peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-app-primaria"
+              >
+                <CalendarDays aria-hidden="true" className="h-4 w-4 shrink-0 text-app-texto-2" />
+                {rotuloDoDia(date, todayStr)}
+              </button>
             </div>
             <button
               onClick={() => shiftDate(1)}
@@ -564,7 +586,7 @@ export default function DietaPage() {
                 {/* Sem link: o plano está logo abaixo. */}
                 {sugestao && (
                   <p className="border-t border-app-linha px-4 py-3.5 text-[15px] text-app-texto">
-                    {textoDaSugestao(sugestao)}
+                    <TextoDaSugestao sugestao={sugestao} />
                   </p>
                 )}
                 {(!calorieGoal || !proteinGoal) && (
@@ -595,6 +617,7 @@ export default function DietaPage() {
                 date={date}
                 jaRegistrados={meals.map((m) => m.meal_type)}
                 registradas={meals.map((m) => ({ meal_type: m.meal_type, description: m.description }))}
+                refeicoesFalharam={!!dia?.falhou}
                 onRegistrado={load}
                 nutriNome={contexto?.nutriNome || undefined}
                 linkPlano

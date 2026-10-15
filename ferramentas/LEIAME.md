@@ -63,7 +63,7 @@ de 30 dias e o "Não deu para carregar o peso", os alvos de 44 px, os links, nen
 Instrument Sans (também no `NutriHome`).
 
 `conferir-dieta.cjs` faz o mesmo com a Dieta da Maria (mock sem cenário, dev no
-ar): o rótulo do dia ("Hoje, qui. 15/10") que abre o seletor de data pelo
+ar; `SO=regex` roda só as etapas cujo nome casa): o rótulo do dia ("Hoje, qui. 15/10") que abre o seletor de data pelo
 `showPicker()` e o `input type="date"` escondido (`max` em hoje, data futura e
 campo limpo sem efeito), as setas, o chip "Hoje", os alvos de 44 px (medidos
 com `elementFromPoint`, porque o "Comi isso" tem 40 px visíveis e 44 de
@@ -75,7 +75,13 @@ refeições registradas (excluir incluído) e o "Nenhuma refeição neste dia.".
 `meals`, `profiles`, `body_measurements`, `patient_links`, `meal_plans` e
 `meal_plan_items` falhando (`/__falhar`, sempre por `comFalha`, que desfaz no
 `finally`), confere que nenhum anel vira "0", nenhum papel das calorias nem
-sugestão é inventado e que o plano diz que não carregou. Também a rolagem até
+sugestão é inventado e que o plano diz que não carregou. Com `meals` falhando,
+o plano também não oferece "Comi isso" nem marca "feito" (diz que não carregou as
+refeições do dia). Também: o nome e o foco do botão do dia (o `input` escondido
+fora da ordem de tab, o contorno de foco no botão), o papel das calorias mudando
+por `pf-data-changed` ("perfil" e "medidas", como a Gaia avisa), a descrição da
+sugestão cortada em duas linhas na Dieta (com a leitura do plano interceptada
+pelo `page.route`) e na Início, e a rolagem até
 `#plano` (direto e pelo link da sugestão da Início), o cardápio de Meu plano
 (sem o "ver em Meu plano"), o formulário de refeição (só a linguagem mudou), os
 atalhos `?novo=1` e `?foto=1`, nenhuma caixa alta nem classe da paleta antiga e

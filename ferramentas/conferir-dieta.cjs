@@ -46,8 +46,12 @@ function ok(passou, msg, detalhe = "") {
   console.log(`  ${passou ? "OK   " : "FALHA"}  ${msg}`);
   if (!passou && detalhe) console.log(`         ${detalhe}`);
 }
+// SO=regex roda só as etapas cujo nome casa: para repetir uma parte sem esperar
+// o roteiro inteiro. Sem SO, vale tudo (é como o roteiro se confere por inteiro).
+const SO = process.env.SO ? new RegExp(process.env.SO, "i") : null;
 /** Uma etapa que lança (elemento que não existe, timeout) vira FALHA, e o roteiro segue. */
 async function etapa(nome, fn) {
+  if (SO && !SO.test(nome)) return;
   try {
     await fn();
   } catch (e) {
@@ -236,13 +240,16 @@ async function entrar(ctx, email = "maria.teste@exemplo.com") {
     const t = await anel(rotulo).locator(".tabular").first().innerText({ timeout: 5000 });
     return Number(t.trim().replace(/\./g, "").replace(",", "."));
   };
-  const rotuloDoDia = topo.getByRole("button", { name: /^(Hoje, )?\S+\. \d{1,2}\/\d{1,2}$/ });
+  // O nome acessível é o texto visível mais ", escolher outra data" (a etapa
+  // "datas: nome e foco" confere o sufixo).
+  const rotuloDoDia = topo.getByRole("button", { name: /^(Hoje, )?\S+\. \d{1,2}\/\d{1,2}(, escolher outra data)?$/ });
   const botaoDeData = p.locator('main input[type="date"]');
   const diaAnterior = topo.getByRole("button", { name: "Dia anterior", exact: true });
   const proximoDia = topo.getByRole("button", { name: "Próximo dia", exact: true });
   const chipHoje = topo.getByRole("button", { name: "Hoje", exact: true });
   const comiIsso = plano.getByRole("button", { name: "Comi isso", exact: true });
-  const sugestao = resumo.getByText(/^Faltam \d+ g de proteína para a meta de hoje\./);
+  // O <p> inteiro: a frase e a descrição da opção são dois blocos dentro dele.
+  const sugestao = resumo.locator("p", { hasText: /^Faltam \d+ g de proteína para a meta de hoje\./ });
   const textoDoRotulo = async () => (await rotuloDoDia.innerText({ timeout: 5000 })).trim();
   /** Vai a um dia pelo próprio input de data (o que o seletor nativo faz). */
   const irParaODia = async (iso) => {
@@ -302,6 +309,38 @@ async function entrar(ctx, email = "maria.teste@exemplo.com") {
     const depois = await p.evaluate(() => window.__showPicker);
     ok(depois === antes + 1, `tocar no rótulo chama showPicker() do input de data (${antes} → ${depois})`);
     await p.keyboard.press("Escape");
+  });
+
+  await etapa("datas: nome e foco", async () => {
+    await carregar();
+    await hidratado(rotuloDoDia);
+    const rotulo = await textoDoRotulo();
+    const nome = await rotuloDoDia.getAttribute("aria-label");
+    ok(nome === `${rotulo}, escolher outra data`, `o botão do dia diz que abre a escolha da data: aria-label "${nome}"`);
+    ok(nome != null && nome.startsWith(rotulo), "e o nome acessível começa pelo texto visível (rótulo no nome)");
+    // O input de data fica fora da ordem de tab: o botão do dia cobre o teclado
+    // (Enter abre o seletor por showPicker). Um segundo ponto de parada, num
+    // campo que ninguém vê, seria digitar às cegas.
+    ok((await botaoDeData.getAttribute("tabindex")) === "-1", "o input de data escondido fica fora da ordem de tab (tabindex -1)");
+    const primaria = await corDaVariavel(p, "--app-primaria", "outlineColor");
+    await diaAnterior.evaluate((e) => e.focus());
+    await p.keyboard.press("Tab");
+    const noBotao = await rotuloDoDia.evaluate((e) => {
+      const c = getComputedStyle(e);
+      return { ativo: document.activeElement === e, estilo: c.outlineStyle, largura: c.outlineWidth, cor: c.outlineColor, folga: c.outlineOffset };
+    });
+    ok(noBotao.ativo, "de Tab em Tab, o foco do teclado para no botão do dia (e não no input escondido)");
+    ok(noBotao.estilo !== "none" && noBotao.largura === "2px" && noBotao.folga === "2px" && noBotao.cor === primaria,
+      `e o botão mostra o contorno de foco (2 px app-primaria, folga de 2): ${JSON.stringify(noBotao)}`);
+    // O recurso quando showPicker não existe ou lança: o foco vai para o input
+    // escondido, e o contorno tem de aparecer no botão (o input não se vê).
+    await botaoDeData.evaluate((e) => e.focus());
+    const viaInput = await rotuloDoDia.evaluate((e) => {
+      const c = getComputedStyle(e);
+      return { ativo: document.activeElement === e, estilo: c.outlineStyle, largura: c.outlineWidth };
+    });
+    ok(!viaInput.ativo && viaInput.estilo !== "none" && viaInput.largura === "2px",
+      `com o foco no input escondido, o botão do dia mostra o contorno: ${JSON.stringify(viaInput)}`);
   });
 
   await etapa("trocar de dia pelo input de data", async () => {
@@ -425,6 +464,61 @@ async function entrar(ctx, email = "maria.teste@exemplo.com") {
     ok((await sugestao.count()) === 1, "de volta a hoje, ela volta");
   });
 
+  // A spec diz que a descrição da opção corta em duas linhas. O texto inteiro
+  // segue no DOM (o leitor de tela lê tudo): o corte é só de desenho.
+  const LONGA = "Prato caprichado: " + "120 g de frango grelhado + 4 colheres de arroz integral + 3 colheres de feijão + salada de folhas à vontade + legumes refogados, ".repeat(3).trim();
+  const blocoCortado = (el) =>
+    el.evaluate((raiz) => {
+      const e = [...raiz.querySelectorAll("*")].find((x) => getComputedStyle(x).webkitLineClamp === "2");
+      if (!e) return null;
+      const c = getComputedStyle(e);
+      return { alturaLinha: parseFloat(c.lineHeight), altura: e.clientHeight, cortado: e.scrollHeight > e.clientHeight + 1, texto: e.textContent, oculto: !!e.closest("[aria-hidden='true']") };
+    });
+  await etapa("sugestão: a descrição corta em duas linhas (Dieta)", async () => {
+    await p.route("**/rest/v1/meal_plan_items*", async (rota) => {
+      const resposta = await rota.fetch();
+      const itens = await resposta.json();
+      for (const i of itens) if (i.meal_type === "Café da manhã" && i.position === 0) i.description = LONGA;
+      await rota.fulfill({ response: resposta, json: itens });
+    });
+    try {
+      await carregar();
+      ok((await sugestao.count()) === 1, "preparo: a sugestão do café com a descrição longa aparece");
+      const b = await blocoCortado(sugestao);
+      ok(!!b, "a descrição é um bloco com -webkit-line-clamp: 2");
+      if (b) {
+        ok(b.altura <= b.alturaLinha * 2 + 1, `em 390 px a descrição ocupa até duas linhas (${b.altura} px, linha de ${b.alturaLinha} px)`);
+        ok(b.cortado, "e uma descrição longa de verdade é cortada (scrollHeight > clientHeight)");
+        ok(b.texto.includes(LONGA) && !b.oculto, "o texto inteiro segue no DOM, fora de aria-hidden (o leitor de tela lê tudo)");
+      }
+      const frase = (await sugestao.innerText()).replace(/\s+/g, " ");
+      ok(/^Faltam 110 g de proteína para a meta de hoje\. Próxima refeição do seu plano: café da manhã, 20 g \(Prato caprichado/.test(frase), "a frase continua a mesma, com a descrição entre parênteses", frase.slice(0, 160));
+      await sugestao.screenshot({ path: `${OUT}/sugestao-longa-dieta.png` });
+    } finally {
+      await p.unroute("**/rest/v1/meal_plan_items*");
+    }
+  });
+  await etapa("sugestão: a descrição corta em duas linhas (Início)", async () => {
+    await carregar("/app");
+    const link = p.locator('a[href="/app/dieta#plano"]', { hasText: /^Faltam \d+ g de proteína/ });
+    ok((await link.count()) === 1, "preparo: a sugestão da Início aparece");
+    const b = await blocoCortado(link);
+    ok(!!b, "a descrição é um bloco com -webkit-line-clamp: 2, como na Dieta");
+    if (b) {
+      // A leitura da Início é do servidor e o mock tem descrições curtas: o
+      // texto longo entra pelo DOM, no mesmo bloco, só para medir o corte.
+      const medida = await link.evaluate((raiz, longa) => {
+        const e = [...raiz.querySelectorAll("*")].find((x) => getComputedStyle(x).webkitLineClamp === "2");
+        e.textContent = longa;
+        const c = getComputedStyle(e);
+        return { alturaLinha: parseFloat(c.lineHeight), altura: e.clientHeight, cortado: e.scrollHeight > e.clientHeight + 1 };
+      }, LONGA);
+      ok(medida.altura <= medida.alturaLinha * 2 + 1 && medida.cortado, `com uma descrição longa, ocupa até duas linhas e corta (${medida.altura} px, linha de ${medida.alturaLinha} px)`);
+    }
+    await carregar("/app");
+    ok(((await link.innerText()).replace(/\s+/g, " ")).match(/^Faltam \d+ g de proteína para a meta de hoje\. Próxima refeição do seu plano: .*, \d+ g \(.+\)\.$/) != null, "e a frase da Início segue completa e igual (sem a descrição de teste)");
+  });
+
   await etapa("acima do limite", () => comEstado(async () => {
     const r = await gravarComoMaria("meals", { date: hoje, meal_type: "Ceia", description: "Verificação do anel", calories: 2400, protein_g: 150, carbs_g: 200, fat_g: 90 });
     ok(r.status === 201, `preparo: refeição de 2.400 kcal gravada no mock (${r.status})`);
@@ -475,6 +569,36 @@ async function entrar(ctx, email = "maria.teste@exemplo.com") {
     ok(alvo44(await alvoReal(link)), `e tem 44 px de alvo (${JSON.stringify(await alvoReal(link))})`);
   }));
 
+  // O assistente grava o peso e as metas por conta própria e avisa a tela por
+  // "pf-data-changed": o peso sai com a área "medidas" e as metas com "perfil"
+  // (lib/aiActions.ts). Sem ouvir as duas, a Dieta mostrava o papel das
+  // calorias de antes da conversa até alguém recarregar.
+  await etapa("a Gaia muda a meta ou o peso, sem recarregar", () => comEstado(async () => {
+    const avisar = (area) => p.evaluate((a) => window.dispatchEvent(new CustomEvent("pf-data-changed", { detail: { areas: [a] } })), area);
+    const rotuloDasCalorias = () => anel("Calorias").locator("figcaption").innerText().then((t) => t.trim());
+    const esperar = (esperado) =>
+      p.waitForFunction((e) => {
+        const f = [...document.querySelectorAll("figure")].find((x) => x.querySelector("figcaption")?.textContent.trim().startsWith("Calorias"));
+        return f?.querySelector("figcaption")?.textContent.trim() === e;
+      }, esperado, { timeout: 5000 }).then(() => true, () => false);
+    await carregar();
+    ok((await rotuloDasCalorias()) === "Calorias · limite", "antes: Calorias · limite (meta de peso 62 kg)");
+    const sessao = await entrarComoMaria();
+    const autorizacao = { "content-type": "application/json", authorization: `Bearer ${sessao.access_token}` };
+    await fetch(`${MOCK}/rest/v1/profiles`, { method: "POST", headers: autorizacao, body: JSON.stringify({ id: sessao.user.id, weight_goal_kg: 80 }) });
+    await avisar("perfil");
+    ok(await esperar("Calorias · meta"), 'a meta de peso muda pela Gaia ("perfil"): o anel passa a "Calorias · meta" sem recarregar');
+    await fetch(`${MOCK}/rest/v1/profiles`, { method: "POST", headers: autorizacao, body: JSON.stringify({ id: sessao.user.id, weight_goal_kg: 62 }) });
+    await avisar("perfil");
+    ok(await esperar("Calorias · limite"), "e volta ao limite quando a meta volta");
+    // O peso: a pesagem mais recente da Maria passa a 50 kg, abaixo da meta.
+    const linhas = await (await fetch(`${MOCK}/rest/v1/body_measurements?weight_kg=not.is.null&measured_by=is.null&order=date.desc&limit=1`, { headers: autorizacao })).json();
+    const r = await fetch(`${MOCK}/rest/v1/body_measurements?id=eq.${linhas[0].id}`, { method: "PATCH", headers: autorizacao, body: JSON.stringify({ weight_kg: 50 }) });
+    ok(r.status === 204 || r.status === 200, `preparo: a última pesagem passa a 50 kg no mock (${r.status})`);
+    await avisar("medidas");
+    ok(await esperar("Calorias · meta"), 'o peso muda pela Gaia ("medidas"): o anel passa a "Calorias · meta" sem recarregar');
+  }));
+
   // =========================================================================
   console.log("\nPlano alimentar");
   await etapa("plano alimentar", async () => {
@@ -497,6 +621,7 @@ async function entrar(ctx, email = "maria.teste@exemplo.com") {
     const alvoVer = await alvoReal(ver);
     ok(alvoVer.h >= 44, `o link "ver em Meu plano" tem 44 px de altura de toque (${JSON.stringify(alvoVer)})`);
 
+    ok((await plano.getByText(/Não deu para carregar as refeições do dia/).count()) === 0, "com as refeições carregadas, o plano não traz o aviso de leitura");
     const subtitulos = (await plano.locator("h3").allInnerTexts()).map((s) => s.replace(/\s+/g, " ").trim());
     ok(JSON.stringify(subtitulos) === JSON.stringify(["Café da manhã", "Almoço", "Lanche da tarde", "Jantar"]),
       "cada refeição é um subtítulo, sem “feito” (nada registrado hoje)", subtitulos.join(" | "));
@@ -706,6 +831,23 @@ async function entrar(ctx, email = "maria.teste@exemplo.com") {
     ok((await registradas.getByText("Nenhuma refeição neste dia.").count()) === 0, 'e a lista não diz "Nenhuma refeição neste dia."');
     ok((await registradas.getByText(/^Não deu para carregar/).count()) === 1, "a lista diz que não carregou");
     ok((await principal.innerText()).includes("Café da manhã"), "o plano, que é outra leitura, segue na tela");
+    // Sem saber o que foi registrado, o plano não pode dizer "nada registrado":
+    // sem "· feito", sem "comi" e, principalmente, sem "Comi isso" (quem já
+    // registrou seria convidado a registrar de novo, e o dia e a adesão
+    // contariam em dobro).
+    const textoPlano = (await plano.innerText()).replace(/\s+/g, " ");
+    ok((await comiIsso.count()) === 0, `meals falhando: o plano não oferece "Comi isso" (${await comiIsso.count()})`);
+    ok(!/feito/.test(textoPlano) && (await plano.locator("ul > li span", { hasText: /^comi$/ }).count()) === 0, 'e não marca "· feito" nem "comi"');
+    const avisoPlano = plano.getByText("Não deu para carregar as refeições do dia, então o plano não mostra o que já foi registrado.", { exact: true });
+    ok((await avisoPlano.count()) === 1, "e uma linha dentro do cartão do plano diz que não carregou as refeições do dia");
+    if (await avisoPlano.count()) {
+      const [cor, atencao] = await Promise.all([avisoPlano.evaluate((e) => getComputedStyle(e).color), corDaVariavel(p, "--app-atencao", "color")]);
+      ok(cor === atencao, "em app-atencao");
+    }
+    ok((await plano.locator("ul > li").count()) === 5 && ["2 ovos mexidos", "120 g de frango", "1 scoop de whey", "Omelete de 3 ovos"].every((t) => textoPlano.includes(t)),
+      "e o plano segue legível: as cinco opções com a descrição");
+    ok(textoPlano.includes("380 kcal · 20 g prot"), "com as kcal e a proteína de cada opção");
+    await plano.screenshot({ path: `${OUT}/falha-meals-plano.png` });
     await p.screenshot({ path: `${OUT}/falha-meals-390.png`, fullPage: true });
   }));
   await etapa("perfil falhando", () => comFalha("profiles", async () => {

@@ -30,6 +30,7 @@ export default function MealPlanView({
   date,
   jaRegistrados,
   registradas,
+  refeicoesFalharam = false,
   onRegistrado,
   nutriNome,
   linkPlano = false,
@@ -47,6 +48,14 @@ export default function MealPlanView({
    * Sem elas (Meu plano só lê os tipos), só o "· feito" da refeição aparece.
    */
   registradas?: { meal_type: string; description: string }[];
+  /**
+   * A leitura das refeições do dia falhou. `jaRegistrados` e `registradas`
+   * chegam vazios por falta de dado, e não porque nada foi registrado: sem
+   * "· feito", sem "comi" e, principalmente, sem "Comi isso" (quem já
+   * registrou seria convidado a registrar de novo, e o dia e a adesão do
+   * paciente contariam em dobro). O plano segue legível, com uma linha de aviso.
+   */
+  refeicoesFalharam?: boolean;
   /** Quando ausente, recarrega a rota — serve o dashboard, que é servidor. */
   onRegistrado?: () => void;
   /** Primeiro nome do nutricionista, para "de Ricardo, seu nutricionista". */
@@ -129,11 +138,17 @@ export default function MealPlanView({
           )}
         </div>
 
+        {refeicoesFalharam && (
+          <p className="px-4 py-3 text-[15px] text-app-atencao">
+            Não deu para carregar as refeições do dia, então o plano não mostra o que já foi registrado.
+          </p>
+        )}
+
         {tipos.map((tipo) => {
           const opcoes = itens
             .filter((i) => i.meal_type === tipo)
             .sort((a, b) => a.position - b.position);
-          const feito = jaRegistrados.includes(tipo);
+          const feito = !refeicoesFalharam && jaRegistrados.includes(tipo);
 
           return (
             <div key={tipo}>
@@ -149,7 +164,7 @@ export default function MealPlanView({
 
               <ul className="divide-y divide-app-linha">
                 {opcoes.map((o, i) => {
-                  const comi = comidas.has(`${o.meal_type}\u0000${o.description.trim()}`);
+                  const comi = !refeicoesFalharam && comidas.has(`${o.meal_type}\u0000${o.description.trim()}`);
                   // "opção 1" só quando há mais de uma; os números são dado.
                   const meta = [
                     opcoes.length > 1 ? `opção ${i + 1}` : null,
@@ -165,7 +180,7 @@ export default function MealPlanView({
                         <span className="whitespace-pre-wrap text-[15px] text-app-texto">{o.description}</span>
                         {meta && <span className="tabular text-[13px] text-app-texto-2">{meta}</span>}
                       </div>
-                      {comi ? (
+                      {refeicoesFalharam ? null : comi ? (
                         <span className="inline-flex shrink-0 items-center gap-1 text-[13px] font-semibold text-app-primaria">
                           <Check aria-hidden="true" className="h-4 w-4" />
                           comi

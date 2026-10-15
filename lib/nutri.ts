@@ -836,19 +836,25 @@ export function pesoDe30Dias(
 }
 
 /**
- * O peso do dia mais recente com peso, até hoje, ou nulo. É o "peso atual" da
- * Dieta para `papelDasCalorias`, e vale o mesmo que o da Início: um valor por
- * dia (`pesoDoDia`: a medida da consulta vence a de casa) e teto em hoje, de
- * modo que um peso lançado com data futura não vira o peso atual.
+ * O peso do dia mais recente com peso, até hoje, com a data dele, ou nulo. É a
+ * regra única do "último peso": a Dieta a usa para `papelDasCalorias`, e a
+ * Início para o "em dd/mm" de quem não se pesou nos últimos 30 dias. Um valor
+ * por dia (`pesoDoDia`: a medida da consulta vence a de casa) e teto em hoje,
+ * de modo que um peso lançado com data futura não vira o peso atual.
  *
  * Sem janela de dias, de propósito: quem se pesou há dois meses ainda tem um
- * peso e uma meta, e a direção da meta de calorias não some por isso.
+ * peso e uma meta, e a direção da meta de calorias não some por isso. A data
+ * vai junto porque a Início diz de quando é uma pesagem antiga.
  */
-export function pesoMaisRecente(linhas: LinhaDePeso[], hoje: string): number | null {
+export function pesoMaisRecente(
+  linhas: LinhaDePeso[],
+  hoje: string
+): { data: string; peso: number } | null {
   const ate = linhas.filter((l) => l.weight_kg != null && l.date <= hoje);
   if (ate.length === 0) return null;
-  const dia = ate.reduce((maior, l) => (l.date > maior ? l.date : maior), ate[0].date);
-  return pesoDoDia(ate.filter((l) => l.date === dia));
+  const data = ate.reduce((maior, l) => (l.date > maior ? l.date : maior), ate[0].date);
+  const peso = pesoDoDia(ate.filter((l) => l.date === data));
+  return peso == null ? null : { data, peso };
 }
 
 /** Média de um item na janela. `dias` diz quantos dias entraram na conta. */
