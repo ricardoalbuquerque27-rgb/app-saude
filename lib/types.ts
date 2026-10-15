@@ -31,6 +31,9 @@ export type Database = {
           user_id: string;
           waist_cm: number | null;
           weight_kg: number | null;
+          // Nulo é medida do paciente; preenchido é do nutri (prontuário).
+          measured_by: string | null;
+          appointment_id: string | null;
         };
         Insert: {
           arm_cm?: number | null;
@@ -47,6 +50,8 @@ export type Database = {
           user_id: string;
           waist_cm?: number | null;
           weight_kg?: number | null;
+          measured_by?: string | null;
+          appointment_id?: string | null;
         };
         Update: {
           arm_cm?: number | null;
@@ -63,6 +68,8 @@ export type Database = {
           user_id?: string;
           waist_cm?: number | null;
           weight_kg?: number | null;
+          measured_by?: string | null;
+          appointment_id?: string | null;
         };
         Relationships: [];
       };
@@ -370,6 +377,7 @@ export type Database = {
           onboarded: boolean;
           sex: string | null;
           role: string;
+          crn: string | null;
         };
         Insert: {
           birth_date?: string | null;
@@ -390,6 +398,7 @@ export type Database = {
           onboarded?: boolean;
           sex?: string | null;
           role?: string;
+          crn?: string | null;
         };
         Update: {
           birth_date?: string | null;
@@ -410,6 +419,7 @@ export type Database = {
           onboarded?: boolean;
           sex?: string | null;
           role?: string;
+          crn?: string | null;
         };
         Relationships: [];
       };
@@ -947,6 +957,46 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      // Registro da consulta: só leitura (do autor) pela RLS; escrita pelas
+      // funções abaixo (supabase/migrations/20261014120100_registro_da_consulta.sql).
+      // As telas usam `Registro`/`Adendo` de lib/registro.ts, com `medidas` tipado.
+      consultation_records: {
+        Row: {
+          id: string;
+          appointment_id: string;
+          nutritionist_id: string;
+          patient_id: string;
+          anamnese: string | null;
+          diagnostico: string | null;
+          conduta: string | null;
+          observar: string | null;
+          medidas: Json;
+          measurement_id: string | null;
+          status: string;
+          concluded_at: string | null;
+          assinatura_nome: string | null;
+          assinatura_crn: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      consultation_addenda: {
+        Row: {
+          id: string;
+          record_id: string;
+          author_id: string;
+          body: string;
+          assinatura_nome: string | null;
+          assinatura_crn: string | null;
+          created_at: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -986,6 +1036,23 @@ export type Database = {
       };
       cancelar_consulta: {
         Args: { p_id: string };
+        Returns: Json;
+      };
+      // Registro da consulta: devolvem { ok, id?, updated_at?, error? }.
+      salvar_registro: {
+        Args: { p_consulta: string; p_campos: Json; p_visto_em: string | null };
+        Returns: Json;
+      };
+      concluir_registro: {
+        Args: { p_consulta: string; p_visto_em: string | null; p_crn?: string | null };
+        Returns: Json;
+      };
+      descartar_rascunho: {
+        Args: { p_consulta: string };
+        Returns: Json;
+      };
+      adicionar_adendo: {
+        Args: { p_registro: string; p_texto: string };
         Returns: Json;
       };
       is_active_nutri_of: {

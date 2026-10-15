@@ -20,6 +20,8 @@ import { Corpo } from "./secoes/Corpo";
 import { Clinico } from "./secoes/Clinico";
 import { Consultas } from "./secoes/Consultas";
 import { getConsultasDoPaciente, getDesdeDoPaciente } from "@/lib/consultasDb";
+import { getObservarDosPacientes, getRegistrosDasConsultas } from "@/lib/registroDb";
+import { comDireitoAoRegistro } from "@/lib/registro";
 import { ConversaENotas, type Foco } from "./secoes/ConversaENotas";
 import { ErroSecao } from "@/components/clinico/ErroSecao";
 import { LinkPacientes, SemAcesso } from "./secoes/SemAcesso";
@@ -174,6 +176,7 @@ export default async function PacienteDetalhe({
           <Suspense fallback={<SkelCard />}>
             <Corpo
               uid={uid}
+              nutriId={nutriId}
               perfil={{
                 daily_calorie_goal: perfil.daily_calorie_goal,
                 protein_goal_g: perfil.protein_goal_g,
@@ -188,20 +191,35 @@ export default async function PacienteDetalhe({
       case "clinico":
         return (
           <Suspense fallback={<SkelCard />}>
-            <Clinico uid={uid} />
+            <Clinico uid={uid} sexo={perfil.sex} nascimento={perfil.birth_date} />
           </Suspense>
         );
-      case "consultas":
+      case "consultas": {
+        // Os registros são só da aba Consultas (a regra de que só a aba aberta
+        // consulta o banco). O "observar" corre junto das consultas; o selo de
+        // cada uma só pede os registros das que têm direito a ele, depois de
+        // as consultas chegarem.
+        const consultas = getConsultasDoPaciente(supabase, uid);
+        const agora = new Date().toISOString();
         return (
           <Suspense fallback={<SkelCard />}>
             <Consultas
               uid={uid}
               nutriId={nutriId}
               nome={nome}
-              consultas={getConsultasDoPaciente(supabase, uid)}
+              agora={agora}
+              consultas={consultas}
+              registros={consultas.then((c) =>
+                getRegistrosDasConsultas(
+                  supabase,
+                  comDireitoAoRegistro(c.data, agora).map((x) => x.id),
+                ),
+              )}
+              observar={getObservarDosPacientes(supabase, [uid])}
             />
           </Suspense>
         );
+      }
     }
   }
 

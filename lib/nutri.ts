@@ -17,9 +17,13 @@ export type Alerta = { tipo: TipoAlerta; nivel: number; texto: string };
 export type PatientSummary = {
   id: string;
   name: string;
-  /** Último dia com QUALQUER registro (refeição, treino, log diário, medida). */
+  /**
+   * Último dia com QUALQUER registro do paciente (refeição, treino, log
+   * diário, medida que ele lançou). A medida da consulta não conta: quem
+   * registrou foi o nutricionista.
+   */
   lastActivity: string | null;
-  /** Dias distintos com registro nos últimos 7 dias (0–7). */
+  /** Dias distintos com registro do paciente nos últimos 7 dias (0–7). */
   daysLogged7: number;
   caloriesToday: number;
   proteinToday: number;
@@ -123,9 +127,11 @@ export async function resumirPacientes(
         .select("user_id, date, water_ml")
         .in("user_id", ids)
         .gte("date", d30),
+      // `measured_by` separa a medida da consulta, e `created_at` desempata as
+      // pesagens de casa do mesmo dia (montarResumos, via pesoDoDia).
       supabase
         .from("body_measurements")
-        .select("user_id, date, weight_kg")
+        .select("user_id, date, weight_kg, measured_by, created_at")
         .in("user_id", ids)
         .not("weight_kg", "is", null)
         .gte("date", d30)
@@ -211,11 +217,16 @@ async function ultimosRegistros(
   await Promise.all(
     ids.flatMap((id) =>
       tabelas.map(async (tabela) => {
-        const { data, error } = await supabase
+        let busca = supabase
           .from(tabela)
           .select("date")
           .eq("user_id", id)
-          .lte("date", today)
+          .lte("date", today);
+        // Só a medida que o paciente lançou. A da consulta fazia quem nunca
+        // registrou nada aparecer como "40 dias sem registrar", contados da
+        // consulta. As outras tabelas não têm a coluna.
+        if (tabela === "body_measurements") busca = busca.is("measured_by", null);
+        const { data, error } = await busca
           .order("date", { ascending: false })
           .limit(1);
         if (error) falhou = true;
@@ -232,7 +243,11 @@ export type DadosResumo = {
   meals: any[];
   workouts: any[];
   logs: any[];
-  /** Só medidas com peso, em ordem crescente de data. */
+  /**
+   * Só medidas com peso, em ordem crescente de data, com `measured_by`
+   * (preenchido na medida da consulta) e `created_at` (que desempata o dia
+   * com mais de uma pesagem, em pesoDoDia).
+   */
   body: any[];
   /** Só exames fora do normal. */
   exams: any[];
@@ -278,9 +293,14 @@ export function montarResumos(
     const myBody = body.filter((b) => b.user_id === id);
 
     // Dias com atividade — união das quatro fontes. Data futura fica de
-    // fora: com ela, quem está parado aparecia como "Registrou hoje".
+    // fora: com ela, quem está parado aparecia como "Registrou hoje". A
+    // medida da consulta (`measured_by`) também: quem registrou foi o
+    // nutricionista, e com ela quem nunca registrou nada virava "N dias sem
+    // registrar" contados da consulta, e o alerta de parado sumia depois de
+    // toda consulta. Para o peso ela continua valendo (pesoDe30Dias).
+    const doPaciente = myBody.filter((b) => b.measured_by == null);
     const activeDays = new Set<string>();
-    for (const r of [...myMeals, ...myWk, ...myLogs, ...myBody]) {
+    for (const r of [...myMeals, ...myWk, ...myLogs, ...doPaciente]) {
       if (r.date && r.date <= today) activeDays.add(r.date as string);
     }
     const sortedDays = Array.from(activeDays).sort();
@@ -305,18 +325,10 @@ export function montarResumos(
       .filter((l) => l.date === today)
       .reduce((s, l) => s + (Number(l.water_ml) || 0), 0);
 
-    // Peso de 30 dias contados com naJanela: a consulta traz `>= hoje-30`
-    // (31 dias) e sem teto, e uma medida lançada com data futura virava o
-    // "peso atual" e a ponta da variação.
-    const pesos30 = myBody.filter((b) => naJanela(b.date, today, 30));
-    const weightLast = pesos30.length
-      ? Number(pesos30[pesos30.length - 1].weight_kg)
-      : null;
-    const weightFirst = pesos30.length ? Number(pesos30[0].weight_kg) : null;
-    const weightDelta30 =
-      weightLast != null && weightFirst != null && pesos30.length > 1
-        ? Number((weightLast - weightFirst).toFixed(1))
-        : null;
+    const { atual: weightLast, variacao: weightDelta30 } = pesoDe30Dias(
+      myBody,
+      today
+    );
 
     // Adesão ao plano nos últimos 7 dias. A mesma conta da aba do
     // paciente: era uma cópia à mão do computeAdherence, e duas cópias da
@@ -480,7 +492,7 @@ export async function getPatientActivity(
         .gte("date", since),
       supabase
         .from("body_measurements")
-        .select("date, created_at, weight_kg, body_fat_pct, waist_cm")
+        .select("date, created_at, weight_kg, body_fat_pct, waist_cm, measured_by")
         .eq("user_id", uid)
         .gte("date", since),
       supabase
@@ -597,13 +609,19 @@ export function montarLinhaDoTempo(
     push("treino", w, w.name || "Treino", d);
   }
   for (const b of body) {
-    const d = [
+    const peso = b.weight_kg ? `Peso ${b.weight_kg} kg` : null;
+    const resto = [
       b.body_fat_pct ? `${b.body_fat_pct}% gordura` : null,
       b.waist_cm ? `cintura ${b.waist_cm} cm` : null,
-    ]
-      .filter(Boolean)
-      .join(" · ");
-    push("peso", b, b.weight_kg ? `Peso ${b.weight_kg} kg` : "Medidas", d);
+    ];
+    // A medida que o nutricionista tirou na consulta (`measured_by`) fica na
+    // linha do tempo, mas com o próprio rótulo: saía "Peso 66.4 kg", igual a
+    // uma pesagem que o paciente lançou em casa.
+    if (b.measured_by != null) {
+      push("peso", b, "Medida na consulta", [peso, ...resto].filter(Boolean).join(" · "));
+      continue;
+    }
+    push("peso", b, peso ?? "Medidas", resto.filter(Boolean).join(" · "));
   }
   for (const l of logs) {
     const parts = [
@@ -708,7 +726,7 @@ export async function getPatientSeries(
       .gte("date", since),
     supabase
       .from("body_measurements")
-      .select("date, weight_kg")
+      .select("date, weight_kg, measured_by, created_at")
       .eq("user_id", uid)
       .not("weight_kg", "is", null)
       .gte("date", since),
@@ -733,10 +751,88 @@ export async function getPatientSeries(
       water: Number(dayLog?.water_ml) || 0,
       sleep: dayLog?.sleep_hours != null ? Number(dayLog.sleep_hours) : null,
       workouts: (workouts.data ?? []).filter((w: any) => w.date === date).length,
-      weight: dayBody.length ? Number(dayBody[dayBody.length - 1].weight_kg) : null,
+      weight: pesoDoDia(dayBody),
     });
   }
   return { serie: out, falhou: [meals, logs, workouts, body].some((r) => r.error) };
+}
+
+/**
+ * O peso de um dia com mais de uma medida. Desde a medida da consulta isso é
+ * comum (a da consulta e a pesagem de casa no mesmo dia), e a série pegava a
+ * última na ordem em que o banco trouxe, que ninguém pediu: o peso do dia
+ * podia mudar de uma visita para outra. Vale a da consulta (`measured_by`), que é a
+ * medida profissional e a que o prontuário cita; sem ela, a lançada por
+ * último. Em cada grupo, a de `created_at` mais recente, seja qual for a ordem
+ * de chegada.
+ */
+export function pesoDoDia(
+  linhas: { weight_kg: number | string | null; measured_by?: string | null; created_at?: string | null }[]
+): number | null {
+  const comPeso = linhas.filter((l) => l.weight_kg != null);
+  const daConsulta = comPeso.filter((l) => l.measured_by != null);
+  const grupo = daConsulta.length ? daConsulta : comPeso;
+  const ultima = [...grupo].sort((a, b) =>
+    (a.created_at ?? "") < (b.created_at ?? "") ? -1 : (a.created_at ?? "") > (b.created_at ?? "") ? 1 : 0
+  ).pop();
+  return ultima ? Number(ultima.weight_kg) : null;
+}
+
+/** Uma medida de peso, como vem de `body_measurements`. */
+export type LinhaDePeso = {
+  date: string;
+  weight_kg: number | string | null;
+  measured_by?: string | null;
+  created_at?: string | null;
+};
+
+/**
+ * O peso dos últimos 30 dias: um ponto por dia, o peso atual e a variação.
+ * É a conta do resumo do nutri (`montarResumos`) e a do Progresso da Início do
+ * paciente (app/app/page.tsx, que lê a mesma janela com `limitesDaJanela`),
+ * para os dois não mostrarem dois "−2,8 kg" diferentes.
+ *
+ * Os 30 dias são contados com naJanela: a consulta traz `>= hoje-30` (31
+ * dias) e sem teto, e uma medida lançada com data futura virava o "peso
+ * atual" e a ponta da variação.
+ *
+ * Um valor por dia, pela regra de pesoDoDia (a da consulta vence a de casa).
+ * Antes, `weightLast` e `weightFirst` pegavam a última e a primeira linha da
+ * lista: num dia com as duas medidas, uma das duas ao acaso (a ordem dentro
+ * do dia é a que o banco trouxe), e o "Peso atual" do Corpo podia mostrar a
+ * outra. Contar dias, e não linhas, também impede que duas medidas do mesmo
+ * dia virem uma "variação".
+ *
+ * `pontos` vem em ordem crescente de data, seja qual for a ordem das linhas.
+ * `atual` é o do dia mais recente da janela (não precisa ser hoje) e
+ * `variacao` é o último menos o primeiro, com uma casa; com menos de dois
+ * dias com peso, é nula.
+ */
+export function pesoDe30Dias(
+  linhas: LinhaDePeso[],
+  hoje: string
+): {
+  pontos: { data: string; peso: number }[];
+  atual: number | null;
+  variacao: number | null;
+} {
+  const porDia = new Map<string, LinhaDePeso[]>();
+  for (const linha of linhas) {
+    if (!naJanela(linha.date, hoje, 30)) continue;
+    const doDia = porDia.get(linha.date);
+    if (doDia) doDia.push(linha);
+    else porDia.set(linha.date, [linha]);
+  }
+  const pontos: { data: string; peso: number }[] = [];
+  for (const data of Array.from(porDia.keys()).sort()) {
+    const peso = pesoDoDia(porDia.get(data)!);
+    if (peso != null) pontos.push({ data, peso });
+  }
+  if (pontos.length === 0) return { pontos, atual: null, variacao: null };
+  const atual = pontos[pontos.length - 1].peso;
+  const variacao =
+    pontos.length > 1 ? Number((atual - pontos[0].peso).toFixed(1)) : null;
+  return { pontos, atual, variacao };
 }
 
 /** Média de um item na janela. `dias` diz quantos dias entraram na conta. */
@@ -827,6 +923,43 @@ export function textoVariacaoPeso(delta: number | null): string {
   });
   if (arredondado === 0) return `${numero} kg`;
   return `${arredondado > 0 ? "+" : "−"}${numero} kg`;
+}
+
+/**
+ * Meta de peso a 0,5 kg do peso atual ainda é manutenção; passado disso a
+ * direção é clara. Em kg.
+ */
+const MANUTENCAO_KG = 0.5;
+/** Folga contra o ruído do ponto flutuante: 64,4 − 63,9 dá 0,5000000000000071. */
+const RUIDO_KG = 1e-9;
+
+/** O papel da meta de calorias; `null` é manutenção ou falta de dado. */
+export type PapelDasCalorias = "limite" | "meta" | null;
+
+/**
+ * O que a meta de calorias é para este paciente: "limite" (um teto) para quem
+ * está acima do peso-alvo, "meta" (um piso a alcançar) para quem está abaixo, e
+ * `null` na manutenção ou quando falta o peso ou a meta (spec "Anel e macros",
+ * "Meta ou limite das calorias"). O app não guarda o objetivo do paciente; a
+ * meta de peso, que o nutricionista ou o paciente definiu, é o que diz a
+ * direção. Sem o papel, o aviso de "acima" valeria para todo mundo, e quem quer
+ * ganhar massa e passou das calorias receberia um aviso por fazer o que devia
+ * (spec "Decisões", "Meta ou limite").
+ *
+ * O peso atual é o do dia mais recente com peso (`pesoDoDia`) e a meta é
+ * `profiles.weight_goal_kg`. "Mais de 0,5 kg" é estrito: a 0,5 kg exatos ainda
+ * é manutenção, e o `RUIDO_KG` impede que a conta em ponto flutuante empurre
+ * esse caso para fora (64,4 contra 63,9 daria "limite").
+ */
+export function papelDasCalorias(
+  pesoAtual: number | null,
+  metaDePeso: number | null
+): PapelDasCalorias {
+  if (pesoAtual == null || metaDePeso == null) return null;
+  const acima = pesoAtual - metaDePeso;
+  if (acima > MANUTENCAO_KG + RUIDO_KG) return "limite";
+  if (acima < -(MANUTENCAO_KG + RUIDO_KG)) return "meta";
+  return null;
 }
 
 /**

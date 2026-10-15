@@ -39,6 +39,8 @@ export function Agenda({
   nomes,
   pacientes,
   desde,
+  registros,
+  observar,
   falhou,
 }: {
   vista: Vista;
@@ -51,8 +53,22 @@ export function Agenda({
   nomes: Record<string, string>;
   pacientes: { id: string; nome: string }[];
   desde: Record<string, { titulo: string; texto: string }>;
-  /** Que leitura falhou: cada uma mostra o erro no lugar do que não carregou. */
-  falhou: { periodo: boolean; pendencias: boolean; pacientes: boolean };
+  /** O estado do registro de cada consulta que tem direito a ele, por id da consulta. */
+  registros: Record<string, "rascunho" | "concluido">;
+  /** O "observar" do último registro concluído, por id do paciente. */
+  observar: Record<string, { texto: string; data: string }>;
+  /**
+   * Que leitura falhou: cada uma mostra o erro no lugar do que não carregou.
+   * `registros` e `observar` não têm lugar na página: quem avisa é o painel
+   * da consulta, na hora de abrir (PainelConsulta).
+   */
+  falhou: {
+    periodo: boolean;
+    pendencias: boolean;
+    pacientes: boolean;
+    registros: boolean;
+    observar: boolean;
+  };
 }) {
   // A consulta aberta guardada inteira, e não só o id: depois de uma ação ela
   // pode sair das listas (a sem desfecho de outro dia, aberta pela linha de
@@ -158,6 +174,8 @@ export function Agenda({
             agora={agora}
             nutriId={nutriId}
             desde={consulta.kind === "retorno" ? desde[consulta.patient_id] : null}
+            registro={falhou.registros ? "falhou" : registros[consulta.id] ?? null}
+            observar={falhou.observar ? "falhou" : observar[consulta.patient_id] ?? null}
             abrirPaciente
             aoTerminar={() => setAberta(null)}
           />

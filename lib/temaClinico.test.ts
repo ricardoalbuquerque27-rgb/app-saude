@@ -38,6 +38,33 @@ describe("tema clínico", () => {
     expect(PARES_GRAFICO).toContainEqual(["campo", "chao"]);
   });
 
+  it("os pares que os gráficos da aba Corpo usam estão na lista de 3:1", () => {
+    // A linha da média e o arco do anel (primaria), o ponto da consulta
+    // (texto) e a meta (campo) sobre o fundo da página; a linha da média
+    // sobre a semana que a dica destaca (primaria sobre primaria-fundo). Sem
+    // estar na lista, trocar um hex que derruba o contraste do gráfico não
+    // quebraria teste nenhum.
+    for (const par of [
+      ["primaria", "chao"],
+      ["texto", "chao"],
+      ["campo", "chao"],
+      ["primaria", "primaria-fundo"],
+    ])
+      expect(PARES_GRAFICO).toContainEqual(par);
+  });
+
+  it("os pares que o minigráfico dos exames desenha estão na lista de 3:1", () => {
+    // A linha e os pontos (texto) caem sobre a faixa sombreada
+    // (primaria-fundo), e as bordas da faixa (campo) sobre o fundo da página:
+    // o preenchimento sozinho dá ~1,1:1 contra a página, e o limite da faixa
+    // é informação (WCAG 1.4.11).
+    for (const par of [
+      ["texto", "primaria-fundo"],
+      ["campo", "chao"],
+    ])
+      expect(PARES_GRAFICO).toContainEqual(par);
+  });
+
   it.each(["claro", "escuro"] as const)(
     "a borda de campo passa 3:1 sobre o chão e é mais suave que o texto-2 no tema %s",
     (t) => {

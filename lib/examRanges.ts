@@ -38,36 +38,177 @@ export function parseExamNumber(input: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-// Interpreta uma faixa de referência textual comum do laudo.
-// Ex.: "< 200", "70-99", "70 a 99", "> 40", "até 150", "≥ 30".
-export function parseReferenceRange(
-  ref: unknown
-): { min?: number; max?: number } | null {
-  if (typeof ref !== "string") return null;
-  const s = ref.toLowerCase().replace(",", ".");
+/**
+ * Uma faixa de referência lida do texto. As bordas são dentro da faixa, salvo
+ * quando o operador é estrito: "< 190" quer dizer que 190 já não é
+ * desejável, e "> 40" que 40 ainda não basta. Lido como "até 190", o
+ * colesterol de 190 "entrava na faixa" no comparativo e saía "normal" pelo
+ * laudo, onde a tabela do app dizia "atenção".
+ */
+export type FaixaDeReferencia = {
+  min?: number;
+  max?: number;
+  /** O `min` fica fora ("> 40", "acima de 40", "superior a 40"). Ausente: dentro. */
+  minExclusivo?: true;
+  /** O `max` fica fora ("< 190", "abaixo de 190", "inferior a 190"). Ausente: dentro. */
+  maxExclusivo?: true;
+};
 
-  // intervalo: 70-99 / 70 a 99 / 70 até 99
-  const range = s.match(/(-?\d+(?:\.\d+)?)\s*(?:-|–|a|até|ate)\s*(-?\d+(?:\.\d+)?)/);
-  if (range) {
-    const a = Number(range[1]);
-    const b = Number(range[2]);
-    if (Number.isFinite(a) && Number.isFinite(b)) {
-      return { min: Math.min(a, b), max: Math.max(a, b) };
-    }
+/** O valor está dentro da faixa? A borda conta como dentro, menos a estrita. */
+export function dentroDaFaixa(valor: number, faixa: FaixaDeReferencia): boolean {
+  if (faixa.min != null && (faixa.minExclusivo ? valor <= faixa.min : valor < faixa.min)) return false;
+  if (faixa.max != null && (faixa.maxExclusivo ? valor >= faixa.max : valor > faixa.max)) return false;
+  return true;
+}
+
+// Os operadores de um limite só, sobre o texto já sem acento e em minúsculas.
+// A ordem importa nas que começam igual: "<=" antes de "<", senão o "<"
+// casava sozinho e o "=" sobrava (a expressão antiga só acertava o ">=" por
+// retrocesso, e o "=" não decidia nada). As de palavra pedem limite de
+// palavra: "ate" não pode casar dentro de outra palavra.
+const OPERADORES: { expr: string; lado: "min" | "max"; estrito: boolean }[] = [
+  { expr: "<=", lado: "max", estrito: false },
+  { expr: "≤", lado: "max", estrito: false },
+  { expr: String.raw`\bmenor ou igual a\b`, lado: "max", estrito: false },
+  { expr: String.raw`\bigual ou inferior a\b`, lado: "max", estrito: false },
+  { expr: String.raw`\bate\b`, lado: "max", estrito: false },
+  { expr: "<", lado: "max", estrito: true },
+  { expr: String.raw`\bmenor (?:do )?que\b`, lado: "max", estrito: true },
+  { expr: String.raw`\babaixo de\b`, lado: "max", estrito: true },
+  { expr: String.raw`\binferior a\b`, lado: "max", estrito: true },
+  { expr: ">=", lado: "min", estrito: false },
+  { expr: "≥", lado: "min", estrito: false },
+  { expr: String.raw`\bmaior ou igual a\b`, lado: "min", estrito: false },
+  { expr: String.raw`\bigual ou superior a\b`, lado: "min", estrito: false },
+  { expr: ">", lado: "min", estrito: true },
+  { expr: String.raw`\bmaior (?:do )?que\b`, lado: "min", estrito: true },
+  { expr: String.raw`\bacima de\b`, lado: "min", estrito: true },
+  { expr: String.raw`\bsuperior a\b`, lado: "min", estrito: true },
+];
+
+const NUMERO = String.raw`(-?\d+(?:\.\d+)?)`;
+// Cada pedaço do texto que é uma faixa ("70 a 99", "70-99", "70 até 99") ou
+// um limite ("< 190", "acima de 40"). Grupos: 1 e 2 são as pontas da faixa; um
+// por operador, na ordem de OPERADORES; o último é o número do limite.
+const PEDACO = new RegExp(
+  String.raw`${NUMERO}\s*(?:-|–|—|\ba\b|\bate\b)\s*${NUMERO}|(?:${OPERADORES.map((o) => `(${o.expr})`).join("|")})\s*${NUMERO}`,
+  "g"
+);
+
+// Palavras de estrato: a referência que as tem fora de parênteses é uma
+// tabela por sexo, idade, fase ou risco, não uma faixa. Sem acento.
+const ESTRATO =
+  /\b(?:homem|homens|mulher|mulheres|masculino|feminino|anos|fase|risco|desejavel|limitrofe|otimo|diabetes)\b|\bpre-/;
+
+/**
+ * O "(" do começo fecha no último caractere? Então o texto inteiro é um
+ * embrulho de parênteses: "(70 a 99)" sim, "(70 a 99) (jejum)" não (são dois
+ * comentários).
+ */
+function embrulhadoPorInteiro(t: string): boolean {
+  let fundo = 0;
+  for (let i = 0; i < t.length; i++) {
+    if (t[i] === "(") fundo++;
+    else if (t[i] === ")" && --fundo === 0) return i === t.length - 1;
   }
-  // só máximo: < 200 / <= 200 / ≤ 200 / menor que 200 / até 200
-  const maxOnly = s.match(/(?:<|≤|<=|menor que|abaixo de|até|ate)\s*(-?\d+(?:\.\d+)?)/);
-  if (maxOnly) {
-    const b = Number(maxOnly[1]);
-    if (Number.isFinite(b)) return { max: b };
+  return false;
+}
+
+/** "((70 a 99))" é "70 a 99"; o que não é um embrulho só passa como está. */
+function semEmbrulho(texto: string): string {
+  let t = texto.trim();
+  while (t.startsWith("(") && t.endsWith(")") && embrulhadoPorInteiro(t)) t = t.slice(1, -1).trim();
+  return t;
+}
+
+/**
+ * Lê a faixa de referência de um texto de laudo: "70 a 99", "70-99", "< 200",
+ * "até 150", "> 40", "≥ 30", "inferior a 5,7%"...
+ *
+ * Devolve `null` quando o texto, fora de parênteses, tem mais de uma faixa ou
+ * limite, ou uma palavra de estrato (homens, mulheres, anos, fase, risco,
+ * desejável, limítrofe, ótimo, pré-, diabetes). Lida pela primeira faixa que a
+ * expressão achava, a referência em níveis ("Normal: < 5,7 %; Pré-diabetes:
+ * 5,7 a 6,4 %; Diabetes: ≥ 6,5 %") ia contra 5,7–6,4, e a glicada que subiu de
+ * 5,4 para 6,0 "entrava na faixa". Uma por sexo dava a faixa do homem à
+ * mulher. Sem faixa, o comparativo diz "sem faixa para comparar" e o texto
+ * inteiro continua na tela. O que está entre parênteses é comentário e não
+ * conta: "< 130 mg/dL (ideal < 100)" é "< 130", e "≥ 50 mg/dL (mulheres)" é
+ * "≥ 50" (os textos da tabela do app são assim). Mas quando o texto TODO está
+ * entre parênteses, "(70 a 99)", o que está dentro é a faixa: tirar tudo o
+ * que tem parênteses deixava esse texto vazio e dava `null`, onde antes dava
+ * 70–99.
+ */
+export function parseReferenceRange(ref: unknown): FaixaDeReferencia | null {
+  if (typeof ref !== "string") return null;
+  // Todas as vírgulas: com `replace(",", ".")` só a primeira trocava, e
+  // "0,9 a 1,7" virava 0,9 a 1 (o 1,5 normal saía "alterado, acima").
+  const fora = semEmbrulho(ref)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/,/g, ".");
+  if (ESTRATO.test(fora)) return null;
+
+  const pedacos = Array.from(fora.matchAll(PEDACO));
+  if (pedacos.length !== 1) return null;
+  const m = pedacos[0];
+
+  if (m[1] != null) {
+    const a = Number(m[1]);
+    const b = Number(m[2]);
+    if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
+    return { min: Math.min(a, b), max: Math.max(a, b) };
   }
-  // só mínimo: > 40 / >= 40 / ≥ 40 / maior que 40 / acima de 40
-  const minOnly = s.match(/(?:>|≥|>=|maior que|acima de)\s*(-?\d+(?:\.\d+)?)/);
-  if (minOnly) {
-    const a = Number(minOnly[1]);
-    if (Number.isFinite(a)) return { min: a };
+  const i = OPERADORES.findIndex((_, j) => m[3 + j] != null);
+  const n = Number(m[3 + OPERADORES.length]);
+  if (i < 0 || !Number.isFinite(n)) return null;
+  const { lado, estrito } = OPERADORES[i];
+  if (lado === "max") return estrito ? { max: n, maxExclusivo: true } : { max: n };
+  return estrito ? { min: n, minExclusivo: true } : { min: n };
+}
+
+// ---------------------------------------------------------------------------
+// Unidades
+// ---------------------------------------------------------------------------
+
+/**
+ * Uma parte da unidade (o que fica de cada lado da barra), na forma comparável:
+ *  - UI, IU e U são a mesma unidade internacional, com ou sem prefixo ("mUI",
+ *    "µUI", "uUI", "mIU"); o prefixo micro (u, µ, mc) vira µ e o mili fica m;
+ *  - em qualquer outra unidade, o prefixo micro inicial (u, µ, mc) vira µ:
+ *    "mcg", "ug" e "µg" são o micrograma, "umol" o micromol, "uL" o microlitro.
+ * Parte que não começa assim (mg, ng, mmol, dL, mL...) passa como está.
+ */
+function parteDaUnidade(parte: string): string {
+  const internacional = parte.match(/^(m|\u03bc|u|mc)?(?:ui|iu|u)$/);
+  if (internacional) {
+    const prefixo = internacional[1];
+    return (prefixo === undefined ? "" : prefixo === "m" ? "m" : "\u03bc") + "u";
   }
-  return null;
+  return parte.replace(/^(?:\u03bc|u|mc)(?=[a-z])/, "\u03bc");
+}
+
+/**
+ * A unidade para comparar: sem espaço e sem caixa ("mg/dL" e " MG / DL " são
+ * a mesma). O NFKC junta o sinal de micro (U+00B5) e a letra grega mi
+ * (U+03BC), que o laudo copiado de PDF traz um ou outro; `parteDaUnidade`
+ * junta mcg, ug, µg e UI, IU, U. Por fim, µUI/mL e mUI/L são o mesmo número (1
+ * µUI/mL = 1 mUI/L, e a TSH aparece de um jeito ou do outro), então a
+ * primeira vira a segunda. Só essas equivalências valem para qualquer exame:
+ * µg/mL e mg/L, por exemplo, não são tratadas como iguais. As que valem só
+ * para um exame (mEq/L e mmol/L do potássio) moram na entrada dele.
+ */
+export function unidadeNormalizada(unidade: string | null | undefined): string {
+  const u = (unidade ?? "")
+    .normalize("NFKC")
+    .replace(/\s+/g, "")
+    .toLowerCase()
+    .split("/")
+    .map(parteDaUnidade)
+    .join("/");
+  return u === "\u03bcu/ml" ? "mu/l" : u;
 }
 
 // Normaliza o nome do exame para casar com a tabela.
@@ -84,6 +225,12 @@ function norm(s: string): string {
 type RangeDef = {
   keys: string[]; // termos que identificam o exame (sem acento)
   unit: string;
+  /**
+   * Outras grafias de unidade que dão o MESMO número neste exame: mmol/L do
+   * potássio e do sódio é o mesmo que mEq/L (íon de carga 1). Não vale como
+   * regra geral: no cálcio e no magnésio, 1 mmol/L são 2 mEq/L.
+   */
+  unidadesEquivalentes?: string[];
   sexDependent?: boolean; // faixa muda muito entre homens e mulheres
   // devolve status/direção/faixa a partir do valor e do contexto
   classify: (v: number, ctx: ExamContext) => {
@@ -145,7 +292,7 @@ const isFemale = (ctx: ExamContext) => ctx.sex === "F";
 
 const TABLE: RangeDef[] = [
   {
-    keys: ["glicose", "glicemia", "glicose jejum", "glicose em jejum", "glicemia de jejum"],
+    keys: ["glicose", "glicemia", "glicose jejum", "glicose em jejum", "glicemia de jejum", "glicose basal"],
     unit: "mg/dL",
     classify: (v) =>
       highConcern(100, 126, "70–99 mg/dL (jejum)", 70)(v),
@@ -156,17 +303,19 @@ const TABLE: RangeDef[] = [
     classify: (v) => highConcern(5.7, 6.5, "< 5,7%")(v),
   },
   {
-    keys: ["colesterol total", "colesterol"],
+    // "e frações" é key, e não palavra neutra: "Hemoglobina e frações" é a
+    // eletroforese, outro exame, e a neutra juntava com a hemoglobina.
+    keys: ["colesterol total", "colesterol", "colesterol total e fracoes", "colesterol e fracoes"],
     unit: "mg/dL",
     classify: (v) => highConcern(190, 240, "< 190 mg/dL")(v),
   },
   {
-    keys: ["ldl", "colesterol ldl", "ldl colesterol"],
+    keys: ["ldl", "colesterol ldl", "ldl colesterol", "ldl c"],
     unit: "mg/dL",
     classify: (v) => highConcern(130, 160, "< 130 mg/dL (ideal < 100)")(v),
   },
   {
-    keys: ["hdl", "colesterol hdl", "hdl colesterol"],
+    keys: ["hdl", "colesterol hdl", "hdl colesterol", "hdl c"],
     unit: "mg/dL",
     sexDependent: true,
     classify: (v, ctx) =>
@@ -180,7 +329,14 @@ const TABLE: RangeDef[] = [
     classify: (v) => highConcern(150, 200, "< 150 mg/dL")(v),
   },
   {
-    keys: ["vitamina d", "25 oh vitamina d", "25 hidroxivitamina d", "vitamina d 25"],
+    keys: [
+      "vitamina d",
+      "25 oh vitamina d",
+      "25 hidroxivitamina d",
+      "vitamina d 25",
+      "25 hidroxi vitamina d",
+      "vitamina d 25 hidroxi",
+    ],
     unit: "ng/mL",
     classify: (v) => {
       if (v > 100) return { status: "atencao", direction: "alto", faixa: "30–100 ng/mL" };
@@ -188,7 +344,9 @@ const TABLE: RangeDef[] = [
     },
   },
   {
-    keys: ["tsh", "hormonio tireoestimulante"],
+    // O "ultrassensível" é o método, não outro exame: com uma entrada à parte,
+    // TSH e TSH ultrassensível viravam duas linhas, cada uma com um resultado.
+    keys: ["tsh", "hormonio tireoestimulante", "tsh ultrassensivel", "tsh ultra sensivel"],
     unit: "µUI/mL",
     classify: (v) => windowConcern(0.4, 4.0, "0,4–4,0 µUI/mL")(v),
   },
@@ -276,7 +434,15 @@ const TABLE: RangeDef[] = [
     classify: (v) => windowConcern(60, 160, "60–160 µg/dL")(v),
   },
   {
-    keys: ["tgo", "ast", "aspartato aminotransferase"],
+    // "Transaminase oxalacética" é o nome que o laudo dá à TGO/AST, e a "pirúvica"
+    // à TGP/ALT; a palavra sozinha não é key, para não bastar para nada.
+    keys: [
+      "tgo",
+      "ast",
+      "aspartato aminotransferase",
+      "transaminase oxalacetica",
+      "transaminase glutamico oxalacetica",
+    ],
     unit: "U/L",
     sexDependent: true,
     classify: (v, ctx) =>
@@ -285,7 +451,13 @@ const TABLE: RangeDef[] = [
         : highConcern(40, 60, "até 40 U/L (homens)")(v),
   },
   {
-    keys: ["tgp", "alt", "alanina aminotransferase"],
+    keys: [
+      "tgp",
+      "alt",
+      "alanina aminotransferase",
+      "transaminase piruvica",
+      "transaminase glutamico piruvica",
+    ],
     unit: "U/L",
     sexDependent: true,
     classify: (v, ctx) =>
@@ -294,46 +466,204 @@ const TABLE: RangeDef[] = [
         : highConcern(41, 62, "até 41 U/L (homens)")(v),
   },
   {
-    keys: ["pcr", "proteina c reativa", "proteina c-reativa"],
+    keys: [
+      "pcr",
+      "proteina c reativa",
+      "proteina c-reativa",
+      "pcr us",
+      "pcr ultrassensivel",
+      "proteina c reativa ultrassensivel",
+      // como o TSH: o método também chega separado ("ultra-sensível", "ultra sensível")
+      "pcr ultra sensivel",
+      "proteina c reativa ultra sensivel",
+    ],
     unit: "mg/L",
     classify: (v) => highConcern(3, 10, "< 3 mg/L")(v),
   },
   {
-    keys: ["tsh ultrassensivel"],
-    unit: "µUI/mL",
-    classify: (v) => windowConcern(0.4, 4.0, "0,4–4,0 µUI/mL")(v),
-  },
-  {
     keys: ["potassio", "k"],
     unit: "mEq/L",
+    unidadesEquivalentes: ["mmol/L"],
     classify: (v) => windowConcern(3.5, 5.1, "3,5–5,1 mEq/L")(v),
   },
   {
     keys: ["sodio", "na"],
     unit: "mEq/L",
+    unidadesEquivalentes: ["mmol/L"],
     classify: (v) => windowConcern(135, 145, "135–145 mEq/L")(v),
   },
 ];
 
-function findDef(name: string): RangeDef | null {
-  const n = norm(name);
-  const nPadded = ` ${n} `;
-  // Pontua cada chave: correspondência exata vence; senão, a chave que aparece
-  // como PALAVRA/EXPRESSÃO inteira no nome (evita "hemoglobina" casar com
-  // "hemoglobina glicada", ou "na" casar dentro de "creatinina").
-  let best: { def: RangeDef; score: number } | null = null;
-  for (const def of TABLE) {
-    for (const k of def.keys) {
-      const nk = norm(k);
-      let score = 0;
-      if (n === nk) score = 1000 + nk.length;
-      else if (nPadded.includes(` ${nk} `)) score = nk.length;
-      if (score > 0 && (!best || score > best.score)) {
-        best = { def, score };
-      }
-    }
-  }
-  return best?.def ?? null;
+/**
+ * Todos os textos de faixa que a tabela dá (os dois sexos, qualquer valor: o
+ * texto não muda com o valor, só com o sexo). Servem para reconhecer o texto
+ * da tabela gravado em `reference_range` (`ehTextoDaTabela`).
+ */
+const VALORES_DE_AMOSTRA = [0, 0.5, 1, 2, 5, 10, 50, 100, 150, 200, 300, 500, 1000, 100000];
+export const TEXTOS_DE_FAIXA_DA_TABELA: ReadonlySet<string> = new Set(
+  TABLE.flatMap((def) =>
+    (["F", "M"] as const).flatMap((sex) => VALORES_DE_AMOSTRA.map((v) => def.classify(v, { sex }).faixa))
+  )
+);
+
+/**
+ * O texto é, letra por letra (sem os espaços das pontas), um texto de faixa da
+ * tabela do app? Então não é o laudo do laboratório: o casamento frouxo antigo
+ * do `classifyExam` gravava em `reference_range` o texto da entrada que ele
+ * achava (o VLDL-colesterol saía com "< 190 mg/dL", do colesterol total), e o
+ * formulário de exames e a IA ainda gravam o texto da tabela quando o laudo
+ * não traz faixa.
+ */
+export function ehTextoDaTabela(texto: string | null | undefined): boolean {
+  return !!texto && TEXTOS_DE_FAIXA_DA_TABELA.has(texto.trim().replace(/\s+/g, " "));
+}
+
+// As palavras de cada entrada da tabela: a união das palavras de todas as keys
+// dela, contada como uma só (a entrada da glicose tem "glicose", "glicemia",
+// "jejum", "em" e "de"). Na ordem de TABLE.
+const PALAVRAS_DAS_ENTRADAS: Set<string>[] = TABLE.map(
+  (def) => new Set(def.keys.flatMap((k) => norm(k).split(" ")))
+);
+
+// Palavras que dizem de onde veio a amostra e não de qual exame se trata
+// ("Potássio sérico", "Glicose plasmática"): não contam contra o nome na
+// cobertura. Já normalizadas, sem acento. Sem "urina" e "urinária" de
+// propósito: glicose na urina é outro exame, e a glicose do sangue não é a
+// faixa dela.
+const PALAVRAS_DE_AMOSTRA = new Set([
+  "soro",
+  "serico",
+  "serica",
+  "sericos",
+  "sericas",
+  "plasma",
+  "plasmatico",
+  "plasmatica",
+  "sangue",
+  "sanguineo",
+]);
+
+// Palavras que dizem COMO o resultado foi obtido ou de onde ele vem, e não de
+// qual exame se trata ("Colesterol LDL calculado", "COLESTEROL LDL -
+// FRIEDEWALD", "Glicose basal", "Hemograma - Hemoglobina", "TRANSAMINASE ...
+// (TGO/AST)"): também não contam contra o nome. Sem elas, o nome que o laudo
+// escreve todo dia não casava com a entrada e o `classifyExam` dava
+// `source: "nenhuma"`; pelo chat o LDL-c de 180 era gravado "normal" e saía
+// da fila de triagem. Servem só como "não pesa contra", nunca como prova: o
+// nome precisa de pelo menos uma palavra que conte e da key inteira de uma
+// entrada, então "Calculado" ou "Basal" sozinhos não são exame. Palavra que
+// juntaria exame diferente não entra aqui, e sim como key da entrada que a
+// tem ("e frações", que a hemoglobina também escreve; ver o colesterol total).
+const PALAVRAS_DE_METODO = new Set([
+  "calculado",
+  "calculada",
+  "friedewald",
+  "ultrassensivel",
+  "basal",
+  "hemograma",
+  "transaminase",
+]);
+
+// A entrada da tabela a que o nome do exame se refere, ou nenhuma. O nome
+// casa quando:
+//   1. é IGUAL (depois do `norm`) a uma das keys de uma entrada; a exata vence; ou
+//   2. TODAS as suas palavras (menos as de amostra e de método) aparecem entre as palavras
+//      de UMA ÚNICA entrada E o nome contém inteira, como expressão, pelo
+//      menos uma key dela (" nome " inclui " key ").
+//      Se mais de uma entrada qualificar, não há casamento: não dá para saber
+//      de qual o laudo fala, e a faixa da entrada errada é pior que nenhuma.
+//
+// Foi o casamento antigo do `classifyExam` (o `findDef`, que saiu) que pegou a
+// key como palavra solta dentro de qualquer nome e juntou exames diferentes:
+// "VLDL-colesterol" e "Colesterol não-HDL" saíam como "colesterol total",
+// "Vitamina K" como potássio (chave "k"), "Hemoglobina corpuscular média" como
+// hemoglobina e "Capacidade total de ligação do ferro" como ferro. Aqui a palavra que
+// diferencia o exame ("vldl", "corpuscular", "prandial", "vitamina") nunca
+// está nas keys da entrada errada, então o nome não casa com ela. Já o sufixo
+// redundante ("Hemoglobina glicada (HbA1c)", "Glicose (jejum)") tem só
+// palavras da própria entrada, e a key inteira, e junta.
+//
+// A exigência da key inteira tira o nome que só tem PALAVRAS da entrada: "T4"
+// é palavra da entrada do T4 livre, mas T4 sozinho pode ser o total, e
+// "Jejum" é palavra da glicose sem ser exame nenhum ("Livre" e "Hormônio"
+// também). Sem key inteira, a chave é o próprio nome e não há faixa.
+function entradaDaTabela(nome: string): RangeDef | null {
+  const n = norm(nome);
+  if (!n) return null;
+  const exata = TABLE.find((def) => def.keys.some((k) => norm(k) === n));
+  if (exata) return exata;
+  const palavras = n.split(" ").filter((p) => !PALAVRAS_DE_AMOSTRA.has(p) && !PALAVRAS_DE_METODO.has(p));
+  if (palavras.length === 0) return null;
+  const nomeComBordas = ` ${n} `;
+  const cobrem = TABLE.filter(
+    (def, i) =>
+      palavras.every((p) => PALAVRAS_DAS_ENTRADAS[i].has(p)) &&
+      def.keys.some((k) => nomeComBordas.includes(` ${norm(k)} `))
+  );
+  return cobrem.length === 1 ? cobrem[0] : null;
+}
+
+// A chave que junta as grafias do mesmo exame no comparativo do nutricionista:
+// a primeira chave da entrada da tabela a que o nome se refere (`entradaDaTabela`;
+// "Glicose", "Glicemia de jejum" e "glicose em jejum" são todas "glicose"). Sem
+// isso o comparativo teria uma linha por grafia, cada uma com um resultado só e
+// sem nada para comparar.
+//
+// O casamento é o estrito de `entradaDaTabela`, de propósito: com "um
+// resultado por dia", colesterol total 200 (10/07) e 190 (02/10) mais
+// VLDL-colesterol 24 (02/10) viravam UMA linha, "VLDL-colesterol, 24, entrou
+// na faixa", e o 190 sumia. Fora da tabela vale o nome normalizado (sem
+// acento, caixa nem pontuação). É o mesmo casamento do `classifyExam`.
+export function chaveDoExame(nome: string): string {
+  return entradaDaTabela(nome)?.keys[0] ?? norm(nome);
+}
+
+/** As unidades em que a faixa da entrada vale, normalizadas: a dela e as equivalentes. */
+function unidadesDaEntrada(def: RangeDef): string[] {
+  return [def.unit, ...(def.unidadesEquivalentes ?? [])].map(unidadeNormalizada);
+}
+
+/**
+ * A faixa da entrada vale para este resultado? Só sem unidade (o laudo
+ * muitas vezes omite) ou numa unidade da entrada: a B12 em pmol/L contra
+ * 200–900 pg/mL, ou a glicose em mmol/L contra 70–99 mg/dL, julgava um valor
+ * normal como fora da faixa.
+ */
+function naUnidadeDaEntrada(def: RangeDef, unidade: string | null | undefined): boolean {
+  const u = unidadeNormalizada(unidade);
+  return u === "" || unidadesDaEntrada(def).includes(u);
+}
+
+/**
+ * A unidade de um resultado para compará-lo com outros do mesmo exame: a
+ * normalizada (`unidadeNormalizada`) e, quando é uma equivalente da entrada da
+ * tabela (mmol/L do potássio), a principal da entrada. Assim o potássio de 4,0
+ * mEq/L e o de 5,6 mmol/L se comparam, e o cálcio nas mesmas duas unidades não.
+ */
+export function unidadeDoExame(nome: string, unidade: string | null | undefined): string {
+  const u = unidadeNormalizada(unidade);
+  const def = entradaDaTabela(nome);
+  return def && def.unidadesEquivalentes && unidadesDaEntrada(def).includes(u)
+    ? unidadeNormalizada(def.unit)
+    : u;
+}
+
+// A faixa de referência da tabela do app para o exame, pelo mesmo casamento de
+// `chaveDoExame` (nome com uma palavra que a entrada não tem não leva a faixa
+// dela), com a unidade em que a entrada está e a situação do `valor` nela (os
+// três níveis da entrada: é o selo do comparativo). Só quando a `unidade` do
+// resultado é vazia ou da entrada (`naUnidadeDaEntrada`). Exame que depende do
+// sexo, sem o sexo, fica sem faixa: não chutamos, como no `classifyExam`.
+export function faixaDaTabela(
+  nome: string,
+  valor: number,
+  ctx: ExamContext,
+  unidade: string | null = null
+): { faixa: string; unidade: string; situacao: ExamLevel } | null {
+  const def = entradaDaTabela(nome);
+  if (!def || (def.sexDependent && !ctx.sex) || !naUnidadeDaEntrada(def, unidade)) return null;
+  const r = def.classify(valor, ctx);
+  return { faixa: r.faixa, unidade: def.unit, situacao: r.status };
 }
 
 const STATUS_LABEL: Record<ExamLevel, string> = {
@@ -369,8 +699,20 @@ function explain(
   return parts.join(" ");
 }
 
-// Classifica um exame. `reference` (opcional) é a faixa impressa no laudo,
-// usada como segunda opção quando o exame não está na tabela curada.
+// Classifica um exame: a página Exames do paciente (o selo e o "acima/abaixo"),
+// o formulário (que preenche a situação e a faixa) e a IA (que grava o exame).
+// `reference` (opcional) é a faixa impressa no laudo.
+//
+// 1. A tabela do app, quando o nome casa com uma entrada pela regra estrita de
+//    `entradaDaTabela` (a mesma do comparativo do nutricionista) e a unidade é
+//    vazia ou a da entrada. O casamento antigo, por palavra solta, julgava a
+//    "Vitamina K" pela faixa do potássio e a HCM pela da hemoglobina; e a
+//    tabela em qualquer unidade dava "atenção" à B12 de 235 pmol/L, que o laudo
+//    (148 a 664) põe dentro.
+// 2. Senão, a faixa do laudo, com a borda estrita do "<" e do ">" e sem a
+//    referência em níveis (`parseReferenceRange`). Texto da tabela não vale
+//    como laudo (`ehTextoDaTabela`): o formulário preenche a referência com ele
+//    assim que o nome casa, e a glicose de 5,1 mmol/L ia contra "70–99 mg/dL".
 export function classifyExam(params: {
   name: string;
   value: unknown;
@@ -378,7 +720,13 @@ export function classifyExam(params: {
   reference?: string | null;
   ctx?: ExamContext;
 }): ExamClassification {
-  const { name, value, reference } = params;
+  const { name, value } = params;
+  // A rota analyze-exam passa o JSON da IA direto, e a IA devolve número,
+  // objeto ou nulo onde se espera texto. `.normalize` e `.trim` num valor que
+  // não é texto lançavam erro e derrubavam a leitura do laudo inteiro; o que
+  // não é texto vale como ausente (a unidade em branco deixa a tabela valer).
+  const unit = typeof params.unit === "string" ? params.unit : null;
+  const reference = typeof params.reference === "string" ? params.reference : null;
   const ctx: ExamContext = params.ctx ?? {};
   const v = parseExamNumber(value);
 
@@ -393,8 +741,9 @@ export function classifyExam(params: {
     };
   }
 
-  // 1) Tabela curada (personalizada por sexo/idade)
-  const def = findDef(name);
+  // 1) Tabela curada (personalizada por sexo/idade), na unidade dela
+  const daUnidade = entradaDaTabela(name);
+  const def = daUnidade && naUnidadeDaEntrada(daUnidade, unit) ? daUnidade : null;
   // Exame que depende de sexo, mas não sabemos o sexo: não chutamos.
   // Tentamos a faixa do laudo; se não houver, pedimos o sexo.
   const faltaSexo = !!def?.sexDependent && !ctx.sex;
@@ -411,16 +760,14 @@ export function classifyExam(params: {
   }
 
   // 2) Faixa de referência do laudo
-  const parsed = parseReferenceRange(reference);
+  const parsed = ehTextoDaTabela(reference) ? null : parseReferenceRange(reference);
   if (parsed && (parsed.min != null || parsed.max != null)) {
     let status: ExamLevel = "normal";
     let direction: ExamDirection = "normal";
-    if (parsed.max != null && v > parsed.max) {
+    if (!dentroDaFaixa(v, parsed)) {
       status = "alterado";
-      direction = "alto";
-    } else if (parsed.min != null && v < parsed.min) {
-      status = "alterado";
-      direction = "baixo";
+      direction =
+        parsed.max != null && (parsed.maxExclusivo ? v >= parsed.max : v > parsed.max) ? "alto" : "baixo";
     }
     const faixa = (reference ?? "").trim();
     const dirTxt = direction === "alto" ? "acima" : direction === "baixo" ? "abaixo" : "dentro";

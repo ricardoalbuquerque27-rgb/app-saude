@@ -14,15 +14,24 @@ import {
   type PlanSession,
 } from "@/lib/planCheckIn";
 
-// Check-in do treino planejado, para o paciente. Aparece no dashboard e na
-// aba Plano. Sem marcação = "sem resposta"; tocar de novo no mesmo botão
-// desfaz.
+// Check-in do treino planejado, para o paciente. Aparece no "Para hoje" da
+// Início (`linha`), na leitura do treino (`compact`, só os botões) e na aba
+// Plano. Sem marcação = "sem resposta"; tocar de novo no mesmo botão desfaz.
+//
+// `linha` é a forma da Início: cada sessão é um <li> da lista do cartão "Para
+// hoje", com o nome, "{categoria} · do seu nutricionista" (ou "· seu treino")
+// e os botões à direita. Mora numa prop própria, e não no `compact`, porque o
+// `compact` é o da página do treino (app/app/treino/[id]): redesenhá-lo lá
+// punha um <li> fora de lista, repetia o nome e a nota e dava "Fui/Não fui"
+// ao treino do próprio paciente.
 export default function PlanCheckIn({
   sessions,
   date,
   completions,
   compact = false,
   nota = true,
+  linha = false,
+  doNutri = true,
 }: {
   sessions: PlanSession[];
   date: string;
@@ -30,11 +39,18 @@ export default function PlanCheckIn({
   compact?: boolean;
   /** A explicação do check-in só precisa aparecer uma vez por tela. */
   nota?: boolean;
+  /** A forma de linha do "Para hoje" da Início (só dentro de um <ul>). */
+  linha?: boolean;
+  /** Só na `linha`: a sessão foi prescrita pelo nutricionista (vínculo ativo). */
+  doNutri?: boolean;
 }) {
   const supabase = createClient();
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+  // Em qual sessão a gravação falhou: na `linha` cada sessão é uma linha, e o
+  // aviso vai na linha dela.
+  const [erroEm, setErroEm] = useState<string | null>(null);
   // Guarda qual sessão acabou de ser salva, para dar o "pop" de confirmação.
   const [pop, setPop] = useState<string | null>(null);
   const idx = indexCompletions(completions);
@@ -64,6 +80,7 @@ export default function PlanCheckIn({
     setBusy(null);
     if (error) {
       setErro("Não foi possível salvar. Tente de novo.");
+      setErroEm(session.id);
       return;
     }
     if (next !== null) {
@@ -85,6 +102,77 @@ export default function PlanCheckIn({
   const primeiroSemResposta = sessions.findIndex(
     (s) => !idx[completionKey(s.id, date)]
   );
+
+  if (linha) {
+    return (
+      <>
+        {sessions.map((s, i) => {
+          const current = idx[completionKey(s.id, date)];
+          const done = current?.status === "done";
+          const skipped = current?.status === "skipped";
+          const loading = busy === s.id;
+          const nome = s.title || s.sport || "Treino";
+          const origem = doNutri ? "do seu nutricionista" : "seu treino";
+          const apoio = s.title && s.sport ? `${s.sport} · ${origem}` : origem;
+          // A hierarquia da maquete: "Fui" é o primário (sólido) e "Não fui"
+          // o secundário. Depois de responder, o sólido fica com a resposta:
+          // "Não fui" marcado vai para o tom de aviso (verde diria que faltar
+          // foi bom) e "Fui" volta a secundário. O "Fiz" do treino próprio é
+          // secundário até ser marcado, como na maquete.
+          const BASE =
+            "tappable inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-[10px] px-3 text-sm font-semibold disabled:opacity-60";
+          const SOLIDO = "bg-app-primaria text-app-sobre-primaria hover:[filter:brightness(0.94)]";
+          const SECUNDARIO = "border border-app-campo bg-app-cartao text-app-texto hover:bg-app-primaria-fundo";
+          const AVISO = "border border-app-atencao bg-app-atencao-fundo text-app-atencao";
+          const estiloFeito = doNutri ? (skipped ? SECUNDARIO : SOLIDO) : done ? SOLIDO : SECUNDARIO;
+          return (
+            <li key={s.id} className="px-4 py-3.5">
+              <div className="flex items-center gap-3">
+                {/* O nome leva à leitura do treino; os botões ficam aqui, porque
+                    confirmar é a ação de um toque. */}
+                <Link href={`/app/treino/${s.id}`} className="tappable min-w-0 flex-1 rounded-lg">
+                  <span className="block text-[15px] font-semibold text-app-texto">{nome}</span>
+                  <span className="block text-[13px] text-app-texto-2">{apoio}</span>
+                </Link>
+                <div className="flex shrink-0 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => mark(s, "done")}
+                    disabled={loading}
+                    aria-pressed={done}
+                    className={`${BASE} ${estiloFeito} ${pop === s.id && done ? "pf-pop" : ""}`}
+                  >
+                    {loading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                    ) : done ? (
+                      <Check className="h-4 w-4" aria-hidden="true" />
+                    ) : null}
+                    {doNutri ? "Fui" : "Fiz"}
+                  </button>
+                  {doNutri && (
+                    <button
+                      type="button"
+                      onClick={() => mark(s, "skipped")}
+                      disabled={loading}
+                      aria-pressed={skipped}
+                      className={`${BASE} ${skipped ? AVISO : SECUNDARIO} ${pop === s.id && skipped ? "pf-pop" : ""}`}
+                    >
+                      {skipped && <X className="h-4 w-4" aria-hidden="true" />}
+                      Não fui
+                    </button>
+                  )}
+                </div>
+              </div>
+              {nota && i === primeiroSemResposta && !current && (
+                <p className="mt-2 text-[13px] text-app-texto-2">Seu nutricionista vê essa confirmação.</p>
+              )}
+              {erro && erroEm === s.id && <p className="mt-2 text-[13px] text-app-perigo">{erro}</p>}
+            </li>
+          );
+        })}
+      </>
+    );
+  }
 
   return (
     <div className={compact ? "" : "space-y-2"}>

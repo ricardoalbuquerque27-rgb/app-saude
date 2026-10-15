@@ -6,6 +6,16 @@
 // CENARIO escolhe os dados (ver ferramentas/LEIAME.md):
 //   (não definido) a conta de teste de hoje, a Maria, para as telas do paciente;
 //   carteira       a carteira do nutricionista, para o detalhe do paciente.
+//
+// Quase nada é guardado: um POST responde 201 e a leitura seguinte devolve o que
+// já havia. As exceções, com estado e com as regras da migração, são as funções
+// de consulta (rpcConsulta) e as do registro da consulta (rpcRegistro), e as
+// escritas de escrever(): o upsert do perfil (o CRN), o PATCH/DELETE de
+// body_measurements com a RLS do paciente (a medida da consulta não se altera
+// nem se apaga, e o banco recusa sem erro), o upsert da água do dia
+// (daily_logs) e o insert de refeição (meals). POST
+// /__reset volta tudo ao que o cenário subiu; POST /__falhar derruba os GET de
+// uma tabela (500) até o próximo /__reset, ou só as escritas, com "escrita": true.
 
 const http = require("http");
 
@@ -26,6 +36,14 @@ const dias = (n) => diaDe(Date.now() - n * 86400000);
  * futuro). O mock usa −03:00 fixo; o app não (lib/consultas.ts).
  */
 const naHora = (n, hhmm) => new Date(`${dias(n)}T${hhmm}:00-03:00`).toISOString();
+/**
+ * Um instante do jeito que o PostgREST devolve um timestamptz: microssegundos e
+ * "+00:00" (o ISO do JavaScript tem milissegundos e "Z"). O registro da consulta
+ * usa o `updated_at` como trava de concorrência e o app o guarda como TEXTO;
+ * com milissegundos o mock não pegaria um app que passasse o valor por `Date`
+ * (que corta os microssegundos) e a trava recusaria sem ninguém ter mexido.
+ */
+const pg = (ms, us = 0) => new Date(ms).toISOString().replace("Z", `${String(us).padStart(3, "0")}+00:00`);
 const consulta = (id, nutri, paciente, n, hhmm, extra = {}) => ({
   id, nutritionist_id: nutri, patient_id: paciente, starts_at: naHora(n, hhmm),
   duration_min: 45, kind: "retorno", mode: "presencial", status: "agendada",
@@ -40,7 +58,14 @@ const medidas = [65.8, 66.2, 66.6, 66.9, 67.3, 67.7, 68.0, 68.4].map((w, i) => (
   body_fat_pct: 30 + i * 0.2, waist_cm: 78 + i * 0.5, hip_cm: 99.6 + i * 0.3,
   arm_cm: 29, chest_cm: null, thigh_cm: null, neck_cm: null, calf_cm: null,
   notes: null, created_at: dias(i * 4) + "T10:00:00Z",
+  // Nulos: medida que o paciente anotou. Preenchidos: a do prontuário.
+  measured_by: null, appointment_id: null,
 }));
+// A de 20 dias atrás cai no dia da consulta realizada da Maria (ap-m1, abaixo):
+// é a que o nutri tirou lá. Os números não mudam; só passa a ser do prontuário
+// (measured_by) e ligada à consulta, para a página Medidas do paciente mostrar a
+// marca "Medida na consulta" e não oferecer o excluir.
+Object.assign(medidas[5], { measured_by: NUT, appointment_id: "ap-m1", created_at: naHora(20, "14:50") });
 
 const refeicoesHist = [];
 ["Café da manhã", "Almoço", "Jantar"].forEach((t, j) => {
@@ -76,7 +101,9 @@ const T = {
       sex: "F", role: "patient", onboarded: true, cpf: null, friend_code: null,
       reminder_enabled: false, reminder_time: null, reminder_tz_offset: 0, last_reminded_on: null,
       created_at: "2026-09-11T02:21:22Z", updated_at: "2026-09-11T12:00:35Z" },
-    { id: NUT, full_name: "Ricardo Albuquerque", role: "nutritionist", onboarded: true,
+    // Sem CRN de propósito: é o que faz o diálogo de "Concluir registro" pedir o número.
+    // `concluir_registro` grava o CRN digitado aqui; `POST /__reset` apaga de novo.
+    { id: NUT, full_name: "Ricardo Albuquerque", crn: null, role: "nutritionist", onboarded: true,
       height_cm: null, birth_date: null, weight_goal_kg: null, daily_water_goal_ml: 2500,
       daily_calorie_goal: null, protein_goal_g: 100, sex: "M", cpf: null, friend_code: "1FAA3F",
       reminder_enabled: false, reminder_time: null, reminder_tz_offset: 0, last_reminded_on: null,
@@ -178,9 +205,10 @@ const T = {
 };
 
 // ---------- cenário "carteira" ----------
-// Cinco pacientes de um nutricionista, um para cada situação que o detalhe do
-// paciente precisa mostrar, mais dois convites. As datas saem de `dias(n)`,
-// então os alertas valem em qualquer dia em que o mock suba.
+// Seis pacientes de um nutricionista, cinco para cada situação que o detalhe do
+// paciente precisa mostrar e a sexta para os gráficos, mais dois convites. As
+// datas saem de `dias(n)`, então os alertas valem em qualquer dia em que o
+// mock suba.
 //
 //   Carlos   dose atrasada (e mais nada)
 //   Beatriz  usa 2.200 kcal onde a prescrição diz 1.800, mudou o treino, faltou
@@ -189,9 +217,11 @@ const T = {
 //   Joana    parada há 12 dias, com um exame alterado
 //   Pedro    acabou de chegar e nunca registrou nada
 //   Luiza    em dia, sem nenhum alerta
+//   Helena   em dia, sem nenhum alerta, com 22 semanas de pesagem e exames com
+//            histórico: os dados dos gráficos da aba Corpo e da aba Clínico
 function carteira() {
   const id = (n) => `c1a00000-0000-4000-8000-${String(n).padStart(12, "0")}`;
-  const P = { carlos: id(1), beatriz: id(2), joana: id(3), pedro: id(4), luiza: id(5) };
+  const P = { carlos: id(1), beatriz: id(2), joana: id(3), pedro: id(4), luiza: id(5), helena: id(6) };
   const dow = (iso) => (new Date(iso + "T12:00:00").getDay() + 6) % 7;
   /** Um instante de n dias atrás. Nunca use n = 0: a hora pode estar no futuro. */
   const em = (n, hhmm) => `${dias(n)}T${hhmm}:00Z`;
@@ -265,6 +295,7 @@ function carteira() {
       body_fat_pct: Number((kg * 0.34).toFixed(1)), waist_cm: Math.round(kg * 1.1),
       hip_cm: Math.round(kg * 1.35), arm_cm: 30, chest_cm: null, thigh_cm: null,
       neck_cm: null, calf_cm: null, notes: null, created_at: `${dias(d)}T11:00:00Z`,
+      measured_by: null, appointment_id: null,
     }));
   const exame = (k, n, uid, d, titulo, valor, unidade, ref, status, notas = null) => ({
     id: `ex-${k}-${n}`, user_id: uid, date: dias(d), title: titulo, result_value: valor,
@@ -507,7 +538,10 @@ function carteira() {
         prescriptions: [prescricao(k, uid, metas, 100)],
         meals: refeicoes(k, uid, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13], 1780, 108),
         daily_logs: diario(k, uid, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 2450, 9100),
-        body_measurements: medidas(k, uid, [[0, 65.4], [7, 65.6], [14, 66.0], [21, 66.4], [28, 66.8]]),
+        // Sem ponto há 14 dias: esse dia é o da consulta (ap-3), e a medida do
+        // prontuário (66,4 kg) fica sozinha nele. Duas medidas no mesmo dia
+        // apareceriam as duas na tabela e no gráfico do Corpo.
+        body_measurements: medidas(k, uid, [[0, 65.4], [7, 65.6], [21, 66.4], [28, 66.8]]),
         exams: [exame(k, 1, uid, 35, "Vitamina D", "38", "ng/mL", "30 a 100", "normal")],
         patient_notes: [
           nota(7, uid, uid, "Perdi 1,2 kg neste mês, obrigada pelo cardápio!", 5, "13:00", em(5, "20:00")),
@@ -523,6 +557,201 @@ function carteira() {
         { d: 6, sport: "Corrida", title: "Corrida leve" },
       ], tudoFeito)
     );
+  };
+
+  // Helena: a paciente dos gráficos das abas Corpo e Clínico. Em dia, sem
+  // alerta nenhum, para não mexer na fila que as verificações conferem.
+  //
+  // Corpo. O vínculo começou há 154 dias (22 semanas), e é dali que o gráfico
+  // de peso conta as semanas, de segunda a domingo:
+  //  - pesagens de casa de 2 a 4 dias por semana, a média semanal caindo de
+  //    74,4 para 70,1 kg (a primeira e a última semana com pesagem fecham
+  //    nesses números; as do meio oscilam em volta da reta);
+  //  - a 8ª semana sem nenhuma pesagem, e a 2ª consulta cai nela: o ponto da
+  //    consulta fora da linha do peso, que o gráfico precisa mostrar;
+  //  - seis consultas realizadas, cada uma com peso, cintura e % de gordura
+  //    (74,6 / 92 / 34,0 até 70,3 / 85 / 30,4). A primeira é no dia do
+  //    vínculo: o peso inicial do anel é o dela, 74,6, e não os 74,4 de casa;
+  //  - ontem é a última consulta e também tem pesagem de casa: o ÚNICO dia com
+  //    as duas medidas, e o último dia com peso, então o "Peso atual" diz "na
+  //    consulta" e mostra a da consulta (70,3) e não a de casa (a diferença
+  //    entre as duas é de propósito). Nos outros dias de consulta não há
+  //    pesagem de casa;
+  //  - cintura e % de gordura de casa em alguns dias (os pontos vazados), todos
+  //    entre a primeira e a última consulta: a variação do gráfico (último
+  //    menos primeiro) segue sendo a das consultas, −7 cm e −3,6 pontos.
+  //  A meta de peso é 66 kg.
+  //
+  // O que depende do dia da semana em que o mock sobe: no domingo a 1ª semana
+  // é só o dia do vínculo (só a consulta, sem pesagem de casa) e na segunda a
+  // semana em curso é só hoje (sem pesagem). A 8ª fica sem pesagem em qualquer
+  // dia.
+  //
+  // Exames. Datas a mais de 180 dias, de propósito: o alerta "N exames fora da
+  // referência" da fila olha os 180 dias e conta qualquer status que não seja
+  // "normal", e triglicerídeos 168 ou LDL 132 são "atencao" de verdade (é o que
+  // o app grava). Mais recentes, a Helena entraria na fila com um alerta. São os
+  // exames que ela trouxe de antes do vínculo, em três laudos e um resultado
+  // sem número:
+  //   300 dias  triglicerídeos 141, LDL 145, vitamina D 18, "Glicose" 101,
+  //             colesterol total 200, vitamina B12 310 pg/mL
+  //   245 dias  vitamina D 24, "Glicemia de jejum" 98, ferritina 45
+  //   192 dias  triglicerídeos 168 (saiu), e um 165 lançado antes no mesmo dia
+  //             (a linha avisa "mais de um resultado"), LDL 132 (mais perto),
+  //             vitamina D 38 (entrou, com minigráfico), "Glicemia de jejum" 92
+  //             (a mesma linha da Glicose, com minigráfico), colesterol total
+  //             190 (mais perto: o "< 190" do laudo é estrito), VLDL-colesterol
+  //             24 (NO MESMO DIA do 190: tem de continuar uma linha à parte, e
+  //             não somar ao colesterol total), vitamina B12 235 pmol/L
+  //             (unidade diferente da anterior)
+  //   185 dias  "Glicemia de jejum" sem número, "Amostra hemolisada": a linha
+  //             da glicemia continua no 92 e diz "depois: Amostra hemolisada"
+  // A ferritina tem um resultado só e a data mais antiga das linhas de um
+  // resultado só (o VLDL é outra), para continuar por último na tabela.
+  //
+  // Dois `status` são os que o app ANTIGO gravava, de propósito: a B12 de 235
+  // pmol/L como "atencao" (o classifyExam a julgava pela tabela em pg/mL) e o
+  // VLDL com a referência "< 190 mg/dL", que é o texto da faixa do colesterol
+  // total (o casamento frouxo achava "colesterol" no nome). O comparativo não
+  // lê o status gravado (o selo da B12 sai do laudo: "Normal") e não toma o
+  // texto da tabela por laudo (o VLDL fica sem faixa).
+  const helena = () => {
+    const uid = P.helena, k = "he";
+    const metas = { kcal: 1700, prot: 105, agua: 2500, peso: 66 };
+    const DESDE = 154;
+    const SEM_PESAGEM = 8;
+    const dowDesde = dow(dias(DESDE));
+    /** A semana do gráfico (1 = a do vínculo) em que cai o dia de n dias atrás. */
+    const semanaDe = (n) => Math.floor((DESDE - n + dowDesde) / 7) + 1;
+
+    // [dias atrás, peso, cintura, % de gordura]. A 2ª é uma quinta-feira da 8ª
+    // semana, qualquer que seja o dia de hoje. As do meio passam de sábado e
+    // domingo para a segunda seguinte; a 1ª (o dia do vínculo) e a última (ontem)
+    // ficam onde caem, porque o anel e o "Peso atual" dependem desses dois dias.
+    const diaUtil = (n) => {
+      const d = dow(dias(n));
+      return d >= 5 ? n - (7 - d) : n;
+    };
+    const CONSULTAS = [
+      [DESDE, 74.6, 92, 34.0],
+      [102 + dowDesde, 73.2, 90.5, 33.0],
+      [diaUtil(78), 72.2, 89, 32.3],
+      [diaUtil(52), 71.6, 87.5, 31.6],
+      [diaUtil(26), 70.9, 86, 31.0],
+      [1, 70.3, 85, 30.4],
+    ];
+    if (semanaDe(CONSULTAS[1][0]) !== SEM_PESAGEM) throw new Error("A 2ª consulta da Helena saiu da semana sem pesagem.");
+    const diasDeConsulta = new Set(CONSULTAS.map(([n]) => n));
+
+    // Os dias de pesagem de casa de cada semana: um molde de 2 a 4 dias
+    // (segunda = 0), sem a 8ª semana e sem os dias de consulta, menos ontem.
+    const MOLDES = [[0, 2, 4], [1, 3, 5], [0, 3], [2, 4, 6], [1, 4], [0, 2, 5, 6], [1, 3, 6], [0, 4]];
+    const livre = (n) => !diasDeConsulta.has(n) && semanaDe(n) !== SEM_PESAGEM;
+    const porSemana = new Map();
+    for (let n = DESDE; n >= 1; n--) {
+      const s = semanaDe(n);
+      const doMolde = MOLDES[(s * 3) % MOLDES.length].includes(dow(dias(n)));
+      if (!(n === 1 || (livre(n) && doMolde))) continue;
+      porSemana.set(s, [...(porSemana.get(s) ?? []), n]);
+    }
+    // Uma consulta tirando um dia de um molde de dois deixaria a semana com uma
+    // pesagem só: completa até duas com os dias que sobram da semana.
+    porSemana.forEach((ns, s) => {
+      for (let n = DESDE; n >= 1 && ns.length < 2; n--) {
+        if (semanaDe(n) === s && livre(n) && !ns.includes(n)) ns.push(n);
+      }
+      ns.sort((a, b) => b - a);
+    });
+    const semanas = [...porSemana.keys()].sort((a, b) => a - b);
+    const primeira = semanas[0], ultima = semanas[semanas.length - 1];
+    // Buraco que não seja a 8ª semana é erro do molde, não da Helena.
+    for (let s = primeira; s <= ultima; s++) {
+      if ((s === SEM_PESAGEM) === porSemana.has(s)) throw new Error(`Semana ${s} da Helena: pesagem onde não devia ou falta onde devia.`);
+    }
+    /** Em décimos de kg, a reta de 74,4 a 70,1 pelo calendário. */
+    const base10 = (s) => Math.round(744 - 43 * ((s - primeira) / (ultima - primeira)));
+    // Décimos que se somam a zero na primeira e na última semana com pesagem
+    // (a média fecha em 74,4 e 70,1); nas do meio, uma oscilação fixa.
+    const RUIDO = [2, -2, 1, -1, 3, -3, 0, 2, -1, 1, -2, 0];
+    let giro = 0;
+    const casa = [];
+    for (const s of semanas) {
+      const ns = porSemana.get(s);
+      let desvios;
+      if (s === primeira || s === ultima) {
+        desvios = [1, -2, 1, 0].slice(0, ns.length - 1);
+        desvios.push(-desvios.reduce((a, b) => a + b, 0));
+      } else {
+        desvios = ns.map(() => RUIDO[giro++ % RUIDO.length]);
+      }
+      const t = (s - primeira) / (ultima - primeira);
+      ns.forEach((n, i) => {
+        const linha = {
+          id: `bm-${k}-${n}`, user_id: uid, date: dias(n), weight_kg: (base10(s) + desvios[i]) / 10,
+          body_fat_pct: null, waist_cm: null, hip_cm: null, arm_cm: null, chest_cm: null,
+          thigh_cm: null, neck_cm: null, calf_cm: null, notes: null,
+          created_at: em(n, "10:30"), measured_by: null, appointment_id: null,
+        };
+        // Cintura (e, em duas delas, % de gordura de uma balança) de casa no
+        // primeiro dia de pesagem de algumas semanas do meio.
+        if (i === 0 && [4, 10, 15, 19].includes(s)) {
+          linha.waist_cm = Math.round((92 - 7 * t) * 2) / 2;
+          if (s === 10 || s === 19) linha.body_fat_pct = Number((34.0 - 3.6 * t + 0.2).toFixed(1));
+        }
+        casa.push(linha);
+      });
+    }
+
+    const naConsulta = CONSULTAS.map(([n, peso, cintura, gordura], i) => ({
+      id: `bm-${k}-c${i + 1}`, user_id: uid, date: dias(n), weight_kg: peso, body_fat_pct: gordura,
+      waist_cm: cintura, hip_cm: null, arm_cm: null, chest_cm: null, thigh_cm: null,
+      neck_cm: null, calf_cm: null, notes: null, created_at: naHora(n, "16:40"),
+      measured_by: NUT, appointment_id: `ap-h${i + 1}`,
+    }));
+    const consultas = CONSULTAS.map(([n], i) =>
+      consulta(`ap-h${i + 1}`, NUT, uid, n, "16:00", {
+        status: "realizada", kind: i === 0 ? "primeira" : "retorno", duration_min: i === 0 ? 60 : 45,
+        // A 1ª foi marcada no dia em que o vínculo começou, e não 10 dias antes.
+        ...(i === 0 ? { created_at: naHora(n, "10:00"), updated_at: naHora(n, "10:00") } : {}),
+      })
+    );
+
+    const LAUDO_1 = 300, LAUDO_2 = 245, LAUDO_3 = 192;
+    const e = (n, d, ...resto) => exame(k, n, uid, d, ...resto);
+    const exames = [
+      e(1, LAUDO_1, "Triglicerídeos", "141", "mg/dL", "< 150", "normal"),
+      e(2, LAUDO_1, "Colesterol LDL", "145", "mg/dL", "< 130", "atencao"),
+      e(3, LAUDO_1, "Vitamina D", "18", "ng/mL", "30 a 100", "alterado"),
+      e(4, LAUDO_1, "Glicose", "101", "mg/dL", "70 a 99", "atencao"),
+      e(5, LAUDO_1, "Colesterol total", "200", "mg/dL", "< 190", "atencao"),
+      e(6, LAUDO_1, "Vitamina B12", "310", "pg/mL", "200 a 900", "normal"),
+      e(7, LAUDO_2, "Vitamina D", "24", "ng/mL", "30 a 100", "atencao"),
+      e(8, LAUDO_2, "Glicemia de jejum", "98", "mg/dL", "70 a 99", "normal"),
+      e(9, LAUDO_2, "Ferritina", "45", "ng/mL", "15 a 150", "normal"),
+      e(10, LAUDO_3, "Triglicerídeos", "168", "mg/dL", "< 150", "atencao"),
+      e(11, LAUDO_3, "Colesterol LDL", "132", "mg/dL", "< 130", "atencao"),
+      e(12, LAUDO_3, "Vitamina D", "38", "ng/mL", "30 a 100", "normal"),
+      e(13, LAUDO_3, "Glicemia de jejum", "92", "mg/dL", "70 a 99", "normal"),
+      e(14, LAUDO_3, "Colesterol total", "190", "mg/dL", "< 190", "atencao"),
+      // A referência é a da tabela do colesterol total, gravada pelo app antigo.
+      e(15, LAUDO_3, "VLDL-colesterol", "24", "mg/dL", "< 190 mg/dL", "normal"),
+      // Outro laboratório, que dá a B12 em pmol/L: não se compara com os 310 pg/mL.
+      e(16, LAUDO_3, "Vitamina B12", "235", "pmol/L", "148 a 664", "atencao"),
+      // Lançado antes do 168 no mesmo dia (às 11:00; o 168 é das 12:00): vale o 168.
+      { ...e(17, LAUDO_3, "Triglicerídeos", "165", "mg/dL", "< 150", "atencao"), created_at: em(LAUDO_3, "11:00") },
+      e(18, 185, "Glicemia de jejum", "Amostra hemolisada", null, "70 a 99", "normal"),
+    ];
+
+    return juntar({
+      profiles: [perfil(uid, "Helena Duarte", "F", "1990-04-09", 164, metas, 160)],
+      patient_links: [vinculo(8, uid, null, DESDE)],
+      prescriptions: [prescricao(k, uid, metas, 150)],
+      meals: refeicoes(k, uid, [1, 2, 3, 4, 5, 6, 7], 1700, 105),
+      daily_logs: diario(k, uid, [0, 1, 2, 3, 4, 5, 6], 2400, 8000),
+      body_measurements: [...casa, ...naConsulta],
+      appointments: consultas,
+      exams: exames,
+    });
   };
 
   // Consultas: uma situação por paciente, sem mexer nos alertas que as
@@ -555,6 +784,51 @@ function carteira() {
     c(12, P.carlos, 7, "15:00", { status: "cancelada", cancelled_by: "paciente" }),
   ];
 
+  // Registros da consulta (prontuário), um por situação. O nutri do mock não
+  // tem CRN no perfil, então o concluído já traz o dele na assinatura (foi o
+  // que ele digitou ao concluir) e o diálogo de concluir pede o número de novo.
+  //   Luiza, a de 14 dias atrás   concluído, com as cinco partes, a medida de
+  //                               peso publicada na série e UM adendo
+  //   Luiza, a em andamento       sem registro
+  //   Joana, sem desfecho         rascunho só com a anamnese
+  const consulta3 = consultas.find((x) => x.id === "ap-3");
+  const dia3 = diaDe(Date.parse(consulta3.starts_at));
+  const conclusao3 = Date.parse(naHora(14, "10:52"));
+  const registros = [
+    {
+      id: "rg-3", appointment_id: consulta3.id, nutritionist_id: NUT, patient_id: P.luiza,
+      anamnese: "Retorno de 28 dias. Boa adesão ao cardápio de segunda a sexta; no fim de semana come fora e perde a conta das porções. Dorme 7 horas, intestino regular, sem queixas. Bebe cerca de 2 litros de água por dia.",
+      diagnostico: "Perdeu 1,2 kg no mês, dentro do esperado. Adesão alta nos dias úteis e irregular aos sábados e domingos.",
+      conduta: "Manter o plano de 1.800 kcal. Levar um lanche pronto nos passeios de fim de semana e reforçar a proteína no café da manhã. Retorno em 15 dias.",
+      observar: "Adesão no fim de semana. Testar café da manhã com ovos.",
+      medidas: { weight_kg: 66.4 }, measurement_id: "bm-reg-3", status: "concluido",
+      concluded_at: pg(conclusao3, 412), assinatura_nome: "Ricardo Albuquerque",
+      assinatura_crn: "CRN-3 12345",
+      created_at: pg(Date.parse(naHora(14, "10:04")), 218), updated_at: pg(conclusao3, 413),
+    },
+    {
+      id: "rg-10", appointment_id: "ap-10", nutritionist_id: NUT, patient_id: P.joana,
+      anamnese: "Retorno depois de 12 dias sem registrar. Conta uma semana corrida no trabalho, almoços fora de casa e pouco sono. Pergunta se pode trocar o lanche da tarde.",
+      diagnostico: null, conduta: null, observar: null, medidas: {}, measurement_id: null,
+      status: "rascunho", concluded_at: null, assinatura_nome: null, assinatura_crn: null,
+      created_at: pg(Date.parse(naHora(5, "10:41")), 530), updated_at: pg(Date.parse(naHora(5, "11:24")), 903),
+    },
+  ];
+  const adendos = [{
+    id: "ad-3-1", record_id: "rg-3", author_id: NUT,
+    body: "Correção da conduta: o retorno é em 21 dias, e não em 15, porque a paciente viaja na próxima semana.",
+    assinatura_nome: "Ricardo Albuquerque", assinatura_crn: "CRN-3 12345",
+    created_at: pg(Date.parse(naHora(9, "16:20")), 655),
+  }];
+  // A linha que o registro publicou na série de medidas da Luiza: do nutri
+  // (measured_by), ligada à consulta e com a data do dia dela em São Paulo.
+  const medidaDoRegistro = {
+    id: "bm-reg-3", user_id: P.luiza, date: dia3, weight_kg: 66.4, body_fat_pct: null,
+    waist_cm: null, hip_cm: null, arm_cm: null, chest_cm: null, thigh_cm: null,
+    neck_cm: null, calf_cm: null, notes: null, created_at: new Date(conclusao3).toISOString(),
+    measured_by: NUT, appointment_id: consulta3.id,
+  };
+
   const nutri = T.profiles.find((p) => p.id === NUT);
   return {
     pacientes: P,
@@ -562,8 +836,9 @@ function carteira() {
       { profiles: [nutri], patient_links: [
         convite(6, "Fernanda Lima", "H4X9QP", 3),
         convite(7, "Marcos Teixeira", "T8N2WD", 1),
-      ], appointments: consultas },
-      carlos(), beatriz(), joana(), pedro(), luiza()
+      ], appointments: consultas, consultation_records: registros,
+      consultation_addenda: adendos, body_measurements: [medidaDoRegistro] },
+      carlos(), beatriz(), joana(), pedro(), luiza(), helena()
     ),
   };
 }
@@ -582,20 +857,69 @@ if (CENARIO === "carteira") {
   process.exit(1);
 }
 
-// As consultas do jeito que o cenário subiu: POST /__reset volta a elas, e o
-// roteiro de verificações pode rodar duas vezes seguidas.
-const CONSULTAS_INICIAIS = JSON.stringify(T.appointments ?? []);
+// Os registros da consulta existem em qualquer cenário (vazios fora da carteira).
+T.consultation_records ||= [];
+T.consultation_addenda ||= [];
+
+// As tabelas que as funções mexem, do jeito que o cenário subiu: POST /__reset
+// volta a elas, e o roteiro de verificações pode rodar duas vezes seguidas.
+// `profiles` está aqui porque concluir_registro grava o CRN no perfil do nutri,
+// e `body_measurements` porque publica a medida da consulta.
+// `daily_logs` e `meals` porque o "+250 ml" da Início e a refeição que o
+// roteiro da Início lança para passar da meta de calorias gravam de verdade.
+const TABELAS_COM_ESTADO = [
+  "appointments", "consultation_records", "consultation_addenda", "body_measurements", "profiles",
+  "daily_logs", "meals",
+];
+const ESTADO_INICIAL = JSON.stringify(Object.fromEntries(TABELAS_COM_ESTADO.map((n) => [n, T[n] ?? []])));
+
+// Tabelas cujo GET devolve 500 até o próximo /__reset (POST /__falhar). As
+// leituras de página são do servidor do Next, que o `page.route` do Playwright
+// não intercepta; é o único jeito de ver a tela de "não carregou".
+const FALHANDO = new Set();
+// Tabelas cujas ESCRITAS (POST, PATCH, DELETE) devolvem 500 até o próximo
+// /__reset, com as leituras normais: `{ "tabela": "daily_logs", "escrita": true }`.
+// É o que deixa ver a gravação que falha numa tela que, com a leitura
+// falhando, nem chegaria a mostrar o botão (o "Seu dia" da Início, sem o
+// registro do dia, diz que não carregou em vez de desenhar o anel de água).
+const FALHANDO_ESCRITA = new Set();
+
+function reiniciar() {
+  const inicial = JSON.parse(ESTADO_INICIAL);
+  for (const n of TABELAS_COM_ESTADO) T[n] = inicial[n];
+  FALHANDO.clear();
+  FALHANDO_ESCRITA.clear();
+}
+
+/**
+ * O "agora" no formato de pg(), que sempre anda: nunca devolve o mesmo valor
+ * duas vezes, nem com dois salvamentos no mesmo milissegundo (o banco faz o
+ * mesmo com `greatest(clock_timestamp(), updated_at + 1µs)`). Os microssegundos
+ * nunca são zero de propósito, ver pg().
+ */
+let relogio = { ms: 0, us: 0 };
+let giro = 0;
+function agoraPg() {
+  const ms = Date.now();
+  if (ms > relogio.ms) relogio = { ms, us: 50 + ((++giro * 137) % 900) };
+  else if (relogio.us >= 999) relogio = { ms: relogio.ms + 1, us: 50 };
+  else relogio = { ms: relogio.ms, us: relogio.us + 1 };
+  return pg(relogio.ms, relogio.us);
+}
+
+const vinculoAtivo = (nutri, pac) =>
+  T.patient_links.some((l) => l.nutritionist_id === nutri && l.patient_id === pac && l.status === "active");
 
 // ---------- funções de consulta (com estado) ----------
 // Imitam supabase/migrations/20261013120000_consultas_e_agenda.sql nas regras
 // que a tela usa; quem vale é o banco, testado em supabase/testes/.
 let seqConsulta = 0;
+let seqRegistro = 0;
 function rpcConsulta(nome, a, quem) {
   const A = (T.appointments ||= []);
   const agora = Date.now();
   const erro = (m) => ({ ok: false, error: m });
-  const ativo = (nutri, pac) =>
-    T.patient_links.some((l) => l.nutritionist_id === nutri && l.patient_id === pac && l.status === "active");
+  const ativo = vinculoAtivo;
   const achar = (id) => A.find((x) => x.id === id);
   const iso = (v) => new Date(v).toISOString();
   const toque = (x, campos) => Object.assign(x, campos, { updated_at: new Date().toISOString() });
@@ -629,6 +953,7 @@ function rpcConsulta(nome, a, quem) {
       return { ok: true, id: x.id };
     }
     case "fechar_consulta": {
+      if (!["realizada", "faltou", "cancelada"].includes(a.p_desfecho)) return erro("Desfecho inválido.");
       const x = doNutri(a.p_id);
       if (!x) return erro("Consulta não encontrada.");
       if (a.p_desfecho !== "cancelada") {
@@ -636,6 +961,14 @@ function rpcConsulta(nome, a, quem) {
         if (x.status === "cancelada")
           return erro("Consulta cancelada não pode virar realizada nem falta. Marque outra.");
         if (Date.parse(x.starts_at) > agora) return erro("A consulta ainda não começou.");
+      }
+      // As duas recusas do registro (migração do registro da consulta): falta ou
+      // cancelamento não pode prender um rascunho que ninguém mais conclui, nem
+      // contradizer um prontuário concluído. Realizada continua livre.
+      if (a.p_desfecho !== "realizada") {
+        const reg = T.consultation_records.find((r) => r.appointment_id === x.id);
+        if (reg?.status === "rascunho") return erro("Descarte o rascunho do registro antes.");
+        if (reg?.status === "concluido") return erro("Esta consulta tem registro concluído.");
       }
       toque(x, { status: a.p_desfecho, cancelled_by: a.p_desfecho === "cancelada" ? "nutri" : null,
         reschedule_requested_at: null });
@@ -677,6 +1010,175 @@ function rpcConsulta(nome, a, quem) {
     }
   }
   return null;
+}
+
+// ---------- funções do registro da consulta (com estado) ----------
+// Imitam supabase/migrations/20261014120100_registro_da_consulta.sql (e as
+// faixas de erro_das_medidas) na MESMA ordem de conferências, porque é a ordem
+// que decide qual mensagem aparece quando duas recusas valem ao mesmo tempo.
+// O mock não é o banco: quem vale é o teste SQL. Aqui basta o que as telas usam.
+const MEDIDAS_FAIXAS = [
+  ["weight_kg", 20, 400, "Peso", " kg"],
+  ["body_fat_pct", 2, 75, "% de gordura", "%"],
+  ["waist_cm", 30, 250, "Cintura", " cm"],
+  ["hip_cm", 30, 250, "Quadril", " cm"],
+  ["chest_cm", 30, 250, "Tórax", " cm"],
+  ["arm_cm", 10, 80, "Braço", " cm"],
+  ["thigh_cm", 20, 120, "Coxa", " cm"],
+  ["calf_cm", 10, 80, "Panturrilha", " cm"],
+  ["neck_cm", 10, 80, "Pescoço", " cm"],
+];
+const chars = (t) => [...t].length; // char_length conta caracteres, não unidades UTF-16
+
+/** erro_das_medidas: nulo = as medidas valem. */
+function erroDasMedidas(m) {
+  if (m == null) return null;
+  if (typeof m !== "object" || Array.isArray(m)) return "Medida desconhecida.";
+  if (Object.keys(m).some((k) => !MEDIDAS_FAIXAS.some(([c]) => c === k))) return "Medida desconhecida.";
+  for (const [campo, min, max, rotulo, unidade] of MEDIDAS_FAIXAS) {
+    const v = m[campo];
+    if (v == null) continue;
+    if (typeof v !== "number" || v < min || v > max) return `${rotulo} fora da faixa (${min} a ${max}${unidade}).`;
+  }
+  return null;
+}
+
+/** erro_do_registro: os limites de texto e depois as medidas, na ordem da tela. */
+function erroDoRegistro(r, medidas) {
+  if (r.anamnese != null && chars(r.anamnese) > 20000) return "Texto longo demais em Anamnese.";
+  if (r.diagnostico != null && chars(r.diagnostico) > 5000) return "Texto longo demais em Diagnóstico.";
+  if (r.conduta != null && chars(r.conduta) > 10000) return "Texto longo demais em Conduta.";
+  if (r.observar != null && chars(r.observar) > 2000) return "Texto longo demais em Observar no retorno.";
+  return erroDasMedidas(medidas);
+}
+
+/** jsonb_strip_nulls no que importa aqui: medida nula é medida não tirada. */
+function semNulos(m) {
+  if (m == null) return {};
+  if (typeof m !== "object" || Array.isArray(m)) return m;
+  return Object.fromEntries(Object.entries(m).filter(([, v]) => v != null));
+}
+
+// btrim() do Postgres tira só espaços; o trim() do JavaScript tira qualquer branco.
+const btrim = (t) => String(t ?? "").replace(/^ +| +$/g, "");
+
+function rpcRegistro(nome, a, quem) {
+  if (!["salvar_registro", "concluir_registro", "descartar_rascunho", "adicionar_adendo"].includes(nome))
+    return null;
+  const R = T.consultation_records;
+  const erro = (m) => ({ ok: false, error: m });
+  const MUDOU = "O rascunho mudou em outra aba. Recarregue a página.";
+  const JA_CONCLUIDO = "O registro já foi concluído. Para corrigir, use um adendo.";
+
+  if (nome === "adicionar_adendo") {
+    const r = R.find((x) => x.id === a.p_registro);
+    if (!r || r.nutritionist_id !== quem) return erro("Registro não encontrado.");
+    if (r.status !== "concluido") return erro("Só registro concluído recebe adendo.");
+    const texto = String(a.p_texto ?? "").replace(/^\s+|\s+$/g, "");
+    if (texto === "" || chars(texto) > 5000) return erro("Escreva o adendo (até 5.000 caracteres).");
+    // O adendo é assinado quando é escrito: nome e CRN do perfil de agora, e, se
+    // o perfil não tem, os da conclusão (para não sair sem assinatura).
+    const perfil = T.profiles.find((p) => p.id === quem);
+    const crn = btrim(perfil?.crn) || null;
+    const x = {
+      id: `ad-novo-${++seqRegistro}`, record_id: r.id, author_id: quem, body: texto,
+      assinatura_nome: perfil?.full_name ?? r.assinatura_nome,
+      assinatura_crn: crn ?? r.assinatura_crn, created_at: agoraPg(),
+    };
+    T.consultation_addenda.push(x);
+    return { ok: true, id: x.id };
+  }
+
+  // As três funções por consulta começam igual: de quem é a consulta.
+  const c = T.appointments.find((x) => x.id === a.p_consulta);
+  if (!c || c.nutritionist_id !== quem || !vinculoAtivo(quem, c.patient_id)) return erro("Consulta não encontrada.");
+  const reg = R.find((x) => x.appointment_id === c.id);
+
+  if (nome === "descartar_rascunho") {
+    // Não confere a situação nem o horário: um rascunho que ficou numa consulta
+    // remarcada para a frente também precisa poder sair. Sem rascunho, ok.
+    if (!reg) return { ok: true };
+    if (reg.status === "concluido") return erro(JA_CONCLUIDO);
+    T.consultation_records = R.filter((x) => x !== reg);
+    return { ok: true };
+  }
+
+  if (["faltou", "cancelada"].includes(c.status)) return erro("Consulta com falta ou cancelada não tem registro.");
+  if (c.status === "pedido" || Date.parse(c.starts_at) > Date.now()) return erro("A consulta ainda não começou.");
+
+  if (nome === "salvar_registro") {
+    if (reg?.status === "concluido") return erro(JA_CONCLUIDO);
+    // O updated_at tem de ser o TEXTO que o mock devolveu, igual byte a byte.
+    if (reg && (a.p_visto_em == null || a.p_visto_em !== reg.updated_at)) return erro(MUDOU);
+    // Sem rascunho, mas a tela diz que leu um: outra aba o descartou.
+    if (!reg && a.p_visto_em != null) return erro(MUDOU);
+
+    const campo = (k) => (a.p_campos?.[k] == null ? null : String(a.p_campos[k]));
+    const novo = {
+      anamnese: campo("anamnese"), diagnostico: campo("diagnostico"),
+      conduta: campo("conduta"), observar: campo("observar"),
+    };
+    const medidas = semNulos(a.p_campos?.medidas);
+    const e = erroDoRegistro(novo, medidas);
+    if (e) return erro(e);
+
+    const quando = agoraPg();
+    if (!reg) {
+      const x = {
+        id: `rg-novo-${++seqRegistro}`, appointment_id: c.id, nutritionist_id: c.nutritionist_id,
+        patient_id: c.patient_id, ...novo, medidas, measurement_id: null, status: "rascunho",
+        concluded_at: null, assinatura_nome: null, assinatura_crn: null,
+        created_at: quando, updated_at: quando,
+      };
+      R.push(x);
+      return { ok: true, id: x.id, updated_at: quando };
+    }
+    Object.assign(reg, novo, { medidas, updated_at: quando });
+    return { ok: true, id: reg.id, updated_at: quando };
+  }
+
+  // concluir_registro
+  if (!reg) {
+    // A tela leu um rascunho que outra aba descartou: é concorrência.
+    if (a.p_visto_em != null) return erro(MUDOU);
+    return erro("Preencha ao menos uma parte do registro.");
+  }
+  if (reg.status === "concluido") return erro(JA_CONCLUIDO);
+  if (a.p_visto_em == null || a.p_visto_em !== reg.updated_at) return erro(MUDOU);
+
+  const e = erroDoRegistro(reg, reg.medidas);
+  if (e) return erro(e);
+  // Só espaço ou quebra de linha não é parte preenchida.
+  const preenchida = [reg.anamnese, reg.diagnostico, reg.conduta, reg.observar].some((t) => t != null && /\S/.test(t));
+  if (!preenchida && Object.keys(reg.medidas).length === 0) return erro("Preencha ao menos uma parte do registro.");
+  let crn = btrim(a.p_crn) || null;
+  if (crn && chars(crn) > 30) return erro("CRN longo demais (até 30 caracteres).");
+  const perfil = T.profiles.find((p) => p.id === quem);
+  const crnDoPerfil = btrim(perfil?.crn) || null;
+  if (!(crn ?? crnDoPerfil)) return erro("Informe o seu CRN para concluir.");
+
+  // Daqui em diante, só escrita.
+  if (crn) { if (perfil) perfil.crn = crn; }
+  else crn = crnDoPerfil;
+  if (c.status === "agendada")
+    Object.assign(c, { status: "realizada", reschedule_requested_at: null, updated_at: new Date().toISOString() });
+  let medida = null;
+  if (Object.keys(reg.medidas).length > 0) {
+    medida = {
+      id: `bm-reg-novo-${++seqRegistro}`, user_id: c.patient_id,
+      // O dia da consulta em São Paulo, nunca toISOString().slice(0, 10): às 22h
+      // o dia em UTC já é o de amanhã (a armadilha de fuso do CLAUDE.md).
+      date: diaDe(Date.parse(c.starts_at)),
+      ...Object.fromEntries(MEDIDAS_FAIXAS.map(([campo]) => [campo, reg.medidas[campo] ?? null])),
+      notes: null, created_at: new Date().toISOString(), measured_by: quem, appointment_id: c.id,
+    };
+    T.body_measurements.push(medida);
+  }
+  Object.assign(reg, {
+    status: "concluido", concluded_at: agoraPg(), measurement_id: medida?.id ?? null,
+    assinatura_nome: perfil?.full_name ?? null, assinatura_crn: crn, updated_at: agoraPg(),
+  });
+  return { ok: true, id: reg.id };
 }
 
 // ---------- mini-PostgREST ----------
@@ -782,6 +1284,87 @@ const sessao = (id) => ({
   refresh_token: "refresh-falso", user: usuario(id),
 });
 
+/**
+ * Escritas pelo PostgREST. Quase toda tabela só aceita e não guarda (201, vazio);
+ * estas duas guardam, com a regra do banco, e o /__reset desfaz:
+ *
+ *  - body_measurements, PATCH e DELETE: a RLS do paciente (migração
+ *    20261014120000) só deixa mexer na linha DELE com `measured_by` nulo. Quando
+ *    a política esconde a linha, o banco NÃO dá erro: afeta zero linhas, e o
+ *    supabase-js devolve `{ error: null, count: 0 }`. É esse silêncio que o app
+ *    tem de tratar (Medidas) ou evitar (assistente), e o mock o reproduz. Com
+ *    `Prefer: count=exact` o total vai no Content-Range, como no PostgREST.
+ *  - profiles, POST (o upsert da página Perfil): grava no perfil de quem pede,
+ *    com o check do CRN (até 30 caracteres), para o CRN salvo reaparecer.
+ *  - daily_logs, POST (o upsert de `adicionarAgua`, com `on_conflict=user_id,date`):
+ *    junta as colunas enviadas à linha do dia, como o PostgREST faz com
+ *    `resolution=merge-duplicates`, e cria a linha quando não existe. Sem isto o
+ *    "+250 ml" da Início gravava e a página, recarregada, mostrava a água de
+ *    antes: não havia como ver o anel subir, nem o "Desfazer" devolvê-lo.
+ *  - meals, POST (insert): guarda a refeição. É o que deixa o roteiro da Início
+ *    passar da meta de calorias e ver o "acima do limite" do anel.
+ *  Nas duas, só linha de quem pede (a RLS `user_id = auth.uid()`), senão 403.
+ */
+let seqEscrita = 0;
+function escrever(tabela, metodo, params, corpo, quem, prefer) {
+  const vazio = { status: 201, dados: [], cabecalhos: {} };
+  let dados = null;
+  try { dados = corpo ? JSON.parse(corpo) : null; } catch {}
+  const representacao = prefer.includes("return=representation");
+  const contagem = (n) => (prefer.includes("count=") ? { "content-range": `*/${n}` } : {});
+
+  if (tabela === "profiles" && metodo === "POST") {
+    const novos = (Array.isArray(dados) ? dados : [dados]).filter((x) => x && typeof x === "object");
+    if (novos.some((n) => n.id !== quem))
+      return { status: 403, dados: { code: "42501", message: 'new row violates row-level security policy for table "profiles"' }, cabecalhos: {} };
+    if (novos.some((n) => typeof n.crn === "string" && n.crn.length > 30))
+      return { status: 400, dados: { code: "23514", message: 'new row for relation "profiles" violates check constraint "profiles_crn_check"' }, cabecalhos: {} };
+    const gravados = novos.map((n) => {
+      let linha = T.profiles.find((p) => p.id === n.id);
+      if (linha) Object.assign(linha, n);
+      else T.profiles.push((linha = { ...n }));
+      return linha;
+    });
+    return { status: 201, dados: representacao ? gravados : [], cabecalhos: {} };
+  }
+
+  if ((tabela === "daily_logs" || tabela === "meals") && metodo === "POST") {
+    const novos = (Array.isArray(dados) ? dados : [dados]).filter((x) => x && typeof x === "object");
+    if (novos.some((n) => n.user_id !== quem))
+      return { status: 403, dados: { code: "42501", message: `new row violates row-level security policy for table "${tabela}"` }, cabecalhos: {} };
+    const lista = (T[tabela] ||= []);
+    const gravados = novos.map((n) => {
+      // O upsert do dia: a mesma linha (user_id, date) recebe só as colunas
+      // enviadas; o sono, o humor e o resto ficam como estavam.
+      let linha = tabela === "daily_logs" ? lista.find((l) => l.user_id === n.user_id && l.date === n.date) : null;
+      if (linha) Object.assign(linha, n);
+      else lista.push((linha = { id: `${tabela}-novo-${++seqEscrita}`, created_at: new Date().toISOString(), ...n }));
+      return linha;
+    });
+    return { status: 201, dados: representacao ? gravados : [], cabecalhos: {} };
+  }
+
+  if (tabela === "body_measurements" && (metodo === "PATCH" || metodo === "DELETE")) {
+    // O que a política de update/delete deixa o paciente enxergar.
+    const visiveis = aplicaFiltros(T.body_measurements, params)
+      .filter((l) => l.user_id === quem && l.measured_by == null);
+    if (metodo === "PATCH") {
+      // O with check do update: continua sendo linha dele, sem assinatura de nutri nem consulta.
+      const depois = visiveis.map((l) => ({ ...l, ...dados }));
+      if (depois.some((l) => l.user_id !== quem || l.measured_by != null || l.appointment_id != null))
+        return { status: 403, dados: { code: "42501", message: 'new row violates row-level security policy for table "body_measurements"' }, cabecalhos: {} };
+      visiveis.forEach((l, i) => Object.assign(l, depois[i]));
+      if (representacao) return { status: 200, dados: visiveis, cabecalhos: contagem(visiveis.length) };
+    } else {
+      T.body_measurements = T.body_measurements.filter((l) => !visiveis.includes(l));
+      if (representacao) return { status: 200, dados: visiveis, cabecalhos: contagem(visiveis.length) };
+    }
+    return { status: 204, dados: null, cabecalhos: contagem(visiveis.length) };
+  }
+
+  return vazio;
+}
+
 const srv = http.createServer((req, res) => {
   const url = new URL(req.url, "http://localhost");
   const params = [...url.searchParams.entries()];
@@ -812,8 +1395,23 @@ const srv = http.createServer((req, res) => {
     if (url.pathname === "/__cenario")
       return envia(200, { cenario: CENARIO, nutri: NUT, pacientes: PACIENTES });
     if (url.pathname === "/__reset") {
-      T.appointments = JSON.parse(CONSULTAS_INICIAIS);
+      reiniciar();
       return envia(200, { ok: true });
+    }
+    // { "tabela": "consultation_records" }: os GET nessa tabela passam a dar 500
+    // até o próximo /__reset. Serve para ver a tela de "não carregou".
+    if (url.pathname === "/__falhar") {
+      let tabela = "";
+      let escrita = false;
+      try {
+        const pedido = JSON.parse(corpo || "{}");
+        tabela = String(pedido.tabela || "");
+        escrita = pedido.escrita === true;
+      } catch {}
+      if (req.method !== "POST" || !tabela)
+        return envia(400, { error: 'POST com { "tabela": "<nome>" } (e "escrita": true para derrubar só as escritas)' });
+      (escrita ? FALHANDO_ESCRITA : FALHANDO).add(tabela);
+      return envia(200, { ok: true, falhando: [...FALHANDO], falhandoEscrita: [...FALHANDO_ESCRITA] });
     }
 
     // --- GoTrue ---
@@ -835,21 +1433,32 @@ const srv = http.createServer((req, res) => {
       if (alvo.startsWith("rpc/")) {
         let args = {};
         try { args = JSON.parse(corpo || "{}"); } catch {}
-        const r = rpcConsulta(alvo.slice(4), args, quemPede(req));
+        const quem = quemPede(req);
+        const r = rpcConsulta(alvo.slice(4), args, quem) ?? rpcRegistro(alvo.slice(4), args, quem);
         return envia(200, r ?? { ok: true });
       }
+      if (FALHANDO.has(alvo) && (req.method === "GET" || req.method === "HEAD"))
+        return envia(500, { code: "XX000", message: `falha sob encomenda em ${alvo} (POST /__falhar)`, details: null, hint: null });
+      if (FALHANDO_ESCRITA.has(alvo) && req.method !== "GET" && req.method !== "HEAD")
+        return envia(500, { code: "XX000", message: `escrita derrubada sob encomenda em ${alvo} (POST /__falhar, escrita)`, details: null, hint: null });
       const linhas = T[alvo] ?? [];
       // HEAD é o que o supabase-js manda em .select(..., { head: true,
       // count: "exact" }) — a contagem vem só no cabeçalho. Sem tratar
       // isto, todo contador do app aparecia zerado AQUI, o que parece bug
       // do app e não é.
-      if (req.method !== "GET" && req.method !== "HEAD")
-        return envia(201, []);
+      if (req.method !== "GET" && req.method !== "HEAD") {
+        const r = escrever(alvo, req.method, params, corpo, quemPede(req), req.headers["prefer"] || "");
+        return envia(r.status, r.dados, r.cabecalhos);
+      }
 
       let out = aplicaOrdem(aplicaFiltros(linhas, params), params);
       const total = out.length;
+      // `.range(de, ate)` do supabase-js vira `offset` e `limit`: as leituras
+      // dos exames e do Corpo pedem em páginas (lib/paginacao.ts). Sem o
+      // `offset`, a 2ª página repetiria a 1ª.
+      const desde = Number(url.searchParams.get("offset") || 0);
       const limite = url.searchParams.get("limit");
-      if (limite) out = out.slice(0, Number(limite));
+      out = out.slice(desde, limite ? desde + Number(limite) : undefined);
 
       const prefer = req.headers["prefer"] || "";
       const cabecalhos = prefer.includes("count=")

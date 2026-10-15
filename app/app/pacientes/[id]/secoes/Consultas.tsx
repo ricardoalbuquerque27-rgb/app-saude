@@ -2,7 +2,7 @@ import { Secao } from "@/components/clinico/Secao";
 import { ErroSecao } from "@/components/clinico/ErroSecao";
 import { MarcarConsulta } from "@/components/consultas/MarcarConsulta";
 import { PainelConsulta } from "@/components/consultas/PainelConsulta";
-import { CLASSE_SELO, SELO } from "@/components/consultas/aparencia";
+import { CLASSE_SELO, SELO, SELO_REGISTRO } from "@/components/consultas/aparencia";
 import {
   ehPendencia,
   proximaConsulta,
@@ -16,6 +16,13 @@ import {
   type Consulta,
 } from "@/lib/consultas";
 import { FOCO } from "@/components/clinico/estilos";
+import {
+  ROTULO_REGISTRO,
+  situacaoDoRegistro,
+  type ObservarDoPaciente,
+  type Registro,
+} from "@/lib/registro";
+import type { Res } from "@/lib/consultasDb";
 
 type Grupo = "pendente" | "proxima" | "retorno";
 const TITULO_DO_GRUPO: Record<Grupo, string> = {
@@ -29,19 +36,34 @@ const TITULO_DO_GRUPO: Record<Grupo, string> = {
 // realizada com o "Marcar retorno", e o histórico. Cada consulta
 // abre o mesmo painel da agenda; no histórico ele fica fechado num
 // <details>, para a lista não virar uma parede de botões.
+//
+// Cada consulta que já começou (e não é falta nem cancelamento) leva o selo do
+// registro e, no painel, a porta para a página dele. Os registros e o
+// "observar" chegam como promessas da página, que só os pede quando esta aba
+// está aberta. Se a leitura dos registros falha, a lista segue sem selo
+// nenhum e com o aviso: "Sem registro" em tudo diria o que não se sabe.
 export async function Consultas({
   uid,
   nutriId,
   nome,
+  agora,
   consultas,
+  registros: registrosP,
+  observar: observarP,
 }: {
   uid: string;
   nutriId: string;
   nome: string;
-  consultas: Promise<{ data: Consulta[]; falhou: boolean }>;
+  /**
+   * O instante da página, o mesmo com que ela escolheu quais registros ler:
+   * um `new Date()` aqui, depois das esperas, daria à aba outro "agora".
+   */
+  agora: string;
+  consultas: Promise<Res<Consulta[]>>;
+  registros: Promise<Res<Record<string, Registro["status"]>>>;
+  observar: Promise<Res<Record<string, ObservarDoPaciente>>>;
 }) {
-  const r = await consultas;
-  const agora = new Date().toISOString();
+  const [r, registros, observar] = await Promise.all([consultas, registrosP, observarP]);
 
   const marcar = (
     <MarcarConsulta
@@ -84,8 +106,20 @@ export async function Consultas({
     ...(semRetorno ? [{ c: semRetorno, grupo: "retorno" as const }] : []),
   ];
 
+  // Lido e falhou são coisas diferentes (ver PainelConsulta): "falhou" só
+  // quando a leitura falhou, nulo quando ela deu certo e a consulta não tem.
+  const registroDe = (c: Consulta) => (registros.falhou ? "falhou" : registros.data[c.id] ?? null);
+
   const painel = (c: Consulta) => (
-    <PainelConsulta consulta={c} nome={nome} agora={agora} nutriId={nutriId} mostrarNome={false} />
+    <PainelConsulta
+      consulta={c}
+      nome={nome}
+      agora={agora}
+      nutriId={nutriId}
+      mostrarNome={false}
+      registro={registroDe(c)}
+      observar={observar.falhou ? "falhou" : observar.data[uid] ?? null}
+    />
   );
 
   return (
@@ -94,6 +128,8 @@ export async function Consultas({
         <p className="text-[15px] text-clin-texto-2">Nenhuma consulta marcada ainda.</p>
       ) : (
         <div className="space-y-6">
+          {registros.falhou && <ErroSecao secao="os registros" />}
+
           {/* Pendências, próxima e "sem retorno" numa lista só, com a
               consulta como chave: quando a sem desfecho vira realizada, ela
               passa de "Precisa de você" para "Sem retorno marcado" e o React
@@ -127,6 +163,8 @@ export async function Consultas({
               <ul role="list" className="divide-y divide-clin-linha border-y border-clin-linha">
                 {historico.map((c) => {
                   const s = situacao(c, agora);
+                  const status = registros.data[c.id];
+                  const sr = situacaoDoRegistro(c, status ? { status } : null, agora);
                   return (
                     <li key={c.id}>
                       <details className="group">
@@ -138,6 +176,9 @@ export async function Consultas({
                             {ROTULO_TIPO[c.kind]} · {ROTULO_MODO[c.mode]}
                           </span>
                           <span className={`${CLASSE_SELO} ${SELO[s]}`}>{ROTULO_SITUACAO[s]}</span>
+                          {!registros.falhou && sr !== "sem-direito" && (
+                            <span className={`${CLASSE_SELO} ${SELO_REGISTRO[sr]}`}>{ROTULO_REGISTRO[sr]}</span>
+                          )}
                         </summary>
                         <div className="pb-4 pt-1">{painel(c)}</div>
                       </details>

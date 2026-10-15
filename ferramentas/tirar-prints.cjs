@@ -5,11 +5,23 @@
 const { chromium } = require("playwright");
 const OUT = process.env.OUT || ".";
 
+// Todas as telas do paciente. `treino/[id]` fica de fora: precisa de um id e
+// é conferida por navegação, a partir da lista de treinos.
 const TELAS = [
   ["inicio", "/app"],
   ["meu-plano", "/app/nutricionista"],
   ["dieta", "/app/dieta"],
   ["treinos", "/app/treinos"],
+  ["habitos", "/app/habitos"],
+  ["medidas", "/app/medidas"],
+  ["exames", "/app/exames"],
+  ["tratamento", "/app/tratamento"],
+  ["relatorios", "/app/relatorios"],
+  ["saude", "/app/saude"],
+  ["perfil", "/app/perfil"],
+  ["integracoes", "/app/integracoes"],
+  ["diagnostico", "/app/diagnostico"],
+  ["assistente", "/app/assistente"],
 ];
 
 (async () => {

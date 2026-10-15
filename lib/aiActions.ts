@@ -6,6 +6,7 @@
 // próprios dados). O user_id é sempre definido pelo servidor, nunca pelo modelo.
 
 import { todayISO, addDaysISO } from "@/lib/date";
+import { adicionarAgua } from "@/lib/agua";
 import { classifyExam, EXAM_STATUS_LABEL, type Sex } from "@/lib/examRanges";
 
 // Idade em anos a partir da data de nascimento (AAAA-MM-DD).
@@ -711,21 +712,13 @@ export async function executeAction(
         if (ml == null || ml === 0) {
           return { ok: false, resumo: "Quantidade de água inválida." };
         }
-        const hoje = todayISO();
-        const { data: atual } = await supabase
-          .from("daily_logs")
-          .select("water_ml")
-          .eq("user_id", uid)
-          .eq("date", hoje)
-          .maybeSingle();
-        const total = Math.max(0, (toNum(atual?.water_ml) ?? 0) + ml);
-        const { error } = await supabase
-          .from("daily_logs")
-          .upsert(
-            { user_id: uid, date: hoje, water_ml: total },
-            { onConflict: "user_id,date" }
-          );
-        if (error) throw error;
+        // A leitura e a gravação do dia moram em lib/agua.ts, as mesmas do
+        // "+250 ml" da Início (components/inicio/AdicionarAgua.tsx). Falha
+        // vira exceção, como antes: o catch daqui responde "Não consegui
+        // salvar agora", e não "água registrada".
+        const agua = await adicionarAgua(supabase, uid, ml);
+        if (!agua.ok) throw new Error(agua.erro);
+        const total = agua.total;
         const sinal = ml > 0 ? `+${ml}` : `${ml}`;
         return {
           ok: true,
@@ -1137,11 +1130,17 @@ export async function executeAction(
         const peso = toNum(args.peso_kg);
         if (peso == null || peso <= 0) return { ok: false, resumo: "Peso inválido." };
         const hoje = todayISO();
+        // Só a medida do próprio paciente (`measured_by` nulo). A que o
+        // nutricionista tirou na consulta é do prontuário: a RLS recusa o
+        // update dela SEM erro (zero linhas, e o supabase-js não reclama), e o
+        // assistente diria "peso atualizado" sem ter mudado nada. Sem a linha
+        // do paciente, cai no insert abaixo e registra uma nova.
         const { data: hojeReg } = await supabase
           .from("body_measurements")
           .select("id")
           .eq("user_id", uid)
           .eq("date", hoje)
+          .is("measured_by", null)
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
@@ -1172,10 +1171,13 @@ export async function executeAction(
         };
         const c = conf[tipo];
         if (!c) return { ok: false, resumo: "Tipo inválido para remover." };
-        const { data: last } = await supabase
-          .from(c.table)
-          .select("id")
-          .eq("user_id", uid)
+        let busca = supabase.from(c.table).select("id").eq("user_id", uid);
+        // Peso: só as medidas do próprio paciente. A da consulta (`measured_by`
+        // preenchido) a RLS não deixa apagar, e sem erro: o delete afetaria
+        // zero linhas e o assistente diria "última medida apagada" com ela
+        // ainda lá. Refeição, treino e exame não têm a coluna.
+        if (tipo === "peso") busca = busca.is("measured_by", null);
+        const { data: last } = await busca
           .order(c.order, { ascending: false })
           .limit(1)
           .maybeSingle();

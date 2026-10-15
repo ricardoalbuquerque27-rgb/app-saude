@@ -3,6 +3,9 @@
 // que o app já coleta (sem wearable), ideal para o público brasileiro no PWA.
 //
 // Módulo PURO (sem dependências) para usar no dashboard e no contexto da IA.
+//
+// As dicas não levam emoji: a Início não usa (spec "Início (paciente)", item
+// 5), como o 👋 da saudação também saiu.
 
 export type ScoreInput = {
   sleepHours: number | null;
@@ -24,6 +27,15 @@ export type ScorePillar = {
   label: string;
   value: number; // 0..100
   tip: string;
+  /**
+   * O pilar não tem nenhum registro por trás: o valor é o padrão da conta, não
+   * uma medida. Sono sem horas vale 60, nutrição sem refeição vale 40 e o
+   * bem-estar sem água, humor e energia vale 24 — sem esta marca a tela mostra
+   * esses números como se fossem do dia do paciente (spec "Início (paciente)",
+   * item 5, "O pilar sem registro diz que é padrão"). Movimento nunca é "sem
+   * registro": zero treino na semana é dado.
+   */
+  semRegistro: boolean;
 };
 
 export type HealthScore = {
@@ -32,6 +44,13 @@ export type HealthScore = {
   color: "brand" | "amber" | "rose";
   pillars: ScorePillar[];
   topTip: string;
+  /**
+   * O pilar de onde sai a `topTip` (o mais fraco; no empate, o primeiro da
+   * ordem). A Início precisa saber qual é para esconder a dica quando a
+   * sugestão de proteína diz o mesmo; comparar o texto da dica com o de cada
+   * pilar quebraria no dia em que dois pilares tivessem a mesma frase.
+   */
+  topPilar: ScorePillar["key"];
   hasData: boolean;
 };
 
@@ -55,7 +74,7 @@ function scoreMovimento(week: number, today: boolean): { value: number; tip: str
       ? "Ótima constância de treino!"
       : today
         ? "Boa, você treinou hoje!"
-        : "Que tal treinar hoje? 🌱";
+        : "Que tal treinar hoje?";
   return { value, tip };
 }
 
@@ -72,7 +91,7 @@ function scoreNutricao(i: ScoreInput): { value: number; tip: string } {
       const faltam = Math.max(0, Math.round(i.proteinGoal - i.proteinToday));
       tip = `Faltam ${faltam} g de proteína para a meta.`;
     } else {
-      tip = "Meta de proteína batida! 💪";
+      tip = "Meta de proteína batida.";
     }
   } else {
     value += 40 * Math.min(1, i.mealsLoggedToday / 3);
@@ -109,10 +128,28 @@ export function computeHealthScore(i: ScoreInput): HealthScore {
   const bem = scoreBemEstar(i);
 
   const pillars: ScorePillar[] = [
-    { key: "sono", label: "Sono", value: sono.value, tip: sono.tip },
-    { key: "movimento", label: "Movimento", value: mov.value, tip: mov.tip },
-    { key: "nutricao", label: "Nutrição", value: nut.value, tip: nut.tip },
-    { key: "bemestar", label: "Hidratação e bem-estar", value: bem.value, tip: bem.tip },
+    {
+      key: "sono",
+      label: "Sono",
+      value: sono.value,
+      tip: sono.tip,
+      semRegistro: i.sleepHours == null,
+    },
+    { key: "movimento", label: "Movimento", value: mov.value, tip: mov.tip, semRegistro: false },
+    {
+      key: "nutricao",
+      label: "Nutrição",
+      value: nut.value,
+      tip: nut.tip,
+      semRegistro: i.mealsLoggedToday === 0,
+    },
+    {
+      key: "bemestar",
+      label: "Hidratação e bem-estar",
+      value: bem.value,
+      tip: bem.tip,
+      semRegistro: i.waterToday === 0 && i.mood == null && i.energy == null,
+    },
   ];
 
   const score = clamp(
@@ -135,5 +172,5 @@ export function computeHealthScore(i: ScoreInput): HealthScore {
     i.mood != null ||
     i.energy != null;
 
-  return { score, label, color, pillars, topTip: weakest.tip, hasData };
+  return { score, label, color, pillars, topTip: weakest.tip, topPilar: weakest.key, hasData };
 }

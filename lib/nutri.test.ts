@@ -3,6 +3,12 @@ import {
   montarResumos,
   montarLinhaDoTempo,
   filaDeTriagem,
+  idleDays,
+  pesoDoDia,
+  pesoDe30Dias,
+  resumirPacientes,
+  getPatientActivity,
+  getPatientSeries,
   mediasDaSemana,
   compararComMeta,
   textoVariacaoPeso,
@@ -13,12 +19,14 @@ import {
   textoDoDesvio,
   separarDesvios,
   textoDoDesvioDoPlano,
+  papelDasCalorias,
   type DadosResumo,
   type DadosAtividade,
   type DailySeries,
   type ItemMeta,
 } from "./nutri";
 import type { Consulta } from "./consultas";
+import { addDaysISO, naJanela, todayISO } from "./date";
 
 /** 2026-10-08 é uma quinta. A janela de 7 dias vai de 02 (sexta) a 08. */
 const HOJE = "2026-10-08";
@@ -175,6 +183,48 @@ describe("montarResumos — peso", () => {
     });
     expect(r.weightLast).toBe(78.4);
     expect(r.weightDelta30).toBe(-1.6);
+  });
+
+  // No dia com a pesagem de casa e a medida da consulta, o resumo pegava uma
+  // das duas ao acaso (a que o banco trouxe por último) e o "Peso atual" do
+  // Corpo, outra: a mesma página mostrava dois pesos para o mesmo dia. A regra
+  // é a de pesoDoDia: vale a da consulta, mesmo lançada antes da de casa.
+  describe("no dia com a pesagem de casa e a medida da consulta", () => {
+    const casa = (date: string, weight_kg: number, hora: string) => ({
+      user_id: A, date, weight_kg, measured_by: null, created_at: `${date}T${hora}:00Z`,
+    });
+    const consulta = (date: string, weight_kg: number, hora: string) => ({
+      user_id: A, date, weight_kg, measured_by: "nutri", created_at: `${date}T${hora}:00Z`,
+    });
+
+    it("o peso atual é o da consulta, em qualquer ordem de chegada", () => {
+      const d = "2026-10-07";
+      const emCasaPrimeiro = resumo({ body: [casa(d, 71.2, "08:00"), consulta(d, 70.8, "07:00")] });
+      const consultaPrimeiro = resumo({ body: [consulta(d, 70.8, "07:00"), casa(d, 71.2, "08:00")] });
+      expect(emCasaPrimeiro.weightLast).toBe(70.8);
+      expect(consultaPrimeiro.weightLast).toBe(70.8);
+    });
+
+    it("a variação em 30 dias usa um valor por dia", () => {
+      // O dia 18/09 tem 72,0 em casa e 71,6 na consulta; hoje, 70,9 em casa.
+      // Com o valor do dia sendo o da consulta, a variação é 70,9 - 71,6.
+      const d0 = "2026-09-18";
+      const d1 = HOJE;
+      const emCasaPrimeiro = resumo({
+        body: [casa(d0, 72, "08:00"), consulta(d0, 71.6, "07:00"), casa(d1, 70.9, "08:00")],
+      });
+      const consultaPrimeiro = resumo({
+        body: [consulta(d0, 71.6, "07:00"), casa(d0, 72, "08:00"), casa(d1, 70.9, "08:00")],
+      });
+      expect(emCasaPrimeiro.weightDelta30).toBe(-0.7);
+      expect(consultaPrimeiro.weightDelta30).toBe(-0.7);
+    });
+
+    it("duas medidas no mesmo dia são um dia só: não inventam variação", () => {
+      const d = "2026-10-07";
+      const r = resumo({ body: [casa(d, 71.2, "08:00"), consulta(d, 70.8, "07:00")] });
+      expect(r.weightDelta30).toBeNull();
+    });
   });
 });
 
@@ -388,6 +438,62 @@ describe("montarResumos — consultas", () => {
   });
 });
 
+describe("montarResumos — medida da consulta", () => {
+  // A medida que o nutricionista tira na consulta vai para body_measurements
+  // com `measured_by`. Contada como registro do paciente, ela fazia quem nunca
+  // registrou nada virar "N dias sem registrar" a partir da consulta, sumia
+  // com o alerta de parado logo depois de toda consulta e dava ao "X/7" um dia
+  // que o paciente não registrou.
+  const daConsulta = (date: string, weight_kg = 66.4) => ({
+    user_id: A, date, weight_kg, measured_by: "nutri-1",
+  });
+
+  it("só a medida da consulta: continua 'Nunca registrou nada', e o peso vale", () => {
+    const r = resumo({ body: [daConsulta("2026-10-07")] });
+    expect(r.lastActivity).toBeNull();
+    expect(idleDays(r, HOJE)).toBeNull();
+    expect(r.daysLogged7).toBe(0);
+    expect(r.alerts).toContain("Nunca registrou nada");
+    // É a medida mais confiável que existe: o peso continua vindo dela.
+    expect(r.weightLast).toBe(66.4);
+  });
+
+  it("medida da consulta ontem e o último registro do paciente há 10 dias: conta os 10", () => {
+    const r = resumo({
+      meals: [{ user_id: A, date: "2026-09-28", calories: 400, protein_g: 20 }],
+      body: [daConsulta("2026-10-07")],
+    });
+    expect(r.lastActivity).toBe("2026-09-28");
+    expect(r.daysLogged7).toBe(0);
+    expect(r.alerts).toContain("10 dias sem registrar");
+  });
+
+  it("parou há mais de 30 dias e foi à consulta ontem: o último registro é o dele", () => {
+    const r = resumo({ body: [daConsulta("2026-10-07")], ultimoRegistro: { [A]: "2026-08-24" } });
+    expect(r.lastActivity).toBe("2026-08-24");
+    expect(r.alerts).toContain("45 dias sem registrar");
+  });
+
+  it("a medida que o paciente lançou continua contando como registro", () => {
+    const r = resumo({ body: [{ user_id: A, date: "2026-10-07", weight_kg: 65.8, measured_by: null }] });
+    expect(r.lastActivity).toBe("2026-10-07");
+    expect(r.daysLogged7).toBe(1);
+  });
+
+  it("na fila, quem só foi medido na consulta fica como quem nunca registrou", () => {
+    const resumos = montarResumos(
+      dados({
+        body: [{ ...daConsulta("2026-10-07"), user_id: "a" }],
+        workouts: [{ user_id: "b", date: "2026-10-05" }],
+      }),
+      ["a", "b"],
+      {},
+      HOJE
+    );
+    expect(filaDeTriagem(resumos, HOJE).map((r) => r.id)).toEqual(["b", "a"]);
+  });
+});
+
 describe("filaDeTriagem", () => {
   /** Monta os resumos pelo caminho real e devolve a fila como lista de ids. */
   function fila(parcial: Partial<DadosResumo>, nomes: Record<string, string> = {}) {
@@ -596,6 +702,279 @@ describe("montarLinhaDoTempo", () => {
       2
     );
     expect(itens.map((i) => i.date)).toEqual(["2026-10-08", "2026-10-06"]);
+  });
+});
+
+describe("montarLinhaDoTempo — medida da consulta", () => {
+  it("a medida que o nutricionista tirou aparece como 'Medida na consulta', não como registro dela", () => {
+    // Sem o rótulo, a medida da consulta saía "Peso 66.4 kg", igual a uma
+    // pesagem que o paciente lançou em casa.
+    const itens = montarLinhaDoTempo(
+      atividade({
+        body: [
+          { date: "2026-10-07", created_at: "2026-10-07T17:00:00Z", weight_kg: 66.4, waist_cm: 80, measured_by: "nutri-1" },
+          { date: "2026-10-06", created_at: "2026-10-06T11:00:00Z", weight_kg: 65.8, measured_by: null },
+        ],
+      }),
+      HOJE
+    );
+    expect(itens.map((i) => i.title)).toEqual(["Medida na consulta", "Peso 65.8 kg"]);
+    expect(itens[0].detail).toBe("Peso 66.4 kg · cintura 80 cm");
+  });
+});
+
+describe("pesoDe30Dias", () => {
+  const casa = (date: string, weight_kg: number | string, hora = "08:00") => ({
+    date, weight_kg, measured_by: null, created_at: `${date}T${hora}:00Z`,
+  });
+  const daConsulta = (date: string, weight_kg: number | string, hora = "07:00") => ({
+    date, weight_kg, measured_by: "nutri-1", created_at: `${date}T${hora}:00Z`,
+  });
+
+  // Os extremos da janela vêm de naJanela (o JSDoc de lib/date.ts), e não de
+  // uma conta à mão: 30 dias são 30, contando hoje.
+  const primeiroDia = addDaysISO(HOJE, -29);
+  const diaAntes = addDaysISO(HOJE, -30);
+  const amanha = addDaysISO(HOJE, 1);
+
+  it("as bordas do teste são as de naJanela", () => {
+    expect(naJanela(primeiroDia, HOJE, 30)).toBe(true);
+    expect(naJanela(HOJE, HOJE, 30)).toBe(true);
+    expect(naJanela(diaAntes, HOJE, 30)).toBe(false);
+    expect(naJanela(amanha, HOJE, 30)).toBe(false);
+  });
+
+  it("no dia com as duas medidas, o ponto é o da consulta, nas duas ordens de chegada", () => {
+    const d = "2026-10-07";
+    const emCasaPrimeiro = pesoDe30Dias([casa(d, 71.2, "08:00"), daConsulta(d, 70.8, "07:00")], HOJE);
+    const consultaPrimeiro = pesoDe30Dias([daConsulta(d, 70.8, "07:00"), casa(d, 71.2, "08:00")], HOJE);
+    expect(emCasaPrimeiro.pontos).toEqual([{ data: d, peso: 70.8 }]);
+    expect(consultaPrimeiro.pontos).toEqual([{ data: d, peso: 70.8 }]);
+    expect(emCasaPrimeiro.atual).toBe(70.8);
+    expect(consultaPrimeiro.atual).toBe(70.8);
+  });
+
+  it("o primeiro e o último dia da janela entram; o dia antes e amanhã ficam fora", () => {
+    const r = pesoDe30Dias(
+      [
+        casa(diaAntes, 90),
+        casa(primeiroDia, 80),
+        casa(HOJE, 78),
+        casa(amanha, 60),
+      ],
+      HOJE
+    );
+    expect(r.pontos).toEqual([
+      { data: primeiroDia, peso: 80 },
+      { data: HOJE, peso: 78 },
+    ]);
+    expect(r.atual).toBe(78);
+    expect(r.variacao).toBe(-2);
+  });
+
+  it("data futura não vira o peso atual nem a ponta da variação", () => {
+    const r = pesoDe30Dias([casa("2026-10-01", 80), casa(amanha, 70)], HOJE);
+    expect(r.pontos).toEqual([{ data: "2026-10-01", peso: 80 }]);
+    expect(r.atual).toBe(80);
+    expect(r.variacao).toBeNull();
+  });
+
+  it("um dia só: sem variação, mesmo com duas pesagens nele", () => {
+    const d = "2026-10-07";
+    const r = pesoDe30Dias([casa(d, 71.2, "08:00"), casa(d, 71.0, "20:00")], HOJE);
+    expect(r.pontos).toEqual([{ data: d, peso: 71 }]);
+    expect(r.atual).toBe(71);
+    expect(r.variacao).toBeNull();
+  });
+
+  it("sem linhas, tudo vazio", () => {
+    expect(pesoDe30Dias([], HOJE)).toEqual({ pontos: [], atual: null, variacao: null });
+  });
+
+  it("a variação é a do último dia menos a do primeiro, com uma casa", () => {
+    // 78.4 - 80 dá -1.5999999999999943 em ponto flutuante.
+    const r = pesoDe30Dias([casa("2026-09-10", 80), casa("2026-10-07", "78.4")], HOJE);
+    expect(r.atual).toBe(78.4);
+    expect(r.variacao).toBe(-1.6);
+  });
+
+  it("linha sem peso não conta como dia", () => {
+    const r = pesoDe30Dias(
+      [casa("2026-09-20", 80), { date: "2026-10-01", weight_kg: null }, casa("2026-10-07", 78)],
+      HOJE
+    );
+    expect(r.pontos.map((p) => p.data)).toEqual(["2026-09-20", "2026-10-07"]);
+  });
+
+  it("noventa dias de linhas embaralhadas: só os 30 da janela, em ordem crescente", () => {
+    // O peso de i dias atrás é (700 + 3i)/10: quanto mais velho, mais pesado.
+    const linhas = Array.from({ length: 90 }, (_, i) =>
+      casa(addDaysISO(HOJE, -i), (700 + 3 * i) / 10)
+    );
+    linhas.push(casa(amanha, 50));
+    // Embaralha sem aleatório (o teste tem de dar o mesmo sempre): o passo 37
+    // e as 91 linhas são primos entre si, então visita todas as posições.
+    const embaralhadas = linhas.map((_, k) => linhas[(k * 37) % linhas.length]);
+    expect(new Set(embaralhadas).size).toBe(linhas.length);
+
+    const r = pesoDe30Dias(embaralhadas, HOJE);
+    expect(r.pontos).toHaveLength(30);
+    expect(r.pontos[0]).toEqual({ data: primeiroDia, peso: (700 + 3 * 29) / 10 });
+    expect(r.pontos[29]).toEqual({ data: HOJE, peso: 70 });
+    const datas = r.pontos.map((p) => p.data);
+    expect(datas).toEqual([...datas].sort());
+    expect(new Set(datas).size).toBe(30);
+    expect(r.atual).toBe(70);
+    expect(r.variacao).toBe(-8.7);
+  });
+
+  it("sem pesagem hoje, o atual é o do dia mais recente até hoje", () => {
+    const r = pesoDe30Dias([casa("2026-10-02", 75), casa("2026-10-05", 74.2), casa(amanha, 60)], HOJE);
+    expect(r.atual).toBe(74.2);
+  });
+});
+
+describe("pesoDoDia", () => {
+  // Com a medida da consulta, ter duas medidas no mesmo dia ficou comum (a
+  // da consulta e a pesagem de casa). A série pegava a última que o banco
+  // trouxesse, numa ordem que ninguém pediu.
+  const casa = (weight_kg: number, created_at: string) => ({ weight_kg, measured_by: null, created_at });
+  const daConsulta = (weight_kg: number, created_at: string) => ({ weight_kg, measured_by: "nutri-1", created_at });
+
+  it("a da consulta vale no dia, mesmo com a de casa lançada depois", () => {
+    expect(pesoDoDia([daConsulta(66.4, "2026-10-07T13:00:00Z"), casa(65.9, "2026-10-07T22:00:00Z")])).toBe(66.4);
+  });
+
+  it("não depende da ordem em que as linhas chegam", () => {
+    expect(pesoDoDia([casa(65.9, "2026-10-07T22:00:00Z"), daConsulta(66.4, "2026-10-07T13:00:00Z")])).toBe(66.4);
+  });
+
+  it("sem medida da consulta, a lançada por último", () => {
+    expect(pesoDoDia([casa(65.9, "2026-10-07T22:00:00Z"), casa(66.2, "2026-10-07T08:00:00Z")])).toBe(65.9);
+    expect(pesoDoDia([casa(66.2, "2026-10-07T08:00:00Z"), casa(65.9, "2026-10-07T22:00:00Z")])).toBe(65.9);
+  });
+
+  it("dia sem medida, nulo", () => {
+    expect(pesoDoDia([])).toBeNull();
+  });
+});
+
+type Linha = Record<string, any>;
+
+/**
+ * Um Supabase em memória, só com o que as leituras de lib/nutri.ts usam. O
+ * `select` devolve só as colunas pedidas, como o PostgREST: a coluna esquecida
+ * na lista chega ausente, e é assim que o teste pega a leitura que não traz
+ * `measured_by`. O Supabase falso das ferramentas ignora a lista de colunas e
+ * não pegaria.
+ */
+function bancoFalso(tabelas: Record<string, Linha[]>) {
+  return {
+    from(tabela: string) {
+      let colunas: string[] | null = null;
+      const filtros: ((l: Linha) => boolean)[] = [];
+      const ordens: { col: string; asc: boolean }[] = [];
+      let teto: number | null = null;
+      const q: any = {
+        select: (c: string) => ((colunas = c.trim() === "*" ? null : c.split(",").map((x) => x.trim())), q),
+        eq: (c: string, v: unknown) => (filtros.push((l) => l[c] === v), q),
+        neq: (c: string, v: unknown) => (filtros.push((l) => l[c] !== v), q),
+        in: (c: string, vs: unknown[]) => (filtros.push((l) => vs.includes(l[c])), q),
+        gte: (c: string, v: string) => (filtros.push((l) => l[c] >= v), q),
+        lte: (c: string, v: string) => (filtros.push((l) => l[c] <= v), q),
+        is: (c: string, _v: null) => (filtros.push((l) => l[c] == null), q),
+        not: (c: string, _op: "is", _v: null) => (filtros.push((l) => l[c] != null), q),
+        order: (c: string, o?: { ascending?: boolean }) => (ordens.push({ col: c, asc: o?.ascending !== false }), q),
+        limit: (n: number) => ((teto = n), q),
+        then: (resolve: (r: { data: Linha[]; error: null }) => void) => {
+          let out = (tabelas[tabela] ?? []).filter((l) => filtros.every((f) => f(l)));
+          out = [...out].sort((a, b) => {
+            for (const { col, asc } of ordens) {
+              if (a[col] === b[col]) continue;
+              return (a[col] < b[col] ? -1 : 1) * (asc ? 1 : -1);
+            }
+            return 0;
+          });
+          if (teto != null) out = out.slice(0, teto);
+          const lista = colunas;
+          resolve({
+            data: lista ? out.map((l) => Object.fromEntries(lista.map((c) => [c, l[c]]))) : out,
+            error: null,
+          });
+        },
+      };
+      return q;
+    },
+  };
+}
+
+describe("leituras do banco — medida da consulta", () => {
+  // Datas a partir do hoje de verdade: as leituras usam todayISO().
+  const hoje = todayISO();
+  const daConsulta = (dias: number, extra: Linha = {}): Linha => ({
+    user_id: A, date: addDaysISO(hoje, -dias), weight_kg: 66.4, measured_by: "nutri-1",
+    appointment_id: "ap-1", created_at: `${addDaysISO(hoje, -dias)}T13:00:00Z`, ...extra,
+  });
+
+  it("resumirPacientes: só a medida da consulta, ontem, não tira o 'Nunca registrou nada'", async () => {
+    const { resumos } = await resumirPacientes(bancoFalso({ body_measurements: [daConsulta(1)] }), [A], { [A]: "Ana" });
+    expect(resumos[0].lastActivity).toBeNull();
+    expect(resumos[0].alerts).toContain("Nunca registrou nada");
+    expect(resumos[0].weightLast).toBe(66.4);
+  });
+
+  it("resumirPacientes: o último registro de antes dos 30 dias não é a medida da consulta", async () => {
+    // Quem não tem nada nos 30 dias passa pela busca do último registro sem
+    // janela (ultimosRegistros). Ali a medida da consulta virava "40 dias sem
+    // registrar" de quem nunca registrou nada.
+    const so = await resumirPacientes(bancoFalso({ body_measurements: [daConsulta(40)] }), [A]);
+    expect(so.resumos[0].lastActivity).toBeNull();
+    expect(so.resumos[0].alerts).toContain("Nunca registrou nada");
+
+    const comRefeicao = await resumirPacientes(
+      bancoFalso({
+        body_measurements: [daConsulta(40)],
+        meals: [{ user_id: A, date: addDaysISO(hoje, -45), calories: 400, protein_g: 20 }],
+      }),
+      [A]
+    );
+    expect(comRefeicao.resumos[0].lastActivity).toBe(addDaysISO(hoje, -45));
+    expect(comRefeicao.resumos[0].alerts).toContain("45 dias sem registrar");
+  });
+
+  it("resumirPacientes: a leitura traz o created_at que desempata o peso do dia", async () => {
+    // Sem `created_at` no select, as duas pesagens de casa do mesmo dia
+    // chegam sem hora e o peso do dia vira o da que o banco trouxe por último.
+    // A mais tarde (69,9) vem primeiro na tabela de propósito.
+    const ontem = addDaysISO(hoje, -1);
+    const casa = (weight_kg: number, hora: string): Linha => ({
+      user_id: A, date: ontem, weight_kg, measured_by: null, appointment_id: null,
+      created_at: `${ontem}T${hora}:00Z`,
+    });
+    const { resumos } = await resumirPacientes(
+      bancoFalso({ body_measurements: [casa(69.9, "20:00"), casa(70.3, "08:00")] }),
+      [A],
+      { [A]: "Ana" }
+    );
+    expect(resumos[0].weightLast).toBe(69.9);
+  });
+
+  it("getPatientActivity: a linha do tempo marca a medida da consulta", async () => {
+    const { itens } = await getPatientActivity(bancoFalso({ body_measurements: [daConsulta(1)] }), A);
+    expect(itens.map((i) => i.title)).toEqual(["Medida na consulta"]);
+  });
+
+  it("getPatientSeries: no dia com as duas, vale a da consulta", async () => {
+    const { serie } = await getPatientSeries(
+      bancoFalso({
+        body_measurements: [
+          daConsulta(0, { created_at: `${hoje}T13:00:00Z` }),
+          { user_id: A, date: hoje, weight_kg: 65.9, measured_by: null, appointment_id: null, created_at: `${hoje}T22:00:00Z` },
+        ],
+      }),
+      A
+    );
+    expect(serie[serie.length - 1].weight).toBe(66.4);
   });
 });
 
@@ -835,5 +1214,41 @@ describe("textoDoDesvioDoPlano", () => {
     expect(textoDoDesvioDoPlano(d("removido pelo paciente", null), "F").sessao).toBe(
       "Treino B — Inferiores"
     );
+  });
+});
+
+describe("papelDasCalorias", () => {
+  // O papel diz se a meta de calorias é um teto ("limite") ou um piso
+  // ("meta"): depende de o paciente estar acima ou abaixo do peso-alvo.
+  it.each([
+    [70, 66, "limite"],
+    [60, 66, "meta"],
+    // A 0,5 kg ainda é manutenção: nem teto nem piso.
+    [66.5, 66, null],
+    [65.5, 66, null],
+    [66.6, 66, "limite"],
+    [65.4, 66, "meta"],
+    [66, 66, null],
+  ] as const)("peso %s, meta %s -> %s", (peso, meta, esperado) => {
+    expect(papelDasCalorias(peso, meta)).toBe(esperado);
+  });
+
+  it("falta um dos dois números: null", () => {
+    expect(papelDasCalorias(null, 66)).toBeNull();
+    expect(papelDasCalorias(70, null)).toBeNull();
+    expect(papelDasCalorias(null, null)).toBeNull();
+  });
+
+  it("o ruído do ponto flutuante não empurra 0,5 kg para fora da manutenção", () => {
+    // 64,4 − 63,9 dá 0.5000000000000071 em ponto flutuante, e um `> 0.5`
+    // ingênuo chamaria de "limite" uma diferença de exatamente meio quilo.
+    expect(64.4 - 63.9).toBeGreaterThan(0.5);
+    expect(papelDasCalorias(64.4, 63.9)).toBeNull();
+    expect(papelDasCalorias(63.9, 64.4)).toBeNull();
+  });
+
+  it("meta de peso com duas casas: 0,51 kg já está fora", () => {
+    expect(papelDasCalorias(66.51, 66)).toBe("limite");
+    expect(papelDasCalorias(65.49, 66)).toBe("meta");
   });
 });

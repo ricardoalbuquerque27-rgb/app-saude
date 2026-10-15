@@ -130,12 +130,16 @@ export default function AppShell({
     .filter((i) => !mainHrefs.has(i.href));
 
   // O detalhe do paciente (/app/pacientes/<id>, não a lista nem a linha do
-  // tempo) é a única tela com duas colunas: a conversa fica numa coluna de
+  // tempo) tem duas colunas: a conversa fica numa coluna de
   // 360 px ao lado do conteúdo. Com max-w-5xl, menos o menu lateral e as
   // margens, sobram 720 px em qualquer largura, e a coluna principal ficava
   // com 336 px, mais estreita que um celular. As outras telas continuam como
   // estavam.
-  const detalheDoPaciente = /^\/app\/pacientes\/[^/]+\/?$/.test(pathname);
+  //
+  // O registro de uma consulta (/app/pacientes/<id>/consultas/<consulta>)
+  // também: tem a coluna "Para esta consulta" ao lado das cinco partes, e nos
+  // 720 px o formulário ficaria tão estreito quanto a coluna principal ficava.
+  const detalheDoPaciente = /^\/app\/pacientes\/[^/]+(\/consultas\/[^/]+)?\/?$/.test(pathname);
   // A agenda abre pelo mesmo motivo: a grade da Semana tem sete colunas, e
   // em 720 px cada dia ficava com ~95 px, estreito demais para "14:30 Beatriz".
   //
@@ -194,12 +198,12 @@ export default function AppShell({
   return (
     <div className="min-h-dvh">
       {/* Sidebar — desktop */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-slate-200 bg-white/70 px-4 py-6 backdrop-blur-xl lg:flex dark:border-white/[0.06] dark:bg-slate-950/40">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-app-linha bg-app-cartao px-4 py-6 lg:flex">
         <div className="flex items-center gap-2.5 px-1">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 text-white shadow-[0_8px_20px_-8px_rgba(24,184,94,0.8)]">
+          <div className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-app-primaria text-app-sobre-primaria">
             <Dumbbell className="h-5 w-5" />
           </div>
-          <span className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">
+          <span className="text-lg font-bold tracking-tight text-app-texto">
             Pace Fit
           </span>
         </div>
@@ -211,47 +215,47 @@ export default function AppShell({
               href={item.href}
               className={`tappable flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium ${
                 isActive(item)
-                  ? "bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-300"
-                  : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+                  ? "bg-app-primaria-fundo font-semibold text-app-primaria"
+                  : "text-app-texto-2 hover:bg-app-primaria-fundo hover:text-app-texto"
               }`}
             >
               <item.icon className="h-5 w-5" />
               <span className="flex-1">{item.label}</span>
               {hasPending(item.href) && (
-                <span className="h-2 w-2 shrink-0 rounded-full bg-brand-500" />
+                <span className="h-2 w-2 shrink-0 rounded-full bg-app-primaria" />
               )}
             </Link>
           ))}
         </nav>
 
-        <div className="mt-4 space-y-1 border-t border-slate-200 pt-4 dark:border-slate-800">
+        <div className="mt-4 space-y-1 border-t border-app-linha pt-4">
           {secondaryItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
               className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition ${
                 pathname === item.href
-                  ? "bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-300"
-                  : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+                  ? "bg-app-primaria-fundo font-semibold text-app-primaria"
+                  : "text-app-texto-2 hover:bg-app-primaria-fundo hover:text-app-texto"
               }`}
             >
               <item.icon className="h-5 w-5" />
               <span className="flex-1">{item.label}</span>
               {hasPending(item.href) && (
-                <span className="h-2 w-2 shrink-0 rounded-full bg-brand-500" />
+                <span className="h-2 w-2 shrink-0 rounded-full bg-app-primaria" />
               )}
             </Link>
           ))}
           <button
             onClick={toggleTheme}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-app-texto-2 transition hover:bg-app-primaria-fundo hover:text-app-texto"
           >
             {dark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
             {dark ? "Tema claro" : "Tema escuro"}
           </button>
           <button
             onClick={signOut}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-app-texto-2 transition hover:bg-app-primaria-fundo hover:text-app-texto"
           >
             <LogOut className="h-5 w-5" />
             Sair
@@ -260,22 +264,22 @@ export default function AppShell({
       </aside>
 
       {/* Topbar — mobile */}
-      <header className="sticky top-0 z-20 flex items-center justify-between border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur lg:hidden dark:border-slate-800 dark:bg-slate-900/90">
+      <header className="sticky top-0 z-20 flex items-center justify-between border-b border-app-linha bg-app-cartao px-4 py-3 lg:hidden">
         <Link
           href="/app"
-          className="flex items-center gap-2 font-bold text-brand-700 dark:text-brand-400"
+          className="flex items-center gap-2 font-bold text-app-primaria"
         >
           <Dumbbell className="h-5 w-5" />
           Pace Fit
         </Link>
         <button
           onClick={() => setMenuOpen(true)}
-          className="relative rounded-lg p-2 text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+          className="relative rounded-lg p-2 text-app-texto-2 hover:bg-app-primaria-fundo"
           aria-label="Abrir menu"
         >
           <Menu className="h-6 w-6" />
           {morePending && (
-            <span className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-brand-500 ring-2 ring-white dark:ring-slate-900" />
+            <span className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-app-primaria ring-2 ring-app-cartao" />
           )}
         </button>
       </header>
@@ -290,7 +294,7 @@ export default function AppShell({
       </main>
 
       {/* Bottom nav — mobile */}
-      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur lg:hidden dark:border-slate-800 dark:bg-slate-900/95">
+      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-app-linha bg-app-cartao lg:hidden">
         <div
           className="mx-auto grid max-w-lg"
           style={{
@@ -301,14 +305,14 @@ export default function AppShell({
             <Link
               key={item.href}
               href={item.href}
-              className={`tappable relative flex flex-col items-center gap-0.5 py-2.5 text-[11px] font-medium ${
+              className={`tappable relative flex flex-col items-center gap-0.5 py-2.5 text-[11px] ${
                 isActive(item)
-                  ? "text-brand-700 dark:text-brand-400"
-                  : "text-slate-500 dark:text-slate-400"
+                  ? "font-semibold text-app-primaria"
+                  : "font-medium text-app-texto-2"
               }`}
             >
               {isActive(item) && (
-                <span className="absolute inset-x-4 top-0 h-0.5 rounded-full bg-brand-500 pf-in" />
+                <span className="absolute inset-x-4 top-0 h-0.5 rounded-full bg-app-primaria pf-in" />
               )}
               <span className="relative">
                 <item.icon
@@ -317,7 +321,7 @@ export default function AppShell({
                   }`}
                 />
                 {hasPending(item.href) && (
-                  <span className="absolute -right-1 -top-0.5 h-2 w-2 rounded-full bg-brand-500" />
+                  <span className="absolute -right-1 -top-0.5 h-2 w-2 rounded-full bg-app-primaria" />
                 )}
               </span>
               {item.label}
@@ -325,16 +329,16 @@ export default function AppShell({
           ))}
           <button
             onClick={() => setMenuOpen(true)}
-            className={`tappable flex flex-col items-center gap-0.5 py-2.5 text-[11px] font-medium ${
+            className={`tappable flex flex-col items-center gap-0.5 py-2.5 text-[11px] ${
               menuHrefs.includes(pathname)
-                ? "text-brand-700 dark:text-brand-400"
-                : "text-slate-500 dark:text-slate-400"
+                ? "font-semibold text-app-primaria"
+                : "font-medium text-app-texto-2"
             }`}
           >
             <span className="relative">
               <Menu className="h-[22px] w-[22px]" />
               {morePending && (
-                <span className="absolute -right-1 -top-0.5 h-2 w-2 rounded-full bg-brand-500" />
+                <span className="absolute -right-1 -top-0.5 h-2 w-2 rounded-full bg-app-primaria" />
               )}
             </span>
             Mais
@@ -346,17 +350,17 @@ export default function AppShell({
       {menuOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div
-            className="pf-backdrop absolute inset-0 bg-black/40 backdrop-blur-sm"
+            className="pf-backdrop absolute inset-0 bg-black/40"
             onClick={() => setMenuOpen(false)}
           />
-          <div className="pf-drawer absolute inset-y-0 right-0 flex w-[82%] max-w-xs flex-col bg-white shadow-2xl dark:bg-slate-950">
-            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-800">
-              <span className="text-base font-bold text-slate-900 dark:text-white">
+          <div className="pf-drawer absolute inset-y-0 right-0 flex w-[82%] max-w-xs flex-col border-l border-app-linha bg-app-cartao shadow-2xl">
+            <div className="flex items-center justify-between border-b border-app-linha px-5 py-4">
+              <span className="text-base font-bold text-app-texto">
                 Menu
               </span>
               <button
                 onClick={() => setMenuOpen(false)}
-                className="tappable rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+                className="tappable rounded-lg p-1.5 text-app-texto-2 hover:bg-app-primaria-fundo"
                 aria-label="Fechar menu"
               >
                 <X className="h-5 w-5" />
@@ -366,7 +370,7 @@ export default function AppShell({
             <div className="flex-1 overflow-y-auto px-3 py-4">
               {menuGroupsEff.map((group) => (
                 <div key={group.title} className="mb-5">
-                  <p className="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  <p className="px-2 pb-1.5 text-[13px] font-medium text-app-texto-2">
                     {group.title}
                   </p>
                   <div className="space-y-0.5">
@@ -378,16 +382,16 @@ export default function AppShell({
                           href={item.href}
                           className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
                             active
-                              ? "bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-300"
-                              : "text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+                              ? "bg-app-primaria-fundo font-semibold text-app-primaria"
+                              : "text-app-texto hover:bg-app-primaria-fundo"
                           }`}
                         >
                           <item.icon className="h-5 w-5 shrink-0" />
                           <span className="flex-1">{item.label}</span>
                           {hasPending(item.href) && (
-                            <span className="h-2 w-2 shrink-0 rounded-full bg-brand-500" />
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-app-primaria" />
                           )}
-                          <ChevronRight className="h-4 w-4 text-slate-300" />
+                          <ChevronRight className="h-4 w-4 text-app-campo" />
                         </Link>
                       );
                     })}
@@ -396,17 +400,17 @@ export default function AppShell({
               ))}
             </div>
 
-            <div className="border-t border-slate-200 px-3 py-3 dark:border-slate-800">
+            <div className="border-t border-app-linha px-3 py-3">
               <button
                 onClick={toggleTheme}
-                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-app-texto transition hover:bg-app-primaria-fundo"
               >
                 {dark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
                 {dark ? "Tema claro" : "Tema escuro"}
               </button>
               <button
                 onClick={signOut}
-                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-rose-600 transition hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/30"
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-app-perigo transition hover:bg-app-perigo-fundo"
               >
                 <LogOut className="h-5 w-5" />
                 Sair

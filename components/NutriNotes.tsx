@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { MessageSquare, Check, Loader2, Send } from "lucide-react";
+import { Check, Loader2, Send } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatDate, dataNoBrasil } from "@/lib/date";
 
@@ -16,18 +17,25 @@ export type Nota = {
 
 // Conversa com o nutricionista, do lado do paciente.
 //
-// `compact` é a versão que aparece no bloco "Hoje": mostra só o que chegou e
-// ainda não foi lido, com confirmação de leitura. A conversa completa, com
-// campo de resposta, fica na aba Conversa de "Meu plano".
+// `compact` é a versão que aparece no "Para hoje" da Início: mostra só o que
+// chegou e ainda não foi lido, com confirmação de leitura. A conversa
+// completa, com campo de resposta, fica na aba Conversa de "Meu plano".
+//
+// Compacta, cada recado é um <li>: quem a usa a põe dentro da lista do "Para
+// hoje" (um <ul> com traço entre as linhas), e cada recado é uma linha que
+// conta na contagem de pendentes. Fora de uma lista ela não serve.
 export default function NutriNotes({
   notas,
   meuId,
   nutriId,
+  nutriNome,
   compact = false,
 }: {
   notas: Nota[];
   meuId: string;
   nutriId?: string | null;
+  /** Nome do nutricionista, para o título "Recado de {primeiro nome}" (só na compacta). */
+  nutriNome?: string;
   compact?: boolean;
 }) {
   const supabase = createClient();
@@ -69,43 +77,51 @@ export default function NutriNotes({
     router.refresh();
   }
 
-  // ---- Versão compacta: avisos não lidos no dashboard ----
+  // ---- Versão compacta: recados não lidos, no "Para hoje" da Início ----
   if (compact) {
     if (notas.length === 0) return null;
+    // "de {primeiro nome}", nunca "do"/"da": o app não sabe o gênero de
+    // quem atende (spec, "Nome do nutricionista"). Sem nome, só "Recado".
+    const primeiroNome = nutriNome?.trim().split(/\s+/)[0] ?? "";
+    const titulo = primeiroNome ? `Recado de ${primeiroNome}` : "Recado";
     return (
-      <div className="space-y-2">
+      <>
         {notas.map((n) => (
-          <div
-            key={n.id}
-            className="rounded-xl border border-brand-200 bg-white p-3 dark:border-brand-800/50 dark:bg-slate-900/70"
-          >
-            <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-brand-700 dark:text-brand-300">
-              <MessageSquare className="h-3 w-3" />
-              Recado
+          <li key={n.id} className="px-4 py-3.5">
+            <p className="flex flex-wrap items-baseline gap-x-1.5">
+              <span className="text-[15px] font-semibold text-app-texto">{titulo}</span>
+              <span className="text-[13px] text-app-texto-2">· seu nutricionista</span>
             </p>
-            <p className="whitespace-pre-wrap text-sm text-slate-800 dark:text-slate-200">
+            <p className="mt-1 whitespace-pre-wrap text-[15px] leading-relaxed text-app-texto">
               {n.body}
             </p>
-            <div className="mt-2 flex items-center justify-between gap-2">
-              <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                {formatDate(dataNoBrasil(n.created_at))}
-              </span>
+            <p className="mt-1 text-[13px] text-app-texto-2">
+              {formatDate(dataNoBrasil(n.created_at))}
+            </p>
+            <div className="mt-2.5 flex flex-wrap items-center gap-2">
               <button
+                type="button"
                 onClick={() => marcarLido(n.id)}
                 disabled={busy === n.id}
-                className="tappable inline-flex items-center gap-1.5 rounded-lg border border-brand-300 px-2.5 py-1 text-[11px] font-semibold text-brand-700 hover:bg-brand-50 disabled:opacity-60 dark:border-brand-700 dark:text-brand-300 dark:hover:bg-brand-500/10"
+                className="btn-ghost px-3.5"
               >
                 {busy === n.id ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                 ) : (
-                  <Check className="h-3 w-3" />
+                  <Check className="h-4 w-4" aria-hidden="true" />
                 )}
                 Li o recado
               </button>
+              <Link
+                href="/app/nutricionista"
+                className="tappable inline-flex min-h-[40px] items-center rounded-lg px-1.5 text-sm font-semibold text-app-primaria hover:underline"
+              >
+                Ver Meu plano
+              </Link>
             </div>
-          </div>
+          </li>
         ))}
-      </div>
+      </>
     );
   }
 

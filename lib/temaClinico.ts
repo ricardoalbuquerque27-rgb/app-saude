@@ -109,7 +109,22 @@ export const PARES_TEXTO: [NomeCor, NomeCor][] = [
 export const PARES_GRAFICO: [NomeCor, NomeCor][] = [
   ["primaria", "linha"],
   ["atencao", "linha"],
+  // Também a linha vertical de cada consulta no GraficoPeso (em `linha` ela
+  // dava 1,24:1 e quase sumia), a meta tracejada e as bordas da faixa do
+  // MiniGrafico.
   ["campo", "chao"],
+  // Aba Corpo, a Evolução (components/clinico/graficos/): a linha da média e o
+  // arco do anel sobre o fundo da página, o ponto da consulta (e o texto dos
+  // eixos, que pede mais: está em PARES_TEXTO) e a linha da média sobre a
+  // semana que a dica destaca (GraficoPeso pinta a semana de `primaria-fundo`).
+  ["primaria", "chao"],
+  ["texto", "chao"],
+  ["primaria", "primaria-fundo"],
+  // Aba Clínico, o MiniGrafico dos exames: a linha e os pontos (`texto`) sobre
+  // a faixa de referência sombreada (`primaria-fundo`). As bordas da faixa são
+  // `campo` sobre o fundo da página, par que já está acima: o preenchimento
+  // sozinho dá ~1,1:1 contra a página, e o limite da faixa é informação.
+  ["texto", "primaria-fundo"],
 ];
 
 function bloco(tema: Record<NomeCor, string>): string {
@@ -125,8 +140,11 @@ function bloco(tema: Record<NomeCor, string>): string {
  * O `body:has(...)` pinta a página inteira com o chão do tema. Só a caixa do
  * conteúdo tinha esse fundo; em volta dela ficava o do app (outra cor, com o
  * brilho verde), e a página do paciente parecia uma caixa solta, com uma
- * faixa vazia entre ela e o menu. O `background` (e não `background-color`)
- * apaga também o brilho, que o `.dark body` de globals.css põe.
+ * faixa vazia entre ela e o menu. O `background` (shorthand, e não
+ * `background-color`) zera também uma imagem de fundo do body. Hoje é só
+ * defensivo: o brilho verde que o `.dark body` de globals.css punha saiu, e o
+ * body tem apenas `background-color`; se um dia voltar uma imagem ali, a
+ * página clínica continua lisa.
  */
 export function cssDoTemaClinico(): string {
   return (

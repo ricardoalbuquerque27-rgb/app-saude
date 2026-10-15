@@ -69,6 +69,12 @@ export const ROTULO_MODO: Record<ModoConsulta, string> = {
 };
 export const DURACOES = [30, 45, 60, 90] as const;
 
+/** "Retorno · presencial · 45 min": a linha sob o título do registro, aberto ou concluído. */
+export function resumoDaConsulta(c: Pick<Consulta, "kind" | "mode" | "duration_min">): string {
+  const tipo = ROTULO_TIPO[c.kind];
+  return `${tipo.charAt(0).toUpperCase()}${tipo.slice(1)} · ${ROTULO_MODO[c.mode]} · ${c.duration_min} min`;
+}
+
 function ms(agora: number | string): number {
   return typeof agora === "string" ? Date.parse(agora) : agora;
 }
@@ -360,6 +366,37 @@ export function proximaConsulta(lista: Consulta[], agora: number | string): Cons
       .filter((c) => c.status === "agendada" && fimDa(c) > t)
       .sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at))[0] ?? null
   );
+}
+
+/**
+ * O que o paciente precisa saber da consulta, escolhido num lugar só. A
+ * conta morava dentro do cartão de "Meu plano"; a linha da Início, que manda
+ * para ele, a repetiria à mão, e a linha podia dizer "nenhuma" enquanto o
+ * cartão mostrava uma consulta cancelada.
+ *
+ * - `proxima`: a agendada que ainda não acabou, a mais cedo;
+ * - `pedido`: o primeiro pedido aberto (a lista vem das mais recentes);
+ * - `canceladaPeloNutri`: só quando não há nenhuma das duas acima e a mais
+ *   recente (por início) foi cancelada pelo nutri e começa depois de agora − 7
+ *   dias. Sem isso, quem não abre "Meu plano" iria a uma consulta que não existe.
+ */
+export function estadoDaConsulta(
+  consultas: Consulta[],
+  agora: number | string
+): { proxima: Consulta | null; pedido: Consulta | null; canceladaPeloNutri: Consulta | null } {
+  const t = ms(agora);
+  const pedido = consultas.find((c) => c.status === "pedido") ?? null;
+  const proxima = proximaConsulta(consultas, t);
+  const recente = [...consultas].sort((a, b) => Date.parse(b.starts_at) - Date.parse(a.starts_at))[0];
+  const canceladaPeloNutri =
+    !pedido &&
+    !proxima &&
+    recente?.status === "cancelada" &&
+    recente.cancelled_by === "nutri" &&
+    Date.parse(recente.starts_at) > t - 7 * 86_400_000
+      ? recente
+      : null;
+  return { proxima, pedido, canceladaPeloNutri };
 }
 
 /** A realizada mais recente que já começou. */

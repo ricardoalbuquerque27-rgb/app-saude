@@ -8,15 +8,22 @@ import { FOCO } from "@/components/clinico/estilos";
 // prende o foco dentro, fecha no Esc e devolve o foco a quem abriu. O
 // conteúdo continua dentro do .tema-clinico na árvore do DOM, então herda as
 // variáveis --clin-* mesmo desenhado na camada de cima.
+//
+// `ocupado` segura a janela aberta enquanto algo que não se desfaz está
+// correndo (concluir o registro): Esc, clique no fundo e o X não fecham. Sem
+// isso o diálogo parecia cancelável enquanto a ação seguia, e uma recusa que
+// chegasse depois de fechado ficava invisível. Sem a prop (a agenda), nada muda.
 export function Dialogo({
   aberto,
   aoFechar,
   titulo,
+  ocupado = false,
   children,
 }: {
   aberto: boolean;
   aoFechar: () => void;
   titulo: string;
+  ocupado?: boolean;
   children: React.ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -33,10 +40,21 @@ export function Dialogo({
     <dialog
       ref={ref}
       aria-labelledby={idTitulo}
-      onClose={aoFechar}
+      // Esc: com `ocupado`, o cancel é impedido.
+      onCancel={(e) => {
+        if (ocupado) e.preventDefault();
+      }}
+      onClose={() => {
+        // O Chrome nem sempre respeita o preventDefault do cancel (Esc repetido,
+        // sem gesto do usuário no meio: a verificação 17 fecha o diálogo sem
+        // isto). Se ainda está ocupado, abre de novo, em vez de deixar `aberto`
+        // verdadeiro com a janela fechada.
+        if (ocupado && aberto) ref.current?.showModal();
+        else aoFechar();
+      }}
       // Clique no fundo escuro (fora da caixa) fecha; dentro, não.
       onClick={(e) => {
-        if (e.target === ref.current) aoFechar();
+        if (!ocupado && e.target === ref.current) aoFechar();
       }}
       className="m-auto max-h-[90dvh] w-[calc(100vw-2rem)] max-w-lg overflow-y-auto rounded-lg border border-clin-linha bg-clin-chao p-0 text-clin-texto backdrop:bg-black/50"
     >
@@ -49,8 +67,9 @@ export function Dialogo({
             <button
               type="button"
               onClick={aoFechar}
+              disabled={ocupado}
               aria-label="Fechar"
-              className={`-mr-2 -mt-2 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-clin-texto-2 hover:text-clin-texto ${FOCO}`}
+              className={`-mr-2 -mt-2 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-clin-texto-2 hover:text-clin-texto disabled:opacity-60 ${FOCO}`}
             >
               <X aria-hidden="true" className="h-5 w-5" />
             </button>

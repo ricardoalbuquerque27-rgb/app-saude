@@ -21,23 +21,51 @@ Isso não é óbvio lendo a árvore de arquivos.
   detalhe em `pacientes/[id]`, em abas por assunto: Resumo, Alimentação,
   Treino, Corpo, Clínico e Consultas. Ele prescreve ali mesmo, nas abas Alimentação
   (metas, cardápio) e Treino; a fila do Resumo tem o atalho Reaplicar, que
-  grava de novo a última prescrição; o resto é leitura, fora a conversa e as
-  notas. Não há aba Prescrição. Veja "A página do paciente" abaixo.
+  grava de novo a última prescrição. Fora isso as abas só leem, menos a
+  conversa e as notas; o que ele escreve sobre a consulta vai no registro
+  (prontuário), em página própria, `pacientes/[id]/consultas/[consulta]`
+  (veja "Registro da consulta"). Não há aba Prescrição. Veja "A página do
+  paciente" abaixo.
 - **Lógica testada:** `lib/date.ts` (datas e janelas, `dataNoBrasil`),
   `lib/planCheckIn.ts` (adesão, `estadosDaSemana`), `lib/foods.ts` (tabela
   TACO), `lib/edicao.ts` (`reduzirEdicao`, a regra de uma edição por vez,
   e `oQueSeguraATroca`), `lib/abas.ts` (a aba que o endereço pede),
   `lib/consultas.ts` (situação de cada consulta, hora de São Paulo, choque,
-  grade do mês e da semana, o que cabe num dia do Mês, alertas de consulta), `lib/desdeConsulta.ts`
-  ("desde a última consulta"),
+  grade do mês e da semana, o que cabe num dia do Mês, alertas de consulta,
+  `resumoDaConsulta`), `lib/desdeConsulta.ts` ("desde a última consulta"),
+  `lib/registro.ts` (o registro da consulta: faixas e leitura das medidas,
+  `lerMedida`, `medidasValidas`, `errosDasMedidas`; `situacaoDoRegistro`; o
+  botão do painel, `entradaDoRegistro`; o Observar, `observarDaConsulta` e
+  `ultimoObservarPorPaciente`; o "antes" de cada medida, `anteriores`),
+  `lib/aiActions.ts` (só `atualizar_peso` e `remover_ultimo` de peso, que não
+  podem pegar a medida da consulta),
+  `lib/evolucao.ts` (a conta dos gráficos do Corpo: o período,
+  `inicioDoPeriodo` e `limitadoEmUmAno`; a média semanal, `semanasDePeso`; os
+  pontos da consulta e as séries de medida, `variacaoDaMedida`; o anel da meta,
+  `pesoInicialDoPeriodo`, `progressoDaMeta` e as frases dele, `textoDoAnel`; a
+  escala, o eixo e as frases de título, `rotuloDoPeso`, e de `aria-label`),
+  `lib/exames.ts` (o comparativo dos exames: `compararExames`,
+  `resumoDoComparativo`, `descricaoDaSerie`, `avisosDaLinha`,
+  `fraseSemComparacao`, `dataDoComparativo`), a faixa, o nome e a unidade de
+  exame em `lib/examRanges.ts` (`parseReferenceRange`, `dentroDaFaixa`,
+  `chaveDoExame`, `faixaDaTabela`, `unidadeDoExame`, `ehTextoDaTabela`,
+  `classifyExam`), os números em pt-BR em `lib/numeros.ts`, a leitura em
+  páginas em `lib/paginacao.ts` (`lerEmPaginas`),
   `lib/temaClinico.ts` com `lib/contraste.ts` (paleta e razão de contraste)
   e, em `lib/nutri.ts`, a conta do resumo, da fila de triagem e da linha do
   tempo do nutri (`montarResumos`, `filaDeTriagem`, `montarLinhaDoTempo`),
   as médias da semana e a comparação com a meta (`mediasDaSemana`,
   `compararComMeta`), os textos de meta e de desvio (`textoDaMeta`,
-  `textoDoDesvio`, `textoDoDesvioDoPlano`) e a divisão dos avisos entre meta
-  e plano de treino (`separarDesvios`). As consultas ao banco não têm teste,
-  nem `lib/perfil.ts`, que é só uma consulta.
+  `textoDoDesvio`, `textoDoDesvioDoPlano`), a divisão dos avisos entre meta
+  e plano de treino (`separarDesvios`) e o peso que vale num dia com duas
+  medidas (`pesoDoDia`). As consultas ao banco não têm teste (nem
+  `lib/perfil.ts`, que é só uma consulta), menos as que rodam contra um
+  Supabase em memória: as leituras do resumo, da linha do tempo e da série
+  em `lib/nutri.test.ts`, o "antes" das medidas em `lib/registroDb.test.ts`
+  e as leituras em páginas do Corpo e dos exames em `lib/evolucaoDb.test.ts`
+  e `lib/examesDb.test.ts` (o banco delas, `lib/bancoEmMemoria.ts`, tem
+  `range`, `count: "exact"` e o `max-rows` do projeto, e devolve `error` quando
+  o teste pede).
 
 Toda segurança é por **RLS no Postgres**, nunca por service role no app.
 Ao mexer em política, teste com `BEGIN ... ROLLBACK` e
@@ -97,6 +125,83 @@ alerta de exame sumia calado. Na página, `resumirPacientes`,
 `getPatientSeries` e `getPatientActivity` devolvem `falhou` junto dos dados.
 `getPatientsSummary` manteve a assinatura antiga (Início e lista).
 
+**Gráficos.** Os desenhos moram em `components/clinico/graficos/` (as peças
+comuns em `base.tsx`) e só desenham: o anel da meta e a Evolução (peso,
+cintura, % de gordura) na aba Corpo, e o minigráfico dos exames. A tabela do
+comparativo é do `Clinico.tsx`. A conta é de `lib/evolucao.ts` e
+`lib/exames.ts`, testadas. Cor só por `var(--clin-*)`, nunca hex (é o que faz o
+escuro funcionar sem segunda lista), e par novo entra em `PARES_GRAFICO`
+(`lib/temaClinico.ts`), testado a 3:1 nos dois temas. A faixa do minigráfico é
+`primaria-fundo`, que contra a página dá 1,1 a 1,2:1; por isso o limite dela é
+uma linha de 1 px em `campo`, como a linha vertical de cada consulta no peso
+(em `linha` ela dava 1,24:1 e sumia). O `GraficoPeso` tem dica própria e não o
+`Tooltip` do recharts, que pega o ponto mais próximo e erra a semana nas
+pontas cortadas do período. A semana é de segunda a domingo, com um valor por
+dia antes da média (três pesagens no mesmo dia pesariam três vezes), e a
+medida da consulta fica fora da média, como ponto à parte.
+
+**Leitura em páginas, e só o teto é falha.** O PostgREST corta no limite sem
+erro, e um ano desenhado cortado como se fosse inteiro, ou um
+"anterior" que ficou fora da leitura, é o mesmo "Nunca registrou nada" de
+antes. Os exames e o período do Corpo (`getExamesDoPaciente`,
+`getEvolucaoDoCorpo`) leem em páginas de 1.000 com `.range()` até vir uma
+página curta (`lerEmPaginas`, `lib/paginacao.ts`), com teto de 5.000: só o
+teto, ou erro numa página, é falha. Era `.limit(200)` nos exames com "vir
+cheio é falha": numa leitura que só cresce, oito laudos derrubavam a aba
+Clínico para sempre, tratamento junto. A falha dos exames mostra o erro só no
+bloco Exames. "Ainda não dá para ver tendência" só vale com leitura que deu
+certo. **O tamanho da página supõe o `max-rows` padrão da Supabase (1.000).**
+Se o projeto o baixasse, o PostgREST cortaria a página sem erro e a leitura
+pararia nela, tomada por "curta"; por isso a 1ª página pede `count: "exact"`
+(a consulta recebe `contar`) e a soma das páginas tem de bater com ele, senão
+é falha (só na 1ª, porque o `count` custa uma contagem por pedido). Resposta
+sem contagem não tem o que conferir, e vale o que veio. Leitura nova em
+páginas pede a contagem do mesmo jeito.
+
+**Comparativo dos exames.** Compara o último resultado de cada exame com o
+anterior, um resultado por dia (vale o último da leitura, que por isso vem em
+ordem de `date` e `created_at`; com valores diferentes no mesmo dia a linha
+avisa "mais de um resultado em dd/mm", e o resultado sem número que veio
+depois do último aparece como "depois: …"). A faixa é a do laudo; a da tabela
+do app só vale se a unidade do resultado for vazia ou da entrada. **O
+`status` e a `reference_range` gravados podem ter vindo da tabela**, pelo
+casamento frouxo antigo: o VLDL-colesterol tem "< 190 mg/dL" (do colesterol
+total) e a B12 em pmol/L tem "atencao" (julgada pela tabela em pg/mL). Por
+isso a referência que é, letra por letra, um texto de faixa da tabela
+(`ehTextoDaTabela`) vale como a tabela e não como laudo, e o selo do Último
+sai da faixa da linha (`situacao`: tabela, os três níveis da entrada; laudo,
+normal ou alterado), nunca do `status` gravado. `parseReferenceRange` lê "<"
+e ">" como estritos (o 190 com "< 190" está fora; "≤", "até", "≥" e o
+intervalo "a–b" são inclusivos) e devolve nulo para referência em níveis (mais
+de uma faixa fora de parênteses, ou palavra de sexo, idade, fase, risco ou
+nível): lida pela primeira faixa, a glicada que subiu "entrava na faixa". O
+que está entre parênteses é comentário, menos quando o texto TODO é
+"(70 a 99)": aí vale o de dentro. `classifyExam` trata `unit` e `reference`
+que não são texto (o JSON da IA vem direto na rota `analyze-exam`) como
+ausentes, em vez de lançar erro.
+Para dois nomes serem o mesmo exame, `chaveDoExame`, `faixaDaTabela` e o
+`classifyExam` (`lib/examRanges.ts`) exigem nome igual a uma key da tabela, ou
+todas as palavras do nome nas keys de UMA entrada **e** o nome contendo uma
+key inteira; palavra de amostra (soro, sérico, plasma, sangue…) e de método
+(calculado, Friedewald, ultrassensível, basal, hemograma, transaminase) não
+contam contra o nome, mas nunca bastam: sem uma palavra que conte e uma key
+inteira, "Basal" ou "Calculado" não são exame. O casamento frouxo antigo
+(`findDef`, que saiu) juntou o VLDL-colesterol em "colesterol total" e a
+Vitamina K em potássio: juntar à toa inventa uma conclusão clínica, separar à
+toa só dá duas linhas. O estrito, por sua vez, perdeu grafias que o laudo
+escreve todo dia ("LDL-c", "Colesterol LDL calculado", "PCR-US", "25-Hidroxi
+Vitamina D"), e o chat gravava "normal" para elas (o LDL-c de 180 saía da fila
+de triagem): grafia comum nova entra como key da entrada, ou como palavra de
+método quando é só o jeito de medir. A palavra que juntaria exame diferente
+fica como key, não como neutra: "e frações" é key do colesterol total porque
+"Hemoglobina e frações" é a eletroforese. Cada grafia nova leva um teste em
+`lib/examRanges.test.ts`, junto dos que separam (VLDL, não-HDL, Vitamina K,
+HCM, pós-prandial, capacidade de ligação do ferro, "T4", "Jejum"). Na unidade,
+o prefixo micro (u, μ, µ, mc) é um só, UI, IU e U são a mesma, e µUI/mL
+equivale a mUI/L (o TSH chega de um jeito ou do outro); mEq/L ≡ mmol/L só no
+potássio e no sódio (no cálcio a conta é outra), declarado na entrada. Outra
+unidade diz "unidade diferente do anterior" em vez de comparar o número cru.
+
 **Avisos de meta e de plano.** A Alimentação mostra só os quatro campos de
 meta de `prescription_deviations` (`CAMPOS_META`); o aviso de mudança no
 plano de treino cai na mesma tabela, mas não é meta, e aparece no Treino.
@@ -142,11 +247,84 @@ horário avisa e não impede. O paciente vê o cartão de consulta
 (`components/CartaoConsulta.tsx`) na Início e em "Meu plano", no visual do
 app dele, e não recebe aviso fora do app (sem Web Push).
 
+## Registro da consulta
+
+Spec: `docs/superpowers/specs/2026-10-13-registro-da-consulta-design.md`.
+Um prontuário por consulta, em `/app/pacientes/<id>/consultas/<consulta>`
+(tema clínico pelo layout de `pacientes/[id]`; tela larga no `AppShell` pela
+mesma regra do detalhe, `detalheDoPaciente`). `consultation_records` e
+`consultation_addenda` têm **só política de leitura, e só do autor**, sem
+exigir vínculo (o prontuário não some quando o paciente revoga); o paciente
+não lê. Toda escrita é por função `SECURITY DEFINER` (`salvar_registro`,
+`concluir_registro`, `descartar_rascunho`, `adicionar_adendo`), com
+`{ ok, error, id? }` e o `updated_at` no salvar; o adendo é a única que não
+pede vínculo ativo. Rascunho → concluído → adendo: descartar apaga o
+rascunho; concluir copia nome e CRN (sem CRN no perfil, o diálogo pede e
+grava em `profiles.crn`), marca a consulta realizada se ainda agendada e
+trava; corrigir, só por adendo. `fechar_consulta` recusa falta e
+cancelamento com registro. As faixas de medida e os limites de texto estão
+na migração (`erro_das_medidas`, `erro_do_registro`) e em `lib/registro.ts`
+(`FAIXAS`, `LIMITES`): mudou um, mude o outro. O `appointment_id` do
+registro não tem cascata, de propósito (20 anos de guarda, pelos resumos; ver
+Em aberto): apagar uma consulta com registro, mesmo rascunho, falha, e apagar
+a conta do paciente ou do nutri dela também (a consulta cai em cascata com a
+conta e esbarra na chave).
+
+**Publicar: primeiro as duas migrações, depois o merge**, que dispara o
+deploy da Vercel: código novo em esquema velho quebra a aba Corpo e o resumo
+do paciente (leem `measured_by`), o salvar do perfil do nutri (`crn`) e a
+página do registro, e faz o assistente duplicar o peso calado (o filtro em
+`measured_by` falha e ele cai no insert). Antes de aplicar, em produção e só
+lendo: o dono de `body_measurements` (`pg_class.relowner`) é o papel que
+aplica a migração, dono das funções, e `relforcerowsecurity` é falso; senão
+a RLS nova barra o insert de `concluir_registro` (a réplica local roda como
+superusuário e não pega). Depois, `has_function_privilege('anon',
+'public.salvar_registro(uuid,jsonb,timestamptz)', 'execute')` dá falso, e o
+mesmo nas outras três.
+
+**Medidas da consulta.** Concluir publica em `body_measurements`, com
+`measured_by` (quem mediu; nulo é o paciente) e `appointment_id` (único), na
+data da consulta em São Paulo. A `measurements_all_own` virou quatro: o
+paciente lê todas as dele, mas cria só com as duas colunas nulas e edita e
+apaga só as com `measured_by` nulo; `measurements_author_read` deixa quem
+mediu ler depois do desvínculo. **Update e delete barrados pela RLS não dão
+erro**: afetam zero linhas e o supabase-js devolve `error: null`, e o
+assistente diria "peso atualizado" sem mudar nada. Por isso `atualizar_peso`
+e `remover_ultimo` (peso) filtram `.is("measured_by", null)` antes de escolher
+a linha, e o excluir da página Medidas, que marca "Medida na consulta" e não
+oferece o botão nela, pede `count: "exact"` e avisa com zero. Escrita nova em
+`body_measurements` precisa da mesma defesa. **A medida da consulta não é
+registro do paciente**: contada, quem nunca registrou virava "N dias sem
+registrar" desde a consulta. A triagem (`montarResumos`, `ultimosRegistros`)
+conta só as com `measured_by` nulo, a linha do tempo a rotula "Medida na
+consulta", e no peso do dia ela vence a de casa (`pesoDoDia`): no resumo (peso
+atual e variação em 30 dias), no Peso atual do Corpo, no anel da meta e na
+série. Antes só valia na série: o resumo e o Peso atual pegavam uma das duas
+ao acaso, e o gráfico mostraria a outra. A exceção é a média semanal do gráfico,
+que só conta as de casa (a da consulta é ponto à parte).
+
+**O rascunho salva sozinho** (`useSalvarRascunho`), 1,5 s depois da última
+tecla e ao sair do campo, sem cópia no navegador (computador compartilhado).
+O `updated_at` da trava entre abas fica como o **texto exato** do banco
+(`Date` corta os microssegundos, e toda gravação dava "mudou em outra aba");
+**uma gravação por vez** (duas juntas mandariam o mesmo `updated_at`); e **ao
+abrir, o editor confere o banco**: o cache do roteador do Next devolve no
+Voltar a página com o rascunho velho.
+
+O painel da consulta (`PainelConsulta`) dá "Registrar consulta", "Continuar
+registro" ou "Ver registro" numa consulta que já começou e não é falta,
+cancelamento nem pedido; sem saber o registro (leitura que falhou ou não
+feita), só "Abrir registro" (`entradaDoRegistro`), nunca um "Registrar"
+adivinhado. O "Observar no retorno" ali é o do registro concluído da
+**consulta que começou por último**, não o concluído por último
+(`ultimoObservarPorPaciente`): quem preenche hoje o registro de uma consulta
+antiga faria a instrução velha passar por atual.
+
 ## Comandos
 
 ```bash
 npm run dev      # desenvolvimento
-npm test         # 230 testes unitários (vitest)
+npm test         # 836 testes unitários (vitest)
 ferramentas/testar-sql.sh   # migrações e testes SQL num Postgres local
 npm run build    # produção
 ```
@@ -235,3 +413,33 @@ remove ele. `MODULE_NOT_FOUND` nos scripts de `ferramentas/` é isso.
 - Conta de teste (`Maria Souza (teste)`) e a rota `/estilo` precisam sair
   antes de usuários reais.
 - No painel do Supabase, falta ligar a proteção contra senhas vazadas.
+- **Prontuário de ex-paciente sem tela.** O registro concluído segue legível
+  pelo autor no banco (as leituras do autor e `adicionar_adendo` não pedem
+  vínculo), mas o perfil e a consulta (`appointments_nutri_read`) pedem vínculo
+  ativo e não há lista de ex-pacientes: a página do registro mostra "Sem
+  acesso". O dado não se perde; falta o caminho até ele.
+- **A Resolução CFN 594/2017 não foi lida no texto oficial.** O registro foi
+  desenhado pelos resumos do CONARQ, do CRN-3 e do CRN-5 (a guarda de 20
+  anos inclusive); o texto de venda "atende ao CFN" não sai antes de conferir.
+- No gráfico da página Medidas do paciente, o ponto da medida da consulta não
+  se distingue; a marca "Medida na consulta" fica só na linha da lista.
+- **Exames gravados antes guardam o julgamento antigo.** O `classifyExam`
+  (página Exames do paciente, formulário e IA) já usa a regra estrita de nome,
+  a unidade da entrada e o "<" estrito, mas as linhas gravadas antes guardam o
+  `status` e a `reference_range` do casamento frouxo, e a página Exames do
+  paciente mostra o `status` gravado (a Vitamina K pode seguir "alterado" pela
+  faixa do potássio), até alguém regravar essas linhas. O comparativo do nutri
+  não lê o `status` gravado (o selo sai da faixa da linha) e lê a
+  `reference_range` como laudo, menos quando ela é, letra por letra, texto da
+  tabela (`ehTextoDaTabela`). Mas a lista "Ver todos os resultados" do mesmo
+  nutri também mostra o `status` gravado, e por isso pode discordar do selo do
+  comparativo na mesma tela. E a IA (`app/api/analyze-exam/route.ts`,
+  `lib/aiActions.ts`) grava o texto da tabela em `reference_range` sempre que a
+  tabela classifica, sobrescrevendo a faixa que o laudo trazia (o formulário só
+  preenche o campo vazio): por isso `ehTextoDaTabela` continua necessário. A
+  data `today` que a IA grava quando não acha a do laudo (dois laudos no mesmo
+  dia) também segue em aberto.
+- **O `persist` de Hábitos (`app/app/habitos/page.tsx`) regrava a linha inteira
+  do dia a partir do estado da tela e não confere o `error`.** O que mudou fora
+  da tela (o assistente registrando água) pode voltar ao valor velho, e uma
+  gravação que falha parece salva.

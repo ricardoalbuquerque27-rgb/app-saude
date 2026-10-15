@@ -8,6 +8,7 @@ import {
   diasDaSemana,
   duracaoPadrao,
   ehPendencia,
+  estadoDaConsulta,
   fimDa,
   gradeDoMes,
   horaEmSaoPaulo,
@@ -15,6 +16,7 @@ import {
   noDiaDoMes,
   periodoDaVista,
   proximaConsulta,
+  resumoDaConsulta,
   rotuloDaConsulta,
   situacao,
   sugestaoDeRetorno,
@@ -245,6 +247,13 @@ describe("textos", () => {
     );
   });
 
+  it("resumo da consulta: tipo com maiúscula, modalidade e duração", () => {
+    expect(resumoDaConsulta(consulta({ duration_min: 45 }))).toBe("Retorno · presencial · 45 min");
+    expect(resumoDaConsulta(consulta({ kind: "primeira", mode: "online", duration_min: 60 }))).toBe(
+      "1ª consulta · online · 60 min"
+    );
+  });
+
   it("título de cada vista", () => {
     expect(tituloDoPeriodo("dia", "2026-10-13", "2026-10-13")).toBe("Ter., 13 de out. · hoje");
     expect(tituloDoPeriodo("dia", "2026-10-14", "2026-10-13")).toBe("Qua., 14 de out.");
@@ -287,6 +296,147 @@ describe("próxima e última", () => {
     expect(sugestaoDeRetorno(consulta({ starts_at: "2026-10-20T02:30:00Z" }))).toEqual({
       data: "2026-11-18",
       hora: "23:30",
+    });
+  });
+});
+
+describe("estadoDaConsulta", () => {
+  // 20/10 às 14:30 em São Paulo (17:30 UTC): a consulta de 17:00 UTC (60 min) está em andamento.
+  const agora = Date.parse("2026-10-20T17:30:00Z");
+
+  it("a agendada que já terminou fica fora", () => {
+    const terminou = consulta({ id: "terminou", starts_at: "2026-10-20T15:00:00Z", duration_min: 60 });
+    expect(estadoDaConsulta([terminou], agora)).toEqual({
+      proxima: null,
+      pedido: null,
+      canceladaPeloNutri: null,
+    });
+  });
+
+  it("a que está acontecendo ainda é a próxima", () => {
+    const andando = consulta({ id: "andando" }); // 17:00 UTC, 60 min
+    expect(estadoDaConsulta([andando], agora).proxima?.id).toBe("andando");
+  });
+
+  it("entre duas agendadas futuras vale a mais cedo, qualquer que seja a ordem da lista", () => {
+    const cedo = consulta({ id: "cedo", starts_at: "2026-10-22T17:00:00Z" });
+    const tarde = consulta({ id: "tarde", starts_at: "2026-10-29T17:00:00Z" });
+    expect(estadoDaConsulta([tarde, cedo], agora).proxima?.id).toBe("cedo");
+    expect(estadoDaConsulta([cedo, tarde], agora).proxima?.id).toBe("cedo");
+  });
+
+  it("aceita o agora como texto ISO, como a página o manda", () => {
+    const futura = consulta({ id: "futura", starts_at: "2026-10-22T17:00:00Z" });
+    expect(estadoDaConsulta([futura], "2026-10-20T17:30:00.000Z").proxima?.id).toBe("futura");
+  });
+
+  it("o pedido e a agendada aparecem juntos", () => {
+    const marcada = consulta({ id: "marcada", starts_at: "2026-10-22T17:00:00Z" });
+    const pedida = consulta({ id: "pedida", starts_at: "2026-10-24T17:00:00Z", status: "pedido" });
+    const e = estadoDaConsulta([marcada, pedida], agora);
+    expect(e.proxima?.id).toBe("marcada");
+    expect(e.pedido?.id).toBe("pedida");
+  });
+
+  it("com dois pedidos, vale o primeiro da lista", () => {
+    const a = consulta({ id: "a", status: "pedido", starts_at: "2026-10-24T17:00:00Z" });
+    const b = consulta({ id: "b", status: "pedido", starts_at: "2026-10-23T17:00:00Z" });
+    expect(estadoDaConsulta([a, b], agora).pedido?.id).toBe("a");
+  });
+
+  it("cancelada pelo paciente não conta", () => {
+    const sua = consulta({
+      status: "cancelada",
+      cancelled_by: "paciente",
+      starts_at: "2026-10-18T17:00:00Z",
+    });
+    expect(estadoDaConsulta([sua], agora).canceladaPeloNutri).toBeNull();
+  });
+
+  it("cancelada pelo nutri há 8 dias não conta, e há 6 dias conta", () => {
+    const antiga = consulta({
+      id: "antiga",
+      status: "cancelada",
+      cancelled_by: "nutri",
+      starts_at: "2026-10-12T17:30:00Z", // 8 dias antes de agora
+    });
+    const recente = consulta({
+      id: "recente",
+      status: "cancelada",
+      cancelled_by: "nutri",
+      starts_at: "2026-10-14T17:30:00Z", // 6 dias antes de agora
+    });
+    expect(estadoDaConsulta([antiga], agora).canceladaPeloNutri).toBeNull();
+    expect(estadoDaConsulta([recente], agora).canceladaPeloNutri?.id).toBe("recente");
+  });
+
+  it("a janela de 7 dias é aberta: cancelada que começou há 7 dias exatos não conta", () => {
+    const limite = consulta({
+      status: "cancelada",
+      cancelled_by: "nutri",
+      starts_at: "2026-10-13T17:30:00Z",
+    });
+    expect(estadoDaConsulta([limite], agora).canceladaPeloNutri).toBeNull();
+  });
+
+  it("a cancelada que ainda ia acontecer conta", () => {
+    const futura = consulta({
+      id: "futura",
+      status: "cancelada",
+      cancelled_by: "nutri",
+      starts_at: "2026-10-27T17:00:00Z",
+    });
+    expect(estadoDaConsulta([futura], agora).canceladaPeloNutri?.id).toBe("futura");
+  });
+
+  it("só vale a mais recente: uma realizada depois da cancelada a esconde", () => {
+    const cancelada = consulta({
+      id: "cancelada",
+      status: "cancelada",
+      cancelled_by: "nutri",
+      starts_at: "2026-10-15T17:00:00Z",
+    });
+    const realizada = consulta({
+      id: "realizada",
+      status: "realizada",
+      starts_at: "2026-10-18T17:00:00Z",
+    });
+    expect(estadoDaConsulta([cancelada, realizada], agora).canceladaPeloNutri).toBeNull();
+    // e a mesma cancelada, sozinha, aparece
+    expect(estadoDaConsulta([cancelada], agora).canceladaPeloNutri?.id).toBe("cancelada");
+  });
+
+  it("com uma agendada futura, a cancelada não aparece", () => {
+    const cancelada = consulta({
+      id: "cancelada",
+      status: "cancelada",
+      cancelled_by: "nutri",
+      starts_at: "2026-10-18T17:00:00Z",
+    });
+    const marcada = consulta({ id: "marcada", starts_at: "2026-10-22T17:00:00Z" });
+    const e = estadoDaConsulta([cancelada, marcada], agora);
+    expect(e.proxima?.id).toBe("marcada");
+    expect(e.canceladaPeloNutri).toBeNull();
+  });
+
+  it("com um pedido aberto, a cancelada também não aparece", () => {
+    const cancelada = consulta({
+      id: "cancelada",
+      status: "cancelada",
+      cancelled_by: "nutri",
+      starts_at: "2026-10-18T17:00:00Z",
+    });
+    const pedida = consulta({ id: "pedida", status: "pedido", starts_at: "2026-10-24T17:00:00Z" });
+    const e = estadoDaConsulta([cancelada, pedida], agora);
+    expect(e.pedido?.id).toBe("pedida");
+    expect(e.canceladaPeloNutri).toBeNull();
+  });
+
+  it("sem consulta nenhuma, nada", () => {
+    expect(estadoDaConsulta([], agora)).toEqual({
+      proxima: null,
+      pedido: null,
+      canceladaPeloNutri: null,
     });
   });
 });

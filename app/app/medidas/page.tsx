@@ -38,6 +38,8 @@ export default function MedidasPage() {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [metric, setMetric] = useState<keyof BodyMeasurement>("weight_kg");
+  // Aviso da exclusão que não aconteceu (recusada pelo banco ou com erro).
+  const [erroExcluir, setErroExcluir] = useState<string | null>(null);
 
   const [date, setDate] = useState(todayISO());
   const [form, setForm] = useState<Record<string, string>>({});
@@ -112,6 +114,7 @@ export default function MedidasPage() {
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
+    setErroExcluir(null);
     setSaving(true);
     const {
       data: { user },
@@ -132,8 +135,23 @@ export default function MedidasPage() {
 
   async function remove(id: string) {
     if (!confirm("Excluir este registro?")) return;
-    await supabase.from("body_measurements").delete().eq("id", id);
+    setErroExcluir(null);
+    // `count: "exact"` porque a RLS não recusa com erro. A medida que o nutri
+    // tirou na consulta (measured_by) não é do paciente para apagar, e o banco
+    // a esconde do DELETE: afeta zero linhas e devolve `error: null`. Sem
+    // contar, a tela recarregava a lista, a linha voltava e ninguém sabia por
+    // quê. A tela já não oferece o botão nessas linhas; isto cobre a lista que
+    // ficou velha na tela (a medida foi publicada depois de a página abrir).
+    const { error, count } = await supabase
+      .from("body_measurements")
+      .delete({ count: "exact" })
+      .eq("id", id);
+    if (error) {
+      setErroExcluir("Não foi possível excluir o registro. Tente de novo.");
+      return;
+    }
     await load();
+    if (count === 0) setErroExcluir("Este registro não pode ser apagado.");
   }
 
   const metricLabel = FIELDS.find((f) => f.key === metric)?.label ?? "";
@@ -280,6 +298,15 @@ export default function MedidasPage() {
         )}
       </div>
 
+      {erroExcluir && (
+        <p
+          role="alert"
+          className="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
+        >
+          {erroExcluir}
+        </p>
+      )}
+
       {loading ? (
         <div className="flex justify-center py-16 text-slate-500">
           <Loader2 className="h-6 w-6 animate-spin" />
@@ -295,8 +322,13 @@ export default function MedidasPage() {
           {rows.map((r) => (
             <div key={r.id} className="card flex items-center gap-3 py-3">
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold text-slate-800 dark:text-slate-200">
                   {formatDate(r.date)}
+                  {r.measured_by && (
+                    <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-800 dark:bg-brand-500/10 dark:text-brand-200">
+                      Medida na consulta
+                    </span>
+                  )}
                 </p>
                 <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-500 dark:text-slate-400">
                   {FIELDS.filter((f) => r[f.key] != null).map((f) => (
@@ -307,12 +339,17 @@ export default function MedidasPage() {
                   ))}
                 </div>
               </div>
-              <button
-                onClick={() => remove(r.id)}
-                className="rounded-lg p-1.5 text-slate-500 hover:text-rose-600"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
+              {/* Medida da consulta é do prontuário: sem excluir (a RLS
+                  também recusa, sem erro). */}
+              {!r.measured_by && (
+                <button
+                  onClick={() => remove(r.id)}
+                  aria-label={`Excluir registro de ${formatDate(r.date)}`}
+                  className="rounded-lg p-1.5 text-slate-500 hover:text-rose-600"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
             </div>
           ))}
         </div>

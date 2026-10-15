@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import {
   choques,
+  dataCurta,
   diaDaConsulta,
   horaEmSaoPaulo,
   rotuloDaConsulta,
@@ -21,8 +22,16 @@ import {
   LINK,
 } from "@/components/clinico/estilos";
 import { ErroInline } from "@/components/clinico/ErroInline";
+import {
+  aceitaObservar,
+  entradaDoRegistro,
+  observarDaConsulta,
+  ROTULO_REGISTRO,
+  type ObservarDoPaciente,
+  type RegistroLido,
+} from "@/lib/registro";
 import { useAcaoConsulta } from "./acoes";
-import { CLASSE_SELO, SELO } from "./aparencia";
+import { CLASSE_SELO, SELO, SELO_REGISTRO } from "./aparencia";
 import { FormConsulta } from "./FormConsulta";
 import { useConsultasDoDia } from "./useConsultasDoDia";
 
@@ -38,12 +47,25 @@ import { useConsultasDoDia } from "./useConsultasDoDia";
 // (spec): uma consulta das 14h que acaba às 14h30 é fechada ali, e uma falta
 // se marca sem esperar o horário passar. Marcar "Realizada" leva direto ao
 // "Marcar retorno" (critério 4 da spec: fechar e já marcar o retorno).
+//
+// A porta para a página do registro (spec do registro da consulta, "por onde
+// se chega") está aqui, e não na agenda e na aba separadas, porque as duas
+// abrem este mesmo painel. Quem monta a tela lê o registro e o "observar" e
+// passa o que leu, e há três respostas diferentes: nulo é "li e esta consulta
+// não tem"; "falhou" é "a leitura falhou"; prop ausente é "ninguém leu".
+// Confundir nulo com as outras dizia "Registrar consulta" sobre uma consulta
+// que talvez já tivesse registro (CLAUDE.md, "Leitura que falha não é 'não
+// tem'"). Sem saber, o painel oferece só "Abrir registro" (a página do registro
+// lê o banco por conta própria). As regras do botão e do "observar" estão em
+// lib/registro.ts, com teste.
 export function PainelConsulta({
   consulta: c,
   nome,
   agora,
   nutriId,
   desde,
+  registro,
+  observar,
   mostrarNome = true,
   abrirPaciente = false,
   aoTerminar,
@@ -53,6 +75,10 @@ export function PainelConsulta({
   agora: string;
   nutriId: string;
   desde?: { titulo: string; texto: string } | null;
+  /** O registro desta consulta: nulo = não existe; "falhou" = a leitura falhou; ausente = não foi lido. */
+  registro?: RegistroLido;
+  /** O "observar" do último registro concluído do paciente (nulo = não há; "falhou"; ausente = não foi lido). */
+  observar?: ObservarDoPaciente | "falhou" | null;
   mostrarNome?: boolean;
   abrirPaciente?: boolean;
   /** Depois de uma ação que deu certo (a agenda fecha a janela). */
@@ -106,6 +132,9 @@ export function PainelConsulta({
   const comecou = Date.parse(c.starts_at) <= Date.parse(agora);
   const retorno = sugestaoDeRetorno(c);
 
+  const entrada = entradaDoRegistro(c, registro, agora, s);
+  const observarDaqui = observar && observar !== "falhou" ? observarDaConsulta(observar, c) : null;
+
   // Pedido: o paciente não vê a agenda, então o horário pedido costuma bater
   // com outro. "Aceitar" avisa antes, como o formulário.
   const ehPedido = s === "pedido";
@@ -137,7 +166,7 @@ export function PainelConsulta({
         if (comecou)
           return (
             <>
-              {botao("Realizada", () => fechar("Realizada", "realizada"), true)}
+              {botao("Realizada", () => fechar("Realizada", "realizada"), !entrada?.destaque)}
               {botao("Faltou", () => fechar("Faltou", "faltou"))}
               {botao("Remarcar", () => setEditando("remarcar"))}
             </>
@@ -161,7 +190,7 @@ export function PainelConsulta({
       case "sem-desfecho":
         return (
           <>
-            {botao("Realizada", () => fechar("Realizada", "realizada"), true)}
+            {botao("Realizada", () => fechar("Realizada", "realizada"), !entrada?.destaque)}
             {botao("Faltou", () => fechar("Faltou", "faltou"))}
             {botao("Cancelada", () => fechar("Cancelada", "cancelada"))}
           </>
@@ -198,6 +227,11 @@ export function PainelConsulta({
           <span className={`${CLASSE_SELO} ${SELO[s]}`}>
             {ROTULO_SITUACAO[s]}
           </span>
+          {entrada?.selo && (
+            <span className={`${CLASSE_SELO} ${SELO_REGISTRO[entrada.selo]}`}>
+              {ROTULO_REGISTRO[entrada.selo]}
+            </span>
+          )}
           {s === "cancelada" && c.cancelled_by && (
             <span className="text-[14px] text-clin-texto-2">
               {c.cancelled_by === "paciente" ? "pelo paciente" : "por você"}
@@ -220,17 +254,37 @@ export function PainelConsulta({
         </p>
       )}
 
+      {observar === "falhou" && aceitaObservar(c) && (
+        <Aviso>Não foi possível carregar o Observar no retorno.</Aviso>
+      )}
+      {observarDaqui && (
+        <div className="rounded-md bg-clin-atencao-fundo px-3 py-2">
+          <p className="text-[13px] font-semibold text-clin-atencao">
+            Observar no retorno ({dataCurta(diaDaConsulta({ starts_at: observarDaqui.data }))})
+          </p>
+          <p className="whitespace-pre-line text-[15px] text-clin-texto">{observarDaqui.texto}</p>
+        </div>
+      )}
+
       {ehPedido && !editando && (bate.length > 0 || diaFalhou) && (
-        <p className="flex items-start gap-2 rounded-md bg-clin-atencao-fundo px-3 py-2 text-[14px] text-clin-texto">
-          <AlertTriangle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-clin-atencao" />
-          <span>
-            {diaFalhou
-              ? "Não foi possível conferir as outras consultas deste dia."
-              : `Bate com ${bate
-                  .map((x) => `${horaEmSaoPaulo(x.starts_at)} ${doDia?.nomes[x.patient_id] ?? "outro paciente"}`)
-                  .join(" e ")}. Aceitar marca as duas no mesmo horário.`}
-          </span>
-        </p>
+        <Aviso>
+          {diaFalhou
+            ? "Não foi possível conferir as outras consultas deste dia."
+            : `Bate com ${bate
+                .map((x) => `${horaEmSaoPaulo(x.starts_at)} ${doDia?.nomes[x.patient_id] ?? "outro paciente"}`)
+                .join(" e ")}. Aceitar marca as duas no mesmo horário.`}
+        </Aviso>
+      )}
+
+      {entrada && !editando && (
+        <div>
+          <Link
+            href={`/app/pacientes/${c.patient_id}/consultas/${c.id}`}
+            className={`inline-flex ${entrada.destaque ? ACAO_PRIMARIA : ACAO_SECUNDARIA}`}
+          >
+            {entrada.rotulo}
+          </Link>
+        </div>
       )}
 
       {editando ? (
@@ -315,5 +369,16 @@ export function PainelConsulta({
         </Link>
       )}
     </div>
+  );
+}
+
+// A caixa âmbar de uma linha só (texto `texto` sobre `atencao-fundo`, par
+// testado): o aviso de choque do pedido e o do "observar" que não carregou.
+function Aviso({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="flex items-start gap-2 rounded-md bg-clin-atencao-fundo px-3 py-2 text-[14px] text-clin-texto">
+      <AlertTriangle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-clin-atencao" />
+      <span>{children}</span>
+    </p>
   );
 }

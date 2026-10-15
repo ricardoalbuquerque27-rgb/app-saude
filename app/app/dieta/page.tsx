@@ -344,14 +344,12 @@ export default function DietaPage() {
             centerMain={`${Math.round(totals.calories)}`}
             centerSub={calorieGoal ? `/ ${calorieGoal}` : "kcal"}
             label="Calorias"
-            colorClass="text-amber-600 dark:text-amber-400"
           />
           <ProgressRing
             pct={proteinGoal ? totals.protein / proteinGoal : 0}
             centerMain={`${Math.round(totals.protein)}`}
             centerSub={proteinGoal ? `/ ${proteinGoal} g` : "g"}
             label="Proteína"
-            colorClass="text-rose-500"
           />
         </div>
 
