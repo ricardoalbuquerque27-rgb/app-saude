@@ -191,7 +191,9 @@ export default async function MeuNutricionistaPage({
         <RevogarNutri linkId={link.id} />
       </div>
 
-      <div className="mb-5">
+      {/* O id é o destino da linha da consulta na Início (#consulta); o
+          scroll-mt deixa o cartão abaixo da barra de cima do celular. */}
+      <div id="consulta" className="mb-5 scroll-mt-20">
         <CartaoConsulta
           consultas={consultasRes.data.filter((c) => c.nutritionist_id === nutriId)}
           agora={new Date().toISOString()}

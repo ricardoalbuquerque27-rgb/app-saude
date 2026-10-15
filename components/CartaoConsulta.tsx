@@ -4,7 +4,7 @@ import { useId, useState } from "react";
 import { CalendarClock, Loader2 } from "lucide-react";
 import { todayISO } from "@/lib/date";
 import {
-  fimDa,
+  estadoDaConsulta,
   instanteEmSaoPaulo,
   rotuloDaConsulta,
   ROTULO_MODO,
@@ -44,25 +44,8 @@ export function CartaoConsulta({
 
   const quem = nutriNome ? nutriNome.split(" ")[0] : "o nutricionista";
   const t = Date.parse(agora);
-  const pedido = consultas.find((c) => c.status === "pedido") ?? null;
-  const proxima =
-    consultas
-      .filter((c) => c.status === "agendada" && fimDa(c) > t)
-      .sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at))[0] ??
-    null;
-  // Sem nada marcado: se a mais recente foi cancelada pelo nutri nos
-  // últimos 7 dias (ou ainda ia acontecer), o paciente fica sabendo.
-  const recente = [...consultas].sort(
-    (a, b) => Date.parse(b.starts_at) - Date.parse(a.starts_at),
-  )[0];
-  const canceladaPeloNutri =
-    !pedido &&
-    !proxima &&
-    recente?.status === "cancelada" &&
-    recente.cancelled_by === "nutri" &&
-    Date.parse(recente.starts_at) > t - 7 * 86_400_000
-      ? recente
-      : null;
+  // A escolha é de lib/consultas.ts, a mesma da linha da Início.
+  const { proxima, pedido, canceladaPeloNutri } = estadoDaConsulta(consultas, t);
 
   function abrir(qual: "pedir" | "remarcar") {
     setErro(null);

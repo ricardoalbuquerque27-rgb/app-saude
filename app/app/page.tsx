@@ -28,7 +28,7 @@ import NutriHome from "@/components/NutriHome";
 import PlanCheckIn from "@/components/PlanCheckIn";
 import NutriNotes from "@/components/NutriNotes";
 import MealPlanView from "@/components/MealPlanView";
-import { CartaoConsulta } from "@/components/CartaoConsulta";
+import { LinhaDaConsulta } from "@/components/LinhaDaConsulta";
 import { getConsultasDoCartao } from "@/lib/consultasDb";
 
 export default async function DashboardPage() {
@@ -351,6 +351,21 @@ export default async function DashboardPage() {
         </h1>
       </div>
 
+      {/* A consulta com o nutricionista, numa linha, logo abaixo da saudação:
+          a data é o que se procura, e aqui ela aparece sem rolar. As ações
+          (pedir, remarcar, cancelar) ficam no cartão de "Meu plano", para
+          onde a linha leva; só para quem tem acompanhamento. */}
+      {temNutri && (
+        <LinhaDaConsulta
+          // Só as com o nutricionista de agora: as de um vínculo antigo o
+          // banco já cancela ao desvincular, e as passadas não são assunto aqui.
+          consultas={consultasRes.data.filter((c) => c.nutritionist_id === vinculo?.nutritionist_id)}
+          agora={new Date().toISOString()}
+          nutriNome={nutriNome}
+          falhou={consultasRes.falhou}
+        />
+      )}
+
       {/* ----------------------------------------------------------------
           1. HOJE — o que precisa da ação da pessoa agora
       ---------------------------------------------------------------- */}
@@ -563,20 +578,6 @@ export default async function DashboardPage() {
           ))}
         </div>
       </section>
-
-      {/* A consulta com o nutricionista, só para quem tem acompanhamento.
-          Depois do "Hoje", que é o espaço nobre: sem nada marcado, o cartão
-          só diz isso e oferece pedir uma. */}
-      {temNutri && (
-        <CartaoConsulta
-          // Só as com o nutricionista de agora: as de um vínculo antigo o
-          // banco já cancela ao desvincular, e as passadas não são assunto aqui.
-          consultas={consultasRes.data.filter((c) => c.nutritionist_id === vinculo?.nutritionist_id)}
-          agora={new Date().toISOString()}
-          nutriNome={nutriNome}
-          falhou={consultasRes.falhou}
-        />
-      )}
 
       {/* ----------------------------------------------------------------
           2. SEU DIA — Score e números num bloco só

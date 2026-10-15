@@ -1,12 +1,19 @@
-// O cartão de consulta do lado do paciente (Início e "Meu plano"), com a
-// Maria do cenário padrão: ver a próxima, pedir remarcação, cancelar, pedir
-// consulta e cancelar o pedido; e a medida que o nutri tirou na consulta, que
-// a página Medidas marca e não deixa excluir (nem o banco deixa), e o Perfil,
-// que não mostra o CRN. Acusa com código de saída 1.
+// A consulta do lado do paciente, com a Maria do cenário padrão.
+//
+// Na Início ela é uma LINHA no topo (components/LinhaDaConsulta.tsx), que leva
+// a "Meu plano" (/app/nutricionista#consulta); o cartão inteiro, com as ações,
+// mora lá. Este roteiro confere a linha em cada situação (agendada, remarcação
+// pedida, pedido, agendada com pedido, cancelada pelo nutri, nenhuma e leitura
+// que falhou) e o link; dirige as ações em "Meu plano" (ver a próxima, pedir
+// remarcação, cancelar, pedir consulta e cancelar o pedido); e confere a
+// medida que o nutri tirou na consulta, que a página Medidas marca e não deixa
+// excluir (nem o banco deixa), e o Perfil, que não mostra o CRN. Acusa com
+// código de saída 1.
 //
 // Precisa do mock SEM cenário (`node ferramentas/mock-supabase.cjs`) e do dev
 // no ar (ver LEIAME.md). As consultas do mock voltam ao início antes e depois
-// (POST /__reset).
+// (POST /__reset). O que o paciente não faz pela tela (o nutri cancelar ou
+// marcar uma consulta) sai das funções do próprio mock, com o token do nutri.
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
@@ -21,6 +28,15 @@ const TZ = "America/Sao_Paulo";
 const diaSP = (n) =>
   new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" })
     .format(new Date(Date.now() + n * 86400000));
+
+// O rótulo que a linha e o cartão mostram para uma consulta `n` dias à frente, escrito
+// aqui de novo e à mão de propósito: se o app e o roteiro errarem juntos, é a mesma conta.
+const DIA_CURTO = ["dom.", "seg.", "ter.", "qua.", "qui.", "sex.", "sáb."];
+const rotuloEm = (n, hhmm) => {
+  const dia = diaSP(n);
+  return `${DIA_CURTO[new Date(dia + "T12:00:00Z").getUTCDay()]}, ${dia.slice(8, 10)}/${dia.slice(5, 7)} às ${hhmm}`;
+};
+const instante = (n, hhmm) => new Date(`${diaSP(n)}T${hhmm}:00-03:00`).toISOString();
 
 const resultados = [];
 function ok(passou, msg, detalhe = "") {
@@ -78,7 +94,8 @@ async function clicar(loc) {
       viewport: { width: w, height: h }, deviceScaleFactor: mobile ? 2 : 1, isMobile: mobile,
       hasTouch: mobile, colorScheme: escuro ? "dark" : "light", locale: "pt-BR", storageState: estado,
     });
-  const abrir = async (ctx, rota) => {
+  // "Meu plano": onde o cartão de consulta, com as ações, mora.
+  const abrir = async (ctx, rota = "/app/nutricionista") => {
     const page = await ctx.newPage();
     page.on("console", (m) => m.type() === "error" && erros.push(`${rota}: ${m.text()}`));
     page.on("pageerror", (e) => erros.push(`${rota}: ${e.message}`));
@@ -89,7 +106,18 @@ async function clicar(loc) {
     await page.waitForTimeout(500);
     return page;
   };
+  // A Início: a linha da consulta, quando há, é o único link para #consulta.
+  const abrirInicio = async (ctx) => {
+    const page = await ctx.newPage();
+    page.on("console", (m) => m.type() === "error" && erros.push(`/app: ${m.text()}`));
+    page.on("pageerror", (e) => erros.push(`/app: ${e.message}`));
+    await page.goto(APP + "/app", { waitUntil: "networkidle", timeout: 120000 });
+    await page.locator("h1").first().waitFor({ timeout: 60000 });
+    await page.waitForTimeout(500);
+    return page;
+  };
   const cartao = (page) => page.locator('section[aria-label="Consulta"]');
+  const linha = (page) => page.locator('a[href="/app/nutricionista#consulta"]');
   const texto = async (loc) => (await loc.innerText()).replace(/\s+/g, " ").trim();
   const esperarTexto = (page, t) =>
     page
@@ -98,30 +126,107 @@ async function clicar(loc) {
       })
       .catch(() => {});
 
+  // O que o paciente não faz pela tela (o nutri cancelar ou marcar uma consulta)
+  // sai das funções do mock, com o token de cada um.
+  const entrar = async (email) =>
+    (await fetch(`${MOCK}/auth/v1/token?grant_type=password`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email, password: "senha-de-mentira" }),
+    })).json();
+  const chamar = async (sessao, nome, args, para) => {
+    const r = await (await fetch(`${MOCK}/rest/v1/rpc/${nome}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${sessao.access_token}` },
+      body: JSON.stringify(args),
+    })).json();
+    ok(r.ok === true, `preparo: ${para}`, JSON.stringify(r));
+    return r;
+  };
+  const maria = await entrar("maria.teste@exemplo.com");
+  const nutri = await entrar("nutri@exemplo.com");
+
+  /**
+   * Confere a linha da Início numa situação: o texto inteiro (título e
+   * subtítulo, na ordem), que ela é o link para Meu plano, que o cartão
+   * inteiro NÃO está na Início e que a linha vem antes de tudo que é cartão.
+   */
+  async function conferirLinha(ctx, rotulo, esperado, foto) {
+    const page = await abrirInicio(ctx);
+    const n = await linha(page).count();
+    const t = n === 1 ? await texto(linha(page)) : `(${n} links para #consulta)`;
+    ok(n === 1 && t === esperado, `Início, ${rotulo}: a linha diz "${esperado}"`, t);
+    if (n === 1) {
+      const caixas = await page.evaluate(() => {
+        const a = document.querySelector('a[href="/app/nutricionista#consulta"]').getBoundingClientRect();
+        const primeiro = document.querySelector("main section, section.card");
+        return { linhaTopo: a.top, altura: a.height, secaoTopo: primeiro ? primeiro.getBoundingClientRect().top : null };
+      });
+      ok(caixas.altura >= 44, `Início, ${rotulo}: a linha tem ao menos 44 px de alvo de toque (${Math.round(caixas.altura)}px)`);
+      ok(caixas.secaoTopo === null || caixas.linhaTopo < caixas.secaoTopo,
+        `Início, ${rotulo}: a linha vem antes do primeiro cartão (${Math.round(caixas.linhaTopo)}px < ${Math.round(caixas.secaoTopo)}px)`);
+    }
+    ok((await cartao(page).count()) === 0, `Início, ${rotulo}: o cartão de consulta, com as ações, não está mais aqui`);
+    if (foto) await page.screenshot({ path: `${OUT}/linha-${foto}.png`, clip: { x: 0, y: 0, width: 390, height: 300 } });
+    await page.close();
+  }
+
   // Prints: Início e Meu plano, celular e computador, claro e escuro.
   console.log("\nPrints");
-  for (const [nome, w, h, mobile] of [["mobile", 390, 844, true], ["desktop", 1440, 900, false]]) {
+  for (const [nome, w, h, mobile] of [["mobile", 390, 844, true], ["desktop", 1280, 800, false]]) {
     for (const escuro of [false, true]) {
       const ctx = await contexto(w, h, mobile, escuro);
       if (escuro) await ctx.addInitScript(() => { try { localStorage.setItem("pf-theme", "dark"); } catch {} });
-      for (const [tela, rota] of [["inicio", "/app"], ["meu-plano", "/app/nutricionista"]]) {
-        const page = await abrir(ctx, rota);
+      const quando = `${nome}/${escuro ? "escuro" : "claro"}`;
+      {
+        const page = await abrirInicio(ctx);
         const doc = await page.evaluate(() => document.documentElement.scrollWidth);
-        ok(doc <= w, `sem transbordo: ${tela}/${nome}/${escuro ? "escuro" : "claro"} (${doc}px)`);
-        await cartao(page).screenshot({ path: `${OUT}/consulta-${tela}-${nome}-${escuro ? "escuro" : "claro"}.png` });
+        ok(doc <= w, `sem transbordo: inicio/${quando} (${doc}px)`);
+        await page.screenshot({ path: `${OUT}/inicio-${nome}-${escuro ? "escuro" : "claro"}.png` });
+        await page.close();
+      }
+      {
+        const page = await abrir(ctx);
+        const doc = await page.evaluate(() => document.documentElement.scrollWidth);
+        ok(doc <= w, `sem transbordo: meu-plano/${quando} (${doc}px)`);
+        await cartao(page).screenshot({ path: `${OUT}/consulta-meu-plano-${nome}-${escuro ? "escuro" : "claro"}.png` });
         await page.close();
       }
       await ctx.close();
     }
   }
 
-  console.log("\nO cartão");
   const cel = await contexto(390, 844, true, false);
+
+  console.log("\nA linha na Início");
+  // Agendada: o cenário padrão tem a próxima daqui a 3 dias, 14:00, online.
+  await conferirLinha(cel, "agendada", `Próxima consulta ${rotuloEm(3, "14:00")} · online`, "agendada");
+
+  // O link leva ao cartão em Meu plano, já rolado até ele.
   {
-    const page = await abrir(cel, "/app");
+    const page = await abrirInicio(cel);
+    await clicar(linha(page));
+    await page.waitForURL("**/app/nutricionista#consulta", { timeout: 60000 }).catch(() => {});
+    ok(new URL(page.url()).pathname === "/app/nutricionista" && new URL(page.url()).hash === "#consulta",
+      "o link leva a /app/nutricionista#consulta", page.url());
+    await cartao(page).waitFor({ state: "visible", timeout: 60000 });
+    await page.waitForTimeout(800);
+    const ondeFica = await page.evaluate(() => {
+      const r = document.getElementById("consulta")?.getBoundingClientRect();
+      return r ? { topo: Math.round(r.top), base: Math.round(r.bottom), janela: innerHeight } : null;
+    });
+    ok(!!ondeFica && ondeFica.topo >= 56 && ondeFica.topo < ondeFica.janela / 2,
+      "e a página chega rolada até o cartão, abaixo da barra de cima (scroll-mt)", JSON.stringify(ondeFica));
+    await page.close();
+  }
+
+  console.log("\nO cartão, em Meu plano");
+  {
+    const page = await abrir(cel);
     const t = await texto(cartao(page));
     ok(t.includes("Próxima consulta") && t.includes("às 14:00") && t.includes("online"),
-      "Início: mostra a próxima consulta (daqui a 3 dias, 14:00, online)", t);
+      "Meu plano: mostra a próxima consulta (daqui a 3 dias, 14:00, online)", t);
+    ok((await page.locator("#consulta section[aria-label='Consulta']").count()) === 1,
+      "e o cartão está dentro de #consulta, o destino da linha");
     // Pedir para remarcar: sem recado avisa; com recado, fica o aviso de enviado.
     await clicar(cartao(page).getByRole("button", { name: "Pedir para remarcar" }));
     await clicar(cartao(page).getByRole("button", { name: "Enviar pedido" }));
@@ -133,13 +238,28 @@ async function clicar(loc) {
     ok((await texto(cartao(page))).includes("Pedido de remarcação enviado"), "depois de pedir, o cartão diz que o pedido de remarcação foi enviado");
     await page.close();
   }
+  console.log("\nA linha na Início, depois");
+  await conferirLinha(cel, "remarcação pedida", `Próxima consulta ${rotuloEm(3, "14:00")} · online · remarcação pedida`, "remarcacao-pedida");
   await fetch(MOCK + "/__reset", { method: "POST" });
   {
-    const page = await abrir(cel, "/app");
+    const page = await abrir(cel);
     await clicar(cartao(page).getByRole("button", { name: "Cancelar", exact: true }));
     await esperarTexto(page, "Nenhuma consulta marcada");
     ok((await texto(cartao(page))).includes("Nenhuma consulta marcada"), "Cancelar (com confirmação) tira a consulta");
-
+    await page.close();
+  }
+  // Cancelada pela própria paciente não é aviso: sem consulta, a linha some.
+  {
+    const page = await abrirInicio(cel);
+    const t = await texto(page.locator("body"));
+    ok((await linha(page).count()) === 0, "Início, nenhuma consulta: sem a linha (e sem link para #consulta)");
+    ok(!t.includes("Não deu para carregar a consulta") && !t.includes("Próxima consulta") && !t.includes("Consulta pedida") && !/Consulta de .* cancelada/.test(t),
+      "e sem nenhum texto de consulta no lugar (cancelada por ela mesma não conta)");
+    await page.screenshot({ path: `${OUT}/inicio-sem-consulta.png`, clip: { x: 0, y: 0, width: 390, height: 300 } });
+    await page.close();
+  }
+  {
+    const page = await abrir(cel);
     // Pedir consulta: horário no passado é recusado; no futuro vira pedido.
     await clicar(cartao(page).getByRole("button", { name: "Pedir consulta" }));
     await cartao(page).locator('input[type="date"]').fill(diaSP(5));
@@ -152,14 +272,62 @@ async function clicar(loc) {
     ok(t.includes("Pedido enviado para") && t.includes("às 09:30") && t.includes("online") && t.includes("Aguardando resposta"),
       "Pedir consulta: o cartão mostra o pedido aguardando o nutricionista", t);
     ok((await cartao(page).getByRole("button", { name: "Pedir consulta" }).count()) === 0, "com um pedido aberto, não dá para pedir outro");
+    await page.close();
+  }
+  await conferirLinha(cel, "pedido", `Consulta pedida ${rotuloEm(5, "09:30")} · aguardando Ricardo`, "pedido");
+  {
+    const page = await abrir(cel);
     await clicar(cartao(page).getByRole("button", { name: "Cancelar pedido" }));
     await esperarTexto(page, "Nenhuma consulta marcada");
     ok((await texto(cartao(page))).includes("Nenhuma consulta marcada"), "Cancelar pedido volta ao 'Pedir consulta'");
     await page.close();
   }
+
+  // Agendada e, ao mesmo tempo, um pedido aberto: o nutri marcou sem responder.
+  console.log("\nA linha na Início, por funções do mock");
+  await fetch(MOCK + "/__reset", { method: "POST" });
+  await chamar(maria, "cancelar_consulta", { p_id: "ap-m2" }, "a Maria cancela a consulta marcada");
+  await chamar(maria, "pedir_consulta", { p_inicio: instante(5, "09:30"), p_modo: "online", p_mensagem: null }, "a Maria pede outra");
+  await chamar(nutri, "marcar_consulta", {
+    p_patient: maria.user.id, p_inicio: instante(7, "10:00"), p_duracao: 45, p_tipo: "retorno", p_modo: "presencial",
+  }, "o nutri marca uma consulta sem responder ao pedido");
+  await conferirLinha(cel, "agendada com um pedido aberto",
+    `Próxima consulta ${rotuloEm(7, "10:00")} · presencial · e um pedido aguardando`, "agendada-e-pedido");
+
+  // Cancelada pelo nutri nos últimos 7 dias, sem outra marcada. A do cenário é
+  // daqui a 3 dias: a cancelada que ainda ia acontecer também conta.
+  await fetch(MOCK + "/__reset", { method: "POST" });
+  await chamar(nutri, "fechar_consulta", { p_id: "ap-m2", p_desfecho: "cancelada" }, "o nutri cancela a consulta marcada");
+  await conferirLinha(cel, "cancelada pelo nutri",
+    `Consulta de ${rotuloEm(3, "14:00").split(" às ")[0]} cancelada por Ricardo`, "cancelada-pelo-nutri");
   {
-    const page = await abrir(cel, "/app/nutricionista");
-    ok((await texto(cartao(page))).includes("Consulta"), '"Meu plano" também tem o cartão de consulta');
+    // A mesma regra no cartão de Meu plano: a linha e o cartão não discordam.
+    const page = await abrir(cel);
+    const t = await texto(cartao(page));
+    ok(t.includes("Ricardo cancelou a consulta de " + rotuloEm(3, "14:00")) && t.includes("Pedir consulta"),
+      "Meu plano: o cartão diz a mesma coisa (Ricardo cancelou a consulta) e oferece pedir outra", t);
+    await page.close();
+  }
+
+  // Leitura que falhou: nunca o silêncio do "nenhuma".
+  await fetch(MOCK + "/__reset", { method: "POST" });
+  await fetch(MOCK + "/__falhar", {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ tabela: "appointments" }),
+  });
+  {
+    const page = await abrirInicio(cel);
+    const aviso = page.getByText("Não deu para carregar a consulta", { exact: true });
+    ok((await aviso.count()) === 1, 'Início, leitura falhou: a linha diz "Não deu para carregar a consulta"');
+    ok((await linha(page).count()) === 0, "e não oferece link para uma consulta que não leu");
+    ok(!(await texto(page.locator("body"))).includes("Próxima consulta"), 'e não diz "Próxima consulta"');
+    await page.screenshot({ path: `${OUT}/linha-falhou.png`, clip: { x: 0, y: 0, width: 390, height: 300 } });
+    await page.close();
+  }
+  await fetch(MOCK + "/__reset", { method: "POST" });
+  {
+    // Passada a falha, a linha volta com a consulta (o /__reset desliga o /__falhar).
+    const page = await abrirInicio(cel);
+    ok((await linha(page).count()) === 1, "depois do /__reset, a linha volta");
     await page.close();
   }
   await cel.close();
