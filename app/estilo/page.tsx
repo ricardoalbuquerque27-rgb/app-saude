@@ -8,6 +8,14 @@ import {
   PARES_GRAFICO,
   type NomeCor,
 } from "@/lib/temaClinico";
+import {
+  TEMA_APP,
+  NOMES_COR_APP,
+  PARES_TEXTO_APP,
+  PARES_GRAFICO_APP,
+  VIZINHOS_MACRO,
+  type NomeCorApp,
+} from "@/lib/temaApp";
 
 // Guia de estilo — SÓ desenvolvimento.
 //
@@ -28,13 +36,19 @@ const brand = (config.theme?.extend?.colors as any).brand as Record<string, stri
 const FUNDO_CLARO = "#ffffff";
 const FUNDO_ESCURO = "#0b111e";
 
-function Nota({ r }: { r: number }) {
+function Nota({ r, minimo }: { r: number; minimo?: number }) {
+  // `minimo` é para o par que não segue a régua do WCAG: os vizinhos dos
+  // macros pedem só 2:1, e "falha" ao lado de 2,3 enganaria.
   const [rotulo, cor] =
-    r >= 4.5
-      ? ["AA", "bg-brand-100 text-brand-800"]
-      : r >= 3
-        ? ["grande", "bg-amber-100 text-amber-800"]
-        : ["falha", "bg-rose-100 text-rose-800"];
+    minimo !== undefined
+      ? r >= minimo
+        ? [`ok (${minimo}:1)`, "bg-brand-100 text-brand-800"]
+        : ["falha", "bg-rose-100 text-rose-800"]
+      : r >= 4.5
+        ? ["AA", "bg-brand-100 text-brand-800"]
+        : r >= 3
+          ? ["grande", "bg-amber-100 text-amber-800"]
+          : ["falha", "bg-rose-100 text-rose-800"];
   return (
     <span className={`rounded px-1 py-px text-[10px] font-bold ${cor}`}>
       {r.toFixed(2)} {rotulo}
@@ -120,6 +134,78 @@ function TemaClinico() {
                   </span>
                   <span className="flex items-center gap-1">
                     escuro <Nota r={razaoEm("escuro", f, b)} />
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </Secao>
+  );
+}
+
+function PaletaDoApp() {
+  // Mesma ideia da clínica: os pares são os que lib/temaApp.test.ts reprova
+  // abaixo do mínimo, com a razão nos dois temas. As amostras vêm da tabela
+  // (TEMA_APP), não de hex digitado aqui.
+  const grupos: [string, [NomeCorApp, NomeCorApp][], number | undefined][] = [
+    ["Texto (mínimo 4,5:1)", PARES_TEXTO_APP, undefined],
+    ["Gráfico (mínimo 3:1)", PARES_GRAFICO_APP, undefined],
+    [
+      "Macros vizinhos (mínimo 2:1; contra o fundo não passam 3:1 e a legenda dá nome e gramas em texto)",
+      VIZINHOS_MACRO,
+      2,
+    ],
+  ];
+  const razaoEm = (tema: "claro" | "escuro", f: NomeCorApp, b: NomeCorApp) =>
+    razaoContraste(TEMA_APP[tema][f], TEMA_APP[tema][b]);
+  return (
+    <Secao
+      titulo="Paleta do app"
+      nota="Cores do app do paciente, de lib/temaApp.ts: variáveis --app-* em :root e .dark, classes bg-app-*, text-app-*, border-app-*. Os papéis comuns são os do clínico."
+    >
+      <div className="space-y-4">
+        <div className="grid gap-3 lg:grid-cols-2">
+          {(["claro", "escuro"] as const).map((tema) => (
+            <div key={tema}>
+              <p className="eyebrow mb-1.5">Tema {tema}</p>
+              <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
+                {NOMES_COR_APP.map((nome) => (
+                  <div key={nome} className="text-center">
+                    <div
+                      className="h-9 w-full rounded-md border border-black/10"
+                      style={{ backgroundColor: TEMA_APP[tema][nome] }}
+                    />
+                    <p className="mt-0.5 break-all text-[10px] text-slate-700">
+                      {nome}
+                    </p>
+                    <p className="text-[10px] text-slate-500">
+                      {TEMA_APP[tema][nome]}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+        {grupos.map(([titulo, pares, minimo]) => (
+          <div key={titulo}>
+            <p className="eyebrow mb-1.5">{titulo}</p>
+            <ul className="space-y-1.5">
+              {pares.map(([f, b]) => (
+                <li
+                  key={`${f}/${b}`}
+                  className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-slate-100 pb-1.5 text-xs text-slate-700"
+                >
+                  <code className="w-52 shrink-0 text-[11px]">
+                    {f} sobre {b}
+                  </code>
+                  <span className="flex items-center gap-1">
+                    claro <Nota r={razaoEm("claro", f, b)} minimo={minimo} />
+                  </span>
+                  <span className="flex items-center gap-1">
+                    escuro <Nota r={razaoEm("escuro", f, b)} minimo={minimo} />
                   </span>
                 </li>
               ))}
@@ -316,6 +402,9 @@ export default function GuiaDeEstilo() {
       </div>
       <div className="border-t border-slate-200 p-5">
         <TemaClinico />
+      </div>
+      <div className="border-t border-slate-200 p-5">
+        <PaletaDoApp />
       </div>
     </main>
   );

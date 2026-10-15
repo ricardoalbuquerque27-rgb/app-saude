@@ -1,7 +1,9 @@
 import type { Config } from "tailwindcss";
 // Import RELATIVO de propósito: o carregador de config do Tailwind não
-// resolve o alias "@/". Por isso lib/temaClinico.ts também não importa nada.
+// resolve o alias "@/". Por isso lib/temaClinico.ts não importa nada, e
+// lib/temaApp.ts só importa o clínico, também por caminho relativo.
 import { NOMES_COR } from "./lib/temaClinico";
+import { NOMES_COR_APP } from "./lib/temaApp";
 
 const config: Config = {
   darkMode: "class",
@@ -31,6 +33,13 @@ const config: Config = {
         // lib/temaClinico.ts, a mesma que os testes de contraste usam.
         clin: Object.fromEntries(
           NOMES_COR.map((nome) => [nome, `var(--clin-${nome})`])
+        ),
+        // Paleta do app do paciente. Diferente da clínica, as variáveis
+        // --app-* são globais (:root e .dark, por cssDoTemaApp() no layout
+        // raiz), então bg-app-*, text-app-* e border-app-* não precisam de
+        // `dark:`: o par claro/escuro está dentro da variável.
+        app: Object.fromEntries(
+          NOMES_COR_APP.map((nome) => [nome, `var(--app-${nome})`])
         ),
       },
       fontFamily: {

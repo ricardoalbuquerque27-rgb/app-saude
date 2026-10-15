@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Sora } from "next/font/google";
 import "./globals.css";
 import PwaRegister from "@/components/PwaRegister";
+import { cssDoTemaApp } from "@/lib/temaApp";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const sora = Sora({
@@ -37,6 +38,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR" className={`${inter.variable} ${sora.variable}`}>
+      <head>
+        {/* As variáveis --app-* saem da mesma tabela que o teste de contraste
+            confere (lib/temaApp.ts); não há segunda lista em globals.css. */}
+        <style dangerouslySetInnerHTML={{ __html: cssDoTemaApp() }} />
+      </head>
       <body className="font-sans antialiased">
         <PwaRegister />
         {children}
