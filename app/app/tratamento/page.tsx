@@ -150,7 +150,7 @@ export default function TratamentoPage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center py-20 text-slate-500">
+      <div className="flex justify-center py-20 text-app-texto-2">
         <Loader2 className="h-6 w-6 animate-spin" />
       </div>
     );
@@ -222,13 +222,13 @@ function SetupTreatment({ onCreated }: { onCreated: () => void }) {
 
   return (
     <div className="space-y-5">
-      <div className="card border-brand-200 bg-brand-50/50 dark:border-brand-900/50 dark:bg-brand-950/20">
+      <div className="card">
         <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
-            <Syringe className="h-5 w-5" />
+          <div className="icon-badge">
+            <Syringe className="h-4 w-4" />
           </div>
-          <div className="text-sm text-slate-600 dark:text-slate-300">
-            <p className="font-semibold text-slate-900 dark:text-white">
+          <div className="text-sm text-app-texto-2">
+            <p className="font-semibold text-app-texto">
               Modo Caneta
             </p>
             <p className="mt-1">
@@ -241,9 +241,7 @@ function SetupTreatment({ onCreated }: { onCreated: () => void }) {
       </div>
 
       <form onSubmit={submit} className="card space-y-4">
-        <h2 className="font-semibold text-slate-900 dark:text-white">
-          Configurar tratamento
-        </h2>
+        <h2 className="section-title">Configurar tratamento</h2>
         <Field label="Medicamento">
           <select
             className="input"
@@ -296,14 +294,14 @@ function SetupTreatment({ onCreated }: { onCreated: () => void }) {
             onChange={(e) => setStart(e.target.value)}
           />
         </Field>
-        <label className="flex items-center gap-3 rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+        <label className="flex items-center gap-3 rounded-xl border border-app-linha p-3">
           <input
             type="checkbox"
             checked={remind}
             onChange={(e) => setRemind(e.target.checked)}
-            className="h-4 w-4 accent-brand-500"
+            className="h-4 w-4 accent-app-primaria"
           />
-          <span className="flex items-center gap-1.5 text-sm text-slate-700 dark:text-slate-200">
+          <span className="flex items-center gap-1.5 text-sm text-app-texto">
             <Bell className="h-4 w-4" /> Receber lembrete no dia da aplicação
           </span>
         </label>
@@ -313,7 +311,7 @@ function SetupTreatment({ onCreated }: { onCreated: () => void }) {
         </button>
       </form>
 
-      <p className="flex items-start gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+      <p className="flex items-start gap-1.5 text-xs text-app-texto-2">
         <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
         O Pace Fit ajuda a organizar seu tratamento, mas não substitui seu médico.
         Doses e mudanças devem ser sempre orientadas por um profissional.
@@ -361,17 +359,18 @@ function ActiveTreatment({
 
   return (
     <div className="space-y-5">
-      {/* Hero — próxima aplicação */}
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-600 to-brand-800 p-6 text-white shadow-xl">
-        <div className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-white/10 blur-2xl" />
-        <div className="relative flex items-start justify-between gap-3">
+      {/* Próxima aplicação: o cartão comum, com o botão principal. O bloco
+          verde com degradê, sombra e brilho era o único destaque decorativo
+          do app; o que importa aqui é a data e o botão. */}
+      <section className="card">
+        <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="flex items-center gap-1.5 text-sm text-brand-50/80">
+            <p className="flex items-center gap-1.5 text-sm text-app-texto-2">
               <Syringe className="h-4 w-4" /> {treatment.medication}
               {treatment.dose ? ` · ${treatment.dose}` : ""}
             </p>
-            <h2 className="mt-2 text-2xl font-bold tracking-tight">{nextLabel}</h2>
-            <p className="mt-0.5 text-sm text-brand-50/90">
+            <h2 className="tabular mt-2 text-2xl font-semibold text-app-texto">{nextLabel}</h2>
+            <p className="tabular mt-0.5 text-sm text-app-texto-2">
               Próxima aplicação: {fmt(next)}
             </p>
           </div>
@@ -393,14 +392,12 @@ function ActiveTreatment({
 
       {/* Progresso de peso */}
       <div className="card">
-        <div className="mb-3 flex items-center gap-2">
-          <TrendingDown className="h-5 w-5 text-brand-700 dark:text-brand-400" />
-          <h2 className="font-semibold text-slate-900 dark:text-white">
-            Progresso desde o início
-          </h2>
-        </div>
+        <h2 className="section-title mb-3">
+          <TrendingDown className="h-5 w-5 text-app-primaria" />
+          Progresso desde o início
+        </h2>
         {startWeight != null && currentWeight != null ? (
-          <div className="grid grid-cols-3 gap-3 text-center">
+          <div className="grid grid-cols-3 divide-x divide-app-linha text-center">
             <Stat label="Inicial" value={`${startWeight}`} unit="kg" />
             <Stat label="Atual" value={`${currentWeight}`} unit="kg" />
             <Stat
@@ -411,9 +408,9 @@ function ActiveTreatment({
             />
           </div>
         ) : (
-          <p className="text-sm text-slate-500 dark:text-slate-400">
+          <p className="text-sm text-app-texto-2">
             Registre seu peso em{" "}
-            <Link href="/app/medidas" className="font-medium text-brand-700 hover:underline dark:text-brand-400">
+            <Link href="/app/medidas" className="font-medium text-app-primaria hover:underline">
               Medidas
             </Link>{" "}
             para ver sua evolução aqui.
@@ -424,7 +421,7 @@ function ActiveTreatment({
       {/* Efeitos colaterais */}
       <SideEffectsCard effects={effects} onChange={onChange} />
 
-      <p className="flex items-start gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+      <p className="flex items-start gap-1.5 text-xs text-app-texto-2">
         <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
         Em caso de efeitos fortes ou persistentes, procure seu médico. O Pace Fit
         não substitui acompanhamento profissional.
@@ -446,16 +443,16 @@ function Stat({
 }) {
   const color =
     highlight === "good"
-      ? "text-brand-700 dark:text-brand-400"
+      ? "text-app-primaria"
       : highlight === "bad"
-        ? "text-rose-600 dark:text-rose-400"
-        : "text-slate-900 dark:text-white";
+        ? "text-app-perigo"
+        : "text-app-texto";
   return (
-    <div className="rounded-xl bg-slate-50 py-3 dark:bg-slate-800/40">
-      <p className="text-xs font-medium text-slate-500 dark:text-slate-400">{label}</p>
-      <p className={`mt-0.5 text-xl font-bold tracking-tight ${color}`}>
+    <div className="px-1 py-1">
+      <p className="text-xs font-medium text-app-texto-2">{label}</p>
+      <p className={`tabular mt-0.5 text-xl font-semibold ${color}`}>
         {value}
-        {unit && <span className="ml-0.5 text-sm font-medium text-slate-500">{unit}</span>}
+        {unit && <span className="ml-0.5 text-sm font-medium text-app-texto-2">{unit}</span>}
       </p>
     </div>
   );
@@ -499,7 +496,7 @@ function ApplyButton({
     <button
       onClick={apply}
       disabled={appliedToday || saving}
-      className="relative mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-white/95 py-3 font-semibold text-brand-700 shadow transition hover:bg-white disabled:opacity-80"
+      className="btn-primary mt-5 w-full py-3 disabled:opacity-80"
     >
       {saving ? (
         <Loader2 className="h-4 w-4 animate-spin" />
@@ -549,14 +546,12 @@ function ProteinCard({
     <div className="card">
       <div className="mb-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Beef className="h-5 w-5 text-rose-500" />
-          <h2 className="font-semibold text-slate-900 dark:text-white">
-            Proteína de hoje
-          </h2>
+          <Beef className="h-5 w-5 text-app-primaria" />
+          <h2 className="section-title">Proteína de hoje</h2>
         </div>
         <button
           onClick={() => setEditing((v) => !v)}
-          className="text-xs font-medium text-brand-700 hover:underline dark:text-brand-400"
+          className="inline-flex min-h-[44px] items-center text-xs font-medium text-app-primaria hover:underline"
         >
           {proteinGoal ? "Editar meta" : "Definir meta"}
         </button>
@@ -582,9 +577,9 @@ function ProteinCard({
       ) : proteinGoal ? (
         <>
           <div className="flex items-baseline justify-between">
-            <p className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+            <p className="tabular text-2xl font-semibold text-app-texto">
               {Math.round(proteinToday)}
-              <span className="text-sm font-medium text-slate-500"> / {proteinGoal} g</span>
+              <span className="text-sm font-medium text-app-texto-2"> / {proteinGoal} g</span>
             </p>
             {low && (
               <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
@@ -592,21 +587,21 @@ function ProteinCard({
               </span>
             )}
           </div>
-          <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+          <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-app-linha">
             <div
-              className={`h-full rounded-full transition-all ${low ? "bg-amber-400" : "bg-rose-500"}`}
+              className={`h-full rounded-full transition-all ${low ? "bg-app-atencao" : "bg-app-primaria"}`}
               style={{ width: `${pct}%` }}
             />
           </div>
-          <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+          <p className="mt-2 text-xs text-app-texto-2">
             Proteína é essencial para preservar músculo durante o tratamento.{" "}
-            <Link href="/app/dieta" className="font-medium text-brand-700 hover:underline dark:text-brand-400">
+            <Link href="/app/dieta" className="font-medium text-app-primaria hover:underline">
               Registrar refeição
             </Link>
           </p>
         </>
       ) : (
-        <p className="text-sm text-slate-500 dark:text-slate-400">
+        <p className="text-sm text-app-texto-2">
           Defina uma meta de proteína para acompanhar todos os dias e proteger sua
           massa muscular.
         </p>
@@ -659,12 +654,10 @@ function SideEffectsCard({
 
   return (
     <div className="card">
-      <div className="mb-3 flex items-center gap-2">
-        <Activity className="h-5 w-5 text-violet-500" />
-        <h2 className="font-semibold text-slate-900 dark:text-white">
-          Como você está hoje?
-        </h2>
-      </div>
+      <h2 className="section-title mb-3">
+        <Activity className="h-5 w-5 text-app-primaria" />
+        Como você está hoje?
+      </h2>
 
       <div className="space-y-3">
         <SevRow label="Náusea" value={nausea} onChange={setNausea} />
@@ -690,7 +683,7 @@ function SideEffectsCard({
 
       {history.length > 0 && (
         <div className="mt-5">
-          <p className="mb-2 text-xs font-medium text-slate-500 dark:text-slate-400">
+          <p className="mb-2 text-xs font-medium text-app-texto-2">
             Últimos dias (náusea)
           </p>
           <div className="flex items-end gap-1">
@@ -701,7 +694,7 @@ function SideEffectsCard({
                   title={`${fmt(e.date)}: ${SEV[e.nausea]?.label ?? "-"}`}
                   style={{ opacity: 0.5 + e.nausea * 0.16 }}
                 />
-                <span className="text-[11px] text-slate-500">
+                <span className="tabular text-[11px] text-app-texto-2">
                   {e.date.slice(8, 10)}
                 </span>
               </div>
@@ -724,17 +717,17 @@ function SevRow({
 }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <span className="text-sm text-slate-700 dark:text-slate-200">{label}</span>
+      <span className="text-sm text-app-texto">{label}</span>
       <div className="flex gap-1">
         {SEV.map((s) => (
           <button
             key={s.v}
             type="button"
             onClick={() => onChange(s.v)}
-            className={`rounded-lg px-2.5 py-1 text-xs font-medium transition ${
+            className={`min-h-[44px] rounded-lg px-2.5 text-xs font-medium transition ${
               value === s.v
-                ? "bg-brand-700 text-white"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                ? "bg-app-primaria text-app-sobre-primaria"
+                : "bg-app-pagina text-app-texto-2 hover:bg-app-primaria-fundo"
             }`}
           >
             {s.label}
@@ -784,7 +777,7 @@ function EditTreatment({
     <>
       <button
         onClick={() => setOpen(true)}
-        className="shrink-0 rounded-lg bg-white/15 p-2 text-white backdrop-blur transition hover:bg-white/25"
+        className="btn-ghost h-11 w-11 shrink-0 px-0"
         aria-label="Editar tratamento"
       >
         <Pencil className="h-4 w-4" />
@@ -792,8 +785,8 @@ function EditTreatment({
       {open && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4">
           <div className="absolute inset-0" onClick={() => setOpen(false)} />
-          <div className="relative z-10 w-full max-w-md rounded-t-2xl bg-white p-5 text-slate-900 shadow-xl sm:rounded-2xl dark:bg-slate-900 dark:text-white">
-            <h3 className="mb-4 text-lg font-bold">Editar tratamento</h3>
+          <div className="relative z-10 w-full max-w-md rounded-t-2xl border border-app-linha bg-app-cartao p-5 text-app-texto sm:rounded-2xl">
+            <h3 className="mb-4 text-[17px] font-semibold">Editar tratamento</h3>
             <div className="space-y-3">
               <Field label="Dose">
                 <input
@@ -814,12 +807,12 @@ function EditTreatment({
                   <option value={14}>Quinzenal (14 dias)</option>
                 </select>
               </Field>
-              <label className="flex items-center gap-3 rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+              <label className="flex items-center gap-3 rounded-xl border border-app-linha p-3">
                 <input
                   type="checkbox"
                   checked={remind}
                   onChange={(e) => setRemind(e.target.checked)}
-                  className="h-4 w-4 accent-brand-500"
+                  className="h-4 w-4 accent-app-primaria"
                 />
                 <span className="flex items-center gap-1.5 text-sm">
                   <Bell className="h-4 w-4" /> Lembrete no dia da aplicação
@@ -831,7 +824,7 @@ function EditTreatment({
             </button>
             <button
               onClick={endTreatment}
-              className="mt-2 w-full rounded-xl py-2.5 text-sm font-medium text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/30"
+              className="mt-2 min-h-[44px] w-full rounded-xl text-sm font-medium text-app-perigo hover:bg-app-perigo-fundo"
             >
               Encerrar tratamento
             </button>

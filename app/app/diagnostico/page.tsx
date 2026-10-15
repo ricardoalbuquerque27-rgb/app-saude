@@ -29,9 +29,8 @@ type Level = "ok" | "warn" | "error";
 const STYLES: Record<Level, { icon: any; cls: string; badge: string }> = {
   ok: {
     icon: CheckCircle2,
-    cls: "text-brand-700 dark:text-brand-400",
-    badge:
-      "bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300",
+    cls: "text-app-primaria",
+    badge: "bg-app-primaria-fundo text-app-primaria",
   },
   warn: {
     icon: AlertTriangle,
@@ -64,20 +63,20 @@ function Row({
   const s = STYLES[level];
   const StatusIcon = s.icon;
   return (
-    <div className="flex items-start gap-3 border-b border-slate-100 py-3.5 last:border-0 dark:border-white/[0.06]">
-      <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-        <Icon className="h-5 w-5" />
+    <div className="flex items-start gap-3 border-b border-app-linha py-3.5 last:border-0">
+      <div className="icon-badge mt-0.5">
+        <Icon className="h-4 w-4" />
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="font-semibold text-slate-900 dark:text-white">{title}</p>
+          <p className="font-semibold text-app-texto">{title}</p>
           <span
             className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${s.badge}`}
           >
             <StatusIcon className="h-3 w-3" /> {status}
           </span>
         </div>
-        <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{desc}</p>
+        <p className="mt-0.5 text-sm text-app-texto-2">{desc}</p>
         {hint && level !== "ok" && (
           <p className={`mt-1 text-xs ${s.cls}`}>{hint}</p>
         )}
@@ -177,7 +176,7 @@ export default function DiagnosticoPage() {
       />
 
       {loading && !data ? (
-        <div className="flex justify-center py-16 text-slate-500">
+        <div className="flex justify-center py-16 text-app-texto-2">
           <Loader2 className="h-6 w-6 animate-spin" />
         </div>
       ) : error ? (
@@ -244,7 +243,7 @@ export default function DiagnosticoPage() {
                 />
               </div>
 
-              <p className="mt-3 text-center text-xs text-slate-500 dark:text-slate-400">
+              <p className="mt-3 text-center text-xs text-app-texto-2">
                 Verificado em {new Date(data.checkedAt).toLocaleString("pt-BR")}.
                 Os valores das chaves nunca são exibidos — apenas se existem.
               </p>

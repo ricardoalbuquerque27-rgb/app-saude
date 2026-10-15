@@ -84,9 +84,10 @@ avisa: o "perfil" é só de sexo, altura e nascimento), a descrição da
 sugestão cortada em duas linhas na Dieta (com a leitura do plano interceptada
 pelo `page.route`) e na Início, e a rolagem até
 `#plano` (direto e pelo link da sugestão da Início), o cardápio de Meu plano
-(sem o "ver em Meu plano"), o formulário de refeição (só a linguagem mudou), os
-atalhos `?novo=1` e `?foto=1`, nenhuma caixa alta nem classe da paleta antiga e
-nenhuma rolagem lateral.
+(sem o "ver em Meu plano", e, com `meals` falhando, sem "Comi isso" e com a
+linha que diz que as refeições do dia não carregaram), o formulário de refeição
+(só a linguagem mudou), os atalhos `?novo=1` e `?foto=1`, nenhuma caixa alta nem
+classe da paleta antiga e nenhuma rolagem lateral.
 
 | `CENARIO`  | Quem entra          | Para quê |
 |------------|---------------------|----------|

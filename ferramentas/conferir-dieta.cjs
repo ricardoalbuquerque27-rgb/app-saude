@@ -957,6 +957,22 @@ async function entrar(ctx, email = "maria.teste@exemplo.com") {
     await p.screenshot({ path: `${OUT}/meu-plano-cardapio-390.png`, fullPage: true });
   });
 
+  // A mesma regra da Dieta, agora em Meu plano: `data ?? []` na leitura das
+  // refeições do dia fazia o plano mostrar tudo como não feito e oferecer
+  // "Comi isso" de novo a quem já registrou.
+  await etapa("Meu plano: refeições do dia falhando", () => comFalha("meals", async () => {
+    await carregar("/app/nutricionista?aba=cardapio");
+    const cartao = p.locator("#plano");
+    ok((await cartao.count()) === 1, "meals falhando: o cardápio de Meu plano segue na tela");
+    const texto = (await cartao.innerText()).replace(/\s+/g, " ");
+    ok(texto.includes("Plano alimentar — fase 1") && texto.includes("2 ovos mexidos"), "com o título e as opções, que são outra leitura");
+    ok((await cartao.getByRole("button", { name: "Comi isso", exact: true }).count()) === 0, 'e sem nenhum "Comi isso"');
+    ok(!/feito/.test(texto) && (await cartao.locator("ul > li span", { hasText: /^comi$/ }).count()) === 0, 'nem "· feito" nem "comi"');
+    const aviso = cartao.getByText("Não deu para carregar as refeições do dia, então o plano não mostra o que já foi registrado.", { exact: true });
+    ok((await aviso.count()) === 1, "e uma linha no cartão diz que não carregou as refeições do dia");
+    await p.screenshot({ path: `${OUT}/falha-meals-meu-plano-390.png`, fullPage: true });
+  }));
+
   // =========================================================================
   console.log("\nLinguagem");
   await etapa("linguagem", async () => {

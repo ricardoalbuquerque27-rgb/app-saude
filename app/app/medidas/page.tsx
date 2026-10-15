@@ -174,19 +174,19 @@ export default function MedidasPage() {
         <div className="card">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+              <p className="text-xs font-medium text-app-texto-2">
                 Peso atual
               </p>
-              <p className="tabular mt-1 text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+              <p className="tabular mt-1 text-3xl font-semibold text-app-texto">
                 {currentWeight ?? "—"}
-                <span className="ml-1 text-base font-medium text-slate-500">
+                <span className="ml-1 text-base font-medium text-app-texto-2">
                   {currentWeight ? "kg" : ""}
                 </span>
               </p>
               {weightDiff != null && (
                 <p
                   className={`mt-1 flex items-center gap-1 text-xs font-medium ${
-                    weightDiff <= 0 ? "text-brand-700 dark:text-brand-400" : "text-rose-500"
+                    weightDiff <= 0 ? "text-app-primaria" : "text-app-perigo"
                   }`}
                 >
                   {weightDiff <= 0 ? (
@@ -199,19 +199,19 @@ export default function MedidasPage() {
                 </p>
               )}
             </div>
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-violet-100 text-violet-600 dark:bg-violet-900/40 dark:text-violet-300">
-              <Scale className="h-6 w-6" />
+            <div className="icon-badge">
+              <Scale className="h-4 w-4" />
             </div>
           </div>
 
           {weightGoal != null ? (
             <div className="mt-4">
               <div className="mb-1.5 flex items-center justify-between text-xs">
-                <span className="flex items-center gap-1 font-medium text-slate-600 dark:text-slate-300">
-                  <Target className="h-3.5 w-3.5 text-brand-700 dark:text-brand-400" />
+                <span className="flex items-center gap-1 font-medium text-app-texto-2">
+                  <Target className="h-3.5 w-3.5 text-app-primaria" />
                   Meta: {weightGoal} kg
                 </span>
-                <span className="font-medium text-slate-500 dark:text-slate-400">
+                <span className="font-medium text-app-texto-2">
                   {goalReached
                     ? "Meta atingida! 🎉"
                     : toGoal != null
@@ -220,9 +220,9 @@ export default function MedidasPage() {
                 </span>
               </div>
               {goalPct != null && (
-                <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                <div className="h-2 w-full overflow-hidden rounded-full bg-app-linha">
                   <div
-                    className="h-full rounded-full bg-gradient-to-r from-brand-400 to-brand-600 transition-all"
+                    className="h-full rounded-full bg-app-primaria transition-all"
                     style={{ width: `${Math.round(goalPct * 100)}%` }}
                   />
                 </div>
@@ -231,7 +231,7 @@ export default function MedidasPage() {
           ) : (
             <Link
               href="/app/perfil"
-              className="mt-3 inline-flex text-xs font-medium text-brand-700 hover:underline dark:text-brand-400"
+              className="mt-1 inline-flex min-h-[44px] items-center text-xs font-medium text-app-primaria hover:underline"
             >
               Definir meta de peso
             </Link>
@@ -243,23 +243,23 @@ export default function MedidasPage() {
           <div className="grid grid-cols-2 gap-3">
             {latest?.body_fat_pct != null && (
               <div className="card">
-                <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                <p className="text-xs font-medium text-app-texto-2">
                   % Gordura
                 </p>
-                <p className="tabular mt-1 text-2xl font-bold text-slate-900 dark:text-white">
+                <p className="tabular mt-1 text-2xl font-semibold text-app-texto">
                   {latest.body_fat_pct}
-                  <span className="ml-1 text-sm font-medium text-slate-500">%</span>
+                  <span className="ml-1 text-sm font-medium text-app-texto-2">%</span>
                 </p>
               </div>
             )}
             {latest?.waist_cm != null && (
               <div className="card">
-                <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                <p className="text-xs font-medium text-app-texto-2">
                   Cintura
                 </p>
-                <p className="tabular mt-1 text-2xl font-bold text-slate-900 dark:text-white">
+                <p className="tabular mt-1 text-2xl font-semibold text-app-texto">
                   {latest.waist_cm}
-                  <span className="ml-1 text-sm font-medium text-slate-500">cm</span>
+                  <span className="ml-1 text-sm font-medium text-app-texto-2">cm</span>
                 </p>
               </div>
             )}
@@ -268,30 +268,35 @@ export default function MedidasPage() {
       </div>
 
       <div className="card mb-6">
-        <h2 className="mb-3 font-semibold text-slate-900 dark:text-white">
-          Evolução — {metricLabel}
-        </h2>
+        <h2 className="section-title mb-3">Evolução — {metricLabel}</h2>
         {metricsWithData.length > 0 && (
-          <div className="mb-4 flex flex-wrap gap-1.5">
+          <div className="mb-2 flex flex-wrap gap-x-1.5">
             {metricsWithData.map((f) => (
+              // O botão tem os 44 px de toque; o que se vê é só a pílula de
+              // dentro, que continua pequena.
               <button
                 key={f.key as string}
                 onClick={() => setMetric(f.key)}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                  metric === f.key
-                    ? "bg-brand-700 text-white"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-                }`}
+                aria-pressed={metric === f.key}
+                className="inline-flex min-h-[44px] items-center"
               >
-                {f.label}
+                <span
+                  className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+                    metric === f.key
+                      ? "border-app-primaria bg-app-primaria text-app-sobre-primaria"
+                      : "border-app-linha bg-app-cartao text-app-texto-2 hover:bg-app-primaria-fundo"
+                  }`}
+                >
+                  {f.label}
+                </span>
               </button>
             ))}
           </div>
         )}
         {chartData.length > 1 ? (
-          <TrendChart data={chartData} unit={metricUnit} color="#18b85e" />
+          <TrendChart data={chartData} unit={metricUnit} />
         ) : (
-          <div className="flex h-[240px] items-center justify-center text-center text-sm text-slate-500 dark:text-slate-400">
+          <div className="flex h-[240px] items-center justify-center text-center text-sm text-app-texto-2">
             Registre pelo menos 2 medições de {metricLabel.toLowerCase()} para ver o
             gráfico.
           </div>
@@ -308,7 +313,7 @@ export default function MedidasPage() {
       )}
 
       {loading ? (
-        <div className="flex justify-center py-16 text-slate-500">
+        <div className="flex justify-center py-16 text-app-texto-2">
           <Loader2 className="h-6 w-6 animate-spin" />
         </div>
       ) : rows.length === 0 ? (
@@ -322,15 +327,15 @@ export default function MedidasPage() {
           {rows.map((r) => (
             <div key={r.id} className="card flex items-center gap-3 py-3">
               <div className="min-w-0 flex-1">
-                <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold text-slate-800 dark:text-slate-200">
+                <p className="tabular flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold text-app-texto">
                   {formatDate(r.date)}
                   {r.measured_by && (
-                    <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-800 dark:bg-brand-500/10 dark:text-brand-200">
+                    <span className="rounded-full bg-app-primaria-fundo px-2 py-0.5 text-xs font-medium text-app-primaria">
                       Medida na consulta
                     </span>
                   )}
                 </p>
-                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-500 dark:text-slate-400">
+                <div className="tabular mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-app-texto-2">
                   {FIELDS.filter((f) => r[f.key] != null).map((f) => (
                     <span key={f.key as string}>
                       {f.label}: {String(r[f.key])}
@@ -345,7 +350,7 @@ export default function MedidasPage() {
                 <button
                   onClick={() => remove(r.id)}
                   aria-label={`Excluir registro de ${formatDate(r.date)}`}
-                  className="rounded-lg p-1.5 text-slate-500 hover:text-rose-600"
+                  className="tappable flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-app-texto-2 hover:text-app-perigo"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>

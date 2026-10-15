@@ -60,17 +60,13 @@ const SPORTS = [
   "Descanso",
 ];
 
+// Duas cores só: o descanso é neutro e o resto, a principal. Uma cor por
+// modalidade (âmbar, azul, violeta) era enfeite: o nome da modalidade já está
+// escrito no próprio selo, e o âmbar é o do aviso, que não cabe a "Corrida".
 function sportChip(sport: string) {
-  const s = sport.toLowerCase();
-  if (s.includes("descanso"))
-    return "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300";
-  if (s.includes("corrida") || s.includes("caminh") || s.includes("hiit"))
-    return "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300";
-  if (s.includes("ciclismo") || s.includes("nata"))
-    return "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300";
-  if (s.includes("yoga") || s.includes("pilates") || s.includes("along"))
-    return "bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300";
-  return "bg-brand-100 text-brand-700 dark:bg-brand-950/40 dark:text-brand-300";
+  if (sport.toLowerCase().includes("descanso"))
+    return "bg-app-pagina text-app-texto-2";
+  return "bg-app-primaria-fundo text-app-primaria";
 }
 
 type PlanEntry = {
@@ -147,11 +143,11 @@ function PlanStat({
 }) {
   return (
     <div className="px-2 text-center">
-      <p className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+      <p className="tabular text-xl font-semibold text-app-texto">
         {value}
-        {sub && <span className="ml-1 text-xs font-medium text-slate-500">{sub}</span>}
+        {sub && <span className="ml-1 text-xs font-medium text-app-texto-2">{sub}</span>}
       </p>
-      <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{label}</p>
+      <p className="mt-0.5 text-xs text-app-texto-2">{label}</p>
     </div>
   );
 }
@@ -834,7 +830,7 @@ export default function TreinosPage() {
       />
 
       {/* Abas */}
-      <div className="mb-5 inline-flex max-w-full gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 dark:border-white/[0.06] dark:bg-slate-900/50">
+      <div className="mb-5 inline-flex max-w-full gap-1 overflow-x-auto rounded-xl border border-app-linha bg-app-cartao p-1">
         {[
           { id: "plano", label: "Semana", icon: CalendarDays },
           { id: "rotinas", label: "Rotinas", icon: ListChecks },
@@ -844,10 +840,10 @@ export default function TreinosPage() {
           <button
             key={t.id}
             onClick={() => setTab(t.id as typeof tab)}
-            className={`tappable flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium ${
+            className={`tappable flex min-h-[44px] shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-medium ${
               tab === t.id
-                ? "bg-brand-700 text-white shadow-sm"
-                : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+                ? "bg-app-primaria text-app-sobre-primaria"
+                : "text-app-texto-2 hover:bg-app-primaria-fundo"
             }`}
           >
             {/* Mesmo motivo das abas de "Meu plano": com ícone, as quatro
@@ -858,13 +854,13 @@ export default function TreinosPage() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-16 text-slate-500">
+        <div className="flex justify-center py-16 text-app-texto-2">
           <Loader2 className="h-6 w-6 animate-spin" />
         </div>
       ) : tab === "plano" ? (
         <div className="space-y-4">
           {/* Resumo da semana */}
-          <div className="card grid grid-cols-3 divide-x divide-slate-100 dark:divide-white/[0.06]">
+          <div className="card grid grid-cols-3 divide-x divide-app-linha">
             <PlanStat value={`${daysPlanned}`} sub="/ 7" label="Dias com treino" />
             <PlanStat value={`${sessionsPlanned.length}`} label="Sessões/semana" />
             <PlanStat
@@ -884,29 +880,27 @@ export default function TreinosPage() {
                 <div
                   key={day}
                   className={`card transition duration-200 ${
-                    isToday
-                      ? "bg-gradient-to-b from-brand-50/70 to-white ring-2 ring-brand-500/50 dark:from-brand-950/20 dark:to-slate-900/50"
-                      : ""
+                    isToday ? "border-app-primaria ring-1 ring-app-primaria" : ""
                   }`}
                 >
                 <div className="mb-3 flex items-center gap-2">
-                  <h3 className="font-semibold text-slate-900 dark:text-white">{dayName}</h3>
-                  <span className="text-xs text-slate-500 dark:text-slate-400">
+                  <h3 className="font-semibold text-app-texto">{dayName}</h3>
+                  <span className="tabular text-xs text-app-texto-2">
                     {dataDoDia.slice(8, 10)}/{dataDoDia.slice(5, 7)}
                   </span>
                   {isToday && (
-                    <span className="rounded-full bg-brand-100 px-2 py-0.5 text-[11px] font-semibold text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
+                    <span className="rounded-full bg-app-primaria-fundo px-2 py-0.5 text-[11px] font-semibold text-app-primaria">
                       hoje
                     </span>
                   )}
                 </div>
 
                 {sessions.length === 0 ? (
-                  <p className="mb-3 text-sm text-slate-500 dark:text-slate-400">
+                  <p className="mb-3 text-sm text-app-texto-2">
                     Nada planejado.
                   </p>
                 ) : (
-                  <ul className="mb-3 space-y-2">
+                  <ul className="mb-3 divide-y divide-app-linha">
                     {sessions.map((s) => {
                       const check = compIndex[completionKey(s.id, dataDoDia)];
                       const done = check?.status === "done";
@@ -915,7 +909,7 @@ export default function TreinosPage() {
                       return (
                         <li
                           key={s.id}
-                          className="rounded-xl border border-slate-100 bg-slate-50/70 p-2.5 dark:border-white/[0.05] dark:bg-slate-800/40"
+                          className="py-3 first:pt-0"
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex flex-wrap items-center gap-1">
@@ -927,7 +921,7 @@ export default function TreinosPage() {
                                 {s.sport}
                               </span>
                               {(s as any).prescribed_by && (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-brand-100 px-2 py-0.5 text-[11px] font-semibold text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">
+                                <span className="inline-flex items-center gap-1 rounded-full bg-app-primaria-fundo px-2 py-0.5 text-[11px] font-semibold text-app-primaria">
                                   <Stethoscope className="h-2.5 w-2.5" />
                                   do nutri
                                 </span>
@@ -935,19 +929,19 @@ export default function TreinosPage() {
                             </div>
                             <button
                               onClick={() => removePlanEntry(s.id)}
-                              className="rounded-lg p-1 text-slate-500 hover:text-rose-600"
+                              className="tappable -mr-2 -mt-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-app-texto-2 hover:text-app-perigo"
                               aria-label="Remover"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
                           </div>
                           {s.title && (
-                            <p className="mt-1 text-sm font-medium text-slate-800 dark:text-slate-200">
+                            <p className="mt-1 text-sm font-medium text-app-texto">
                               {s.title}
                             </p>
                           )}
                           {s.notes && (
-                            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                            <p className="mt-0.5 text-xs text-app-texto-2">
                               {s.notes}
                             </p>
                           )}
@@ -966,10 +960,10 @@ export default function TreinosPage() {
                                 onClick={() => markPlan(s, dataDoDia, "done")}
                                 disabled={busyKey}
                                 aria-pressed={done}
-                                className={`tappable flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold disabled:opacity-60 ${
+                                className={`tappable flex min-h-[44px] flex-1 items-center justify-center gap-1 rounded-lg px-2 text-xs font-semibold disabled:opacity-60 ${
                                   done
-                                    ? "bg-brand-700 text-white"
-                                    : "border border-slate-300 text-slate-600 hover:bg-white dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                                    ? "bg-app-primaria text-app-sobre-primaria"
+                                    : "border border-app-campo text-app-texto-2 hover:bg-app-primaria-fundo"
                                 }`}
                               >
                                 {busyKey ? (
@@ -983,10 +977,10 @@ export default function TreinosPage() {
                                 onClick={() => markPlan(s, dataDoDia, "skipped")}
                                 disabled={busyKey}
                                 aria-pressed={skipped}
-                                className={`tappable flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold disabled:opacity-60 ${
+                                className={`tappable flex min-h-[44px] flex-1 items-center justify-center gap-1 rounded-lg px-2 text-xs font-semibold disabled:opacity-60 ${
                                   skipped
                                     ? "bg-rose-600 text-white"
-                                    : "border border-slate-300 text-slate-600 hover:bg-white dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                                    : "border border-app-campo text-app-texto-2 hover:bg-app-primaria-fundo"
                                 }`}
                               >
                                 <X className="h-3.5 w-3.5" />
@@ -1025,17 +1019,17 @@ export default function TreinosPage() {
                 <div className="mb-2 flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <h3 className="font-semibold text-slate-900 dark:text-white">
+                      <h3 className="font-semibold text-app-texto">
                         {r.name}
                       </h3>
                       {(r as any).prescribed_by && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-brand-100 px-2 py-0.5 text-[11px] font-semibold text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-app-primaria-fundo px-2 py-0.5 text-[11px] font-semibold text-app-primaria">
                           <Stethoscope className="h-2.5 w-2.5" />
                           do nutri
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                    <p className="text-xs text-app-texto-2">
                       {r.exercises.length} exercício(s)
                       {r.notes ? ` · ${r.notes}` : ""}
                     </p>
@@ -1043,14 +1037,14 @@ export default function TreinosPage() {
                   <div className="flex shrink-0 gap-1">
                     <button
                       onClick={() => openEditRoutine(r)}
-                      className="rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
+                      className="tappable flex min-h-[44px] items-center rounded-lg px-2 text-xs font-semibold text-app-texto-2 hover:bg-app-primaria-fundo hover:text-app-texto"
                       aria-label="Editar rotina"
                     >
                       Editar
                     </button>
                     <button
                       onClick={() => removeRoutine(r.id)}
-                      className="rounded-lg p-1.5 text-slate-500 hover:text-rose-600"
+                      className="tappable flex h-11 w-11 items-center justify-center rounded-lg text-app-texto-2 hover:text-app-perigo"
                       aria-label="Excluir rotina"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -1063,17 +1057,17 @@ export default function TreinosPage() {
                     {r.exercises.slice(0, 6).map((e, i) => (
                       <li
                         key={i}
-                        className="flex items-center justify-between gap-2 text-sm text-slate-700 dark:text-slate-300"
+                        className="flex items-center justify-between gap-2 text-sm text-app-texto"
                       >
                         <span className="truncate">{e.name}</span>
-                        <span className="shrink-0 text-xs text-slate-500">
+                        <span className="tabular shrink-0 text-xs text-app-texto-2">
                           {e.target_sets ?? "—"}×{e.target_reps ?? "—"}
                           {e.target_weight_kg != null ? ` · ${e.target_weight_kg}kg` : ""}
                         </span>
                       </li>
                     ))}
                     {r.exercises.length > 6 && (
-                      <li className="text-xs text-slate-500">
+                      <li className="text-xs text-app-texto-2">
                         +{r.exercises.length - 6} exercício(s)
                       </li>
                     )}
@@ -1091,7 +1085,7 @@ export default function TreinosPage() {
                   </button>
                   <button
                     onClick={() => registerFromRoutine(r)}
-                    className="text-xs font-medium text-slate-500 hover:text-brand-700 dark:text-slate-400 dark:hover:text-brand-400"
+                    className="tappable min-h-[44px] text-xs font-medium text-app-texto-2 hover:text-app-primaria"
                   >
                     Registro rápido (sem cronômetro)
                   </button>
@@ -1110,23 +1104,23 @@ export default function TreinosPage() {
         ) : (
           <div className="space-y-5">
             {/* alternador Carga / Volume */}
-            <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1 dark:border-white/[0.06] dark:bg-slate-900/50">
+            <div className="inline-flex max-w-full rounded-xl border border-app-linha bg-app-cartao p-1">
               <button
                 onClick={() => setProgView("carga")}
-                className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+                className={`flex min-h-[44px] items-center gap-2 rounded-lg px-3 text-sm font-medium transition ${
                   progView === "carga"
-                    ? "bg-brand-700 text-white"
-                    : "text-slate-600 dark:text-slate-300"
+                    ? "bg-app-primaria text-app-sobre-primaria"
+                    : "text-app-texto-2 hover:bg-app-primaria-fundo"
                 }`}
               >
                 <TrendingUp className="h-4 w-4" /> Carga por exercício
               </button>
               <button
                 onClick={() => setProgView("volume")}
-                className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+                className={`flex min-h-[44px] items-center gap-2 rounded-lg px-3 text-sm font-medium transition ${
                   progView === "volume"
-                    ? "bg-brand-700 text-white"
-                    : "text-slate-600 dark:text-slate-300"
+                    ? "bg-app-primaria text-app-sobre-primaria"
+                    : "text-app-texto-2 hover:bg-app-primaria-fundo"
                 }`}
               >
                 <BarChart3 className="h-4 w-4" /> Volume semanal
@@ -1135,7 +1129,7 @@ export default function TreinosPage() {
 
             {progView === "carga" ? (
               exerciseNames.length === 0 ? (
-                <p className="text-sm text-slate-500 dark:text-slate-400">
+                <p className="text-sm text-app-texto-2">
                   Registre exercícios com carga para ver a progressão por exercício.
                 </p>
               ) : (
@@ -1190,19 +1184,17 @@ export default function TreinosPage() {
 
                   <div className="card">
                     <div className="mb-3 flex items-center justify-between gap-2">
-                      <h3 className="font-semibold text-slate-900 dark:text-white">
-                        Evolução da carga
-                      </h3>
+                      <h3 className="section-title">Evolução da carga</h3>
                       {isRecord && (
-                        <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                        <span className="flex items-center gap-1 rounded-full bg-app-primaria-fundo px-2 py-0.5 text-[11px] font-semibold text-app-primaria">
                           <Trophy className="h-3 w-3" /> Recorde atual!
                         </span>
                       )}
                     </div>
                     {progressData.length > 1 ? (
-                      <TrendChart data={progressData} unit=" kg" color="#18b85e" />
+                      <TrendChart data={progressData} unit=" kg" />
                     ) : (
-                      <p className="py-8 text-center text-sm text-slate-500 dark:text-slate-400">
+                      <p className="py-8 text-center text-sm text-app-texto-2">
                         Registre este exercício em mais de um treino para ver a curva.
                       </p>
                     )}
@@ -1212,18 +1204,16 @@ export default function TreinosPage() {
             ) : volumeData.length > 0 ? (
               <div className="card">
                 <div className="mb-3 flex items-center justify-between">
-                  <h3 className="font-semibold text-slate-900 dark:text-white">
-                    Volume por semana
-                  </h3>
-                  <span className="text-xs text-slate-500">carga total (kg)</span>
+                  <h3 className="section-title">Volume por semana</h3>
+                  <span className="text-xs text-app-texto-2">carga total (kg)</span>
                 </div>
-                <BarsChart data={volumeData} unit=" kg" color="#18b85e" />
-                <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                <BarsChart data={volumeData} unit=" kg" />
+                <p className="mt-2 text-xs text-app-texto-2">
                   Volume = soma de (repetições × carga) de todos os exercícios na semana.
                 </p>
               </div>
             ) : (
-              <p className="text-sm text-slate-500 dark:text-slate-400">
+              <p className="text-sm text-app-texto-2">
                 Registre treinos com repetições e carga para ver o volume semanal.
               </p>
             )}
@@ -1246,17 +1236,17 @@ export default function TreinosPage() {
             return (
               <div key={w.id} className="card overflow-hidden p-0">
                 <div className="flex items-center gap-3 p-4">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
-                    <Dumbbell className="h-5 w-5" />
+                  <div className="icon-badge">
+                    <Dumbbell className="h-4 w-4" />
                   </div>
                   <button
                     onClick={() => setExpanded(isOpen ? null : w.id)}
                     className="min-w-0 flex-1 text-left"
                   >
-                    <p className="truncate font-semibold text-slate-900 dark:text-white">
+                    <p className="truncate font-semibold text-app-texto">
                       {w.name}
                     </p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                    <p className="tabular text-xs text-app-texto-2">
                       {formatDate(w.date)}
                       {w.category ? ` · ${w.category}` : ""}
                       {w.duration_min ? ` · ${w.duration_min} min` : ""}
@@ -1266,7 +1256,8 @@ export default function TreinosPage() {
                   {exs.length > 0 && (
                     <button
                       onClick={() => setExpanded(isOpen ? null : w.id)}
-                      className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      aria-label={isOpen ? "Recolher exercícios" : "Ver exercícios"}
+                      className="tappable flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-app-texto-2 hover:bg-app-primaria-fundo"
                     >
                       {isOpen ? (
                         <ChevronUp className="h-5 w-5" />
@@ -1277,28 +1268,29 @@ export default function TreinosPage() {
                   )}
                   <button
                     onClick={() => remove(w.id)}
-                    className="rounded-lg p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40"
+                    aria-label={`Excluir treino ${w.name}`}
+                    className="tappable flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-app-texto-2 hover:bg-app-perigo-fundo hover:text-app-perigo"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
                 {isOpen && exs.length > 0 && (
-                  <div className="space-y-3 border-t border-slate-100 bg-slate-50/60 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/40">
+                  <div className="space-y-3 border-t border-app-linha bg-app-pagina px-4 py-3">
                     {exs.map((ex) => (
                       <div key={ex.id}>
                         <div className="flex items-center justify-between gap-2">
-                          <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
+                          <p className="text-sm font-medium text-app-texto">
                             {ex.name}
                           </p>
                           {ex.rpe != null && (
-                            <span className="text-xs text-slate-500">RPE {ex.rpe}</span>
+                            <span className="tabular text-xs text-app-texto-2">RPE {ex.rpe}</span>
                           )}
                         </div>
                         <div className="mt-1 flex flex-wrap gap-1.5">
                           {setsOf(ex).map((s, i) => (
                             <span
                               key={i}
-                              className="rounded-md bg-white px-2 py-0.5 text-xs text-slate-600 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700"
+                              className="tabular rounded-md bg-app-cartao px-2 py-0.5 text-xs text-app-texto-2 ring-1 ring-app-linha"
                             >
                               {s.reps ?? "—"}
                               {s.weight != null ? ` × ${s.weight}kg` : ""}
@@ -1308,7 +1300,7 @@ export default function TreinosPage() {
                       </div>
                     ))}
                     {w.notes && (
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                      <p className="text-xs text-app-texto-2">
                         Obs.: {w.notes}
                       </p>
                     )}
@@ -1456,7 +1448,7 @@ export default function TreinosPage() {
               <button
                 type="button"
                 onClick={() => setExercises((p) => [...p, emptyExercise()])}
-                className="text-xs font-semibold text-brand-700 hover:underline dark:text-brand-400"
+                className="inline-flex min-h-[44px] items-center text-xs font-semibold text-app-primaria hover:underline"
               >
                 + Exercício
               </button>
@@ -1465,7 +1457,7 @@ export default function TreinosPage() {
               {exercises.map((ex, ei) => (
                 <div
                   key={ei}
-                  className="rounded-xl border border-slate-200 p-3 dark:border-slate-700"
+                  className="rounded-xl border border-app-linha p-3"
                 >
                   <div className="flex items-center gap-2">
                     <input
@@ -1480,7 +1472,7 @@ export default function TreinosPage() {
                         onClick={() =>
                           setExercises((p) => p.filter((_, idx) => idx !== ei))
                         }
-                        className="rounded-lg p-1.5 text-slate-500 hover:text-rose-600"
+                        className="rounded-lg p-1.5 text-app-texto-2 hover:text-rose-600"
                         aria-label="Remover exercício"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -1490,7 +1482,7 @@ export default function TreinosPage() {
 
                   {/* Sugestão de progressão (baseada no histórico) */}
                   {progressionHint(ex.name) && (
-                    <p className="mt-1.5 flex items-center gap-1 text-xs font-medium text-brand-700 dark:text-brand-400">
+                    <p className="mt-1.5 flex items-center gap-1 text-xs font-medium text-app-primaria">
                       <TrendingUp className="h-3.5 w-3.5 shrink-0" />
                       {progressionHint(ex.name)}
                     </p>
@@ -1500,7 +1492,7 @@ export default function TreinosPage() {
                   <div className="mt-2 space-y-1.5">
                     {ex.sets.map((s, si) => (
                       <div key={si} className="flex items-center gap-2">
-                        <span className="w-14 shrink-0 text-xs font-medium text-slate-500">
+                        <span className="w-14 shrink-0 text-xs font-medium text-app-texto-2">
                           Série {si + 1}
                         </span>
                         <input
@@ -1522,7 +1514,7 @@ export default function TreinosPage() {
                           <button
                             type="button"
                             onClick={() => removeSet(ei, si)}
-                            className="rounded-lg p-1.5 text-slate-500 hover:text-rose-600"
+                            className="rounded-lg p-1.5 text-app-texto-2 hover:text-rose-600"
                             aria-label="Remover série"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
@@ -1536,7 +1528,7 @@ export default function TreinosPage() {
                     <button
                       type="button"
                       onClick={() => addSet(ei)}
-                      className="text-xs font-semibold text-brand-700 hover:underline dark:text-brand-400"
+                      className="inline-flex min-h-[44px] items-center text-xs font-semibold text-app-primaria hover:underline"
                     >
                       + Série
                     </button>
@@ -1603,7 +1595,7 @@ export default function TreinosPage() {
               <button
                 type="button"
                 onClick={() => setRExercises((p) => [...p, emptyRoutineEx()])}
-                className="text-xs font-semibold text-brand-700 hover:underline dark:text-brand-400"
+                className="inline-flex min-h-[44px] items-center text-xs font-semibold text-app-primaria hover:underline"
               >
                 + Exercício
               </button>
@@ -1612,7 +1604,7 @@ export default function TreinosPage() {
               {rExercises.map((ex, i) => (
                 <div
                   key={i}
-                  className="rounded-xl border border-slate-200 p-3 dark:border-slate-700"
+                  className="rounded-xl border border-app-linha p-3"
                 >
                   <div className="flex items-center gap-2">
                     <input
@@ -1627,7 +1619,7 @@ export default function TreinosPage() {
                         onClick={() =>
                           setRExercises((p) => p.filter((_, idx) => idx !== i))
                         }
-                        className="rounded-lg p-1.5 text-slate-500 hover:text-rose-600"
+                        className="rounded-lg p-1.5 text-app-texto-2 hover:text-rose-600"
                         aria-label="Remover exercício"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -1636,7 +1628,7 @@ export default function TreinosPage() {
                   </div>
                   <div className="mt-2 grid grid-cols-4 gap-2">
                     <div>
-                      <span className="mb-0.5 block text-[11px] font-medium text-slate-500">
+                      <span className="mb-0.5 block text-[11px] font-medium text-app-texto-2">
                         Séries
                       </span>
                       <input
@@ -1648,7 +1640,7 @@ export default function TreinosPage() {
                       />
                     </div>
                     <div>
-                      <span className="mb-0.5 block text-[11px] font-medium text-slate-500">
+                      <span className="mb-0.5 block text-[11px] font-medium text-app-texto-2">
                         Reps
                       </span>
                       <input
@@ -1660,7 +1652,7 @@ export default function TreinosPage() {
                       />
                     </div>
                     <div>
-                      <span className="mb-0.5 block text-[11px] font-medium text-slate-500">
+                      <span className="mb-0.5 block text-[11px] font-medium text-app-texto-2">
                         Carga kg
                       </span>
                       <input
@@ -1673,7 +1665,7 @@ export default function TreinosPage() {
                       />
                     </div>
                     <div>
-                      <span className="mb-0.5 block text-[11px] font-medium text-slate-500">
+                      <span className="mb-0.5 block text-[11px] font-medium text-app-texto-2">
                         Descanso s
                       </span>
                       <input

@@ -5,7 +5,6 @@ import {
   Utensils,
   Dumbbell,
   MessageSquare,
-  NotebookPen,
   CalendarDays,
   ChevronRight,
 } from "lucide-react";
@@ -69,7 +68,7 @@ export default async function MeuNutricionistaPage({
           subtitle="Conecte-se ao seu nutricionista para receber metas, cardápio e treino aqui."
         />
         <ConectarNutri codeInicial={searchParams?.code ?? ""} />
-        <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
+        <p className="mt-4 text-sm text-app-texto-2">
           Você ainda não está conectado a nenhum nutricionista. Peça a ele o
           código de convite ou o link que ele gera no painel dele.
         </p>
@@ -124,6 +123,11 @@ export default async function MeuNutricionistaPage({
   const plano = planoRes.data as any;
   const notas = (notasRes.data ?? []) as Nota[];
   const naoLidas = notas.filter((n) => n.author_id !== uid && !n.read_at).length;
+  // `data ?? []` esconderia a falha: sem as refeições do dia o plano mostraria
+  // tudo como não feito e ofereceria "Comi isso" de novo a quem já registrou
+  // (o dia e a adesão contariam em dobro). Com a leitura falhando, o cardápio
+  // diz que não carregou, no lugar das marcas e dos botões.
+  const refeicoesFalharam = !!refeicoesRes.error;
   const jaRegistrados = (refeicoesRes.data ?? []).map((m: any) => m.meal_type);
   const sessoes = (sessoesRes.data ?? []) as any[];
 
@@ -175,14 +179,14 @@ export default async function MeuNutricionistaPage({
 
       {/* Quem está acompanhando */}
       <div className="card mb-5 flex items-center gap-3 p-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
-          <Stethoscope className="h-5 w-5" />
+        <div className="icon-badge">
+          <Stethoscope className="h-4 w-4" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate font-semibold text-slate-900 dark:text-white">
+          <p className="truncate font-semibold text-app-texto">
             {nutriNome}
           </p>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="text-xs text-app-texto-2">
             Desde {formatDate(dataNoBrasil(String(link.accepted_at || link.created_at)))}
           </p>
         </div>
@@ -209,10 +213,10 @@ export default async function MeuNutricionistaPage({
             key={a.key}
             href={`/app/nutricionista?aba=${a.key}`}
             scroll={false}
-            className={`tappable inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium ${
+            className={`tappable inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-lg px-3 text-sm font-medium ${
               aba === a.key
-                ? "bg-brand-700 text-white"
-                : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+                ? "bg-app-primaria text-app-sobre-primaria"
+                : "text-app-texto-2 hover:bg-app-primaria-fundo"
             }`}
           >
             {/* O ícone some no celular: com ele, as quatro abas não cabiam
@@ -234,12 +238,7 @@ export default async function MeuNutricionistaPage({
         (temMetas ? (
           <>
             <div className="card">
-              <h2 className="section-title mb-3">
-                <span className="icon-badge">
-                  <Target className="h-4 w-4" />
-                </span>
-                Suas metas do dia
-              </h2>
+              <h2 className="section-title mb-3">Suas metas do dia</h2>
               <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm sm:grid-cols-4">
                 {[
                   ["Calorias/dia", presc.daily_calorie_goal, "kcal"],
@@ -254,13 +253,13 @@ export default async function MeuNutricionistaPage({
                   ["Peso alvo", presc.weight_goal_kg, "kg"],
                 ].map(([label, valor, unidade]: any) => (
                   <div key={label}>
-                    <dt className="text-xs text-slate-500 dark:text-slate-400">
+                    <dt className="text-xs text-app-texto-2">
                       {label}
                     </dt>
-                    <dd className="font-semibold text-slate-900 dark:text-white">
+                    <dd className="tabular font-semibold text-app-texto">
                       {valor ?? "—"}
                       {valor ? (
-                        <span className="text-xs font-medium text-slate-500">
+                        <span className="text-xs font-medium text-app-texto-2">
                           {" "}
                           {unidade}
                         </span>
@@ -269,11 +268,11 @@ export default async function MeuNutricionistaPage({
                   </div>
                 ))}
               </dl>
-              <p className="mt-3 border-t border-slate-100 pt-3 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
+              <p className="mt-3 border-t border-app-linha pt-3 text-xs text-app-texto-2">
                 Definidas por {nutriNome} em{" "}
                 {formatDate(dataNoBrasil(String(presc.created_at)))}. O
                 acompanhamento do dia contra estas metas aparece em{" "}
-                <Link href="/app" className="font-medium text-brand-700 hover:underline dark:text-brand-400">
+                <Link href="/app" className="font-medium text-app-primaria hover:underline">
                   Início
                 </Link>
                 .
@@ -282,13 +281,8 @@ export default async function MeuNutricionistaPage({
 
             {presc.notes && (
               <div className="card mt-4">
-                <h2 className="section-title mb-2">
-                  <span className="icon-badge">
-                    <NotebookPen className="h-4 w-4" />
-                  </span>
-                  Orientações
-                </h2>
-                <p className="whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-200">
+                <h2 className="section-title mb-2">Orientações</h2>
+                <p className="whitespace-pre-wrap text-sm text-app-texto">
                   {presc.notes}
                 </p>
               </div>
@@ -308,8 +302,9 @@ export default async function MeuNutricionistaPage({
               itens={itensCardapio as any}
               date={today}
               jaRegistrados={jaRegistrados}
+              refeicoesFalharam={refeicoesFalharam}
             />
-            <p className="text-xs text-slate-500 dark:text-slate-400">
+            <p className="text-xs text-app-texto-2">
               Tocar em “Comi isso” registra a refeição na sua Dieta — não
               precisa digitar de novo.
             </p>
@@ -331,7 +326,7 @@ export default async function MeuNutricionistaPage({
                     <CalendarDays className="h-3.5 w-3.5" />
                     {dia}
                     {i === dowHoje && (
-                      <span className="rounded-full bg-brand-100 px-2 py-0.5 text-[11px] font-bold normal-case tracking-normal text-brand-800 dark:bg-brand-500/20 dark:text-brand-200">
+                      <span className="rounded-full bg-app-primaria-fundo px-2 py-0.5 text-[11px] font-semibold text-app-primaria">
                         hoje
                       </span>
                     )}
@@ -358,17 +353,17 @@ export default async function MeuNutricionistaPage({
                         <Link
                           key={s.id}
                           href={`/app/treino/${s.id}`}
-                          className="tappable group -mx-2 flex items-center gap-3 rounded-xl px-2 py-2 hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                          className="tappable group -mx-2 flex items-center gap-3 rounded-xl px-2 py-2 hover:bg-app-pagina"
                         >
                           <div className="min-w-0 flex-1">
-                            <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                            <p className="text-sm font-semibold text-app-texto">
                               {s.title || rotina?.name || s.sport}
                             </p>
-                            <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                            <p className="truncate text-xs text-app-texto-2">
                               {resumo}
                             </p>
                           </div>
-                          <ChevronRight className="h-4 w-4 shrink-0 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-brand-700 dark:group-hover:text-brand-400" />
+                          <ChevronRight className="h-4 w-4 shrink-0 text-app-texto-2 transition group-hover:translate-x-0.5 group-hover:text-app-primaria" />
                         </Link>
                       );
                     })}
@@ -376,12 +371,12 @@ export default async function MeuNutricionistaPage({
                 </div>
               );
             })}
-            <p className="text-xs text-slate-500 dark:text-slate-400">
+            <p className="text-xs text-app-texto-2">
               Toque num treino para ver os exercícios. A confirmação
               (“fui” ou “não fui”) fica na própria tela do treino e em{" "}
               <Link
                 href="/app"
-                className="font-medium text-brand-700 hover:underline dark:text-brand-400"
+                className="font-medium text-app-primaria hover:underline"
               >
                 Início
               </Link>
@@ -402,8 +397,8 @@ export default async function MeuNutricionistaPage({
 
 function Vazio({ texto }: { texto: string }) {
   return (
-    <div className="rounded-xl border border-dashed border-slate-200 p-8 text-center dark:border-slate-700">
-      <p className="text-sm text-slate-500 dark:text-slate-400">{texto}</p>
+    <div className="rounded-xl border border-dashed border-app-campo p-8 text-center">
+      <p className="text-sm text-app-texto-2">{texto}</p>
     </div>
   );
 }
