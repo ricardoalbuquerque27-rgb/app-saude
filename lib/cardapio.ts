@@ -53,10 +53,12 @@ const FALTA_MINIMA_G = 10;
  *   sem isso, um tipo desconhecido ficaria sem lugar na fila e a sugestão
  *   mudaria de uma leitura para outra.
  * - **A opção** é a de mais proteína; no empate, a de menor `position`, que é
- *   a que o nutricionista pôs primeiro. Opção com `protein_g` nulo não entra
- *   na disputa (não há número a mostrar, e inventar um fecharia meta com dado
- *   falso), e uma refeição em que nenhuma opção tem proteína informada passa a
- *   vez para a próxima.
+ *   a que o nutricionista pôs primeiro. Opção com `protein_g` nulo ou até 0
+ *   não entra na disputa: nulo não tem número a mostrar, e 0 g (o
+ *   nutricionista lança 0 para fruta) não "cobre parte" do que falta, de modo
+ *   que "lanche da tarde, 0 g (1 maçã)" para fechar 40 g seria absurdo. Uma
+ *   refeição em que nenhuma opção tem proteína acima de 0 passa a vez para a
+ *   próxima.
  * - **Calorias ficam de fora**, por decisão: "faltam 600 kcal" empurra quem
  *   está emagrecendo a comer sem fome, e o excesso já aparece no anel.
  *
@@ -71,7 +73,9 @@ export function sugestaoDeProteina(e: {
 }): SugestaoDeProteina | null {
   if (!e.vinculoAtivo || e.meta == null || e.itens.length === 0) return null;
   const faltam = Math.round(e.meta - e.consumido);
-  if (faltam < FALTA_MINIMA_G) return null;
+  // `!(>=)` e não `<`: com meta ou consumido NaN, `faltam` é NaN e `NaN < 10`
+  // é falso, o que deixaria passar a frase "Faltam NaN g".
+  if (!(faltam >= FALTA_MINIMA_G)) return null;
 
   const registrados = new Set(e.tiposRegistrados);
   const porTipo = new Map<string, ItemDoPlano[]>();
@@ -95,11 +99,12 @@ export function sugestaoDeProteina(e: {
     if (registrados.has(tipo)) continue;
     let melhor: ItemDoPlano | null = null;
     for (const item of porTipo.get(tipo)!) {
-      if (item.protein_g == null || !Number.isFinite(item.protein_g)) continue;
+      const g = item.protein_g;
+      if (g == null || !Number.isFinite(g) || g <= 0) continue;
       if (
         melhor == null ||
-        item.protein_g > melhor.protein_g! ||
-        (item.protein_g === melhor.protein_g && item.position < melhor.position)
+        g > melhor.protein_g! ||
+        (g === melhor.protein_g && item.position < melhor.position)
       ) {
         melhor = item;
       }

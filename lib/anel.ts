@@ -1,6 +1,10 @@
 // Texto dos anéis da Início e da Dieta. Mora num módulo puro, e não dentro do
 // ProgressRing, para ser testado sem componente (o vitest só roda lib/).
 
+// Só o tipo: o `import type` some na compilação, e um componente de cliente que
+// use este módulo (o ProgressRing) não puxa lib/nutri.ts, que consulta o banco.
+import type { PapelDasCalorias } from "@/lib/nutri";
+
 /**
  * O rótulo do anel de calorias com o papel que a meta tem para este paciente
  * (`papelDasCalorias`, em lib/nutri.ts): "Calorias · limite" para quem está
@@ -9,7 +13,7 @@
  * mesma palavra no anel de proteína diria que comer menos é o objetivo
  * (spec "Anel e macros", "Meta ou limite das calorias").
  */
-export function rotuloDoAnel(label: string, papel: "limite" | "meta" | null): string {
+export function rotuloDoAnel(label: string, papel: PapelDasCalorias): string {
   return papel ? `${label} · ${papel}` : label;
 }
 

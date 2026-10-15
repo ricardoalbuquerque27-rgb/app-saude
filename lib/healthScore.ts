@@ -121,9 +121,21 @@ export function computeHealthScore(i: ScoreInput): HealthScore {
   const bem = scoreBemEstar(i);
 
   const pillars: ScorePillar[] = [
-    { key: "sono", label: "Sono", value: sono.value, tip: sono.tip, semRegistro: i.sleepHours == null },
+    {
+      key: "sono",
+      label: "Sono",
+      value: sono.value,
+      tip: sono.tip,
+      semRegistro: i.sleepHours == null,
+    },
     { key: "movimento", label: "Movimento", value: mov.value, tip: mov.tip, semRegistro: false },
-    { key: "nutricao", label: "Nutrição", value: nut.value, tip: nut.tip, semRegistro: i.mealsLoggedToday === 0 },
+    {
+      key: "nutricao",
+      label: "Nutrição",
+      value: nut.value,
+      tip: nut.tip,
+      semRegistro: i.mealsLoggedToday === 0,
+    },
     {
       key: "bemestar",
       label: "Hidratação e bem-estar",

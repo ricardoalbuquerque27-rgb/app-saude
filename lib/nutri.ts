@@ -897,6 +897,9 @@ const MANUTENCAO_KG = 0.5;
 /** Folga contra o ruído do ponto flutuante: 64,4 − 63,9 dá 0,5000000000000071. */
 const RUIDO_KG = 1e-9;
 
+/** O papel da meta de calorias; `null` é manutenção ou falta de dado. */
+export type PapelDasCalorias = "limite" | "meta" | null;
+
 /**
  * O que a meta de calorias é para este paciente: "limite" (um teto) para quem
  * está acima do peso-alvo, "meta" (um piso a alcançar) para quem está abaixo, e
@@ -915,7 +918,7 @@ const RUIDO_KG = 1e-9;
 export function papelDasCalorias(
   pesoAtual: number | null,
   metaDePeso: number | null
-): "limite" | "meta" | null {
+): PapelDasCalorias {
   if (pesoAtual == null || metaDePeso == null) return null;
   const acima = pesoAtual - metaDePeso;
   if (acima > MANUTENCAO_KG + RUIDO_KG) return "limite";

@@ -49,6 +49,10 @@ describe("sugestaoDeProteina", () => {
       expect(sugestaoDeProteina({ ...BASE, consumido: 100.4 })?.faltam).toBe(10);
       expect(sugestaoDeProteina({ ...BASE, consumido: 100.6 })).toBeNull();
     });
+    it("meta ou consumido que não é número: null, nunca 'Faltam NaN g'", () => {
+      expect(sugestaoDeProteina({ ...BASE, meta: NaN })).toBeNull();
+      expect(sugestaoDeProteina({ ...BASE, consumido: NaN })).toBeNull();
+    });
     it("meta batida ou passada", () => {
       expect(sugestaoDeProteina({ ...BASE, consumido: 110 })).toBeNull();
       expect(sugestaoDeProteina({ ...BASE, consumido: 150 })).toBeNull();
@@ -161,6 +165,37 @@ describe("sugestaoDeProteina", () => {
         ...PLANO.slice(2),
       ];
       expect(sugestaoDeProteina({ ...BASE, itens })?.refeicao).toBe("Almoço");
+    });
+
+    // O nutricionista lança 0 g para fruta: "lanche da tarde, 0 g (1 maçã)"
+    // não cobre parte de nada do que falta, então vale como sem proteína.
+    it.each([0, -5])("opção com %s g vale como sem proteína: a refeição é pulada", (zero) => {
+      const itens: ItemDoPlano[] = [
+        { meal_type: "Café da manhã", position: 0, description: "1 fruta", protein_g: zero },
+        ...PLANO.slice(2),
+      ];
+      expect(sugestaoDeProteina({ ...BASE, itens })).toMatchObject({
+        refeicao: "Almoço",
+        descricao: ALMOCO,
+      });
+    });
+
+    it("refeição com opções de 0 g e de 12 g sugere a de 12 g", () => {
+      const itens: ItemDoPlano[] = [
+        { meal_type: "Lanche da tarde", position: 0, description: "1 maçã", protein_g: 0 },
+        { meal_type: "Lanche da tarde", position: 1, description: "Iogurte", protein_g: 12 },
+      ];
+      expect(sugestaoDeProteina({ ...BASE, itens })).toEqual({
+        faltam: 110,
+        refeicao: "Lanche da tarde",
+        descricao: "Iogurte",
+        proteina: 12,
+      });
+    });
+
+    it("plano inteiro de 0 g: null", () => {
+      const itens = PLANO.map((i) => ({ ...i, protein_g: 0 }));
+      expect(sugestaoDeProteina({ ...BASE, itens })).toBeNull();
     });
 
     it("plano inteiro sem proteína informada: null", () => {
