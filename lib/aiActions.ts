@@ -6,6 +6,7 @@
 // próprios dados). O user_id é sempre definido pelo servidor, nunca pelo modelo.
 
 import { todayISO, addDaysISO } from "@/lib/date";
+import { adicionarAgua } from "@/lib/agua";
 import { classifyExam, EXAM_STATUS_LABEL, type Sex } from "@/lib/examRanges";
 
 // Idade em anos a partir da data de nascimento (AAAA-MM-DD).
@@ -711,21 +712,12 @@ export async function executeAction(
         if (ml == null || ml === 0) {
           return { ok: false, resumo: "Quantidade de água inválida." };
         }
-        const hoje = todayISO();
-        const { data: atual } = await supabase
-          .from("daily_logs")
-          .select("water_ml")
-          .eq("user_id", uid)
-          .eq("date", hoje)
-          .maybeSingle();
-        const total = Math.max(0, (toNum(atual?.water_ml) ?? 0) + ml);
-        const { error } = await supabase
-          .from("daily_logs")
-          .upsert(
-            { user_id: uid, date: hoje, water_ml: total },
-            { onConflict: "user_id,date" }
-          );
-        if (error) throw error;
+        // A leitura e a gravação do dia moram em lib/agua.ts, as mesmas do
+        // botão da Início. Falha vira exceção, como antes: o catch daqui
+        // responde "Não consegui salvar agora", e não "água registrada".
+        const agua = await adicionarAgua(supabase, uid, ml);
+        if (!agua.ok) throw new Error(agua.erro);
+        const total = agua.total;
         const sinal = ml > 0 ? `+${ml}` : `${ml}`;
         return {
           ok: true,

@@ -5,6 +5,7 @@ import {
   filaDeTriagem,
   idleDays,
   pesoDoDia,
+  pesoDe30Dias,
   resumirPacientes,
   getPatientActivity,
   getPatientSeries,
@@ -25,7 +26,7 @@ import {
   type ItemMeta,
 } from "./nutri";
 import type { Consulta } from "./consultas";
-import { addDaysISO, todayISO } from "./date";
+import { addDaysISO, naJanela, todayISO } from "./date";
 
 /** 2026-10-08 é uma quinta. A janela de 7 dias vai de 02 (sexta) a 08. */
 const HOJE = "2026-10-08";
@@ -719,6 +720,117 @@ describe("montarLinhaDoTempo — medida da consulta", () => {
     );
     expect(itens.map((i) => i.title)).toEqual(["Medida na consulta", "Peso 65.8 kg"]);
     expect(itens[0].detail).toBe("Peso 66.4 kg · cintura 80 cm");
+  });
+});
+
+describe("pesoDe30Dias", () => {
+  const casa = (date: string, weight_kg: number | string, hora = "08:00") => ({
+    date, weight_kg, measured_by: null, created_at: `${date}T${hora}:00Z`,
+  });
+  const daConsulta = (date: string, weight_kg: number | string, hora = "07:00") => ({
+    date, weight_kg, measured_by: "nutri-1", created_at: `${date}T${hora}:00Z`,
+  });
+
+  // Os extremos da janela vêm de naJanela (o JSDoc de lib/date.ts), e não de
+  // uma conta à mão: 30 dias são 30, contando hoje.
+  const primeiroDia = addDaysISO(HOJE, -29);
+  const diaAntes = addDaysISO(HOJE, -30);
+  const amanha = addDaysISO(HOJE, 1);
+
+  it("as bordas do teste são as de naJanela", () => {
+    expect(naJanela(primeiroDia, HOJE, 30)).toBe(true);
+    expect(naJanela(HOJE, HOJE, 30)).toBe(true);
+    expect(naJanela(diaAntes, HOJE, 30)).toBe(false);
+    expect(naJanela(amanha, HOJE, 30)).toBe(false);
+  });
+
+  it("no dia com as duas medidas, o ponto é o da consulta, nas duas ordens de chegada", () => {
+    const d = "2026-10-07";
+    const emCasaPrimeiro = pesoDe30Dias([casa(d, 71.2, "08:00"), daConsulta(d, 70.8, "07:00")], HOJE);
+    const consultaPrimeiro = pesoDe30Dias([daConsulta(d, 70.8, "07:00"), casa(d, 71.2, "08:00")], HOJE);
+    expect(emCasaPrimeiro.pontos).toEqual([{ data: d, peso: 70.8 }]);
+    expect(consultaPrimeiro.pontos).toEqual([{ data: d, peso: 70.8 }]);
+    expect(emCasaPrimeiro.atual).toBe(70.8);
+    expect(consultaPrimeiro.atual).toBe(70.8);
+  });
+
+  it("o primeiro e o último dia da janela entram; o dia antes e amanhã ficam fora", () => {
+    const r = pesoDe30Dias(
+      [
+        casa(diaAntes, 90),
+        casa(primeiroDia, 80),
+        casa(HOJE, 78),
+        casa(amanha, 60),
+      ],
+      HOJE
+    );
+    expect(r.pontos).toEqual([
+      { data: primeiroDia, peso: 80 },
+      { data: HOJE, peso: 78 },
+    ]);
+    expect(r.atual).toBe(78);
+    expect(r.variacao).toBe(-2);
+  });
+
+  it("data futura não vira o peso atual nem a ponta da variação", () => {
+    const r = pesoDe30Dias([casa("2026-10-01", 80), casa(amanha, 70)], HOJE);
+    expect(r.pontos).toEqual([{ data: "2026-10-01", peso: 80 }]);
+    expect(r.atual).toBe(80);
+    expect(r.variacao).toBeNull();
+  });
+
+  it("um dia só: sem variação, mesmo com duas pesagens nele", () => {
+    const d = "2026-10-07";
+    const r = pesoDe30Dias([casa(d, 71.2, "08:00"), casa(d, 71.0, "20:00")], HOJE);
+    expect(r.pontos).toEqual([{ data: d, peso: 71 }]);
+    expect(r.atual).toBe(71);
+    expect(r.variacao).toBeNull();
+  });
+
+  it("sem linhas, tudo vazio", () => {
+    expect(pesoDe30Dias([], HOJE)).toEqual({ pontos: [], atual: null, variacao: null });
+  });
+
+  it("a variação é a do último dia menos a do primeiro, com uma casa", () => {
+    // 78.4 - 80 dá -1.5999999999999943 em ponto flutuante.
+    const r = pesoDe30Dias([casa("2026-09-10", 80), casa("2026-10-07", "78.4")], HOJE);
+    expect(r.atual).toBe(78.4);
+    expect(r.variacao).toBe(-1.6);
+  });
+
+  it("linha sem peso não conta como dia", () => {
+    const r = pesoDe30Dias(
+      [casa("2026-09-20", 80), { date: "2026-10-01", weight_kg: null }, casa("2026-10-07", 78)],
+      HOJE
+    );
+    expect(r.pontos.map((p) => p.data)).toEqual(["2026-09-20", "2026-10-07"]);
+  });
+
+  it("noventa dias de linhas embaralhadas: só os 30 da janela, em ordem crescente", () => {
+    // O peso de i dias atrás é (700 + 3i)/10: quanto mais velho, mais pesado.
+    const linhas = Array.from({ length: 90 }, (_, i) =>
+      casa(addDaysISO(HOJE, -i), (700 + 3 * i) / 10)
+    );
+    linhas.push(casa(amanha, 50));
+    // Embaralha sem aleatório (o teste tem de dar o mesmo sempre): o passo 37
+    // e as 91 linhas são primos entre si, então visita todas as posições.
+    const embaralhadas = linhas.map((_, k) => linhas[(k * 37) % linhas.length]);
+    expect(new Set(embaralhadas).size).toBe(linhas.length);
+
+    const r = pesoDe30Dias(embaralhadas, HOJE);
+    expect(r.pontos).toHaveLength(30);
+    expect(r.pontos[0]).toEqual({ data: primeiroDia, peso: (700 + 3 * 29) / 10 });
+    expect(r.pontos[29]).toEqual({ data: HOJE, peso: 70 });
+    const datas = r.pontos.map((p) => p.data);
+    expect(datas).toEqual([...datas].sort());
+    expect(new Set(datas).size).toBe(30);
+    expect(r.atual).toBe(70);
+    expect(r.variacao).toBe(-8.7);
+  });
+
+  it("sem pesagem hoje, o atual é o do dia mais recente até hoje", () => {
+    const r = pesoDe30Dias([casa("2026-10-02", 75), casa("2026-10-05", 74.2), casa(amanha, 60)], HOJE);
+    expect(r.atual).toBe(74.2);
   });
 });
 

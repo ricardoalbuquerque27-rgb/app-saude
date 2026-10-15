@@ -297,7 +297,7 @@ export function montarResumos(
     // medida da consulta (`measured_by`) também: quem registrou foi o
     // nutricionista, e com ela quem nunca registrou nada virava "N dias sem
     // registrar" contados da consulta, e o alerta de parado sumia depois de
-    // toda consulta. Para o peso ela continua valendo (pesos30, abaixo).
+    // toda consulta. Para o peso ela continua valendo (pesoDe30Dias).
     const doPaciente = myBody.filter((b) => b.measured_by == null);
     const activeDays = new Set<string>();
     for (const r of [...myMeals, ...myWk, ...myLogs, ...doPaciente]) {
@@ -325,31 +325,10 @@ export function montarResumos(
       .filter((l) => l.date === today)
       .reduce((s, l) => s + (Number(l.water_ml) || 0), 0);
 
-    // Peso de 30 dias contados com naJanela: a consulta traz `>= hoje-30`
-    // (31 dias) e sem teto, e uma medida lançada com data futura virava o
-    // "peso atual" e a ponta da variação.
-    //
-    // Um valor por dia, pela regra de pesoDoDia (a da consulta vence a de
-    // casa). Antes, `weightLast` e `weightFirst` pegavam a última e a primeira
-    // linha da lista: num dia com as duas medidas, uma das duas ao acaso (a
-    // ordem dentro do dia é a que o banco trouxe), e o "Peso atual" do Corpo
-    // podia mostrar a outra. Contar dias, e não linhas, também impede que duas
-    // medidas do mesmo dia virem uma "variação".
-    const porDia = new Map<string, any[]>();
-    for (const b of myBody) {
-      if (!naJanela(b.date, today, 30)) continue;
-      porDia.set(b.date, [...(porDia.get(b.date) ?? []), b]);
-    }
-    const pesos30 = Array.from(porDia.keys())
-      .sort()
-      .map((dia) => pesoDoDia(porDia.get(dia)!))
-      .filter((p): p is number => p != null);
-    const weightLast = pesos30.length ? pesos30[pesos30.length - 1] : null;
-    const weightFirst = pesos30.length ? pesos30[0] : null;
-    const weightDelta30 =
-      weightLast != null && weightFirst != null && pesos30.length > 1
-        ? Number((weightLast - weightFirst).toFixed(1))
-        : null;
+    const { atual: weightLast, variacao: weightDelta30 } = pesoDe30Dias(
+      myBody,
+      today
+    );
 
     // Adesão ao plano nos últimos 7 dias. A mesma conta da aba do
     // paciente: era uma cópia à mão do computeAdherence, e duas cópias da
@@ -797,6 +776,62 @@ export function pesoDoDia(
     (a.created_at ?? "") < (b.created_at ?? "") ? -1 : (a.created_at ?? "") > (b.created_at ?? "") ? 1 : 0
   ).pop();
   return ultima ? Number(ultima.weight_kg) : null;
+}
+
+/** Uma medida de peso, como vem de `body_measurements`. */
+export type LinhaDePeso = {
+  date: string;
+  weight_kg: number | string | null;
+  measured_by?: string | null;
+  created_at?: string | null;
+};
+
+/**
+ * O peso dos últimos 30 dias: um ponto por dia, o peso atual e a variação.
+ * É a conta do resumo do nutri (`montarResumos`) e a do Progresso da Início do
+ * paciente, para os dois não discordarem.
+ *
+ * Os 30 dias são contados com naJanela: a consulta traz `>= hoje-30` (31
+ * dias) e sem teto, e uma medida lançada com data futura virava o "peso
+ * atual" e a ponta da variação.
+ *
+ * Um valor por dia, pela regra de pesoDoDia (a da consulta vence a de casa).
+ * Antes, `weightLast` e `weightFirst` pegavam a última e a primeira linha da
+ * lista: num dia com as duas medidas, uma das duas ao acaso (a ordem dentro
+ * do dia é a que o banco trouxe), e o "Peso atual" do Corpo podia mostrar a
+ * outra. Contar dias, e não linhas, também impede que duas medidas do mesmo
+ * dia virem uma "variação".
+ *
+ * `pontos` vem em ordem crescente de data, seja qual for a ordem das linhas.
+ * `atual` é o do dia mais recente da janela (não precisa ser hoje) e
+ * `variacao` é o último menos o primeiro, com uma casa; com menos de dois
+ * dias com peso, é nula.
+ */
+export function pesoDe30Dias(
+  linhas: LinhaDePeso[],
+  hoje: string
+): {
+  pontos: { data: string; peso: number }[];
+  atual: number | null;
+  variacao: number | null;
+} {
+  const porDia = new Map<string, LinhaDePeso[]>();
+  for (const linha of linhas) {
+    if (!naJanela(linha.date, hoje, 30)) continue;
+    const doDia = porDia.get(linha.date);
+    if (doDia) doDia.push(linha);
+    else porDia.set(linha.date, [linha]);
+  }
+  const pontos: { data: string; peso: number }[] = [];
+  for (const data of Array.from(porDia.keys()).sort()) {
+    const peso = pesoDoDia(porDia.get(data)!);
+    if (peso != null) pontos.push({ data, peso });
+  }
+  if (pontos.length === 0) return { pontos, atual: null, variacao: null };
+  const atual = pontos[pontos.length - 1].peso;
+  const variacao =
+    pontos.length > 1 ? Number((atual - pontos[0].peso).toFixed(1)) : null;
+  return { pontos, atual, variacao };
 }
 
 /** Média de um item na janela. `dias` diz quantos dias entraram na conta. */
