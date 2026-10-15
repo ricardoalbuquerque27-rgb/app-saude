@@ -13,7 +13,7 @@
 // escritas de escrever(): o upsert do perfil (o CRN), o PATCH/DELETE de
 // body_measurements com a RLS do paciente (a medida da consulta não se altera
 // nem se apaga, e o banco recusa sem erro), o upsert da água do dia
-// (daily_logs) e o insert de refeição (meals). POST
+// (daily_logs) e o insert e o delete de refeição (meals). POST
 // /__reset volta tudo ao que o cenário subiu; POST /__falhar derruba os GET de
 // uma tabela (500) até o próximo /__reset, ou só as escritas, com "escrita": true.
 
@@ -1302,8 +1302,12 @@ const sessao = (id) => ({
  *    "+250 ml" da Início gravava e a página, recarregada, mostrava a água de
  *    antes: não havia como ver o anel subir, nem o "Desfazer" devolvê-lo.
  *  - meals, POST (insert): guarda a refeição. É o que deixa o roteiro da Início
- *    passar da meta de calorias e ver o "acima do limite" do anel.
- *  Nas duas, só linha de quem pede (a RLS `user_id = auth.uid()`), senão 403.
+ *    passar da meta de calorias e ver o "acima do limite" do anel, e o da Dieta
+ *    registrar um "Comi isso" e ver o plano dizer "feito".
+ *  - meals, DELETE: apaga a refeição de quem pede (o excluir da Dieta). Como no
+ *    banco, a RLS esconde a linha dos outros: zero linhas afetadas, sem erro.
+ *  Nas escritas de insert, só linha de quem pede (a RLS `user_id = auth.uid()`),
+ *  senão 403.
  */
 let seqEscrita = 0;
 function escrever(tabela, metodo, params, corpo, quem, prefer) {
@@ -1342,6 +1346,15 @@ function escrever(tabela, metodo, params, corpo, quem, prefer) {
       return linha;
     });
     return { status: 201, dados: representacao ? gravados : [], cabecalhos: {} };
+  }
+
+  if (tabela === "meals" && metodo === "DELETE") {
+    // A RLS de meals (`user_id = auth.uid()`) só deixa enxergar, e portanto
+    // apagar, a refeição da própria pessoa.
+    const visiveis = aplicaFiltros(T.meals, params).filter((l) => l.user_id === quem);
+    T.meals = T.meals.filter((l) => !visiveis.includes(l));
+    if (representacao) return { status: 200, dados: visiveis, cabecalhos: contagem(visiveis.length) };
+    return { status: 204, dados: null, cabecalhos: contagem(visiveis.length) };
   }
 
   if (tabela === "body_measurements" && (metodo === "PATCH" || metodo === "DELETE")) {

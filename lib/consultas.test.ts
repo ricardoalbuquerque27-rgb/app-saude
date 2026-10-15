@@ -18,6 +18,7 @@ import {
   proximaConsulta,
   resumoDaConsulta,
   rotuloDaConsulta,
+  rotuloDoDia,
   situacao,
   sugestaoDeRetorno,
   tipoSugerido,
@@ -245,6 +246,24 @@ describe("textos", () => {
     expect(rotuloDaConsulta(consulta({ starts_at: "2026-10-20T02:30:00Z" }))).toBe(
       "seg., 19/10 às 23:30"
     );
+  });
+
+  it("rótulo do dia da Dieta: \"Hoje, sex. 9/10\" ou \"qua. 7/10\", sem zero à esquerda", () => {
+    expect(rotuloDoDia("2026-10-09", "2026-10-09")).toBe("Hoje, sex. 9/10");
+    expect(rotuloDoDia("2026-10-07", "2026-10-09")).toBe("qua. 7/10");
+    // Dia e mês de dois dígitos ficam como estão.
+    expect(rotuloDoDia("2026-12-25", "2026-12-31")).toBe("sex. 25/12");
+    // 1º de janeiro: o dia da semana vem da data, não do ano anterior.
+    expect(rotuloDoDia("2027-01-01", "2027-01-05")).toBe("sex. 1/1");
+  });
+
+  it("rótulo do dia: o dia da semana vem da data, não do fuso de quem roda", () => {
+    // A leste de Greenwich (UTC+14) o meio-dia local de 2026-10-09 já é 10
+    // em UTC; um `new Date(iso)` lido em hora local erraria o dia da semana.
+    process.env.TZ = "Pacific/Kiritimati";
+    expect(rotuloDoDia("2026-10-09", "2026-10-09")).toBe("Hoje, sex. 9/10");
+    process.env.TZ = "Pacific/Pago_Pago";
+    expect(rotuloDoDia("2026-10-09", "2026-10-09")).toBe("Hoje, sex. 9/10");
   });
 
   it("resumo da consulta: tipo com maiúscula, modalidade e duração", () => {

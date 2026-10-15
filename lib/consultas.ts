@@ -320,6 +320,19 @@ export function dataCurta(data: string): string {
   return `${data.slice(8, 10)}/${data.slice(5, 7)}`;
 }
 
+/**
+ * O rótulo do dia da Dieta: "Hoje, sex. 9/10" ou "qua. 7/10". Sem zero à
+ * esquerda ("9/10", e não o "09/10" de `dataCurta`), que é como a pessoa
+ * escreve. O dia da semana sai da data em si (`nomeCurtoDoDia`, ao meio-dia
+ * UTC): `new Date(iso)` lido em hora local erraria o dia a leste e a oeste de
+ * Greenwich, e `toLocale*` sem `timeZone` mostraria o de amanhã no servidor
+ * (UTC) entre 21h e meia-noite.
+ */
+export function rotuloDoDia(data: string, hoje: string): string {
+  const curto = `${nomeCurtoDoDia(data)} ${Number(data.slice(8, 10))}/${Number(data.slice(5, 7))}`;
+  return data === hoje ? `Hoje, ${curto}` : curto;
+}
+
 /** "ter., 20/10 às 14:00", no fuso de São Paulo. */
 export function rotuloDoInstante(instante: string): string {
   const dia = dataNoBrasil(instante);
