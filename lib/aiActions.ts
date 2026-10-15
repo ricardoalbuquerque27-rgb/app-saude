@@ -713,8 +713,9 @@ export async function executeAction(
           return { ok: false, resumo: "Quantidade de água inválida." };
         }
         // A leitura e a gravação do dia moram em lib/agua.ts, as mesmas do
-        // botão da Início. Falha vira exceção, como antes: o catch daqui
-        // responde "Não consegui salvar agora", e não "água registrada".
+        // "+250 ml" da Início (components/inicio/AdicionarAgua.tsx). Falha
+        // vira exceção, como antes: o catch daqui responde "Não consegui
+        // salvar agora", e não "água registrada".
         const agua = await adicionarAgua(supabase, uid, ml);
         if (!agua.ok) throw new Error(agua.erro);
         const total = agua.total;

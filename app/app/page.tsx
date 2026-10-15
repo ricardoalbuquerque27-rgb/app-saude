@@ -1,35 +1,31 @@
 import Link from "next/link";
-import {
-  Dumbbell,
-  Flame,
-  Scale,
-  ArrowRight,
-  Camera,
-  CalendarDays,
-  Syringe,
-  HeartPulse,
-  ChevronRight,
-  MessageCircle,
-  BarChart3,
-  Plus,
-  CheckCircle2,
-  Stethoscope,
-  Utensils,
-  ChevronDown,
-} from "lucide-react";
+import { ChevronRight, Plus, Scale } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { TrendChart } from "@/components/charts";
-import OpenChatButton from "@/components/OpenChatButton";
 import { ProgressRing } from "@/components/ProgressRing";
-import { todayISO, addDaysISO, formatDate, hojeLongo } from "@/lib/date";
+import { todayISO, addDaysISO, hojeLongo, limitesDaJanela, saudacao } from "@/lib/date";
 import { computeHealthScore } from "@/lib/healthScore";
 import { getPending } from "@/lib/pending";
+import { montarParaHoje } from "@/lib/paraHoje";
+import { sugestaoDeProteina, textoDaSugestao } from "@/lib/cardapio";
+import { papelDasCalorias, pesoDe30Dias, pesoDoDia, textoVariacaoPeso } from "@/lib/nutri";
+import { dataCurta } from "@/lib/consultas";
+import { numeroBR } from "@/lib/numeros";
 import NutriHome from "@/components/NutriHome";
-import PlanCheckIn from "@/components/PlanCheckIn";
-import NutriNotes from "@/components/NutriNotes";
-import MealPlanView from "@/components/MealPlanView";
 import { LinhaDaConsulta } from "@/components/LinhaDaConsulta";
+import { ParaHoje } from "@/components/inicio/ParaHoje";
+import { ScoreExplicado } from "@/components/inicio/ScoreExplicado";
+import AdicionarAgua from "@/components/inicio/AdicionarAgua";
+import { LinhaDoPeso, kg } from "@/components/inicio/LinhaDoPeso";
 import { getConsultasDoCartao } from "@/lib/consultasDb";
+
+// A Início do paciente (spec do visual do app do paciente, "Início
+// (paciente)"): uma coluna só, no celular e no computador, nesta ordem — data
+// e saudação, a consulta numa linha, "Para hoje", "Registrar", "Seu dia",
+// "Progresso" e os links. A conta de cada bloco mora em lib/ e é testada
+// (montarParaHoje, sugestaoDeProteina, papelDasCalorias, pesoDe30Dias,
+// computeHealthScore); a página lê e desenha.
+
+const PESO = "date, weight_kg, measured_by, created_at";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -60,12 +56,16 @@ export default async function DashboardPage() {
   // "Treinos (7 dias)" contava 8 dias de treino.
   const weekAgo = addDaysISO(today, -6);
   const dow = (new Date(today + "T12:00:00").getDay() + 6) % 7; // 0 = Segunda
+  // O peso de 30 dias: a janela pela mesma conta do nutricionista. A leitura
+  // antiga era `order(date asc).limit(60)`, que pega as 60 MAIS ANTIGAS: com
+  // mais de 60 pesagens, o "Peso atual" era uma de meses atrás.
+  const janelaDoPeso = limitesDaJanela(today, 30);
 
   const [
     profileRes,
     workoutsWeekRes,
     mealsTodayRes,
-    measurementsRes,
+    pesoRes,
     dailyTodayRes,
     recentWorkoutsRes,
     todayPlanRes,
@@ -75,6 +75,7 @@ export default async function DashboardPage() {
     cardapioRes,
     vinculoRes,
     consultasRes,
+    pending,
   ] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", uid).maybeSingle(),
     supabase
@@ -92,20 +93,22 @@ export default async function DashboardPage() {
       .eq("date", today),
     supabase
       .from("body_measurements")
-      .select("date, weight_kg")
+      .select(PESO)
       .eq("user_id", uid)
       .not("weight_kg", "is", null)
-      .order("date", { ascending: true })
-      .limit(60),
+      .gte("date", janelaDoPeso.desde)
+      .lte("date", janelaDoPeso.ate),
     supabase
       .from("daily_logs")
       .select("water_ml, sleep_hours, mood, energy")
       .eq("user_id", uid)
       .eq("date", today)
       .maybeSingle(),
+    // Os treinos recentes ficam só para o Score (treinou hoje?): a lista saiu
+    // da Início e virou o link "Treinos recentes".
     supabase
       .from("workouts")
-      .select("id, date, name, category")
+      .select("id, date")
       .eq("user_id", uid)
       .order("date", { ascending: false })
       .limit(5),
@@ -151,72 +154,79 @@ export default async function DashboardPage() {
       .eq("status", "active")
       .limit(1)
       .maybeSingle(),
-    // As consultas mais recentes (inclusive as futuras), para o cartão.
+    // As consultas mais recentes (inclusive as futuras), para a linha.
     getConsultasDoCartao(supabase, uid),
+    getPending(supabase, uid),
   ]);
 
-  const profile = profileRes.data;
+  const profile = profileRes.data as any;
   const firstName = (profile?.full_name || "Atleta").split(" ")[0];
+  const cardapio = cardapioRes.data as any;
+  const vinculo = vinculoRes.data as any;
+  const peso30 = pesoRes.error ? null : pesoDe30Dias((pesoRes.data ?? []) as any, today);
 
-  const workoutsWeek = workoutsWeekRes.count ?? 0;
-  const caloriesToday = (mealsTodayRes.data ?? []).reduce(
-    (s, m) => s + (Number(m.calories) || 0),
-    0
-  );
-  const proteinToday = (mealsTodayRes.data ?? []).reduce(
-    (s, m) => s + (Number(m.protein_g) || 0),
-    0
-  );
-  const measurements = measurementsRes.data ?? [];
-  const currentWeight =
-    measurements.length > 0
-      ? measurements[measurements.length - 1].weight_kg
-      : null;
-  const waterToday = dailyTodayRes.data?.water_ml ?? 0;
+  // O que depende da primeira leva: os itens do cardápio, o nome do
+  // nutricionista e, sem pesagem na janela, a última antes dela.
+  const [itensRes, nutriRes, pesoAntesRes] = await Promise.all([
+    cardapio
+      ? supabase
+          .from("meal_plan_items")
+          .select("id, meal_type, position, description, protein_g")
+          .eq("meal_plan_id", cardapio.id)
+          .order("position", { ascending: true })
+      : null,
+    vinculo?.nutritionist_id
+      ? supabase.from("profiles").select("full_name").eq("id", vinculo.nutritionist_id).maybeSingle()
+      : null,
+    peso30 && peso30.atual == null
+      ? supabase
+          .from("body_measurements")
+          .select(PESO)
+          .eq("user_id", uid)
+          .not("weight_kg", "is", null)
+          .lt("date", janelaDoPeso.desde)
+          .order("date", { ascending: false })
+          .order("created_at", { ascending: false })
+          .limit(10)
+      : null,
+  ]);
+
+  const nutriNome: string = (nutriRes?.data as any)?.full_name || "";
+  const temNutri = !!vinculo;
+
+  // ---------------------------------------------------------------------
+  // Progresso: o peso de 30 dias, pela conta do nutricionista (pesoDe30Dias:
+  // um valor por dia, a medida da consulta vence a de casa, teto em hoje).
+  // ---------------------------------------------------------------------
+  const pesoFalhou = !!pesoRes.error || !!pesoAntesRes?.error;
+  let pesoAnterior: { data: string; peso: number } | null = null;
+  if (pesoAntesRes && !pesoAntesRes.error && pesoAntesRes.data?.length) {
+    const linhas = pesoAntesRes.data as any[];
+    const dia = linhas[0].date as string;
+    const peso = pesoDoDia(linhas.filter((l) => l.date === dia));
+    if (peso != null) pesoAnterior = { data: dia, peso };
+  }
+  const pesoAtual = peso30?.atual ?? pesoAnterior?.peso ?? null;
+
+  // ---------------------------------------------------------------------
+  // Seu dia: o Score, os anéis e a sugestão de proteína.
+  // ---------------------------------------------------------------------
+  const refeicoesHoje = (mealsTodayRes.data ?? []) as any[];
+  const caloriesToday = refeicoesHoje.reduce((s, m) => s + (Number(m.calories) || 0), 0);
+  const proteinToday = refeicoesHoje.reduce((s, m) => s + (Number(m.protein_g) || 0), 0);
+  const tiposJaRegistrados: string[] = refeicoesHoje.map((m) => m.meal_type);
+  const waterToday = Number((dailyTodayRes.data as any)?.water_ml) || 0;
   const waterGoal = profile?.daily_water_goal_ml ?? 2500;
   const calorieGoal = profile?.daily_calorie_goal ?? null;
   const proteinGoal = profile?.protein_goal_g ?? null;
-  const sleepToday = dailyTodayRes.data?.sleep_hours ?? null;
-  const recentWorkouts = recentWorkoutsRes.data ?? [];
-  const todayPlan = todayPlanRes.data ?? [];
-  const todayCompletions = todayCompletionsRes.data ?? [];
-  const notasNaoLidas = notasRes.data ?? [];
-
-  // Cardápio prescrito: o paciente não deveria precisar ir atrás dele numa
-  // aba. Trazemos para a primeira tela, e só as refeições que ainda faltam
-  // hoje — o que sobra é exatamente o que ele tem a fazer.
-  const cardapio = cardapioRes.data as any;
-  const vinculo = vinculoRes.data as any;
-  const tiposJaRegistrados = (mealsTodayRes.data ?? []).map(
-    (m: any) => m.meal_type
-  );
-  let itensCardapioPendentes: any[] = [];
-  if (cardapio) {
-    const { data: itens } = await supabase
-      .from("meal_plan_items")
-      .select("id, meal_type, position, description, calories, protein_g, carbs_g, fat_g")
-      .eq("meal_plan_id", cardapio.id)
-      .order("position", { ascending: true });
-    itensCardapioPendentes = (itens ?? []).filter(
-      (i: any) => !tiposJaRegistrados.includes(i.meal_type)
-    );
-  }
-
-  let nutriNome = "";
-  if (vinculo?.nutritionist_id) {
-    const { data: prof } = await supabase
-      .from("profiles")
-      .select("full_name")
-      .eq("id", vinculo.nutritionist_id)
-      .maybeSingle();
-    nutriNome = (prof as any)?.full_name || "";
-  }
+  const sleepToday = (dailyTodayRes.data as any)?.sleep_hours ?? null;
+  const recentWorkouts = (recentWorkoutsRes.data ?? []) as any[];
 
   const health = computeHealthScore({
     sleepHours: sleepToday,
     trainedToday: recentWorkouts.some((w) => w.date === today),
-    workoutsWeek,
-    mealsLoggedToday: (mealsTodayRes.data ?? []).length,
+    workoutsWeek: workoutsWeekRes.count ?? 0,
+    mealsLoggedToday: refeicoesHoje.length,
     proteinToday,
     proteinGoal,
     caloriesToday,
@@ -226,584 +236,330 @@ export default async function DashboardPage() {
     mood: (dailyTodayRes.data as any)?.mood ?? null,
     energy: (dailyTodayRes.data as any)?.energy ?? null,
   });
-  // O número do Score é texto grande (4xl), então o mínimo é 3:1 — e os tons
-  // 500 ficavam em 2.15:1 (amber) e 2.53:1 (brand) sobre o card branco. Cada
-  // cor ganha o par claro/escuro: um tom só não serve os dois temas.
-  const healthColor =
-    health.color === "brand"
-      ? "text-brand-700 dark:text-brand-400"
-      : health.color === "amber"
-        ? "text-amber-600 dark:text-amber-400"
-        : "text-rose-600 dark:text-rose-400";
 
-  // Um único conjunto de números do dia. Antes o mesmo dado aparecia em três
-  // blocos seguidos: pilares do Score, anéis e mini-stats.
-  const rings = [
-    {
-      label: "Calorias",
-      colorClass: "text-amber-600 dark:text-amber-400",
-      pct: calorieGoal ? caloriesToday / calorieGoal : 0,
-      centerMain: `${Math.round(caloriesToday)}`,
-      centerSub: calorieGoal ? `/ ${calorieGoal}` : "kcal",
-    },
-    {
-      label: "Água",
-      colorClass: "text-blue-600 dark:text-blue-400",
-      pct: waterGoal ? waterToday / waterGoal : 0,
-      centerMain: `${(waterToday / 1000).toFixed(1)}`,
-      centerSub: `/ ${(waterGoal / 1000).toFixed(1)} L`,
-    },
-    {
-      label: "Proteína",
-      colorClass: "text-rose-600 dark:text-rose-400",
-      pct: proteinGoal ? proteinToday / proteinGoal : 0,
-      centerMain: `${Math.round(proteinToday)}`,
-      centerSub: proteinGoal ? `/ ${proteinGoal} g` : "g",
-    },
-  ];
+  // A meta de calorias é teto ("limite") para quem está acima do peso-alvo e
+  // piso ("meta") para quem está abaixo. Sem pesagem na janela, vale a última.
+  const metaDePeso = profile?.weight_goal_kg != null ? Number(profile.weight_goal_kg) : null;
+  const papel = papelDasCalorias(pesoAtual, metaDePeso);
 
-  const pending = await getPending(supabase, uid);
-
-  const treatment = treatmentRes.data;
-  let doseLabel: string | null = null;
-  let doseUrgent = false;
-  if (treatment?.next_dose_date) {
-    const diff = Math.round(
-      (new Date(treatment.next_dose_date + "T00:00:00").getTime() -
-        new Date(today + "T00:00:00").getTime()) /
-        86400000
-    );
-    if (diff < 0) {
-      doseLabel = "Aplicação atrasada";
-      doseUrgent = true;
-    } else if (diff === 0) {
-      doseLabel = "Hoje é dia da aplicação";
-      doseUrgent = true;
-    } else if (diff === 1) {
-      doseLabel = "Aplicação amanhã";
-    } else {
-      doseLabel = `Aplicação em ${diff} dias`;
-    }
-  }
-
-  const chartData = measurements.map((m) => ({
-    label: formatDate(m.date).slice(0, 5),
-    value: m.weight_kg,
+  const itensDoPlano = ((itensRes?.data ?? []) as any[]).map((i) => ({
+    meal_type: i.meal_type,
+    position: Number(i.position) || 0,
+    description: i.description,
+    protein_g: i.protein_g == null ? null : Number(i.protein_g),
   }));
+  // Com as refeições de hoje ou o plano sem carregar, a conta partiria de um
+  // zero que é falha, e a frase diria "Faltam 110 g" a quem já comeu.
+  const sugestao =
+    mealsTodayRes.error || itensRes?.error
+      ? null
+      : sugestaoDeProteina({
+          meta: proteinGoal == null ? null : Number(proteinGoal),
+          consumido: proteinToday,
+          itens: itensDoPlano,
+          tiposRegistrados: tiposJaRegistrados,
+          vinculoAtivo: temNutri,
+        });
+  // A dica principal sai quando a sugestão aparece e o pilar mais fraco é a
+  // Nutrição: as duas diriam "faltam N g de proteína" uma embaixo da outra.
+  const pilarDaDica = health.pillars.find((p) => p.tip === health.topTip);
+  const mostraDica =
+    health.hasData && !!health.topTip && !(sugestao && pilarDaDica?.key === "nutricao");
 
+  // "1.800" e "1,45": números de anel em pt-BR. A água leva até duas casas,
+  // porque um copo é 0,25 L e "1,2" depois de "+250 ml" não mudaria.
+  const kcal = (n: number) => Math.round(n).toLocaleString("pt-BR");
+  const litros = (ml: number) => numeroBR(ml / 1000, 2);
+
+  // ---------------------------------------------------------------------
+  // Para hoje: cada leitura que o alimenta guarda o `error`. O supabase-js
+  // devolve `{ data: null, error }` sem lançar, e a página fazia `data ?? []`:
+  // com os recados fora do ar, o cartão dizia "em dia".
+  // ---------------------------------------------------------------------
+  const todayPlan = (todayPlanRes.data ?? []) as any[];
+  const todayCompletions = (todayCompletionsRes.data ?? []) as any[];
+  const notasNaoLidas = (notasRes.data ?? []) as any[];
+  const treatment = treatmentRes.data as any;
+
+  // Dias até a próxima dose, contados em datas (meio-dia UTC), sem o fuso de
+  // quem roda.
+  const diasAteADose = treatment?.next_dose_date
+    ? Math.round(
+        (Date.parse(treatment.next_dose_date + "T12:00:00Z") - Date.parse(today + "T12:00:00Z")) /
+          86400000
+      )
+    : null;
+  const doseHojeOuAtrasada = diasAteADose != null && diasAteADose <= 0;
+
+  const tiposFaltando = new Set(
+    itensDoPlano.map((i) => i.meal_type).filter((t) => !tiposJaRegistrados.includes(t))
+  );
+
+  const falhouParaHoje =
+    !!notasRes.error ||
+    !!todayPlanRes.error ||
+    !!todayCompletionsRes.error ||
+    !!cardapioRes.error ||
+    !!itensRes?.error ||
+    !!mealsTodayRes.error ||
+    !!treatmentRes.error ||
+    // Sem o vínculo, o treino do nutricionista viraria "seu treino".
+    !!vinculoRes.error ||
+    pending.falhou;
+
+  const paraHoje = montarParaHoje({
+    recados: notasNaoLidas,
+    treinos: todayPlan,
+    confirmados: todayCompletions.map((c) => c.plan_id).filter(Boolean),
+    temNutri,
+    aplicacao: doseHojeOuAtrasada ? { atrasada: (diasAteADose as number) < 0 } : null,
+    refeicoesFaltando: tiposFaltando.size,
+    pendencias: pending.items,
+    falhou: falhouParaHoje,
+  });
+
+  // A data longa vem minúscula do Intl ("quinta-feira, 15 de outubro"); a
+  // maiúscula vai no texto, e não por CSS: `first-letter:uppercase` é caixa
+  // alta por estilo, que a Início não usa.
   const dataLonga = hojeLongo();
-
-  // O dia só está resolvido quando não há treino previsto sem check-in, nem
-  // pendência de cadastro, nem dose vencendo.
-  const checkinPendente = todayPlan.filter(
-    (p: any) => !todayCompletions.some((c: any) => c.plan_id === p.id)
-  ).length;
-
-  // O que vem do nutricionista fica junto, num bloco só e identificado. Antes
-  // o recado, o treino prescrito e o cardápio apareciam soltos no meio das
-  // pendências do próprio app — e a pessoa não sabia o que era orientação
-  // profissional e o que era lembrete do sistema.
-  const tiposPendentes = Array.from(
-    new Set(itensCardapioPendentes.map((i: any) => i.meal_type))
-  );
-  // O cartão de dose logo acima já cobre o assunto com mais detalhe
-  // (remédio e dosagem); repetir como pendência mostrava a mesma coisa
-  // duas vezes seguidas.
-  const mostraCartaoDose = !!(treatment && doseLabel && doseUrgent);
-  const pendenciasVisiveis = pending.items.filter(
-    (it) => !(mostraCartaoDose && it.key === "dose")
-  );
-
-  const planoNutri = todayPlan.filter((p: any) => p.prescribed_by);
-  const planoProprio = todayPlan.filter((p: any) => !p.prescribed_by);
-  const temNutri = !!vinculo;
-  const blocoNutri =
-    temNutri &&
-    (notasNaoLidas.length > 0 ||
-      planoNutri.length > 0 ||
-      itensCardapioPendentes.length > 0);
-  const tudoEmDia =
-    checkinPendente === 0 &&
-    pendenciasVisiveis.length === 0 &&
-    !doseUrgent &&
-    itensCardapioPendentes.length === 0 &&
-    notasNaoLidas.length === 0;
+  const dataDeHoje = dataLonga.charAt(0).toUpperCase() + dataLonga.slice(1);
 
   // "Refeição" e "Foto do prato" apontavam para a MESMA URL, /app/dieta, e
   // nenhuma das duas abria nada — a pessoa chegava na página e tinha de
   // procurar o botão. Agora cada atalho abre o que o rótulo diz.
   const atalhos = [
-    { href: "/app/dieta?novo=1", icon: Flame, label: "Refeição" },
-    { href: "/app/dieta?foto=1", icon: Camera, label: "Foto do prato" },
-    { href: "/app/treinos", icon: Dumbbell, label: "Treino" },
-    { href: "/app/medidas", icon: Scale, label: "Peso" },
+    { href: "/app/dieta?novo=1", label: "Refeição" },
+    { href: "/app/dieta?foto=1", label: "Foto do prato" },
+    { href: "/app/treinos", label: "Treino" },
+    { href: "/app/medidas", label: "Peso" },
   ];
 
-  return (
-    <div className="space-y-5">
-      {/* Saudação enxuta — o espaço nobre é do bloco "Hoje", logo abaixo. */}
-      <div>
-        <p className="text-sm text-slate-500 first-letter:uppercase dark:text-slate-400">
-          {dataLonga}
-        </p>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-3xl">
-          Olá, {firstName} 👋
-        </h1>
-      </div>
+  const LINK_DE_LISTA =
+    "tappable flex min-h-[52px] items-center justify-between gap-3 px-4 text-[15px] text-app-texto hover:bg-app-primaria-fundo";
 
-      {/* A consulta com o nutricionista, numa linha, logo abaixo da saudação:
-          a data é o que se procura, e aqui ela aparece sem rolar. As ações
-          (pedir, remarcar, cancelar) ficam no cartão de "Meu plano", para
-          onde a linha leva; só para quem tem acompanhamento. */}
-      {temNutri && (
+  return (
+    <div className="flex flex-col gap-6">
+      {/* 1. Data e saudação, pela hora de São Paulo (o servidor roda em UTC). */}
+      <header>
+        <p className="text-[13px] text-app-texto-2">{dataDeHoje}</p>
+        <h1 className="text-2xl font-semibold text-app-texto">
+          {saudacao(new Date())}, {firstName}
+        </h1>
+      </header>
+
+      {/* 2. A consulta, numa linha: a data é o que se procura, e aqui ela
+          aparece sem rolar. As ações ficam no cartão de "Meu plano", para
+          onde a linha leva; só para quem tem acompanhamento (ou quando o
+          vínculo não carregou, para a falha não virar silêncio). */}
+      {(temNutri || vinculoRes.error) && (
         <LinhaDaConsulta
           // Só as com o nutricionista de agora: as de um vínculo antigo o
           // banco já cancela ao desvincular, e as passadas não são assunto aqui.
           consultas={consultasRes.data.filter((c) => c.nutritionist_id === vinculo?.nutritionist_id)}
           agora={new Date().toISOString()}
           nutriNome={nutriNome}
-          falhou={consultasRes.falhou}
+          falhou={consultasRes.falhou || !!vinculoRes.error}
         />
       )}
 
-      {/* ----------------------------------------------------------------
-          1. HOJE — o que precisa da ação da pessoa agora
-      ---------------------------------------------------------------- */}
-      <section className="card">
-        <h2 className="section-title mb-3">
-          <span className="icon-badge">
-            <CalendarDays className="h-4 w-4" />
-          </span>
-          Hoje
+      {/* 3. Para hoje */}
+      <ParaHoje
+        paraHoje={paraHoje}
+        uid={uid}
+        hoje={today}
+        notas={notasNaoLidas}
+        nutriNome={nutriNome}
+        sessoes={todayPlan}
+        completions={todayCompletions}
+        aplicacao={
+          treatment ? { medicamento: treatment.medication, dose: treatment.dose ?? null } : null
+        }
+        pendencias={pending.items}
+        temNutri={temNutri}
+        temTreinoHoje={todayPlan.length > 0}
+      />
+
+      {/* 4. Registrar: saiu de dentro do "Hoje", onde era uma fila de pílulas. */}
+      <section aria-labelledby="registrar">
+        <h2 id="registrar" className="section-title">
+          Registrar
         </h2>
-
-        {tudoEmDia ? (
-          <div className="flex items-center gap-3 py-1">
-            <CheckCircle2 className="h-6 w-6 shrink-0 text-brand-700 dark:text-brand-400" />
-            <p className="text-sm text-slate-600 dark:text-slate-300">
-              {todayPlan.length > 0
-                ? "Treino de hoje já confirmado. Siga registrando o resto do dia."
-                : "Dia de descanso no plano. Siga registrando o resto do dia."}
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {/* Tudo o que veio do nutricionista, num bloco só e com o nome
-                dele no topo — e com um caminho único para o resto. */}
-            {/* Isto já foi uma caixa dentro da caixa "Hoje". Medindo as duas
-                superfícies, elas diferiam por 1.018:1 no tema claro — a
-                mesma cor. A caixa não distinguia nada: só somava uma borda
-                e comia 24px de largura de cada lado, numa tela de 390px
-                onde os cartões de dentro já disputam espaço. O que agrupa
-                aqui é o rótulo e a proximidade, não uma segunda moldura. */}
-            {blocoNutri && (
-              <div>
-                <div className="mb-2.5 flex items-center justify-between gap-2">
-                  <p className="flex min-w-0 items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-brand-700 dark:text-brand-300">
-                    <Stethoscope className="h-3.5 w-3.5 shrink-0" />
-                    <span className="truncate">
-                      {nutriNome
-                        ? `Do seu nutricionista · ${nutriNome.split(" ")[0]}`
-                        : "Do seu nutricionista"}
-                    </span>
-                  </p>
-                  <Link
-                    href="/app/nutricionista"
-                    className="shrink-0 text-[11px] font-semibold text-brand-700 hover:underline dark:text-brand-300"
-                  >
-                    Ver plano
-                  </Link>
-                </div>
-
-                <div className="space-y-3">
-                  {notasNaoLidas.length > 0 && (
-                    <NutriNotes notas={notasNaoLidas as any} meuId={uid} compact />
-                  )}
-
-                  {planoNutri.length > 0 && (
-                    <div>
-                      <p className="eyebrow mb-1.5">Treino prescrito para hoje</p>
-                      <PlanCheckIn
-                        sessions={planoNutri as any}
-                        date={today}
-                        completions={todayCompletions as any}
-                      />
-                    </div>
-                  )}
-
-                  {itensCardapioPendentes.length > 0 && (
-                    // Resumo que abre no lugar. Despejar as cinco refeições
-                    // aqui fazia o cardápio sozinho ocupar um terço da tela
-                    // e empurrava o resto do dia para fora da vista. O aviso
-                    // de que há refeição pendente continua — é a contagem —,
-                    // o que sai da frente é o conteúdo. <details> nativo:
-                    // sem JavaScript e abre instantâneo.
-                    <details className="group rounded-xl border border-brand-200 bg-white dark:border-brand-800/50 dark:bg-slate-900/60">
-                      {/* Três caixas aninhadas já comeram a largura: o
-                          selo de ícone mais a contagem em pílula faziam o
-                          título quebrar em duas linhas e o subtítulo
-                          truncar. Ícone solto, contagem por extenso embaixo
-                          e só a seta à direita — não trunca em 390px. */}
-                      <summary className="tappable flex cursor-pointer list-none items-center gap-2.5 p-3 [&::-webkit-details-marker]:hidden">
-                        <Utensils className="h-4 w-4 shrink-0 text-brand-700 dark:text-brand-400" />
-                        <span className="min-w-0 flex-1">
-                          <span className="block text-sm font-semibold text-slate-900 dark:text-white">
-                            Cardápio de hoje
-                          </span>
-                          <span className="block text-xs text-slate-500 dark:text-slate-400">
-                            {tiposPendentes.length === 1
-                              ? "1 refeição ainda falta"
-                              : `${tiposPendentes.length} refeições ainda faltam`}
-                          </span>
-                        </span>
-                        <ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition group-open:rotate-180" />
-                      </summary>
-                      <div className="border-t border-brand-100 p-3 dark:border-brand-900/50">
-                        <MealPlanView
-                          nome={cardapio.name}
-                          observacao={cardapio.notes}
-                          itens={itensCardapioPendentes as any}
-                          date={today}
-                          jaRegistrados={tiposJaRegistrados}
-                          compacto
-                        />
-                      </div>
-                    </details>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Fora do bloco: o que é do próprio paciente. Sem a moldura,
-                quem marca a virada é esta linha. */}
-            {blocoNutri && (
-              <hr className="border-brand-200/70 dark:border-brand-800/40" />
-            )}
-
-            {(planoProprio.length > 0 || (!temNutri && planoNutri.length > 0)) && (
-              <div>
-                <p className="eyebrow mb-1.5">Treino de hoje</p>
-                <PlanCheckIn
-                  sessions={
-                    (temNutri ? planoProprio : todayPlan) as any
-                  }
-                  date={today}
-                  completions={todayCompletions as any}
-                  // A nota some só quando o bloco do nutri JÁ a mostrou.
-                  // Com o vínculo revogado, temNutri é falso e as linhas
-                  // prescritas caem aqui: antes a explicação sumia das duas.
-                  nota={!blocoNutri || planoNutri.length === 0}
-                />
-              </div>
-            )}
-
-            {!temNutri && itensCardapioPendentes.length > 0 && (
-              <div>
-                <p className="eyebrow mb-1.5">
-                  Cardápio de hoje — o que ainda falta
-                </p>
-                <MealPlanView
-                  nome={cardapio.name}
-                  observacao={cardapio.notes}
-                  itens={itensCardapioPendentes as any}
-                  date={today}
-                  jaRegistrados={tiposJaRegistrados}
-                  compacto
-                />
-              </div>
-            )}
-
-            {treatment && doseLabel && doseUrgent && (
-              <Link
-                href="/app/tratamento"
-                className="tappable group flex items-center gap-3 rounded-xl border border-brand-200 bg-white/70 p-3 hover:border-brand-300 dark:border-brand-900/50 dark:bg-slate-900/40"
-              >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
-                  <Syringe className="h-5 w-5" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                    {doseLabel}
-                  </p>
-                  <p className="truncate text-xs text-slate-500 dark:text-slate-400">
-                    {treatment.medication}
-                    {treatment.dose ? ` · ${treatment.dose}` : ""}
-                  </p>
-                </div>
-                <ArrowRight className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-brand-500" />
-              </Link>
-            )}
-
-            {pendenciasVisiveis.length > 0 && (
-              <ul className="pf-stagger space-y-1.5">
-                {pendenciasVisiveis.map((it) => (
-                  <li key={it.key}>
-                    <Link
-                      href={it.href}
-                      className="tappable group flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white/70 p-2.5 hover:border-brand-300 dark:border-slate-700 dark:bg-slate-900/40"
-                    >
-                      <span
-                        className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                          it.urgent ? "bg-rose-500" : "bg-amber-500"
-                        }`}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-200">
-                          {it.label}
-                        </p>
-                        <p className="truncate text-xs text-slate-500 dark:text-slate-400">
-                          {it.description}
-                        </p>
-                      </div>
-                      <ChevronRight className="h-4 w-4 shrink-0 text-slate-300 dark:text-slate-400" />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
-
-        {/* Registrar algo — atalhos junto da ação, não numa caixa separada */}
-        <div className="mt-4 flex flex-wrap gap-2 border-t border-brand-200/70 pt-3 dark:border-brand-800/40">
+        <div className="mt-2.5 grid grid-cols-2 gap-2 sm:grid-cols-4">
           {atalhos.map((a) => (
             <Link
               key={a.label}
               href={a.href}
-              className="tappable inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-brand-300 hover:text-brand-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-brand-700"
+              className="btn-ghost min-h-[48px] justify-start px-3.5 text-[15px] font-medium"
             >
-              <Plus className="h-3.5 w-3.5" />
+              <Plus aria-hidden="true" className="h-4 w-4 shrink-0 text-app-primaria" />
               {a.label}
             </Link>
           ))}
         </div>
       </section>
 
-      {/* ----------------------------------------------------------------
-          2. SEU DIA — Score e números num bloco só
-      ---------------------------------------------------------------- */}
-      <section className="card">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="section-title">
-            <span className="icon-badge">
-              <HeartPulse className="h-4 w-4" />
-            </span>
+      {/* 5. Seu dia */}
+      <section aria-labelledby="seu-dia">
+        <div className="relative">
+          <h2 id="seu-dia" className="section-title h-7">
             Seu dia
           </h2>
-          {(!calorieGoal || !proteinGoal) && (
+          {health.hasData && <ScoreExplicado health={health} />}
+        </div>
+
+        <div className="card mt-2.5 overflow-hidden p-0">
+          <div className="grid grid-cols-3 gap-1.5 px-2.5 py-4">
+            <ProgressRing
+              pct={calorieGoal ? caloriesToday / calorieGoal : 0}
+              centerMain={kcal(caloriesToday)}
+              centerSub={calorieGoal ? `/ ${kcal(calorieGoal)}` : "kcal"}
+              label="Calorias"
+              papel={papel}
+              avisoAcima={papel === "limite"}
+            />
+            <div className="flex flex-col items-center">
+              <ProgressRing
+                pct={waterGoal ? waterToday / waterGoal : 0}
+                centerMain={litros(waterToday)}
+                centerSub={`/ ${litros(waterGoal)} L`}
+                label="Água"
+              />
+              <AdicionarAgua uid={uid} />
+            </div>
+            <ProgressRing
+              pct={proteinGoal ? proteinToday / proteinGoal : 0}
+              centerMain={`${Math.round(proteinToday)}`}
+              centerSub={proteinGoal ? `/ ${proteinGoal} g` : "g"}
+              label="Proteína"
+            />
+          </div>
+
+          {sugestao && (
             <Link
-              href="/app/perfil"
-              className="text-xs font-medium text-brand-700 hover:underline dark:text-brand-400"
+              href="/app/dieta#plano"
+              className="tappable flex items-center gap-3 border-t border-app-linha px-4 py-3.5 hover:bg-app-primaria-fundo"
             >
-              Definir metas
+              <span className="min-w-0 flex-1 text-[15px] text-app-texto">{textoDaSugestao(sugestao)}</span>
+              <ChevronRight aria-hidden="true" className="h-5 w-5 shrink-0 text-app-texto-2" />
             </Link>
           )}
-        </div>
-
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-          {health.hasData && (
-            <div className="shrink-0 sm:w-40">
-              <p className={`text-4xl font-bold leading-none ${healthColor}`}>
-                {health.score}
-              </p>
-              <p className="mt-1 text-[11px] uppercase tracking-wide text-slate-500">
-                Score de Saúde · {health.label}
-              </p>
+          {mostraDica && (
+            <p className="border-t border-app-linha px-4 py-3.5 text-[15px] text-app-texto-2">
+              {health.topTip}
+            </p>
+          )}
+          {!health.hasData && (
+            <p className="border-t border-app-linha px-4 py-3.5 text-[15px] text-app-texto-2">
+              Registre uma refeição, a água ou o sono para o Score do dia aparecer.
+            </p>
+          )}
+          {(!calorieGoal || !proteinGoal) && (
+            <div className="border-t border-app-linha px-4 py-3">
+              <Link
+                href="/app/perfil"
+                className="inline-flex min-h-[32px] items-center text-[15px] font-semibold text-app-primaria hover:underline"
+              >
+                Definir metas
+              </Link>
             </div>
           )}
-
-          <div className="grid flex-1 grid-cols-3 gap-2">
-            {rings.map((r) => (
-              <ProgressRing
-                key={r.label}
-                pct={r.pct}
-                centerMain={r.centerMain}
-                centerSub={r.centerSub}
-                label={r.label}
-                colorClass={r.colorClass}
-              />
-            ))}
-          </div>
         </div>
-
-        {health.hasData && health.topTip ? (
-          <p className="mt-3 border-t border-slate-100 pt-3 text-sm text-slate-600 dark:border-slate-800 dark:text-slate-300">
-            {health.topTip}
-          </p>
-        ) : !health.hasData ? (
-          <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
-            Registre uma refeição, a água ou o sono para o Score do dia
-            aparecer.
-          </p>
-        ) : null}
       </section>
 
-      {/* ----------------------------------------------------------------
-          3. PROGRESSO — peso e números da semana
-      ---------------------------------------------------------------- */}
-      <section className="card">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="section-title">
-            <span className="icon-badge">
-              <Scale className="h-4 w-4" />
-            </span>
+      {/* 6. Progresso */}
+      <section aria-labelledby="progresso">
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 id="progresso" className="section-title">
             Progresso
           </h2>
           <Link
             href="/app/medidas"
-            className="text-xs font-medium text-brand-700 hover:underline dark:text-brand-400"
+            className="text-[15px] font-semibold text-app-primaria hover:underline"
           >
             Ver medidas
           </Link>
         </div>
-
-        <div className="mb-4 grid grid-cols-3 gap-3 text-center">
-          <div>
-            <p className="text-xl font-bold text-slate-900 dark:text-white">
-              {currentWeight ?? "—"}
-              {currentWeight ? (
-                <span className="text-sm font-medium text-slate-500"> kg</span>
-              ) : null}
-            </p>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              Peso atual
-            </p>
-          </div>
-          <div>
-            <p className="text-xl font-bold text-slate-900 dark:text-white">
-              {workoutsWeek}
-            </p>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              Treinos (7 dias)
-            </p>
-          </div>
-          <div>
-            <p className="text-xl font-bold text-slate-900 dark:text-white">
-              {sleepToday != null ? sleepToday : "—"}
-              {sleepToday != null ? (
-                <span className="text-sm font-medium text-slate-500"> h</span>
-              ) : null}
-            </p>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              Sono hoje
-            </p>
-          </div>
+        <div className="card mt-2.5 p-4">
+          {pesoFalhou ? (
+            // Leitura que falha não é "não tem": sem isto, a falha virava o
+            // "Registre seu peso" de quem nunca se pesou.
+            <p className="text-[15px] text-app-atencao">Não deu para carregar o peso</p>
+          ) : peso30?.atual != null ? (
+            <div className="flex flex-col gap-2.5">
+              <p className="flex flex-wrap items-baseline gap-x-2">
+                <span className="tabular text-[22px] font-semibold text-app-texto">
+                  {kg(peso30.atual)} kg
+                </span>
+                {peso30.variacao != null && (
+                  <span className="text-[15px] text-app-texto-2">
+                    {textoVariacaoPeso(peso30.variacao)} em 30 dias
+                  </span>
+                )}
+              </p>
+              {peso30.pontos.length >= 2 ? (
+                <LinhaDoPeso pontos={peso30.pontos} />
+              ) : (
+                <p className="text-[13px] text-app-texto-2">
+                  Registre seu peso algumas vezes para ver a evolução aqui.
+                </p>
+              )}
+            </div>
+          ) : pesoAnterior ? (
+            <div className="flex flex-col gap-1.5">
+              <p className="flex flex-wrap items-baseline gap-x-2">
+                <span className="tabular text-[22px] font-semibold text-app-texto">
+                  {kg(pesoAnterior.peso)} kg
+                </span>
+                <span className="text-[15px] text-app-texto-2">em {dataCurta(pesoAnterior.data)}</span>
+              </p>
+              <p className="text-[13px] text-app-texto-2">
+                Registre seu peso algumas vezes para ver a evolução aqui.
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center py-2 text-center">
+              <span className="icon-badge" aria-hidden="true">
+                <Scale className="h-4 w-4" />
+              </span>
+              <p className="mt-2 text-[15px] text-app-texto-2">
+                Registre seu peso algumas vezes para ver a evolução aqui.
+              </p>
+              <Link href="/app/medidas" className="btn-primary mt-3 px-4">
+                Registrar peso
+              </Link>
+            </div>
+          )}
         </div>
-
-        {chartData.length > 1 ? (
-          <TrendChart data={chartData as any} unit=" kg" />
-        ) : (
-          <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center dark:border-slate-700">
-            <Scale className="mx-auto h-6 w-6 text-slate-300 dark:text-slate-400" />
-            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-              Registre seu peso algumas vezes para ver a evolução aqui.
-            </p>
-            <Link
-              href="/app/medidas"
-              className="btn-primary mx-auto mt-3 w-fit px-4 py-1.5 text-xs"
-            >
-              Registrar peso
-            </Link>
-          </div>
-        )}
       </section>
 
-      {/* ----------------------------------------------------------------
-          4. Histórico recente e atalhos secundários
-      ---------------------------------------------------------------- */}
-      <div className="grid gap-5 lg:grid-cols-2">
-        <section className="card">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-semibold text-slate-900 dark:text-white">
-              Treinos recentes
-            </h2>
-            <Link
-              href="/app/treinos"
-              className="text-xs font-medium text-brand-700 hover:underline dark:text-brand-400"
-            >
-              Ver todos
-            </Link>
-          </div>
-          {recentWorkouts.length > 0 ? (
-            <ul className="pf-stagger space-y-3">
-              {recentWorkouts.map((w) => (
-                <li key={w.id} className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
-                    <Dumbbell className="h-4 w-4" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-200">
-                      {w.name}
-                    </p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      {formatDate(w.date)}
-                      {w.category ? ` · ${w.category}` : ""}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Nenhum treino registrado ainda.
-            </p>
+      {/* 7. Links. "Próxima aplicação" só quando a dose não é de hoje nem
+          está atrasada: nesses casos ela já está no "Para hoje". */}
+      <nav aria-label="Mais da Início">
+        <ul className="card divide-y divide-app-linha overflow-hidden p-0">
+          {treatment && diasAteADose != null && diasAteADose > 0 && (
+            <li>
+              <Link href="/app/tratamento" className={LINK_DE_LISTA}>
+                <span>
+                  Próxima aplicação · {diasAteADose === 1 ? "amanhã" : `em ${diasAteADose} dias`}
+                </span>
+                <ChevronRight aria-hidden="true" className="h-5 w-5 shrink-0 text-app-texto-2" />
+              </Link>
+            </li>
           )}
-        </section>
-
-        <section className="space-y-3">
-          {treatment && doseLabel && !doseUrgent && (
-            <Link
-              href="/app/tratamento"
-              className="card card-interactive group flex items-center gap-4"
-            >
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
-                <Syringe className="h-5 w-5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                  {doseLabel}
-                </p>
-                <p className="truncate text-xs text-slate-500 dark:text-slate-400">
-                  {treatment.medication}
-                  {treatment.dose ? ` · ${treatment.dose}` : ""}
-                </p>
-              </div>
-              <ArrowRight className="h-5 w-5 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-brand-500" />
+          <li>
+            <Link href="/app/treinos" className={LINK_DE_LISTA}>
+              <span>Treinos recentes</span>
+              <ChevronRight aria-hidden="true" className="h-5 w-5 shrink-0 text-app-texto-2" />
             </Link>
-          )}
-
-          <Link
-            href="/app/relatorios"
-            className="card card-interactive group flex items-center gap-4"
-          >
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
-              <BarChart3 className="h-5 w-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                Relatório com IA
-              </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Um resumo do seu período para levar à consulta.
-              </p>
-            </div>
-            <ArrowRight className="h-5 w-5 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-brand-500" />
-          </Link>
-
-          <div className="card">
-            <div className="mb-2 flex items-center gap-2">
-              <MessageCircle className="h-4 w-4 text-brand-700 dark:text-brand-400" />
-              <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                Fale com a Gaia
-              </p>
-            </div>
-            <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
-              Ela registra treino, refeição, água e peso por você — é só pedir.
-            </p>
-            <OpenChatButton />
-          </div>
-        </section>
-      </div>
+          </li>
+          <li>
+            <Link href="/app/relatorios" className={LINK_DE_LISTA}>
+              <span>Relatório para levar à consulta</span>
+              <ChevronRight aria-hidden="true" className="h-5 w-5 shrink-0 text-app-texto-2" />
+            </Link>
+          </li>
+        </ul>
+      </nav>
     </div>
   );
 }

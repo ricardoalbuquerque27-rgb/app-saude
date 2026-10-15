@@ -57,24 +57,27 @@ export function LinhaDaConsulta({
   );
   const primeiroNome = nutriNome?.trim().split(/\s+/)[0] ?? "";
 
-  let titulo: string;
-  let subtitulo: string | null = null;
+  // O que se procura é a data: ela vem em destaque, e o rótulo ("Próxima
+  // consulta", "Consulta pedida") pequeno em cima, como na maquete da Início.
+  // A cancelada é uma frase só e fica como estava.
+  let rotulo: string | null = null;
+  let principal: string;
 
   if (proxima) {
-    titulo = "Próxima consulta";
-    subtitulo = `${rotuloDaConsulta(proxima)} · ${ROTULO_MODO[proxima.mode]}`;
-    if (proxima.reschedule_requested_at) subtitulo += " · remarcação pedida";
+    rotulo = "Próxima consulta";
+    principal = `${rotuloDaConsulta(proxima)} · ${ROTULO_MODO[proxima.mode]}`;
+    if (proxima.reschedule_requested_at) principal += " · remarcação pedida";
     // O nutri marcou sem responder ao pedido: os dois existem, e a linha
     // não esconde o segundo.
-    if (pedido) subtitulo += " · e um pedido aguardando";
+    if (pedido) principal += " · e um pedido aguardando";
   } else if (pedido) {
-    titulo = "Consulta pedida";
-    subtitulo = `${rotuloDaConsulta(pedido)} · aguardando ${
+    rotulo = "Consulta pedida";
+    principal = `${rotuloDaConsulta(pedido)} · aguardando ${
       primeiroNome || "o nutricionista"
     }`;
   } else if (canceladaPeloNutri) {
     const dia = diaDaConsulta(canceladaPeloNutri);
-    titulo = `Consulta de ${nomeCurtoDoDia(dia)}, ${dataCurta(dia)} cancelada ${
+    principal = `Consulta de ${nomeCurtoDoDia(dia)}, ${dataCurta(dia)} cancelada ${
       primeiroNome ? `por ${primeiroNome}` : "pelo seu nutricionista"
     }`;
   } else {
@@ -85,12 +88,16 @@ export function LinhaDaConsulta({
   return (
     <Link href={DESTINO} className={LINHA}>
       <span className="min-w-0 flex-1">
-        <span className="block text-[15px] font-medium text-app-texto">
-          {titulo}
-        </span>
-        {subtitulo && (
-          <span className="block text-[13px] text-app-texto-2">
-            {subtitulo}
+        {rotulo ? (
+          <>
+            <span className="block text-[13px] text-app-texto-2">{rotulo}</span>
+            <span className="block text-[15px] font-semibold text-app-texto">
+              {principal}
+            </span>
+          </>
+        ) : (
+          <span className="block text-[15px] font-medium text-app-texto">
+            {principal}
           </span>
         )}
       </span>

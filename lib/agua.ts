@@ -1,16 +1,19 @@
 import { todayISO } from "@/lib/date";
 
-// Importado também por componente de cliente (o botão "+250 ml" da Início):
-// só entra aqui o que roda no navegador.
+// Importado também por componente de cliente (o "+250 ml" da Início,
+// components/inicio/AdicionarAgua.tsx): só entra aqui o que roda no navegador.
 
 export type ResultadoDaAgua =
   | { ok: true; total: number }
   | { ok: false; erro: string };
 
 /**
- * Soma `ml` (negativo desfaz) à água do dia e grava o total. É a única forma
- * de gravar água: o assistente (`registrar_agua`) e o botão da Início passam
- * por aqui.
+ * Soma `ml` (negativo desfaz) à água do dia e grava o total. O assistente
+ * (`registrar_agua`) e o "+250 ml" da Início (e o "Desfazer" dele) passam por
+ * aqui. A página Hábitos ainda NÃO: o `addWater` dela soma no estado da tela e
+ * o `persist` regrava a linha inteira do dia (ver abaixo e o CLAUDE.md, "Em
+ * aberto"), então uma água que o assistente registrou com a página aberta pode
+ * voltar ao valor velho.
  *
  * O `registrar_agua` antigo ignorava o erro da leitura: com ela falhando, o
  * total do dia virava 0 e o upsert gravava só o `ml` por cima do que o

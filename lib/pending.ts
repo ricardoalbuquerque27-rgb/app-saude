@@ -1,7 +1,7 @@
 import { todayISO } from "@/lib/date";
 
 // Pendências do usuário — coisas que faltam preencher/fazer. Usado para
-// sinalizar na navegação (pontinho) e num card de pendências no dashboard.
+// sinalizar na navegação (pontinho) e nas linhas do "Para hoje" da Início.
 
 export type PendingItem = {
   key: string;
@@ -11,7 +11,16 @@ export type PendingItem = {
   urgent?: boolean;
 };
 
-export type Pending = { items: PendingItem[]; hrefs: string[] };
+/**
+ * `falhou`: alguma leitura daqui falhou. O supabase-js devolve
+ * `{ data: null, error }` sem lançar, e com o perfil nulo as duas primeiras
+ * pendências ("Complete seu perfil", "Defina suas metas") apareciam para quem
+ * já tinha preenchido tudo; com o tratamento nulo, a dose sumia calada. Agora
+ * a leitura que falha não gera pendência nenhuma (nem "tem", nem "não tem") e
+ * o "Para hoje" da Início diz "Não deu para carregar tudo" em vez de "em dia"
+ * (CLAUDE.md, "Leitura que falha não é 'não tem'").
+ */
+export type Pending = { items: PendingItem[]; hrefs: string[]; falhou: boolean };
 
 export async function getPending(supabase: any, uid: string): Promise<Pending> {
   const today = todayISO();
@@ -36,8 +45,9 @@ export async function getPending(supabase: any, uid: string): Promise<Pending> {
 
   const p = profRes.data;
   const items: PendingItem[] = [];
+  let falhou = !!profRes.error || !!treatRes.error;
 
-  const perfilIncompleto = !p?.sex || !p?.birth_date || !p?.height_cm;
+  const perfilIncompleto = !profRes.error && (!p?.sex || !p?.birth_date || !p?.height_cm);
   if (perfilIncompleto) {
     items.push({
       key: "perfil",
@@ -49,9 +59,10 @@ export async function getPending(supabase: any, uid: string): Promise<Pending> {
   }
 
   const metasFaltando =
-    p?.daily_calorie_goal == null ||
-    p?.protein_goal_g == null ||
-    p?.weight_goal_kg == null;
+    !profRes.error &&
+    (p?.daily_calorie_goal == null ||
+      p?.protein_goal_g == null ||
+      p?.weight_goal_kg == null);
   if (metasFaltando) {
     items.push({
       key: "metas",
@@ -64,14 +75,15 @@ export async function getPending(supabase: any, uid: string): Promise<Pending> {
   // Dose da caneta prevista para hoje (ou atrasada) e ainda não aplicada.
   const treat = treatRes.data;
   if (treat?.next_dose_date && treat.next_dose_date <= today) {
-    const { data: doseHoje } = await supabase
+    const { data: doseHoje, error: erroDaDose } = await supabase
       .from("dose_logs")
       .select("id")
       .eq("user_id", uid)
       .eq("treatment_id", treat.id)
       .eq("date", today)
       .limit(1);
-    if ((doseHoje ?? []).length === 0) {
+    if (erroDaDose) falhou = true;
+    else if ((doseHoje ?? []).length === 0) {
       const atrasada = treat.next_dose_date < today;
       items.push({
         key: "dose",
@@ -86,5 +98,5 @@ export async function getPending(supabase: any, uid: string): Promise<Pending> {
   }
 
   const hrefs = Array.from(new Set(items.map((i) => i.href)));
-  return { items, hrefs };
+  return { items, hrefs, falhou };
 }

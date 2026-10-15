@@ -50,6 +50,17 @@ novo.
 conta de teste da Maria), e é com esses que `tirar-prints.cjs` e
 `conferir-inicio.cjs` rodam.
 
+`conferir-inicio.cjs` confere a Início da Maria em 390 px e acusa com código de
+saída 1: a ordem das seções, a saudação pela hora de São Paulo, a contagem do
+"Para hoje" e o "Não deu para carregar tudo" com os recados falhando, o
+"Calorias · limite" e o "acima do limite" (com uma refeição de 2.400 kcal que o
+roteiro grava no mock), o centro dos anéis em `tabular-nums`, o Score que abre
+nos quatro pilares, a sugestão de proteína, o "+250 ml" (sobe, "Desfazer",
+uma gravação só com dois toques, e "Não deu para registrar a água" com
+`daily_logs` falhando), o Progresso de 30 dias e o "Não deu para carregar o
+peso", os links, nenhuma caixa alta nem degradê, nenhuma rolagem lateral e a
+Instrument Sans (também no `NutriHome`).
+
 | `CENARIO`  | Quem entra          | Para quê |
 |------------|---------------------|----------|
 | (nenhum)   | `maria.teste@…` (paciente) ou `nutri.teste@…` | telas do paciente, Início |
@@ -278,7 +289,7 @@ cobrem as leituras que têm teste; a tabela "Medidas registradas" do Corpo, por
 exemplo, não tem. O de `lib/registroDb.test.ts` é mais simples: o `select`
 ignora a lista de colunas, e ele só confere filtro, ordem e `limit`.
 
-Duas escritas pelo PostgREST também têm estado (o `/__reset` desfaz):
+Quatro escritas pelo PostgREST também têm estado (o `/__reset` desfaz):
 
 - `PATCH` e `DELETE` em `body_measurements` seguem a RLS do paciente: só enxergam
   a linha dele com `measured_by` nulo. Numa linha da consulta o banco **não dá
@@ -289,12 +300,17 @@ Duas escritas pelo PostgREST também têm estado (o `/__reset` desfaz):
 - `POST` em `profiles` (o upsert da página Perfil) grava no perfil de quem pede,
   com o check do CRN (até 30 caracteres): é por isso que o CRN salvo reaparece ao
   recarregar.
+- `POST` em `daily_logs` (o upsert de `adicionarAgua`) junta as colunas enviadas
+  à linha do dia, como o `merge-duplicates` do PostgREST, e cria a linha que não
+  existe: sem isto o "+250 ml" da Início gravava e o anel não subia.
+- `POST` em `meals` guarda a refeição (o "Comi isso" da Dieta também fica).
+  Nas duas, linha de outro usuário leva 403.
 
 Dois endereços que não são do Supabase (além do `/__cenario`):
 
-- `POST /__reset` volta as consultas, os registros, os adendos, as medidas e os
-  perfis (o CRN) ao que o cenário subiu, e desliga o `/__falhar`; o roteiro
-  chama no começo e no fim.
+- `POST /__reset` volta as consultas, os registros, os adendos, as medidas, os
+  perfis (o CRN), a água do dia e as refeições ao que o cenário subiu, e desliga
+  o `/__falhar`; o roteiro chama no começo e no fim.
 - `POST /__falhar` com `{ "tabela": "consultation_records" }` faz os `GET` nessa
   tabela devolverem 500 até o próximo `/__reset`. As leituras da página são do
   servidor do Next, que o `page.route` do Playwright não intercepta; sem isto

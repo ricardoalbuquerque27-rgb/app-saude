@@ -10,9 +10,10 @@
 // Quase nada é guardado: um POST responde 201 e a leitura seguinte devolve o que
 // já havia. As exceções, com estado e com as regras da migração, são as funções
 // de consulta (rpcConsulta) e as do registro da consulta (rpcRegistro), e as
-// escritas de escrever(): o upsert do perfil (o CRN) e o PATCH/DELETE de
+// escritas de escrever(): o upsert do perfil (o CRN), o PATCH/DELETE de
 // body_measurements com a RLS do paciente (a medida da consulta não se altera
-// nem se apaga, e o banco recusa sem erro). POST
+// nem se apaga, e o banco recusa sem erro), o upsert da água do dia
+// (daily_logs) e o insert de refeição (meals). POST
 // /__reset volta tudo ao que o cenário subiu; POST /__falhar derruba os GET de
 // uma tabela (500) até o próximo /__reset.
 
@@ -864,8 +865,11 @@ T.consultation_addenda ||= [];
 // volta a elas, e o roteiro de verificações pode rodar duas vezes seguidas.
 // `profiles` está aqui porque concluir_registro grava o CRN no perfil do nutri,
 // e `body_measurements` porque publica a medida da consulta.
+// `daily_logs` e `meals` porque o "+250 ml" da Início e a refeição que o
+// roteiro da Início lança para passar da meta de calorias gravam de verdade.
 const TABELAS_COM_ESTADO = [
   "appointments", "consultation_records", "consultation_addenda", "body_measurements", "profiles",
+  "daily_logs", "meals",
 ];
 const ESTADO_INICIAL = JSON.stringify(Object.fromEntries(TABELAS_COM_ESTADO.map((n) => [n, T[n] ?? []])));
 
@@ -1285,7 +1289,16 @@ const sessao = (id) => ({
  *    `Prefer: count=exact` o total vai no Content-Range, como no PostgREST.
  *  - profiles, POST (o upsert da página Perfil): grava no perfil de quem pede,
  *    com o check do CRN (até 30 caracteres), para o CRN salvo reaparecer.
+ *  - daily_logs, POST (o upsert de `adicionarAgua`, com `on_conflict=user_id,date`):
+ *    junta as colunas enviadas à linha do dia, como o PostgREST faz com
+ *    `resolution=merge-duplicates`, e cria a linha quando não existe. Sem isto o
+ *    "+250 ml" da Início gravava e a página, recarregada, mostrava a água de
+ *    antes: não havia como ver o anel subir, nem o "Desfazer" devolvê-lo.
+ *  - meals, POST (insert): guarda a refeição. É o que deixa o roteiro da Início
+ *    passar da meta de calorias e ver o "acima do limite" do anel.
+ *  Nas duas, só linha de quem pede (a RLS `user_id = auth.uid()`), senão 403.
  */
+let seqEscrita = 0;
 function escrever(tabela, metodo, params, corpo, quem, prefer) {
   const vazio = { status: 201, dados: [], cabecalhos: {} };
   let dados = null;
@@ -1303,6 +1316,22 @@ function escrever(tabela, metodo, params, corpo, quem, prefer) {
       let linha = T.profiles.find((p) => p.id === n.id);
       if (linha) Object.assign(linha, n);
       else T.profiles.push((linha = { ...n }));
+      return linha;
+    });
+    return { status: 201, dados: representacao ? gravados : [], cabecalhos: {} };
+  }
+
+  if ((tabela === "daily_logs" || tabela === "meals") && metodo === "POST") {
+    const novos = (Array.isArray(dados) ? dados : [dados]).filter((x) => x && typeof x === "object");
+    if (novos.some((n) => n.user_id !== quem))
+      return { status: 403, dados: { code: "42501", message: `new row violates row-level security policy for table "${tabela}"` }, cabecalhos: {} };
+    const lista = (T[tabela] ||= []);
+    const gravados = novos.map((n) => {
+      // O upsert do dia: a mesma linha (user_id, date) recebe só as colunas
+      // enviadas; o sono, o humor e o resto ficam como estavam.
+      let linha = tabela === "daily_logs" ? lista.find((l) => l.user_id === n.user_id && l.date === n.date) : null;
+      if (linha) Object.assign(linha, n);
+      else lista.push((linha = { id: `${tabela}-novo-${++seqEscrita}`, created_at: new Date().toISOString(), ...n }));
       return linha;
     });
     return { status: 201, dados: representacao ? gravados : [], cabecalhos: {} };

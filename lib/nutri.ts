@@ -789,7 +789,8 @@ export type LinhaDePeso = {
 /**
  * O peso dos últimos 30 dias: um ponto por dia, o peso atual e a variação.
  * É a conta do resumo do nutri (`montarResumos`) e a do Progresso da Início do
- * paciente, para os dois não discordarem.
+ * paciente (app/app/page.tsx, que lê a mesma janela com `limitesDaJanela`),
+ * para os dois não mostrarem dois "−2,8 kg" diferentes.
  *
  * Os 30 dias são contados com naJanela: a consulta traz `>= hoje-30` (31
  * dias) e sem teto, e uma medida lançada com data futura virava o "peso

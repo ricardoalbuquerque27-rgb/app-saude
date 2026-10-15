@@ -174,7 +174,6 @@ export default function HabitosPage() {
             centerMain={`${(water / 1000).toFixed(1)}`}
             centerSub={`/ ${(waterGoal / 1000).toFixed(1)} L`}
             label="Hoje"
-            colorClass="text-blue-500"
           />
           <div className="flex-1">
             <div className="grid grid-cols-3 gap-2">

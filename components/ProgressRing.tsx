@@ -1,63 +1,87 @@
-// Anel de progresso (SVG puro, sem dependências). Usado no resumo do dia.
+import { avisoDoAnel, rotuloDoAnel } from "@/lib/anel";
+import type { PapelDasCalorias } from "@/lib/nutri";
+
+// Anel de progresso (SVG puro, sem dependências), da Início, da Dieta e dos
+// Hábitos. O anel é sempre `app-primaria` sobre trilho `app-linha` (spec "Anel
+// e macros"): a cor por anel de antes (âmbar, azul, rosa) era enfeite, e o
+// tom 500 de duas delas nem passava 3:1 sobre o cartão.
+//
+// `pct` é a razão crua (consumido ÷ meta) e pode passar de 1: o desenho corta
+// em 1, mas o aviso precisa do valor de verdade. Cortado antes de chegar
+// aqui, "acima do limite" nunca apareceria.
+//
+// É um <figure> com o rótulo no <figcaption>: o número do centro e o nome do
+// anel ficam juntos para o leitor de tela, e o SVG, que só repete o número,
+// sai da árvore de acessibilidade.
 export function ProgressRing({
   pct,
   centerMain,
   centerSub,
   label,
-  colorClass,
+  papel = null,
+  avisoAcima = false,
 }: {
-  pct: number; // 0..1
+  pct: number;
   centerMain: string;
   centerSub?: string;
   label: string;
-  colorClass: string; // ex: "text-amber-500"
+  /** Só o anel de calorias leva o papel; proteína e água passam `null`. */
+  papel?: PapelDasCalorias;
+  /** Ligado só quando o papel é "limite": passar da meta é bom num piso. */
+  avisoAcima?: boolean;
 }) {
-  const size = 92;
-  const stroke = 9;
+  const size = 88;
+  const stroke = 8;
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
-  const clamped = Math.max(0, Math.min(1, pct || 0));
-  const offset = c * (1 - clamped);
+  const cru = Number.isFinite(pct) ? pct : 0;
+  const desenhado = Math.max(0, Math.min(1, cru));
+  const offset = c * (1 - desenhado);
+  const aviso = avisoDoAnel(cru, avisoAcima);
 
   return (
-    <div className="flex flex-col items-center">
+    <figure className="flex flex-col items-center text-center">
       <div className="relative" style={{ width: size, height: size }}>
-        <svg width={size} height={size} className="-rotate-90">
+        <svg width={size} height={size} className="-rotate-90" aria-hidden="true">
           <circle
             cx={size / 2}
             cy={size / 2}
             r={r}
             fill="none"
             strokeWidth={stroke}
-            className="stroke-slate-100 dark:stroke-slate-800"
+            className="stroke-app-linha"
           />
-          <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={r}
-            fill="none"
-            strokeWidth={stroke}
-            strokeLinecap="round"
-            stroke="currentColor"
-            strokeDasharray={c}
-            strokeDashoffset={offset}
-            className={colorClass}
-          />
+          {desenhado > 0 && (
+            <circle
+              cx={size / 2}
+              cy={size / 2}
+              r={r}
+              fill="none"
+              strokeWidth={stroke}
+              strokeLinecap="round"
+              strokeDasharray={c}
+              strokeDashoffset={offset}
+              className="stroke-app-primaria"
+            />
+          )}
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-base font-bold leading-none text-slate-900 dark:text-white">
+          <span className="tabular text-[17px] font-semibold leading-none text-app-texto">
             {centerMain}
           </span>
           {centerSub && (
-            <span className="mt-0.5 text-[11px] leading-none text-slate-500">
+            <span className="tabular mt-1 text-[13px] leading-none text-app-texto-2">
               {centerSub}
             </span>
           )}
         </div>
       </div>
-      <span className="mt-2 text-xs font-medium text-slate-600 dark:text-slate-300">
-        {label}
-      </span>
-    </div>
+      <figcaption className="mt-2 text-[13px] font-medium leading-tight text-app-texto-2">
+        {rotuloDoAnel(label, papel)}
+      </figcaption>
+      {aviso && (
+        <p className="mt-0.5 text-[13px] font-medium leading-tight text-app-atencao">{aviso}</p>
+      )}
+    </figure>
   );
 }

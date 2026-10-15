@@ -36,7 +36,28 @@ const rotuloEm = (n, hhmm) => {
   const dia = diaSP(n);
   return `${DIA_CURTO[new Date(dia + "T12:00:00Z").getUTCDay()]}, ${dia.slice(8, 10)}/${dia.slice(5, 7)} às ${hhmm}`;
 };
-const instante = (n, hhmm) => new Date(`${diaSP(n)}T${hhmm}:00-03:00`).toISOString();
+// O instante de uma hora de São Paulo `n` dias à frente, com o deslocamento
+// DAQUELE dia tirado do Intl, como o diaSP: um "-03:00" fixo erraria em uma
+// hora se o horário de verão voltar (CLAUDE.md: hora de consulta nunca com
+// deslocamento fixo). A mesma conta do instanteEmSaoPaulo de lib/consultas.ts,
+// escrita aqui de novo: o palpite em UTC, o deslocamento dele e, perto da
+// troca de horário, o do resultado.
+const partesSP = new Intl.DateTimeFormat("en-CA", {
+  timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit",
+  hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
+});
+const deslocamentoSP = (ms) => {
+  const p = Object.fromEntries(partesSP.formatToParts(new Date(ms)).map((x) => [x.type, x.value]));
+  return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second) - Math.floor(ms / 1000) * 1000;
+};
+const instante = (n, hhmm) => {
+  const [a, m, d] = diaSP(n).split("-").map(Number);
+  const [h, mi] = hhmm.split(":").map(Number);
+  const ingenuo = Date.UTC(a, m - 1, d, h, mi);
+  let ms = ingenuo - deslocamentoSP(ingenuo);
+  if (deslocamentoSP(ms) !== deslocamentoSP(ingenuo)) ms = ingenuo - deslocamentoSP(ms);
+  return new Date(ms).toISOString();
+};
 
 const resultados = [];
 function ok(passou, msg, detalhe = "") {
@@ -309,12 +330,13 @@ async function clicar(loc) {
     await page.close();
   }
 
-  // Leitura que falhou: nunca o silêncio do "nenhuma".
+  // Leitura que falhou: nunca o silêncio do "nenhuma". O /__reset vai num
+  // `finally`: um timeout no meio não deixa o mock falhando para o resto.
   await fetch(MOCK + "/__reset", { method: "POST" });
   await fetch(MOCK + "/__falhar", {
     method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ tabela: "appointments" }),
   });
-  {
+  try {
     const page = await abrirInicio(cel);
     const aviso = page.getByText("Não deu para carregar a consulta", { exact: true });
     ok((await aviso.count()) === 1, 'Início, leitura falhou: a linha diz "Não deu para carregar a consulta"');
@@ -322,8 +344,9 @@ async function clicar(loc) {
     ok(!(await texto(page.locator("body"))).includes("Próxima consulta"), 'e não diz "Próxima consulta"');
     await page.screenshot({ path: `${OUT}/linha-falhou.png`, clip: { x: 0, y: 0, width: 390, height: 300 } });
     await page.close();
+  } finally {
+    await fetch(MOCK + "/__reset", { method: "POST" });
   }
-  await fetch(MOCK + "/__reset", { method: "POST" });
   {
     // Passada a falha, a linha volta com a consulta (o /__reset desliga o /__falhar).
     const page = await abrirInicio(cel);
