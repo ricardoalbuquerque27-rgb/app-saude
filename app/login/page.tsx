@@ -14,6 +14,12 @@ import {
   Lock,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import {
+  AJUDA_DA_SENHA,
+  SENHA_MINIMO,
+  ehErroDeSenhaFraca,
+  problemaDaSenha,
+} from "@/lib/senha";
 
 const HIGHLIGHTS = [
   "Modo Caneta: acompanhe seu tratamento (GLP-1)",
@@ -65,6 +71,14 @@ export default function LoginPage() {
         const cpfDigits = onlyDigits(cpf);
         if (!validateCPF(cpfDigits)) {
           setError("CPF inválido. Confira os números digitados.");
+          setLoading(false);
+          return;
+        }
+        // Antes da consulta do CPF e do signUp: senha que a regra recusa não
+        // gasta ida ao servidor, e o erro de lá viria em inglês.
+        const problemaSenha = problemaDaSenha(password);
+        if (problemaSenha) {
+          setError(problemaSenha);
           setLoading(false);
           return;
         }
@@ -271,7 +285,13 @@ export default function LoginPage() {
                     className="input pr-11"
                     type={showPw ? "text" : "password"}
                     required
-                    minLength={6}
+                    // A regra nova vale só ao CRIAR a senha. No entrar o
+                    // mínimo segue 6 (o de antes): quem tem senha antiga de 6
+                    // ou 7 caracteres não pode ficar de fora de casa.
+                    minLength={mode === "signup" ? SENHA_MINIMO : 6}
+                    aria-describedby={
+                      mode === "signup" ? "ajuda-da-senha" : undefined
+                    }
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
@@ -290,6 +310,14 @@ export default function LoginPage() {
                     )}
                   </button>
                 </div>
+                {mode === "signup" && (
+                  <p
+                    id="ajuda-da-senha"
+                    className="mt-1.5 text-[13px] text-slate-600 dark:text-slate-400"
+                  >
+                    {AJUDA_DA_SENHA}
+                  </p>
+                )}
               </div>
             )}
 
@@ -434,8 +462,9 @@ function traduzErro(err: any): string {
     return "E-mail ou senha incorretos.";
   if (m.includes("user already registered"))
     return "Este e-mail já está cadastrado.";
-  if (m.includes("password should be at least"))
-    return "A senha deve ter pelo menos 6 caracteres.";
+  // A regra é a de lib/senha.ts, a mesma do Supabase: o texto do servidor
+  // (em inglês, e com o número dele) não serve para a tela.
+  if (ehErroDeSenhaFraca(err)) return AJUDA_DA_SENHA;
   if (m.includes("email not confirmed"))
     return "Confirme seu e-mail antes de entrar.";
   if (m.includes("email rate limit") || m.includes("too many"))
