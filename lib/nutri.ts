@@ -890,6 +890,40 @@ export function textoVariacaoPeso(delta: number | null): string {
 }
 
 /**
+ * Meta de peso a 0,5 kg do peso atual ainda é manutenção; passado disso a
+ * direção é clara. Em kg.
+ */
+const MANUTENCAO_KG = 0.5;
+/** Folga contra o ruído do ponto flutuante: 64,4 − 63,9 dá 0,5000000000000071. */
+const RUIDO_KG = 1e-9;
+
+/**
+ * O que a meta de calorias é para este paciente: "limite" (um teto) para quem
+ * está acima do peso-alvo, "meta" (um piso a alcançar) para quem está abaixo, e
+ * `null` na manutenção ou quando falta o peso ou a meta (spec "Anel e macros",
+ * "Meta ou limite das calorias"). O app não guarda o objetivo do paciente; a
+ * meta de peso, que o nutricionista ou o paciente definiu, é o que diz a
+ * direção. Sem o papel, o aviso de "acima" valeria para todo mundo, e quem quer
+ * ganhar massa e passou das calorias receberia um aviso por fazer o que devia
+ * (spec "Decisões", "Meta ou limite").
+ *
+ * O peso atual é o do dia mais recente com peso (`pesoDoDia`) e a meta é
+ * `profiles.weight_goal_kg`. "Mais de 0,5 kg" é estrito: a 0,5 kg exatos ainda
+ * é manutenção, e o `RUIDO_KG` impede que a conta em ponto flutuante empurre
+ * esse caso para fora (64,4 contra 63,9 daria "limite").
+ */
+export function papelDasCalorias(
+  pesoAtual: number | null,
+  metaDePeso: number | null
+): "limite" | "meta" | null {
+  if (pesoAtual == null || metaDePeso == null) return null;
+  const acima = pesoAtual - metaDePeso;
+  if (acima > MANUTENCAO_KG + RUIDO_KG) return "limite";
+  if (acima < -(MANUTENCAO_KG + RUIDO_KG)) return "meta";
+  return null;
+}
+
+/**
  * De quantos dias saiu a média de um item (ver `mediasDaSemana`). A tela
  * precisa dizer: "1.650 kcal" de 2 dias e de 7 dias são coisas diferentes, e
  * o dia sem registro não entra na conta.

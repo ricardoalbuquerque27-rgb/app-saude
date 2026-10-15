@@ -60,6 +60,31 @@ export function hojeLongo(): string {
 }
 
 /**
+ * "Bom dia", "Boa tarde" ou "Boa noite" pela hora de SÃO PAULO.
+ *
+ * A saudação da Início é desenhada no servidor, que na Vercel roda em UTC:
+ * com `getHours()` (hora do fuso de quem roda), às 21h de São Paulo — meia-noite
+ * em UTC — ela diria "Bom dia" (spec "Início (paciente)", item 1). Das 5h às
+ * 11h59 é "Bom dia"; das 12h às 17h59, "Boa tarde"; o resto, madrugada
+ * inclusa, é "Boa noite". `hourCycle: "h23"` evita a meia-noite como "24".
+ */
+export function saudacao(agora: Date): "Bom dia" | "Boa tarde" | "Boa noite" {
+  const hora =
+    Number(
+      new Intl.DateTimeFormat("pt-BR", {
+        timeZone: TZ,
+        hour: "numeric",
+        hourCycle: "h23",
+      })
+        .formatToParts(agora)
+        .find((p) => p.type === "hour")?.value
+    ) % 24;
+  if (hora >= 5 && hora < 12) return "Bom dia";
+  if (hora >= 12 && hora < 18) return "Boa tarde";
+  return "Boa noite";
+}
+
+/**
  * Quantos dias DISTINTOS da lista caem na janela dos últimos `dias` dias,
  * contando hoje e nada do futuro.
  *

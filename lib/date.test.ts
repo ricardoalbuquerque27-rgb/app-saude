@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeAll, afterAll } from "vitest";
 import {
   todayISO,
   addDaysISO,
@@ -11,6 +11,7 @@ import {
   avancarDia,
   idadeEm,
   dataNoBrasil,
+  saudacao,
 } from "./date";
 
 afterEach(() => vi.useRealTimers());
@@ -256,5 +257,36 @@ describe("dataNoBrasil", () => {
   it("texto que não é instante volta como os 10 primeiros caracteres", () => {
     expect(dataNoBrasil("2026-10-08")).toBe("2026-10-08");
     expect(dataNoBrasil("lixo")).toBe("lixo");
+  });
+});
+
+describe("saudacao", () => {
+  // A Vercel roda em UTC, e o vitest roda com o TZ de São Paulo (vitest.config).
+  // Um `getHours()` ingênuo passaria aqui com o fuso do vitest e erraria em
+  // produção: às 21h de São Paulo (00h UTC) ele diria "Bom dia". Por isso o
+  // describe põe o processo em UTC, como o servidor.
+  const tzDoVitest = process.env.TZ;
+  beforeAll(() => {
+    process.env.TZ = "UTC";
+  });
+  afterAll(() => {
+    if (tzDoVitest === undefined) delete process.env.TZ;
+    else process.env.TZ = tzDoVitest;
+  });
+
+  it.each([
+    ["2026-10-14T07:59:00Z", "04:59 em São Paulo", "Boa noite"],
+    ["2026-10-14T08:00:00Z", "05:00", "Bom dia"],
+    ["2026-10-14T14:59:00Z", "11:59", "Bom dia"],
+    ["2026-10-14T15:00:00Z", "12:00", "Boa tarde"],
+    ["2026-10-14T20:59:00Z", "17:59", "Boa tarde"],
+    ["2026-10-14T21:00:00Z", "18:00", "Boa noite"],
+    ["2026-10-15T01:30:00Z", "22:30 do dia 14", "Boa noite"],
+  ])("%s (%s) -> %s", (instante, _horaEmSaoPaulo, esperado) => {
+    expect(saudacao(new Date(instante))).toBe(esperado);
+  });
+
+  it("a meia-noite de São Paulo é noite, não hora 24", () => {
+    expect(saudacao(new Date("2026-10-14T03:00:00Z"))).toBe("Boa noite");
   });
 });

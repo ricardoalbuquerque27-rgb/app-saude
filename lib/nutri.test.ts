@@ -18,6 +18,7 @@ import {
   textoDoDesvio,
   separarDesvios,
   textoDoDesvioDoPlano,
+  papelDasCalorias,
   type DadosResumo,
   type DadosAtividade,
   type DailySeries,
@@ -1101,5 +1102,41 @@ describe("textoDoDesvioDoPlano", () => {
     expect(textoDoDesvioDoPlano(d("removido pelo paciente", null), "F").sessao).toBe(
       "Treino B — Inferiores"
     );
+  });
+});
+
+describe("papelDasCalorias", () => {
+  // O papel diz se a meta de calorias é um teto ("limite") ou um piso
+  // ("meta"): depende de o paciente estar acima ou abaixo do peso-alvo.
+  it.each([
+    [70, 66, "limite"],
+    [60, 66, "meta"],
+    // A 0,5 kg ainda é manutenção: nem teto nem piso.
+    [66.5, 66, null],
+    [65.5, 66, null],
+    [66.6, 66, "limite"],
+    [65.4, 66, "meta"],
+    [66, 66, null],
+  ] as const)("peso %s, meta %s -> %s", (peso, meta, esperado) => {
+    expect(papelDasCalorias(peso, meta)).toBe(esperado);
+  });
+
+  it("falta um dos dois números: null", () => {
+    expect(papelDasCalorias(null, 66)).toBeNull();
+    expect(papelDasCalorias(70, null)).toBeNull();
+    expect(papelDasCalorias(null, null)).toBeNull();
+  });
+
+  it("o ruído do ponto flutuante não empurra 0,5 kg para fora da manutenção", () => {
+    // 64,4 − 63,9 dá 0.5000000000000071 em ponto flutuante, e um `> 0.5`
+    // ingênuo chamaria de "limite" uma diferença de exatamente meio quilo.
+    expect(64.4 - 63.9).toBeGreaterThan(0.5);
+    expect(papelDasCalorias(64.4, 63.9)).toBeNull();
+    expect(papelDasCalorias(63.9, 64.4)).toBeNull();
+  });
+
+  it("meta de peso com duas casas: 0,51 kg já está fora", () => {
+    expect(papelDasCalorias(66.51, 66)).toBe("limite");
+    expect(papelDasCalorias(65.49, 66)).toBe("meta");
   });
 });
