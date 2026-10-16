@@ -21,7 +21,7 @@ describe("tema do app", () => {
       ).toBeGreaterThanOrEqual(4.5);
   });
 
-  it("os pares de texto são exatamente os da spec", () => {
+  it("os pares de texto são exatamente os da spec (e o texto sobre o fundo da principal, das outras telas)", () => {
     // Há texto direto no chão (a data, o "Bom dia", o título de seção fora do
     // cartão): por isso texto, texto-2 e primaria entram sobre `pagina` e
     // sobre `cartao`. O slate-500 que o app usa hoje dá 4,43:1 sobre a página
@@ -36,6 +36,9 @@ describe("tema do app", () => {
       ["sobre-primaria", "primaria"],
       ["primaria", "primaria-fundo"],
       ["texto-2", "primaria-fundo"],
+      // Das telas do paciente fora da Início e da Dieta: o hover de botão e de
+      // linha e a linha ativa do histórico de Relatórios.
+      ["texto", "primaria-fundo"],
       ["atencao", "atencao-fundo"],
       ["texto", "atencao-fundo"],
       ["atencao-texto-2", "atencao-fundo"],

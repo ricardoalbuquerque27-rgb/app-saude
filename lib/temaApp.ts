@@ -99,6 +99,10 @@ export const PARES_TEXTO_APP: [NomeCorApp, NomeCorApp][] = [
   ["sobre-primaria", "primaria"],
   ["primaria", "primaria-fundo"],
   ["texto-2", "primaria-fundo"],
+  // O texto comum sobre o fundo da principal: hover de botão e de linha, e a
+  // linha ativa do histórico de Relatórios (as telas do paciente fora da Início
+  // e da Dieta).
+  ["texto", "primaria-fundo"],
   ["atencao", "atencao-fundo"],
   ["texto", "atencao-fundo"],
   ["atencao-texto-2", "atencao-fundo"],

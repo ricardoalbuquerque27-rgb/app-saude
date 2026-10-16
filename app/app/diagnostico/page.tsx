@@ -244,7 +244,11 @@ export default function DiagnosticoPage() {
               </div>
 
               <p className="mt-3 text-center text-xs text-app-texto-2">
-                Verificado em {new Date(data.checkedAt).toLocaleString("pt-BR")}.
+                Verificado em{" "}
+                {new Date(data.checkedAt).toLocaleString("pt-BR", {
+                  timeZone: "America/Sao_Paulo",
+                })}
+                .
                 Os valores das chaves nunca são exibidos — apenas se existem.
               </p>
             </>

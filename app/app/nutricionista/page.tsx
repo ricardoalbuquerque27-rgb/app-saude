@@ -5,7 +5,6 @@ import {
   Utensils,
   Dumbbell,
   MessageSquare,
-  CalendarDays,
   ChevronRight,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -304,10 +303,14 @@ export default async function MeuNutricionistaPage({
               jaRegistrados={jaRegistrados}
               refeicoesFalharam={refeicoesFalharam}
             />
-            <p className="text-xs text-app-texto-2">
-              Tocar em “Comi isso” registra a refeição na sua Dieta — não
-              precisa digitar de novo.
-            </p>
+            {/* Sem as refeições do dia o cardápio não oferece "Comi isso", e a nota
+                falaria de um botão que não está na tela. */}
+            {!refeicoesFalharam && (
+              <p className="text-xs text-app-texto-2">
+                Tocar em “Comi isso” registra a refeição na sua Dieta — não
+                precisa digitar de novo.
+              </p>
+            )}
           </>
         ) : (
           <Vazio texto="Seu nutricionista ainda não montou um cardápio para você." />
@@ -323,7 +326,6 @@ export default async function MeuNutricionistaPage({
               return (
                 <div key={dia} className="card">
                   <p className="eyebrow mb-2 flex items-center gap-1.5">
-                    <CalendarDays className="h-3.5 w-3.5" />
                     {dia}
                     {i === dowHoje && (
                       <span className="rounded-full bg-app-primaria-fundo px-2 py-0.5 text-[11px] font-semibold text-app-primaria">

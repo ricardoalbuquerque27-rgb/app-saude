@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState, useCallback } from "react";
-import { LogOut, Loader2, Check, User, Target, CalendarClock } from "lucide-react";
+import { LogOut, Loader2, Check, CalendarClock } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { Profile } from "@/lib/types";
 import { PageHeader, Field } from "@/components/ui";
@@ -201,9 +201,12 @@ export default function PerfilPage() {
             <p className="mt-1.5 inline-flex items-center gap-1 text-xs text-app-texto-2">
               <CalendarClock className="h-3.5 w-3.5" />
               Membro desde{" "}
+              {/* Com o fuso: sem ele, quem está fora do Brasil via outro mês na
+                  noite do dia 1º. */}
               {new Date(memberSince).toLocaleDateString("pt-BR", {
                 month: "short",
                 year: "numeric",
+                timeZone: "America/Sao_Paulo",
               })}
             </p>
           )}
@@ -211,9 +214,7 @@ export default function PerfilPage() {
       </div>
 
       <form onSubmit={save} className="card space-y-4">
-        <h2 className="section-title">
-          <User className="h-4 w-4 text-app-primaria" /> Dados
-        </h2>
+        <h2 className="section-title">Dados</h2>
         <Field label="Tipo de conta">
           <div className="flex gap-2">
             {[
@@ -309,9 +310,7 @@ export default function PerfilPage() {
           </p>
         </Field>
 
-        <h2 className="section-title pt-2">
-          <Target className="h-4 w-4 text-app-primaria" /> Metas
-        </h2>
+        <h2 className="section-title pt-2">Metas</h2>
         {metasDoNutri && (
           <p className="rounded-lg bg-app-primaria-fundo px-3 py-2 text-xs text-app-texto-2">
             Estas metas foram definidas pelo seu nutricionista. Você pode

@@ -4,12 +4,9 @@ import { useEffect, useState, useCallback } from "react";
 import {
   Sparkles,
   CheckCircle2,
-  TrendingUp,
   AlertTriangle,
-  ListChecks,
   Loader2,
   BarChart3,
-  History,
   Trash2,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -27,12 +24,15 @@ type ReportRow = { id: string; created_at: string; content: Report };
 
 function formatDateTime(iso: string) {
   const d = new Date(iso);
+  // Sempre a hora de São Paulo (CLAUDE.md, "Fuso horário"): no navegador, sem
+  // `timeZone`, quem está fora do Brasil leria outra data e outra hora.
   return d.toLocaleString("pt-BR", {
     day: "2-digit",
     month: "2-digit",
     year: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "America/Sao_Paulo",
   });
 }
 
@@ -183,10 +183,7 @@ export default function RelatoriosPage() {
 
                 {report.pontos_fortes.length > 0 && (
                   <section>
-                    <h2 className="section-title mb-3">
-                      <TrendingUp className="h-5 w-5 text-app-primaria" />
-                      Pontos fortes
-                    </h2>
+                    <h2 className="section-title mb-3">Pontos fortes</h2>
                     <ul className="space-y-2">
                       {report.pontos_fortes.map((p, i) => (
                         <li
@@ -203,10 +200,7 @@ export default function RelatoriosPage() {
 
                 {report.a_melhorar.length > 0 && (
                   <section>
-                    <h2 className="section-title mb-3">
-                      <ListChecks className="h-5 w-5 text-app-primaria" />
-                      O que melhorar
-                    </h2>
+                    <h2 className="section-title mb-3">O que melhorar</h2>
                     <div className="grid gap-3 sm:grid-cols-2">
                       {report.a_melhorar.map((m, i) => (
                         <div key={i} className="card">
@@ -229,10 +223,7 @@ export default function RelatoriosPage() {
 
                 {report.padroes_a_evitar.length > 0 && (
                   <section>
-                    <h2 className="section-title mb-3">
-                      <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-                      Padrões a evitar
-                    </h2>
+                    <h2 className="section-title mb-3">Padrões a evitar</h2>
                     <ul className="space-y-2">
                       {report.padroes_a_evitar.map((p, i) => (
                         <li
@@ -249,10 +240,7 @@ export default function RelatoriosPage() {
 
                 {report.proximos_passos.length > 0 && (
                   <section>
-                    <h2 className="section-title mb-3">
-                      <CheckCircle2 className="h-5 w-5 text-app-primaria" />
-                      Próximos passos
-                    </h2>
+                    <h2 className="section-title mb-3">Próximos passos</h2>
                     <ol className="space-y-2">
                       {report.proximos_passos.map((p, i) => (
                         <li
@@ -280,9 +268,7 @@ export default function RelatoriosPage() {
           {/* Histórico */}
           <div className="min-w-0 lg:col-span-1">
             <div className="card lg:sticky lg:top-6">
-              <h2 className="section-title mb-3">
-                <History className="h-5 w-5 text-app-texto-2" /> Histórico
-              </h2>
+              <h2 className="section-title mb-3">Histórico</h2>
               <div className="-mx-2 divide-y divide-app-linha">
                 {reports.map((r) => {
                   const active = r.id === selectedId;

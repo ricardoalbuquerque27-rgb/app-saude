@@ -6,7 +6,6 @@ import {
   Loader2,
   Sparkles,
   HeartPulse,
-  Target,
   Check,
   FileText,
   Salad,
@@ -198,10 +197,7 @@ export default function SaudePage() {
           {/* Prioridades */}
           {a.prioridades?.length > 0 && (
             <div className="card">
-              <h2 className="section-title mb-3">
-                <Target className="h-5 w-5 text-app-primaria" />
-                Prioridades agora
-              </h2>
+              <h2 className="section-title mb-3">Prioridades agora</h2>
               <ol className="space-y-2">
                 {a.prioridades.map((p, i) => (
                   <li key={i} className="flex items-start gap-2.5 text-sm">

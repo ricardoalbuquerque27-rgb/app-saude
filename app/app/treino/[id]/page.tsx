@@ -4,7 +4,6 @@ import {
   ArrowLeft,
   Stethoscope,
   Timer,
-  NotebookPen,
   Play,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -106,7 +105,7 @@ export default async function TreinoDetalhe({
         <span className="chip">{sessao.sport}</span>
       </div>
 
-      <h1 className="text-2xl font-semibold text-app-texto sm:text-3xl">
+      <h1 className="text-2xl font-semibold text-app-texto">
         {titulo}
       </h1>
 
@@ -119,10 +118,7 @@ export default async function TreinoDetalhe({
 
       {(sessao.notes || rotina?.notes) && (
         <div className="card mt-4">
-          <p className="eyebrow mb-1.5 flex items-center gap-1.5">
-            <NotebookPen className="h-3.5 w-3.5" />
-            Orientações
-          </p>
+          <p className="eyebrow mb-1.5">Orientações</p>
           {sessao.notes && (
             <p className="whitespace-pre-wrap text-base text-app-texto">
               {sessao.notes}

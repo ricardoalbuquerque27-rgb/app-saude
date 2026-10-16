@@ -7,9 +7,6 @@ import {
   Loader2,
   Check,
   CalendarClock,
-  Beef,
-  TrendingDown,
-  Activity,
   Bell,
   Pencil,
   ArrowRight,
@@ -369,8 +366,8 @@ function ActiveTreatment({
               <Syringe className="h-4 w-4" /> {treatment.medication}
               {treatment.dose ? ` · ${treatment.dose}` : ""}
             </p>
-            <h2 className="tabular mt-2 text-2xl font-semibold text-app-texto">{nextLabel}</h2>
-            <p className="tabular mt-0.5 text-sm text-app-texto-2">
+            <h2 className="mt-2 text-2xl font-semibold text-app-texto">{nextLabel}</h2>
+            <p className="mt-0.5 text-sm text-app-texto-2">
               Próxima aplicação: {fmt(next)}
             </p>
           </div>
@@ -392,10 +389,7 @@ function ActiveTreatment({
 
       {/* Progresso de peso */}
       <div className="card">
-        <h2 className="section-title mb-3">
-          <TrendingDown className="h-5 w-5 text-app-primaria" />
-          Progresso desde o início
-        </h2>
+        <h2 className="section-title mb-3">Progresso desde o início</h2>
         {startWeight != null && currentWeight != null ? (
           <div className="grid grid-cols-3 divide-x divide-app-linha text-center">
             <Stat label="Inicial" value={`${startWeight}`} unit="kg" />
@@ -545,10 +539,7 @@ function ProteinCard({
   return (
     <div className="card">
       <div className="mb-2 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Beef className="h-5 w-5 text-app-primaria" />
-          <h2 className="section-title">Proteína de hoje</h2>
-        </div>
+        <h2 className="section-title">Proteína de hoje</h2>
         <button
           onClick={() => setEditing((v) => !v)}
           className="inline-flex min-h-[44px] items-center text-xs font-medium text-app-primaria hover:underline"
@@ -654,10 +645,7 @@ function SideEffectsCard({
 
   return (
     <div className="card">
-      <h2 className="section-title mb-3">
-        <Activity className="h-5 w-5 text-app-primaria" />
-        Como você está hoje?
-      </h2>
+      <h2 className="section-title mb-3">Como você está hoje?</h2>
 
       <div className="space-y-3">
         <SevRow label="Náusea" value={nausea} onChange={setNausea} />

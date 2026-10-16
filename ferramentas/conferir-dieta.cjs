@@ -952,6 +952,7 @@ async function entrar(ctx, email = "maria.teste@exemplo.com") {
       caixaAlta: [...document.querySelectorAll("main *")].filter((e) => getComputedStyle(e).textTransform === "uppercase").length,
       doc: document.documentElement.scrollWidth, janela: innerWidth,
     }));
+    ok((await p.getByText(/^Tocar em “Comi isso” registra a refeição na sua Dieta/).count()) === 1, 'e a nota "Tocar em Comi isso registra a refeição…" aparece');
     ok(r.caixaAlta === 0, `sem caixa alta na aba do cardápio (${r.caixaAlta})`);
     ok(r.doc <= r.janela, `e sem rolagem horizontal (${r.doc} ≤ ${r.janela})`);
     await p.screenshot({ path: `${OUT}/meu-plano-cardapio-390.png`, fullPage: true });
@@ -970,6 +971,7 @@ async function entrar(ctx, email = "maria.teste@exemplo.com") {
     ok(!/feito/.test(texto) && (await cartao.locator("ul > li span", { hasText: /^comi$/ }).count()) === 0, 'nem "· feito" nem "comi"');
     const aviso = cartao.getByText("Não deu para carregar as refeições do dia, então o plano não mostra o que já foi registrado.", { exact: true });
     ok((await aviso.count()) === 1, "e uma linha no cartão diz que não carregou as refeições do dia");
+    ok((await p.getByText(/^Tocar em “Comi isso”/).count()) === 0, 'e a nota "Tocar em Comi isso…" some, porque o botão de que ela fala não está na tela');
     await p.screenshot({ path: `${OUT}/falha-meals-meu-plano-390.png`, fullPage: true });
   }));
 

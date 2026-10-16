@@ -1246,7 +1246,7 @@ export default function TreinosPage() {
                     <p className="truncate font-semibold text-app-texto">
                       {w.name}
                     </p>
-                    <p className="tabular text-xs text-app-texto-2">
+                    <p className="text-xs text-app-texto-2">
                       {formatDate(w.date)}
                       {w.category ? ` · ${w.category}` : ""}
                       {w.duration_min ? ` · ${w.duration_min} min` : ""}
@@ -1466,13 +1466,16 @@ export default function TreinosPage() {
                       onChange={(e) => updateExerciseName(ei, e.target.value)}
                       placeholder="Ex.: Supino reto"
                     />
+                    {/* Os botões de remover têm 44 px de toque; o -mr-3 usa a folga de
+                        12 px do quadro do exercício para os campos da linha não
+                        encolherem (a 390 px "Carga kg" aparecia cortado). */}
                     {exercises.length > 1 && (
                       <button
                         type="button"
                         onClick={() =>
                           setExercises((p) => p.filter((_, idx) => idx !== ei))
                         }
-                        className="rounded-lg p-1.5 text-app-texto-2 hover:text-rose-600"
+                        className="tappable -mr-3 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-app-texto-2 hover:text-app-perigo"
                         aria-label="Remover exercício"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -1514,7 +1517,7 @@ export default function TreinosPage() {
                           <button
                             type="button"
                             onClick={() => removeSet(ei, si)}
-                            className="rounded-lg p-1.5 text-app-texto-2 hover:text-rose-600"
+                            className="tappable -mr-3 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-app-texto-2 hover:text-app-perigo"
                             aria-label="Remover série"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
@@ -1619,7 +1622,7 @@ export default function TreinosPage() {
                         onClick={() =>
                           setRExercises((p) => p.filter((_, idx) => idx !== i))
                         }
-                        className="rounded-lg p-1.5 text-app-texto-2 hover:text-rose-600"
+                        className="tappable -mr-3 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-app-texto-2 hover:text-app-perigo"
                         aria-label="Remover exercício"
                       >
                         <Trash2 className="h-4 w-4" />

@@ -2,8 +2,6 @@
 
 import { useEffect, useState, useCallback } from "react";
 import {
-  Droplets,
-  Smile,
   Loader2,
   Plus,
   Minus,
@@ -158,10 +156,7 @@ export default function HabitosPage() {
       {/* Água */}
       <div className="card mb-4">
         <div className="mb-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Droplets className="h-5 w-5 text-app-primaria" />
-            <h2 className="section-title">Água</h2>
-          </div>
+          <h2 className="section-title">Água</h2>
           {waterPct >= 100 && (
             <span className="rounded-full bg-app-primaria-fundo px-2.5 py-0.5 text-xs font-semibold text-app-primaria">
               Meta batida 💧
@@ -199,7 +194,9 @@ export default function HabitosPage() {
       </div>
 
       {/* Dois números não precisam de dois cartões com ícone e título cada.
-          Lado a lado também no celular: os campos são curtos. */}
+          Lado a lado também no celular: os campos são curtos. Vazios, dizem a
+          unidade ("em horas"), e não um valor de exemplo: "8" e "8000" liam-se
+          como dado salvo, o mesmo problema dos campos do Perfil. */}
       <div className="card mb-4">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Sono (horas)">
@@ -216,7 +213,7 @@ export default function HabitosPage() {
                 }))
               }
               onBlur={() => persist({ sleep_hours: log.sleep_hours })}
-              placeholder="8"
+              placeholder="em horas"
             />
           </Field>
           <Field label="Passos no dia">
@@ -232,7 +229,7 @@ export default function HabitosPage() {
                 }))
               }
               onBlur={() => persist({ steps: log.steps })}
-              placeholder="8000"
+              placeholder="em passos"
             />
           </Field>
         </div>
@@ -242,10 +239,7 @@ export default function HabitosPage() {
           hoje?" — e estavam em dois cartões, com dois títulos e dois
           ícones. Viraram um. */}
       <div className="card mb-4">
-        <div className="mb-3 flex items-center gap-2">
-          <Smile className="h-5 w-5 text-app-primaria" />
-          <h2 className="section-title">Como você está hoje?</h2>
-        </div>
+        <h2 className="section-title mb-3">Como você está hoje?</h2>
         <div className="flex flex-wrap gap-2">
           {MOODS.map((m) => (
             <button
