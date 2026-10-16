@@ -6,10 +6,8 @@ import {
   Syringe,
   Loader2,
   Check,
-  CalendarClock,
   Bell,
   Pencil,
-  ArrowRight,
   Info,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";

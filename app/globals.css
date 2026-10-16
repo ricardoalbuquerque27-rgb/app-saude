@@ -294,7 +294,10 @@ input[type="number"] {
   /* ---- Hierarquia visual ----------------------------------------- */
 
   /* Selo atrás do ícone, onde o ícone diz algo (estado vazio, linha de
-     lista). Os títulos de seção do paciente não o levam mais. */
+     lista). Os títulos de seção do paciente não o levam mais (a spec manda
+     `.section-title` sem ícone); o lado clínico ainda o leva em alguns
+     (EditorTreino e TemplateBar), porque a página do nutricionista não muda
+     na tela. */
   .icon-badge {
     @apply flex h-8 w-8 shrink-0 items-center justify-center rounded-xl
       bg-app-primaria-fundo text-app-primaria;

@@ -196,6 +196,14 @@ nutricionista ativo:
   nutricionista" e "Cancelar pedido";
 - sem nada: "Pedir consulta" (data, hora, modalidade, recado opcional).
 
+> **Nota (2026-10-16), a consulta na Início.** O cartão acima deixou de morar
+> na Início. Lá a consulta virou **uma linha no topo** (`LinhaDaConsulta`), que
+> escolhe a situação por `estadoDaConsulta`, a mesma conta do cartão, e leva a
+> "Meu plano" (`#consulta`); o cartão inteiro e as ações (pedir, remarcar,
+> cancelar) ficam só lá. Sem consulta marcada, a Início não mostra a linha.
+> Ver a spec do visual do app do paciente
+> (`2026-10-14-visual-do-app-do-paciente-design.md`), "Início (paciente)".
+
 ## Datas e fuso
 
 Tudo em `America/Sao_Paulo`, como `lib/date.ts`. O formulário recebe data e

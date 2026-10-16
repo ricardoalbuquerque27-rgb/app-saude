@@ -280,31 +280,11 @@ function Componentes() {
         </div>
 
         <div>
-          <p className="eyebrow mb-1.5">Cartão comum</p>
+          <p className="eyebrow mb-1.5">Cartão</p>
           <div className="card">
-            <h3 className="section-title mb-1">
-              <span className="icon-badge">
-                <span className="text-xs">★</span>
-              </span>
-              Título de seção
-            </h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Texto secundário, que é onde o contraste costuma quebrar.
-            </p>
-          </div>
-        </div>
-
-        <div>
-          <p className="eyebrow mb-1.5">Cartão em destaque</p>
-          <div className="card">
-            <h3 className="section-title mb-1">
-              <span className="icon-badge">
-                <span className="text-xs">★</span>
-              </span>
-              Hoje
-            </h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Mesmo texto, sobre a superfície tingida.
+            <h3 className="section-title mb-1">Título de seção</h3>
+            <p className="text-sm text-app-texto-2">
+              Texto de apoio em app-texto-2, que passa 4,5:1 sobre o cartão e sobre a página.
             </p>
           </div>
         </div>

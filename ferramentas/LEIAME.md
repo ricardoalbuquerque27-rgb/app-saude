@@ -19,23 +19,42 @@ PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm i --no-save playwright
 # rode esta linha outra vez. O Chromium já vem instalado em /opt/pw-browsers;
 # não rode `npx playwright install`.
 
-node ferramentas/mock-supabase.cjs &        # Supabase de mentira na porta 54321
+node ferramentas/mock-supabase.cjs & MOCK_PID=$!   # Supabase de mentira, porta 54321
 
 cat > .env.local <<'ENV'
 NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321
 NEXT_PUBLIC_SUPABASE_ANON_KEY=anon-de-mentira
 ENV
 
-rm -rf .next && npm run dev &               # o .next guarda a URL antiga em
+rm -rf .next                                # o .next guarda a URL antiga em
                                             # cache; sem limpar, o login
                                             # continua indo para o Supabase
                                             # anterior e não acontece nada
+setsid npm run dev & DEV_PID=$!             # PID = o do grupo (shell sem job control)
+until curl -sf -o /dev/null http://localhost:3000/login; do   # dev pronto
+  kill -0 $DEV_PID 2>/dev/null || { echo "o dev caiu"; break; }; sleep 2
+done
 
 OUT=/tmp/prints node ferramentas/tirar-prints.cjs
 ```
 
 Sai um PNG por tela × dispositivo × tema, e o script avisa no terminal quando
-alguma página transborda a largura do viewport.
+alguma página transborda a largura do viewport. As telas são a lista `TELAS`
+do script, as 14 do paciente (Início, Meu plano, Dieta, Treinos, Hábitos,
+Medidas, Exames, Tratamento, Relatórios, Saúde, Perfil, Integrações,
+Diagnóstico e Assistente) × celular 390 px e computador 1280 px × claro e
+escuro: 56 PNGs, `<tela>-<mobile|desktop>-<claro|escuro>.png`. `treino/[id]`
+fica fora da lista porque a rota precisa de um id; abra-o a partir de
+`/app/treinos`. Para uma tela nova do paciente, acrescente o par `[nome, rota]`.
+
+**Parar e esperar, sempre pelo PID.** Guarde o PID de quem você subiu e pare só
+por ele: `kill -- -$DEV_PID` (o `-` mira o grupo, que leva o `next` filho do
+`npm`) e `kill $MOCK_PID`. Para esperar um processo acabar, use `wait <pid>`
+dentro do mesmo shell ou, de outro shell, `while kill -0 <pid> 2>/dev/null; do
+sleep 1; done`, como o laço acima faz com o dev. **Nunca** `until ! pgrep -f …`:
+o padrão casa com a linha de comando do próprio laço, que então nunca vê o
+processo sumir e não termina (já travou dois laços de espera). E nunca `pkill
+-f`, que casa pelo texto da linha de comando e derruba o que não é seu.
 
 **Não rode `npm run build` com o `npm run dev` no ar.** Os dois escrevem na
 mesma pasta `.next`, e o build apaga os chunks que o dev está servindo. O
@@ -47,8 +66,11 @@ novo.
 ## Cenários do mock
 
 `CENARIO` escolhe os dados que o mock devolve. Sem ele, valem os de sempre (a
-conta de teste da Maria), e é com esses que `tirar-prints.cjs`,
-`conferir-inicio.cjs` e `conferir-dieta.cjs` rodam.
+conta de teste da Maria), e é com esses que rodam os quatro roteiros do
+paciente: `tirar-prints.cjs`, `conferir-inicio.cjs`, `conferir-dieta.cjs` e
+`conferir-consulta-paciente.cjs`. Os três `conferir-*` acusam com código de
+saída 1, recusam rodar (código 2) se o mock subiu com outro cenário e começam
+voltando o mock ao início (`POST /__reset`); `OUT` diz onde vão os PNGs.
 
 `conferir-inicio.cjs` confere a Início da Maria em 390 px e acusa com código de
 saída 1: a ordem das seções, a saudação pela hora de São Paulo, a contagem do
@@ -59,8 +81,12 @@ nos quatro pilares, a sugestão de proteína, o "+250 ml" (sobe, "Desfazer",
 uma gravação só com dois toques, e "Não deu para registrar a água" com a
 escrita ou a leitura de `daily_logs` falhando), o "Não deu para carregar os
 números de hoje" com `meals`, `daily_logs` ou `profiles` falhando, o Progresso
-de 30 dias e o "Não deu para carregar o peso", os alvos de 44 px, os links, nenhuma caixa alta nem degradê, nenhuma rolagem lateral e a
-Instrument Sans (também no `NutriHome`).
+de 30 dias e o "Não deu para carregar o peso", os alvos de 44 px, os links,
+nenhuma caixa alta nem degradê e nenhuma rolagem lateral. A Instrument Sans
+vem do `font-family` computado: o `body`, o `h1` e o `h2` da Início da Maria e,
+num segundo contexto logado como `nutri.teste@exemplo.com`, o `body` e o `h1`
+da `NutriHome`. O `next/font` renomeia a família (`__Instrument_Sans_…`), por
+isso a expressão é `/Instrument[ _]Sans/`.
 
 `conferir-dieta.cjs` faz o mesmo com a Dieta da Maria (mock sem cenário, dev no
 ar; `SO=regex` roda só as etapas cujo nome casa): o rótulo do dia ("Hoje, qui. 15/10") que abre o seletor de data pelo
@@ -84,8 +110,10 @@ avisa: o "perfil" é só de sexo, altura e nascimento), a descrição da
 sugestão cortada em duas linhas na Dieta (com a leitura do plano interceptada
 pelo `page.route`) e na Início, e a rolagem até
 `#plano` (direto e pelo link da sugestão da Início), o cardápio de Meu plano
-(sem o "ver em Meu plano", e, com `meals` falhando, sem "Comi isso" e com a
-linha que diz que as refeições do dia não carregaram), o formulário de refeição
+(sem o "ver em Meu plano", e, com `meals` falhando, sem "Comi isso", com a
+linha que diz que as refeições do dia não carregaram e **sem a nota "Tocar em
+Comi isso registra a refeição na sua Dieta"**, que falaria de um botão que não
+está na tela), o formulário de refeição
 (só a linguagem mudou), os atalhos `?novo=1` e `?foto=1`, nenhuma caixa alta nem
 classe da paleta antiga e nenhuma rolagem lateral.
 
@@ -199,17 +227,20 @@ E os registros da consulta (prontuário: `consultation_records`, os adendos em
   `POST /__reset` apaga de novo.
 
 No cenário padrão, a Maria tem uma consulta realizada há 20 dias e a próxima
-daqui a 3, para o cartão de consulta do lado do paciente. A medida de 20 dias
+daqui a 3, para a linha da consulta na Início e o cartão de consulta de "Meu
+plano" (`#consulta`), onde moram as ações. A medida de 20 dias
 atrás (67,7 kg) é a que o nutri tirou nessa consulta (`measured_by` dele,
 `appointment_id` `ap-m1`): a página Medidas dela mostra a marca "Medida na
 consulta" e não oferece o excluir nessa linha. Com o mock **sem** `CENARIO` e o
 dev no ar, `node ferramentas/conferir-consulta-paciente.cjs` confere esse lado:
-o cartão de consulta (Início e "Meu plano"), a página Medidas (a marca, o excluir
+a linha da Início em cada situação (agendada, remarcação pedida, pedido,
+agendada com pedido, cancelada pelo nutri, nenhuma e leitura que falhou) e as
+ações do cartão de "Meu plano", a página Medidas (a marca, o excluir
 só nas medidas dela, "Este registro não pode ser apagado." quando o banco recusa
 sem erro e o aviso de erro no DELETE) e que o Perfil do paciente não mostra o CRN.
 
 ```bash
-CENARIO=carteira node ferramentas/mock-supabase.cjs &
+CENARIO=carteira node ferramentas/mock-supabase.cjs & MOCK_PID=$!
 # o resto como acima: .env.local, rm -rf .next, npm run dev
 
 OUT=/tmp/prints-nutri node ferramentas/tirar-prints-nutri.cjs
@@ -280,7 +311,9 @@ que o Peso atual da Luiza, que é de casa, diz "em dd/mm/aaaa, em casa". Ele des
 ids dos pacientes perguntando ao mock (`/__cenario`), e recusa rodar se o mock
 subiu com outro cenário.
 Sem `OUT`, os PNGs vão para `prints-nutri` no diretório temporário do
-sistema.
+sistema. **Uma falha é conhecida e intermitente:** o aviso de hidratação "Extra
+attributes from the server: style", num `textarea`, que aparece em umas rodadas
+(822 de 823) e em outras não. É a única tolerada; qualquer outra, não.
 
 O mock aceita `PATCH` e `DELETE` no CORS; sem isso o navegador recusava o
 `PATCH` que marca a conversa como lida e o console enchia de erro. Ele não
@@ -345,9 +378,10 @@ Dois endereços que não são do Supabase (além do `/__cenario`):
   tabela devolverem 500 até o próximo `/__reset`. As leituras da página são do
   servidor do Next, que o `page.route` do Playwright não intercepta; sem isto
   não há como ver a tela de "não carregou". Com `"escrita": true` (`{ "tabela":
-  "daily_logs", "escrita": true }`) só as escritas (`POST`, `PATCH`, `DELETE`)
-  dão 500 e as leituras seguem: é a gravação que falha numa tela que, com a
-  leitura falhando, nem mostraria o botão (o "+250 ml" da Início).
+  "daily_logs", "escrita": true }`; nos roteiros, `comFalha(tabela, fn, {
+  escrita: true })`) só as escritas (`POST`, `PATCH`, `DELETE`) dão 500 e as
+  leituras seguem: é a gravação que falha numa tela que, com a leitura falhando,
+  nem mostraria o botão (o "+250 ml" da Início).
 
 ## Funções e regras do banco (SQL)
 
