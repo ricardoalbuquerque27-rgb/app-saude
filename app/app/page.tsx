@@ -202,7 +202,9 @@ export default async function DashboardPage() {
   // um valor por dia, a medida da consulta vence a de casa, teto em hoje).
   // ---------------------------------------------------------------------
   const pesoFalhou = !!pesoRes.error || !!pesoAntesRes?.error;
-  // A regra do "último peso" é uma só, a da Dieta também: pesoMaisRecente.
+  // Sem peso na janela, o último peso antes dela é o de `pesoMaisRecente`, o da
+  // Dieta também; dentro da janela vale o `atual` de `pesoDe30Dias`. As duas
+  // contas passam por `pesoDoDia`, então concordam.
   const pesoAnterior =
     pesoAntesRes && !pesoAntesRes.error ? pesoMaisRecente((pesoAntesRes.data ?? []) as any[], today) : null;
   const pesoAtual = peso30?.atual ?? pesoAnterior?.peso ?? null;

@@ -71,8 +71,9 @@ Isso não é óbvio lendo a árvore de arquivos.
   `textoDoDesvio`, `textoDoDesvioDoPlano`), a divisão dos avisos entre meta
   e plano de treino (`separarDesvios`), o peso que vale num dia com duas
   medidas (`pesoDoDia`), o peso de 30 dias (`pesoDe30Dias`, o mesmo número no
-  resumo do nutri e na Início do paciente), a regra única do "último peso"
-  (`pesoMaisRecente`) e o papel das calorias (`papelDasCalorias`). As
+  resumo do nutri e na Início do paciente), o último peso sem janela
+  (`pesoMaisRecente`: a Dieta e o "em dd/mm" da Início) e o papel das calorias
+  (`papelDasCalorias`). As
   consultas ao banco não têm teste (nem
   `lib/perfil.ts`, que é só uma consulta), menos as que rodam contra um
   Supabase em memória: as leituras do resumo, da linha do tempo e da série
@@ -381,9 +382,11 @@ sem sombra, sem degradê e sem faixa à esquerda (o `.card-accent` saiu). Dentro
 dele, linhas separadas por traço (`divide-y divide-app-linha`), nunca outro
 cartão: cada nível soma borda e come largura em 390 px. Botão primário sólido
 em `app-primaria` (44 px de altura mínima), secundário `.btn-ghost` (40 px).
-Rótulo em frase normal: nada de `uppercase` nem `tracking-wide` fora da
-landing. Título de seção sem ícone; o `.icon-badge` fica onde o ícone diz algo
-(estado vazio, linha de lista).
+Rótulo em frase normal: nada de `uppercase` nem `tracking-wide` no app do
+paciente. O `.eyebrow` do lado clínico **segue em caixa alta** (a cópia sob
+`:where(.tema-clinico)` em `globals.css`), porque o clínico não muda na tela:
+não é para "corrigir". Título de seção sem ícone; o `.icon-badge` fica onde o
+ícone diz algo (estado vazio, linha de lista).
 
 **Texto direto no chão é `app-texto` ou `app-texto-2`.** Nunca `text-slate-500`
 nem `slate-400` (ver "Armadilhas"): o slate-500 dá 4,76:1 sobre o branco do
@@ -403,9 +406,12 @@ atual (passar dá "acima do limite", em `app-atencao`), *meta* quando está
 acima, e neutras sem meta de peso ou na manutenção (±0,5 kg):
 `papelDasCalorias`. O app não guarda o objetivo do paciente, então a meta de
 peso é o que diz a direção; avisar sempre nas calorias dava um aviso laranja
-a quem quer ganhar massa e comeu o que devia. O peso atual vem de
-`pesoMaisRecente`, **a única regra de "última pesagem"** (Início e Dieta; no
-dia com duas medidas vale `pesoDoDia`): duas cópias da mesma regra acabam
+a quem quer ganhar massa e comeu o que devia. O peso atual da Dieta vem de
+`pesoMaisRecente` (o do dia mais recente com peso, até hoje). A Início usa o
+`atual` de `pesoDe30Dias` quando há peso nos 30 dias e `pesoMaisRecente` só
+fora dessa janela; os dois passam por `pesoDoDia` (no dia com duas medidas, a
+da consulta vence a de casa), então concordam. Cada conta tem de ter uma
+função só: a Início chegou a ter a sua à mão, e duas cópias acabam
 discordando, como nas janelas de N dias.
 
 **Água.** `adicionarAgua` (`lib/agua.ts`) lê o total do dia e grava só
@@ -446,10 +452,12 @@ Meu plano, não oferece "Comi isso" (convidaria a registrar de novo o que talvez
 já esteja registrado) e diz que não carregou as refeições do dia. O que ficou
 de fora está em "Em aberto".
 
-**Um componente, dois lados.** O `PlanCheckIn` aparece na Início, em
-`treino/[id]` e dentro de `.tema-clinico`. A forma de linha da Início mora numa
-prop própria (`linha`) e o `compact` segue como era: redesenhá-lo mudou a
-leitura do treino e dava "Fui" e "Não fui" ao treino do próprio paciente.
+**Duas formas, um componente.** O `PlanCheckIn` aparece na Início (`linha`,
+uma linha do "Para hoje") e em `treino/[id]` (`compact`, só os botões); fora
+desses dois, nada o importa, e o lado clínico não o usa. A forma da Início mora
+numa prop própria, e o `compact` mantém a estrutura (só os botões, com 44 px e
+o "Fui" sólido): redesenhá-lo lá punha um `<li>` fora de lista, repetia o nome
+e a nota e dava "Fui" e "Não fui" ao treino do próprio paciente.
 
 ## Senha
 
@@ -546,8 +554,10 @@ fixed`: todo `Modal` dentro de uma página se posicionava em relação a ela, n�
 à janela (358×1256 em vez de 390×844 numa tela de 390 px; em Medidas a folha
 caía 1.100 px abaixo da dobra). Use `backwards`, que só segura o estado inicial
 durante o atraso: o estado final dos quadros-chave já é o natural. Vale também
-para `.pf-modal` e `.pf-stagger`. Modal fora do lugar: procure um `transform`
-num ancestral.
+para `.pf-modal` e `.pf-stagger`. `.pf-drawer`, `.pf-panel` e `.pf-sheet` ainda
+usam `both`: as duas últimas nada usa, e o drawer do `AppShell` não tem filho
+`fixed` hoje, mas um descendente `fixed` ali ficaria preso do mesmo jeito.
+Modal fora do lugar: procure um `transform` num ancestral.
 
 ## Convenções
 
@@ -557,7 +567,9 @@ num ancestral.
   aos dois temas** (no claro só `brand-700+` passa em contraste; no escuro
   só `brand-600` para trás). No app do paciente o par já está dentro das
   variáveis `app-*` (ver "Visual do app"), sem `dark:`; o par `brand-*` com
-  `dark:` sobra na landing e em poucos componentes dos editores clínicos. A
+  `dark:` sobra na landing e em poucos componentes: os editores clínicos, o
+  `FoodSearch` (que a Dieta do paciente também usa) e o `OpenChatButton`, que
+  nada importa. A
   rota `/estilo`, só em desenvolvimento, mostra a escala com a razão de
   contraste calculada.
 - A página do paciente do nutricionista tem tema próprio, `.tema-clinico`,
@@ -626,11 +638,15 @@ num ancestral.
   que falha não avisa (a refeição só continua na lista), e um registro que
   falha fecha o formulário como se tivesse salvo.
 - **As outras telas do paciente ainda leem no navegador com `data ?? []`**
-  (Medidas, Exames, Treinos, Tratamento, Relatórios): leitura que falha vira
-  "não tem", a regra que a Início, a Dieta e Meu plano já seguem.
-- **Se a leitura do papel em `app/app/page.tsx` (linhas 41 a 45) falha, um
-  nutricionista cai no painel do paciente.** `roleRow` vem nulo e a página
-  segue como se fosse paciente; falta conferir o `error` e mostrar a falha.
+  (Medidas, Exames, Treinos, Tratamento, Relatórios, Saúde e o histórico de
+  Hábitos): leitura que falha vira "não tem", a regra que a Início e a Dieta
+  (e as refeições e a consulta de Meu plano) já seguem. O resto de Meu plano
+  (`nutricionista/page.tsx`: prescrição, plano, itens do cardápio, sessões,
+  notas e rotinas) também ignora o `error`.
+- **Se a leitura do papel falha, um nutricionista cai no painel do paciente.**
+  É o `roleRow` do começo de `DashboardPage`, em `app/app/page.tsx`: vem nulo e
+  a página segue como se fosse paciente; falta conferir o `error` e mostrar a
+  falha.
 - **O "comi" do plano casa por descrição.** `MealPlanView` marca a opção como
   "comi" quando há uma refeição do mesmo tipo com o mesmo texto; se a descrição
   é editada, ou o nutricionista troca a opção, a marca some e o "Comi isso"

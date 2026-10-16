@@ -836,11 +836,13 @@ export function pesoDe30Dias(
 }
 
 /**
- * O peso do dia mais recente com peso, até hoje, com a data dele, ou nulo. É a
- * regra única do "último peso": a Dieta a usa para `papelDasCalorias`, e a
- * Início para o "em dd/mm" de quem não se pesou nos últimos 30 dias. Um valor
- * por dia (`pesoDoDia`: a medida da consulta vence a de casa) e teto em hoje,
- * de modo que um peso lançado com data futura não vira o peso atual.
+ * O peso do dia mais recente com peso, até hoje, com a data dele, ou nulo. É o
+ * "último peso" sem janela: a Dieta o usa para `papelDasCalorias`, e a Início
+ * só para o "em dd/mm" de quem não se pesou nos últimos 30 dias (dentro da
+ * janela, o peso atual da Início é o `atual` de `pesoDe30Dias`; as duas contas
+ * passam por `pesoDoDia`, então concordam). Um valor por dia (`pesoDoDia`: a
+ * medida da consulta vence a de casa) e teto em hoje, de modo que um peso
+ * lançado com data futura não vira o peso atual.
  *
  * Sem janela de dias, de propósito: quem se pesou há dois meses ainda tem um
  * peso e uma meta, e a direção da meta de calorias não some por isso. A data
