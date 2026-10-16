@@ -14,6 +14,14 @@ import {
   type PlanSession,
 } from "@/lib/planCheckIn";
 
+// Os três estilos de botão do check-in, iguais nas três formas (linha, compacta
+// e padrão): "Fui" é o primário (sólido) e "Não fui" o secundário. Depois de
+// responder, o sólido fica com a resposta; "Não fui" marcado vai para o tom de
+// aviso (verde diria que faltar foi bom) e "Fui" volta a secundário.
+const SOLIDO = "bg-app-primaria text-app-sobre-primaria hover:[filter:brightness(0.94)]";
+const SECUNDARIO = "border border-app-campo bg-app-cartao text-app-texto hover:bg-app-primaria-fundo";
+const AVISO = "border border-app-atencao bg-app-atencao-fundo text-app-atencao";
+
 // Check-in do treino planejado, para o paciente. Aparece no "Para hoje" da
 // Início (`linha`), na leitura do treino (`compact`, só os botões) e na aba
 // Plano. Sem marcação = "sem resposta"; tocar de novo no mesmo botão desfaz.
@@ -114,16 +122,10 @@ export default function PlanCheckIn({
           const nome = s.title || s.sport || "Treino";
           const origem = doNutri ? "do seu nutricionista" : "seu treino";
           const apoio = s.title && s.sport ? `${s.sport} · ${origem}` : origem;
-          // A hierarquia da maquete: "Fui" é o primário (sólido) e "Não fui"
-          // o secundário. Depois de responder, o sólido fica com a resposta:
-          // "Não fui" marcado vai para o tom de aviso (verde diria que faltar
-          // foi bom) e "Fui" volta a secundário. O "Fiz" do treino próprio é
-          // secundário até ser marcado, como na maquete.
+          // A hierarquia da maquete (estilos no topo do arquivo). O "Fiz" do
+          // treino próprio é secundário até ser marcado, como na maquete.
           const BASE =
             "tappable inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-[10px] px-3 text-sm font-semibold disabled:opacity-60";
-          const SOLIDO = "bg-app-primaria text-app-sobre-primaria hover:[filter:brightness(0.94)]";
-          const SECUNDARIO = "border border-app-campo bg-app-cartao text-app-texto hover:bg-app-primaria-fundo";
-          const AVISO = "border border-app-atencao bg-app-atencao-fundo text-app-atencao";
           const estiloFeito = doNutri ? (skipped ? SECUNDARIO : SOLIDO) : done ? SOLIDO : SECUNDARIO;
           return (
             <li key={s.id} className="px-4 py-3.5">
@@ -174,8 +176,15 @@ export default function PlanCheckIn({
     );
   }
 
+  // Compacta (leitura do treino) e padrão. O padrão não tem tela hoje, mas
+  // segue a mesma linguagem: sessões separadas por traço, sem um cartão por
+  // sessão (quem o usar o põe dentro de um `.card`). Os botões têm 44 px nas
+  // duas: é a ação de um toque, e o `py-1.5` de antes dava ~30 px.
+  const BOTAO =
+    "tappable flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-[10px] px-2 text-sm font-semibold disabled:opacity-60";
+
   return (
-    <div className={compact ? "" : "space-y-2"}>
+    <div className={compact ? "" : "divide-y divide-app-linha"}>
       {sessions.map((s, i) => {
         const current = idx[completionKey(s.id, date)];
         const done = current?.status === "done";
@@ -185,11 +194,7 @@ export default function PlanCheckIn({
         return (
           <div
             key={s.id}
-            className={
-              compact
-                ? "mt-2 flex gap-1.5"
-                : "rounded-xl border border-slate-200/80 bg-white p-3 dark:border-white/[0.07] dark:bg-slate-900/70"
-            }
+            className={compact ? "mt-2 flex gap-1.5" : "py-3 first:pt-0 last:pb-0"}
           >
             {/* O cabeçalho leva para a tela do treino, onde os exercícios
                 cabem com tipografia de ler em pé. Os botões de check-in
@@ -198,19 +203,19 @@ export default function PlanCheckIn({
             {!compact && (
               <Link
                 href={`/app/treino/${s.id}`}
-                className="tappable group -m-1 flex items-start gap-2 rounded-lg p-1 hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                className="tappable group -m-1 flex min-h-[44px] items-start gap-2 rounded-lg p-1 hover:bg-app-primaria-fundo"
               >
                 <span className="min-w-0 flex-1">
-                  <span className="inline-block rounded-full bg-brand-100 px-2.5 py-0.5 text-[11px] font-semibold text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">
+                  <span className="inline-block rounded-full bg-app-primaria-fundo px-2.5 py-0.5 text-[11px] font-semibold text-app-primaria">
                     {s.sport}
                   </span>
                   {s.title && (
-                    <span className="mt-1 block text-sm font-medium text-slate-800 dark:text-slate-200">
+                    <span className="mt-1 block text-sm font-medium text-app-texto">
                       {s.title}
                     </span>
                   )}
                 </span>
-                <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-brand-700 dark:group-hover:text-brand-400" />
+                <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-app-texto-2 transition group-hover:translate-x-0.5 group-hover:text-app-primaria" />
               </Link>
             )}
 
@@ -219,12 +224,8 @@ export default function PlanCheckIn({
                 onClick={() => mark(s, "done")}
                 disabled={loading}
                 aria-pressed={done}
-                className={`tappable flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold disabled:opacity-60 ${
+                className={`${BOTAO} ${done ? SOLIDO : SECUNDARIO} ${
                   pop === s.id && done ? "pf-pop" : ""
-                } ${
-                  done
-                    ? "bg-brand-700 text-white"
-                    : "border border-slate-300 text-slate-700 hover:border-brand-400 hover:text-brand-700 dark:border-slate-600 dark:text-slate-200 dark:hover:border-brand-500 dark:hover:text-brand-300"
                 }`}
               >
                 {loading ? (
@@ -238,30 +239,24 @@ export default function PlanCheckIn({
                 onClick={() => mark(s, "skipped")}
                 disabled={loading}
                 aria-pressed={skipped}
-                className={`tappable flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold disabled:opacity-60 ${
+                className={`${BOTAO} ${skipped ? AVISO : SECUNDARIO} ${
                   pop === s.id && skipped ? "pf-pop" : ""
-                } ${
-                  skipped
-                    ? "bg-rose-600 text-white"
-                    : "border border-slate-300 text-slate-700 hover:border-rose-400 hover:text-rose-700 dark:border-slate-600 dark:text-slate-200 dark:hover:border-rose-500 dark:hover:text-rose-300"
                 }`}
               >
                 <X className="h-3.5 w-3.5" />
-                {skipped ? "Não fui" : "Não fui"}
+                Não fui
               </button>
             </div>
 
             {nota && i === primeiroSemResposta && !compact && !current && (
-              <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+              <p className="mt-2 text-[13px] text-app-texto-2">
                 Seu nutricionista vê essa confirmação.
               </p>
             )}
           </div>
         );
       })}
-      {erro && (
-        <p className="text-xs text-rose-600 dark:text-rose-400">{erro}</p>
-      )}
+      {erro && <p className="pt-2 text-[13px] text-app-perigo">{erro}</p>}
     </div>
   );
 }

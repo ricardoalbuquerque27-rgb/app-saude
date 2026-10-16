@@ -1156,28 +1156,24 @@ export default function TreinosPage() {
                         value={progStats.current}
                         unit="kg"
                         icon={<Dumbbell className="h-5 w-5" />}
-                        accent="brand"
                       />
                       <StatCard
                         label="Recorde"
                         value={progStats.record}
                         unit="kg"
                         icon={<Trophy className="h-5 w-5" />}
-                        accent="amber"
                       />
                       <StatCard
                         label="Variação"
                         value={`${progStats.delta > 0 ? "+" : ""}${progStats.delta}`}
                         unit="kg"
                         icon={<TrendingUp className="h-5 w-5" />}
-                        accent={progStats.delta >= 0 ? "brand" : "rose"}
                       />
                       <StatCard
                         label="1RM estimado"
                         value={Math.round(perfByName[currentExercise.toLowerCase()]?.best1rm ?? 0)}
                         unit="kg"
                         icon={<Zap className="h-5 w-5" />}
-                        accent="brand"
                       />
                     </div>
                   )}

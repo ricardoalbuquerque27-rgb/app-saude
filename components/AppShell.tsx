@@ -272,14 +272,19 @@ export default function AppShell({
           <Dumbbell className="h-5 w-5" />
           Pace Fit
         </Link>
+        {/* 44 px de toque (eram 40), sem mexer um pixel no que se vê: o -my-0.5
+            devolve os 4 px à barra (que é fixa e conta na rolagem das âncoras),
+            o -mr-0.5 mantém o ícone onde estava (o botão cresce 2 px para cada
+            lado e o ícone fica centrado nele), e o ponto de novidade vai de
+            1,5 para 2 pelo mesmo motivo. */}
         <button
           onClick={() => setMenuOpen(true)}
-          className="relative rounded-lg p-2 text-app-texto-2 hover:bg-app-primaria-fundo"
+          className="relative -my-0.5 -mr-0.5 flex h-11 w-11 items-center justify-center rounded-lg text-app-texto-2 hover:bg-app-primaria-fundo"
           aria-label="Abrir menu"
         >
           <Menu className="h-6 w-6" />
           {morePending && (
-            <span className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-app-primaria ring-2 ring-app-cartao" />
+            <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-app-primaria ring-2 ring-app-cartao" />
           )}
         </button>
       </header>
@@ -360,7 +365,7 @@ export default function AppShell({
               </span>
               <button
                 onClick={() => setMenuOpen(false)}
-                className="tappable rounded-lg p-1.5 text-app-texto-2 hover:bg-app-primaria-fundo"
+                className="tappable -my-1.5 -mr-1.5 flex h-11 w-11 items-center justify-center rounded-lg text-app-texto-2 hover:bg-app-primaria-fundo"
                 aria-label="Fechar menu"
               >
                 <X className="h-5 w-5" />

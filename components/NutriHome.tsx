@@ -2,7 +2,6 @@ import Link from "next/link";
 import {
   Users,
   UserPlus,
-  AlertTriangle,
   ChevronRight,
   CheckCircle2,
   Clock,
@@ -43,35 +42,39 @@ const ICONE: Record<TipoAlerta, typeof Syringe> = {
 };
 
 function PatientRow({ s }: { s: PatientSummary }) {
+  // O traço entre as linhas vai num invólucro reto, e não no próprio link: o
+  // link tem cantos de 12 px (para o fundo do hover) e o `divide-y` nele
+  // desenhava o traço curvando nas pontas, o que só aparecia depois que a cor
+  // do traço passou de slate-100 para `linha`.
   return (
-    <Link
-      href={`/app/pacientes/${s.id}`}
-      className="tappable flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/60"
-    >
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-100 text-sm font-semibold text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">
-        {s.name.slice(0, 1).toUpperCase()}
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
-          {s.name}
-        </p>
-        <div className="mt-0.5 flex flex-wrap gap-x-2 gap-y-1">
-          {s.alertas.slice(0, 2).map((a) => {
-            const Icone = ICONE[a.tipo];
-            return (
-              <span
-                key={a.texto}
-                className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 dark:text-amber-400"
-              >
-                <Icone className="h-3.5 w-3.5" />
-                {a.texto}
-              </span>
-            );
-          })}
+    <div className="border-t border-app-linha first:border-t-0">
+      <Link
+        href={`/app/pacientes/${s.id}`}
+        className="tappable flex min-h-[44px] items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-app-primaria-fundo"
+      >
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-app-primaria-fundo text-sm font-semibold text-app-primaria">
+          {s.name.slice(0, 1).toUpperCase()}
         </div>
-      </div>
-      <ChevronRight className="h-4 w-4 shrink-0 text-slate-300 dark:text-slate-400" />
-    </Link>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold text-app-texto">{s.name}</p>
+          <div className="mt-0.5 flex flex-wrap gap-x-2 gap-y-1">
+            {s.alertas.slice(0, 2).map((a) => {
+              const Icone = ICONE[a.tipo];
+              return (
+                <span
+                  key={a.texto}
+                  className="inline-flex items-center gap-1 text-[13px] font-medium text-amber-700 dark:text-amber-400"
+                >
+                  <Icone className="h-3.5 w-3.5" />
+                  {a.texto}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+        <ChevronRight className="h-4 w-4 shrink-0 text-app-texto-2" />
+      </Link>
+    </div>
   );
 }
 
@@ -113,10 +116,10 @@ export default async function NutriHome({
   if (activeIds.length === 0 && pendingCount === 0) {
     return (
       <div>
-        <h1 className="mb-1 text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+        <h1 className="mb-1 text-2xl font-semibold text-app-texto">
           Olá, {firstName}
         </h1>
-        <p className="mb-6 text-sm text-slate-500 dark:text-slate-400">
+        <p className="mb-6 text-sm text-app-texto-2">
           Sua visão geral aparece aqui assim que você tiver pacientes.
         </p>
         <EmptyState
@@ -134,7 +137,7 @@ export default async function NutriHome({
   return (
     <div>
       <div className="mb-5 flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+        <h1 className="text-2xl font-semibold text-app-texto">
           Olá, {firstName}
         </h1>
         <Link href="/app/pacientes" className="btn-primary shrink-0">
@@ -146,17 +149,14 @@ export default async function NutriHome({
         (fila.length > 0 ? (
           <div className="card mb-4 p-3">
             <h2 className="section-title mb-1 px-2 pt-1">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
-                <AlertTriangle className="h-4 w-4" />
-              </span>
               <span>
                 Precisam de você{" "}
-                <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
+                <span className="tabular text-sm font-normal text-app-texto-2">
                   ({fila.length} de {summaries.length})
                 </span>
               </span>
             </h2>
-            <div className="pf-stagger divide-y divide-slate-100 dark:divide-slate-800">
+            <div className="pf-stagger">
               {fila.map((s) => (
                 <PatientRow key={s.id} s={s} />
               ))}
@@ -168,10 +168,10 @@ export default async function NutriHome({
               <CheckCircle2 className="h-4 w-4" />
             </span>
             <div>
-              <p className="text-sm font-semibold text-slate-900 dark:text-white">
+              <p className="text-sm font-semibold text-app-texto">
                 Ninguém precisa de você agora
               </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              <p className="text-[13px] text-app-texto-2">
                 {emDia} {emDia === 1 ? "paciente em dia" : "pacientes em dia"}
               </p>
             </div>
@@ -181,22 +181,22 @@ export default async function NutriHome({
       {pendingCount > 0 && (
         <Link
           href="/app/pacientes"
-          className="tappable mb-4 flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800/60"
+          className="tappable mb-4 flex min-h-[44px] items-center gap-2 rounded-xl px-3 py-2.5 text-sm text-app-texto-2 hover:bg-app-primaria-fundo"
         >
-          <Clock className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" />
+          <Clock className="h-4 w-4 shrink-0" />
           <span className="flex-1">
             {pendingCount}{" "}
             {pendingCount === 1
               ? "convite aguardando o paciente"
               : "convites aguardando o paciente"}
           </span>
-          <ChevronRight className="h-4 w-4 shrink-0 text-slate-300 dark:text-slate-400" />
+          <ChevronRight className="h-4 w-4 shrink-0 text-app-texto-2" />
         </Link>
       )}
 
       <Link
         href="/app/pacientes"
-        className="btn-ghost w-full py-2.5 text-sm text-slate-600 dark:text-slate-300"
+        className="btn-ghost min-h-[44px] w-full py-2.5 text-sm"
       >
         Ver todos os pacientes <ChevronRight className="h-4 w-4" />
       </Link>

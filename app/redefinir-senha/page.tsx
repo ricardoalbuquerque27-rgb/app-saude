@@ -80,43 +80,38 @@ export default function RedefinirSenhaPage() {
   }
 
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-gradient-to-b from-brand-50/60 via-white to-white px-5 py-10 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
+    // O chão é `pagina`, liso: o degradê verde de cima para baixo (e o dele no
+    // escuro, em três tons de slate) era enfeite.
+    <main className="flex min-h-dvh items-center justify-center bg-app-pagina px-5 py-10">
       <div className="w-full max-w-sm">
-        <Link href="/" className="mb-8 flex items-center justify-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 text-white shadow-[0_8px_20px_-8px_rgba(24,184,94,0.8)]">
+        <Link
+          href="/"
+          className="tappable mb-8 flex min-h-[44px] items-center justify-center gap-2.5"
+        >
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-app-primaria text-app-sobre-primaria">
             <Dumbbell className="h-5 w-5" />
           </div>
-          <span className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">
-            Pace Fit
-          </span>
+          <span className="text-lg font-semibold text-app-texto">Pace Fit</span>
         </Link>
 
         <div className="card">
           {done ? (
             <div className="flex flex-col items-center py-6 text-center">
-              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
+              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-app-primaria-fundo text-app-primaria">
                 <Check className="h-6 w-6" />
               </div>
-              <p className="font-semibold text-slate-900 dark:text-white">
-                Senha redefinida!
-              </p>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Entrando no app…
-              </p>
+              <p className="font-semibold text-app-texto">Senha redefinida!</p>
+              <p className="mt-1 text-sm text-app-texto-2">Entrando no app…</p>
             </div>
           ) : checking ? (
             <div className="flex flex-col items-center py-8 text-center">
-              <Loader2 className="mb-3 h-6 w-6 animate-spin text-brand-700 dark:text-brand-400" />
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                Validando o link…
-              </p>
+              <Loader2 className="mb-3 h-6 w-6 animate-spin text-app-primaria" />
+              <p className="text-sm text-app-texto-2">Validando o link…</p>
             </div>
           ) : ready ? (
             <>
-              <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-                Nova senha
-              </h1>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              <h1 className="text-xl font-semibold text-app-texto">Nova senha</h1>
+              <p className="mt-1 text-sm text-app-texto-2">
                 Defina uma nova senha para sua conta.
               </p>
               <form onSubmit={submit} className="mt-5 space-y-4">
@@ -136,7 +131,7 @@ export default function RedefinirSenhaPage() {
                     <button
                       type="button"
                       onClick={() => setShowPw((v) => !v)}
-                      className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-500 hover:text-slate-600 dark:hover:text-slate-200"
+                      className="tappable absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-lg text-app-texto-2 hover:text-app-texto"
                       tabIndex={-1}
                       aria-label={showPw ? "Ocultar senha" : "Mostrar senha"}
                     >
@@ -157,8 +152,8 @@ export default function RedefinirSenhaPage() {
                     aria-atomic="true"
                     className={
                       ajudaEmDestaque
-                        ? "mt-1.5 text-[13px] font-medium text-amber-700 dark:text-amber-400"
-                        : "mt-1.5 text-[13px] text-slate-600 dark:text-slate-400"
+                        ? "mt-1.5 text-[13px] font-medium text-app-atencao"
+                        : "mt-1.5 text-[13px] text-app-texto-2"
                     }
                   >
                     {ajudaEmDestaque && (
@@ -168,7 +163,7 @@ export default function RedefinirSenhaPage() {
                   </p>
                 </div>
                 {error && !ajudaEmDestaque && (
-                  <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
+                  <p className="rounded-lg bg-app-perigo-fundo px-3 py-2 text-sm text-app-perigo">
                     {error}
                   </p>
                 )}
@@ -184,10 +179,10 @@ export default function RedefinirSenhaPage() {
             </>
           ) : (
             <div className="py-4 text-center">
-              <p className="font-semibold text-slate-900 dark:text-white">
+              <p className="font-semibold text-app-texto">
                 Link inválido ou expirado
               </p>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              <p className="mt-1 text-sm text-app-texto-2">
                 Solicite um novo link de redefinição.
               </p>
               <Link href="/login" className="btn-primary mt-4 inline-flex">

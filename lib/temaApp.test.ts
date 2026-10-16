@@ -43,6 +43,8 @@ describe("tema do app", () => {
       ["texto", "atencao-fundo"],
       ["atencao-texto-2", "atencao-fundo"],
       ["atencao", "cartao"],
+      // A ajuda da senha em destaque (login, redefinir-senha), direto no chão.
+      ["atencao", "pagina"],
       ["perigo", "perigo-fundo"],
       ["perigo", "cartao"],
     ];

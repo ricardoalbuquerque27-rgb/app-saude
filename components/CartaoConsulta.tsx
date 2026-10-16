@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
-import { CalendarClock, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { todayISO } from "@/lib/date";
 import {
   estadoDaConsulta,
@@ -89,19 +89,14 @@ export function CartaoConsulta({
   }
 
   const titulo = (
-    <h2 className="section-title mb-3">
-      <span className="icon-badge">
-        <CalendarClock className="h-4 w-4" />
-      </span>
-      Consulta
-    </h2>
+    <h2 className="section-title mb-3">Consulta</h2>
   );
 
   if (falhou) {
     return (
       <section className="card" aria-label="Consulta">
         {titulo}
-        <p className="text-sm text-slate-600 dark:text-slate-300">
+        <p className="text-sm text-app-texto-2">
           Não foi possível carregar suas consultas. Atualize a página para
           tentar de novo.
         </p>
@@ -112,7 +107,7 @@ export function CartaoConsulta({
   const mensagemDeErro = erro && (
     <p
       role="alert"
-      className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:bg-rose-500/10 dark:text-rose-200"
+      className="mt-3 rounded-lg bg-app-perigo-fundo px-3 py-2 text-sm text-app-perigo"
     >
       {erro}
     </p>
@@ -129,14 +124,14 @@ export function CartaoConsulta({
           marcou uma consulta sem responder ao pedido): os dois aparecem. */}
       {proxima && (
         <div>
-          <p className="text-sm text-slate-600 dark:text-slate-300">
+          <p className="text-sm text-app-texto-2">
             Próxima consulta
           </p>
-          <p className="text-base font-semibold text-slate-900 dark:text-white">
+          <p className="tabular text-base font-semibold text-app-texto">
             {rotuloDaConsulta(proxima)} · {ROTULO_MODO[proxima.mode]}
           </p>
           {proxima.reschedule_requested_at ? (
-            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+            <p className="mt-1 text-sm text-app-texto-2">
               Pedido de remarcação enviado. Aguardando {quem}.
             </p>
           ) : formulario === "remarcar" ? null : (
@@ -146,7 +141,7 @@ export function CartaoConsulta({
                   type="button"
                   disabled={ocupado}
                   onClick={() => abrir("remarcar")}
-                  className="btn-ghost"
+                  className="btn-ghost min-h-[44px]"
                 >
                   Pedir para remarcar
                 </button>
@@ -159,7 +154,7 @@ export function CartaoConsulta({
                       `Cancelar a consulta de ${rotuloDaConsulta(proxima)}?`,
                     )
                   }
-                  className="btn-ghost"
+                  className="btn-ghost min-h-[44px]"
                 >
                   {girando}
                   Cancelar
@@ -200,7 +195,7 @@ export function CartaoConsulta({
                   type="button"
                   disabled={ocupado}
                   onClick={() => setFormulario(null)}
-                  className="btn-ghost"
+                  className="btn-ghost min-h-[44px]"
                 >
                   Voltar
                 </button>
@@ -213,19 +208,19 @@ export function CartaoConsulta({
         <div
           className={
             proxima
-              ? "mt-4 border-t border-slate-200 pt-4 dark:border-slate-800"
+              ? "mt-4 border-t border-app-linha pt-4"
               : ""
           }
         >
           <div>
-            <p className="text-sm text-slate-900 dark:text-white">
+            <p className="text-sm text-app-texto">
               Pedido enviado para{" "}
               <strong className="font-semibold">
                 {rotuloDaConsulta(pedido)}
               </strong>{" "}
               · {ROTULO_MODO[pedido.mode]}
             </p>
-            <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-300">
+            <p className="mt-0.5 text-sm text-app-texto-2">
               Aguardando resposta de {quem}.
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -235,7 +230,7 @@ export function CartaoConsulta({
                 onClick={() =>
                   cancelar(pedido, "Cancelar o pedido de consulta?")
                 }
-                className="btn-ghost"
+                className="btn-ghost min-h-[44px]"
               >
                 {girando}
                 Cancelar pedido
@@ -284,10 +279,10 @@ export function CartaoConsulta({
                 {(["presencial", "online"] as const).map((m) => (
                   <label
                     key={m}
-                    className={`flex min-h-[44px] flex-1 cursor-pointer items-center justify-center rounded-xl border px-3 text-sm has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-brand-500/30 ${
+                    className={`flex min-h-[44px] flex-1 cursor-pointer items-center justify-center rounded-xl border px-3 text-sm has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-app-primaria ${
                       modo === m
-                        ? "border-brand-700 bg-brand-50 font-semibold text-brand-800 dark:border-brand-400 dark:bg-brand-500/10 dark:text-brand-300"
-                        : "border-slate-300 text-slate-700 dark:border-slate-700 dark:text-slate-200"
+                        ? "border-app-primaria bg-app-primaria-fundo font-semibold text-app-primaria"
+                        : "border-app-campo text-app-texto"
                     }`}
                   >
                     <input
@@ -326,7 +321,7 @@ export function CartaoConsulta({
                 type="button"
                 disabled={ocupado}
                 onClick={() => setFormulario(null)}
-                className="btn-ghost"
+                className="btn-ghost min-h-[44px]"
               >
                 Voltar
               </button>
@@ -335,13 +330,13 @@ export function CartaoConsulta({
         ) : (
           <div>
             {canceladaPeloNutri ? (
-              <p className="text-sm text-slate-600 dark:text-slate-300">
+              <p className="text-sm text-app-texto-2">
                 {nutriNome ? quem : "Seu nutricionista"} cancelou a consulta de{" "}
                 {rotuloDaConsulta(canceladaPeloNutri)}. Peça outro horário ou
                 mande uma mensagem pela conversa.
               </p>
             ) : (
-              <p className="text-sm text-slate-600 dark:text-slate-300">
+              <p className="text-sm text-app-texto-2">
                 Nenhuma consulta marcada.
               </p>
             )}

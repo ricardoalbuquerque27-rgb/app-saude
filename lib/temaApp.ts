@@ -107,6 +107,9 @@ export const PARES_TEXTO_APP: [NomeCorApp, NomeCorApp][] = [
   ["texto", "atencao-fundo"],
   ["atencao-texto-2", "atencao-fundo"],
   ["atencao", "cartao"],
+  // A ajuda da senha em destaque (login e redefinir-senha) fica direto no chão:
+  // `atencao` sobre `pagina`, que o par sobre o cartão não cobre.
+  ["atencao", "pagina"],
   ["perigo", "perigo-fundo"],
   ["perigo", "cartao"],
 ];

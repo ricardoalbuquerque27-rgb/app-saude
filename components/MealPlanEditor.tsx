@@ -412,6 +412,7 @@ export default function MealPlanEditor({
                 <div className="mt-2 rounded-xl border border-brand-200 bg-brand-50/50 p-3 dark:border-brand-800/50 dark:bg-brand-500/[0.07]">
                   <p className="eyebrow mb-1.5">Buscar na tabela TACO</p>
                   <FoodSearch
+                    tema="clinico"
                     onEscolher={(a) => {
                       // Acumula no texto e soma os macros: uma refeição é
                       // feita de vários alimentos.

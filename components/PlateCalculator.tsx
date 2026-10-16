@@ -36,7 +36,7 @@ export default function PlateCalculator() {
 
   return (
     <>
-      <button onClick={() => setOpen(true)} className="btn-ghost">
+      <button onClick={() => setOpen(true)} className="btn-ghost min-h-[44px]">
         <Calculator className="h-4 w-4" /> Anilhas
       </button>
 
@@ -68,31 +68,31 @@ export default function PlateCalculator() {
           {t > 0 && t >= b ? (
             perSide.length > 0 ? (
               <div>
-                <p className="mb-2 text-sm font-medium text-slate-600 dark:text-slate-300">
+                <p className="mb-2 text-sm font-medium text-app-texto-2">
                   Por lado da barra:
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {perSide.map((x) => (
                     <span
                       key={x.plate}
-                      className="inline-flex items-center gap-1 rounded-lg bg-brand-100 px-3 py-1.5 text-sm font-semibold text-brand-700 dark:bg-brand-900/40 dark:text-brand-300"
+                      className="tabular inline-flex items-center gap-1 rounded-lg bg-app-primaria-fundo px-3 py-1.5 text-sm font-semibold text-app-primaria"
                     >
                       {x.count}× {x.plate} kg
                     </span>
                   ))}
                 </div>
-                <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+                <p className="mt-3 text-[13px] text-app-texto-2">
                   Total montado: {real} kg
                   {sobra !== 0 && ` · faltam ${sobra} kg (sem anilha exata)`}
                 </p>
               </div>
             ) : (
-              <p className="text-sm text-slate-500 dark:text-slate-400">
+              <p className="text-sm text-app-texto-2">
                 Só a barra ({b} kg) — sem anilhas.
               </p>
             )
           ) : (
-            <p className="text-sm text-slate-500 dark:text-slate-400">
+            <p className="text-sm text-app-texto-2">
               Informe um peso total maior que a barra.
             </p>
           )}

@@ -173,7 +173,7 @@ export default function ChatWidget() {
             <button
               onClick={() => setOpen(false)}
               aria-label="Fechar"
-              className="rounded-lg p-1.5 text-app-texto-2 transition hover:bg-app-primaria-fundo"
+              className="-my-1.5 -mr-1.5 flex h-11 w-11 items-center justify-center rounded-lg text-app-texto-2 transition hover:bg-app-primaria-fundo"
             >
               <X className="h-5 w-5" />
             </button>
