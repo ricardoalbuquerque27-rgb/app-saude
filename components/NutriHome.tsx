@@ -46,11 +46,16 @@ function PatientRow({ s }: { s: PatientSummary }) {
   // link tem cantos de 12 px (para o fundo do hover) e o `divide-y` nele
   // desenhava o traço curvando nas pontas, o que só aparecia depois que a cor
   // do traço passou de slate-100 para `linha`.
+  //
+  // O hover é `pagina` (um passo do cartão, como o slate-50 de antes) e não
+  // `primaria-fundo`: o âmbar do alerta (amber-700) sobre `primaria-fundo` dá
+  // 4,41:1 no claro e reprova o 4,5:1. Sobre `pagina` dá 4,68:1; no escuro, o
+  // amber-400 passa de 11:1 em qualquer um dos dois fundos.
   return (
     <div className="border-t border-app-linha first:border-t-0">
       <Link
         href={`/app/pacientes/${s.id}`}
-        className="tappable flex min-h-[44px] items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-app-primaria-fundo"
+        className="tappable flex min-h-[44px] items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-app-pagina"
       >
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-app-primaria-fundo text-sm font-semibold text-app-primaria">
           {s.name.slice(0, 1).toUpperCase()}

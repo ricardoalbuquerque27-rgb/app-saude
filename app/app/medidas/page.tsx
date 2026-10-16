@@ -18,6 +18,16 @@ import { TrendChart } from "@/components/charts";
 import { todayISO, formatDate } from "@/lib/date";
 import { useLiveRefresh } from "@/lib/useLiveRefresh";
 import { meuPerfil } from "@/lib/perfil";
+import { comSinal, numeroBR, numeroFixo } from "@/lib/numeros";
+
+// Número do banco em pt-BR, com uma casa fixa: "99.89999999999999cm" (um float
+// gravado) e "65.8kg" apareciam com ponto, sem espaço e sem arredondar. O "%"
+// fica colado ao número, como no título dos gráficos do nutricionista.
+function comUnidadeFixa(valor: unknown, unidade: string): string {
+  const n = Number(valor);
+  if (!Number.isFinite(n)) return `${String(valor)}${unidade}`;
+  return unidade === "%" ? `${numeroFixo(n, 1)}%` : `${numeroFixo(n, 1)} ${unidade}`;
+}
 
 const FIELDS: { key: keyof BodyMeasurement; label: string; unit: string }[] = [
   { key: "weight_kg", label: "Peso", unit: "kg" },
@@ -178,7 +188,7 @@ export default function MedidasPage() {
                 Peso atual
               </p>
               <p className="tabular mt-1 text-3xl font-semibold text-app-texto">
-                {currentWeight ?? "—"}
+                {currentWeight != null ? numeroFixo(Number(currentWeight), 1) : "—"}
                 <span className="ml-1 text-base font-medium text-app-texto-2">
                   {currentWeight ? "kg" : ""}
                 </span>
@@ -194,8 +204,7 @@ export default function MedidasPage() {
                   ) : (
                     <TrendingUp className="h-3.5 w-3.5" />
                   )}
-                  {weightDiff > 0 ? "+" : ""}
-                  {weightDiff.toFixed(1)} kg desde o último
+                  {comSinal(weightDiff)} kg desde o último
                 </p>
               )}
             </div>
@@ -209,13 +218,13 @@ export default function MedidasPage() {
               <div className="mb-1.5 flex items-center justify-between text-xs">
                 <span className="flex items-center gap-1 font-medium text-app-texto-2">
                   <Target className="h-3.5 w-3.5 text-app-primaria" />
-                  Meta: {weightGoal} kg
+                  Meta: {numeroBR(weightGoal)} kg
                 </span>
                 <span className="font-medium text-app-texto-2">
                   {goalReached
                     ? "Meta atingida! 🎉"
                     : toGoal != null
-                      ? `faltam ${Math.abs(toGoal)} kg`
+                      ? `faltam ${numeroBR(Math.abs(toGoal))} kg`
                       : ""}
                 </span>
               </div>
@@ -247,7 +256,7 @@ export default function MedidasPage() {
                   % Gordura
                 </p>
                 <p className="tabular mt-1 text-2xl font-semibold text-app-texto">
-                  {latest.body_fat_pct}
+                  {numeroFixo(Number(latest.body_fat_pct), 1)}
                   <span className="ml-1 text-sm font-medium text-app-texto-2">%</span>
                 </p>
               </div>
@@ -258,7 +267,7 @@ export default function MedidasPage() {
                   Cintura
                 </p>
                 <p className="tabular mt-1 text-2xl font-semibold text-app-texto">
-                  {latest.waist_cm}
+                  {numeroFixo(Number(latest.waist_cm), 1)}
                   <span className="ml-1 text-sm font-medium text-app-texto-2">cm</span>
                 </p>
               </div>
@@ -338,8 +347,7 @@ export default function MedidasPage() {
                 <div className="tabular mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-app-texto-2">
                   {FIELDS.filter((f) => r[f.key] != null).map((f) => (
                     <span key={f.key as string}>
-                      {f.label}: {String(r[f.key])}
-                      {f.unit}
+                      {f.label}: {comUnidadeFixa(r[f.key], f.unit)}
                     </span>
                   ))}
                 </div>

@@ -259,7 +259,23 @@ export default function LoginPage() {
             </div>
             {mode !== "recover" && (
               <div>
-                <div className="flex items-center justify-between">
+                {/* No entrar, a linha do rótulo tem 44 px para o "Esqueci a senha" ter o
+                    alvo inteiro, sem sobrepor nenhum vizinho: o `-mt-4` come o vão de
+                    16 px do `space-y-4` (a linha encosta no campo de e-mail), o
+                    rótulo e o link ficam colados ao campo da senha (`items-end`) e a
+                    linha cresce só ~4 px. A linha tem 45 px e o link 44, com 1 px de
+                    folga embaixo: o botão do olho do campo da senha tem 44 px sobre
+                    um campo de 42 e invade 1 px para cima, e sem a folga ele comia o
+                    último pixel do link. Antes eram margens negativas, e os 6 px do
+                    botão sobre o campo da senha ficavam por baixo dele: só uns 38 px
+                    respondiam ao toque. */}
+                <div
+                  className={
+                    mode === "login"
+                      ? "-mt-4 flex min-h-[45px] items-end justify-between"
+                      : "flex items-center justify-between"
+                  }
+                >
                   <label className="label">Senha</label>
                   {mode === "login" && (
                     <button
@@ -269,9 +285,7 @@ export default function LoginPage() {
                         setError(null);
                         setMessage(null);
                       }}
-                      // 44 px de toque sem empurrar o campo: as margens
-                      // negativas devolvem o que o botão acrescenta à linha.
-                      className="tappable -mb-1.5 -mt-3 flex min-h-[44px] items-center rounded-lg px-1 text-[13px] font-medium text-app-primaria hover:underline"
+                      className="tappable mb-px flex h-11 items-end rounded-lg px-1 pb-[5px] text-[13px] font-medium text-app-primaria hover:underline"
                     >
                       Esqueci a senha
                     </button>

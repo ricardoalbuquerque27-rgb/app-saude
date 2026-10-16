@@ -128,7 +128,7 @@ export default function RestTimer() {
             <button
               key={s}
               onClick={() => setPreset(s)}
-              className={`tappable tabular inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg px-2.5 text-xs font-semibold ${
+              className={`tappable tabular inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg px-2.5 text-[13px] font-semibold ${
                 total === s
                   ? "bg-app-primaria text-app-sobre-primaria"
                   : "border border-app-campo text-app-texto hover:bg-app-primaria-fundo"

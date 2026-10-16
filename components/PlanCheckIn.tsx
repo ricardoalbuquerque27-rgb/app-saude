@@ -14,10 +14,12 @@ import {
   type PlanSession,
 } from "@/lib/planCheckIn";
 
-// Os três estilos de botão do check-in, iguais nas três formas (linha, compacta
-// e padrão): "Fui" é o primário (sólido) e "Não fui" o secundário. Depois de
-// responder, o sólido fica com a resposta; "Não fui" marcado vai para o tom de
-// aviso (verde diria que faltar foi bom) e "Fui" volta a secundário.
+// Os três estilos de botão do check-in, e a mesma regra nas três formas (linha,
+// compacta e padrão) para um treino prescrito: "Fui" é o primário (sólido) desde
+// antes de responder, e "Não fui" o secundário. A única resposta que muda isso é
+// "Não fui": ele vai para o tom de aviso (verde diria que faltar foi bom) e "Fui"
+// volta a secundário. Só o "Fiz" do treino próprio (`linha` com `doNutri` falso)
+// começa secundário e fica sólido ao ser marcado.
 const SOLIDO = "bg-app-primaria text-app-sobre-primaria hover:[filter:brightness(0.94)]";
 const SECUNDARIO = "border border-app-campo bg-app-cartao text-app-texto hover:bg-app-primaria-fundo";
 const AVISO = "border border-app-atencao bg-app-atencao-fundo text-app-atencao";
@@ -206,7 +208,7 @@ export default function PlanCheckIn({
                 className="tappable group -m-1 flex min-h-[44px] items-start gap-2 rounded-lg p-1 hover:bg-app-primaria-fundo"
               >
                 <span className="min-w-0 flex-1">
-                  <span className="inline-block rounded-full bg-app-primaria-fundo px-2.5 py-0.5 text-[11px] font-semibold text-app-primaria">
+                  <span className="inline-block rounded-full bg-app-primaria-fundo px-2.5 py-0.5 text-[13px] font-semibold text-app-primaria">
                     {s.sport}
                   </span>
                   {s.title && (
@@ -224,7 +226,7 @@ export default function PlanCheckIn({
                 onClick={() => mark(s, "done")}
                 disabled={loading}
                 aria-pressed={done}
-                className={`${BOTAO} ${done ? SOLIDO : SECUNDARIO} ${
+                className={`${BOTAO} ${skipped ? SECUNDARIO : SOLIDO} ${
                   pop === s.id && done ? "pf-pop" : ""
                 }`}
               >

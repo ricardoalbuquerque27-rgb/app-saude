@@ -27,7 +27,7 @@ export default function RevogarNutri({ linkId }: { linkId: string }) {
     <button
       onClick={revogar}
       disabled={busy}
-      className="tappable min-h-[44px] shrink-0 rounded-lg px-3 text-xs font-semibold text-app-texto-2 hover:bg-app-perigo-fundo hover:text-app-perigo disabled:opacity-60"
+      className="tappable min-h-[44px] shrink-0 rounded-lg px-3 text-[13px] font-semibold text-app-texto-2 hover:bg-app-perigo-fundo hover:text-app-perigo disabled:opacity-60"
     >
       {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Revogar"}
     </button>

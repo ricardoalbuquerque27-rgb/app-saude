@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Calculator } from "lucide-react";
 import { Modal, Field } from "@/components/ui";
+import { numeroBR } from "@/lib/numeros";
 
 // Anilhas comuns em kg (academias no Brasil).
 const PLATES = [25, 20, 15, 10, 5, 2.5, 1.25];
@@ -77,18 +78,18 @@ export default function PlateCalculator() {
                       key={x.plate}
                       className="tabular inline-flex items-center gap-1 rounded-lg bg-app-primaria-fundo px-3 py-1.5 text-sm font-semibold text-app-primaria"
                     >
-                      {x.count}× {x.plate} kg
+                      {x.count}× {numeroBR(x.plate, 2)} kg
                     </span>
                   ))}
                 </div>
                 <p className="mt-3 text-[13px] text-app-texto-2">
-                  Total montado: {real} kg
-                  {sobra !== 0 && ` · faltam ${sobra} kg (sem anilha exata)`}
+                  Total montado: {numeroBR(real, 2)} kg
+                  {sobra !== 0 && ` · faltam ${numeroBR(sobra, 2)} kg (sem anilha exata)`}
                 </p>
               </div>
             ) : (
               <p className="text-sm text-app-texto-2">
-                Só a barra ({b} kg) — sem anilhas.
+                Só a barra ({numeroBR(b, 2)} kg) — sem anilhas.
               </p>
             )
           ) : (

@@ -20,6 +20,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { PageHeader, Modal, Field, EmptyState } from "@/components/ui";
 import type { PatientSummary } from "@/lib/nutri";
+import { comSinal, numeroFixo } from "@/lib/numeros";
 
 export type LinkRow = {
   id: string;
@@ -158,7 +159,7 @@ export default function PacientesClient({
                     {/* `opacity` e não `/70` na cor: as cores do app são
                         variáveis e não aceitam alfa no Tailwind. */}
                     <span
-                      className={`tabular ml-1.5 text-xs ${
+                      className={`tabular ml-1.5 text-[13px] ${
                         filter === f.key ? "opacity-80" : "text-app-texto-2"
                       }`}
                     >
@@ -217,9 +218,9 @@ export default function PacientesClient({
                               {s?.weightLast != null ? (
                                 <span className="inline-flex items-center gap-1">
                                   <Scale className="h-3 w-3" />
-                                  {s.weightLast} kg
+                                  {numeroFixo(s.weightLast, 1)} kg
                                   {s.weightDelta30 != null
-                                    ? ` (${s.weightDelta30 > 0 ? "+" : ""}${s.weightDelta30})`
+                                    ? ` (${comSinal(s.weightDelta30)})`
                                     : ""}
                                 </span>
                               ) : null}

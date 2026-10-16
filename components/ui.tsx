@@ -50,7 +50,7 @@ export function StatCard({
         </div>
       )}
       <div className="min-w-0">
-        <p className="truncate text-xs font-medium text-app-texto-2">{label}</p>
+        <p className="truncate text-[13px] font-medium text-app-texto-2">{label}</p>
         <p className="tabular mt-0.5 text-2xl font-semibold text-app-texto">
           {value}
           {unit && (

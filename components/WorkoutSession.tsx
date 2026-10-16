@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { X, Check, Play, Pause, RotateCcw, Plus, Trophy, Loader2 } from "lucide-react";
+import { numeroBR } from "@/lib/numeros";
 
 type RoutineEx = {
   name: string;
@@ -191,7 +192,7 @@ export default function WorkoutSession({
         </button>
         <div className="text-center">
           <p className="text-sm font-semibold text-app-texto">{routine.name}</p>
-          <p className="tabular text-xs text-app-texto-2">{mmss(elapsed)}</p>
+          <p className="tabular text-[13px] text-app-texto-2">{mmss(elapsed)}</p>
         </div>
         <button
           onClick={finish}
@@ -212,7 +213,7 @@ export default function WorkoutSession({
 
       {/* Exercícios */}
       <div className="flex-1 space-y-4 overflow-y-auto p-4 pb-40">
-        <p className="tabular text-center text-xs text-app-texto-2">
+        <p className="tabular text-center text-[13px] text-app-texto-2">
           {doneSets}/{totalSets} séries concluídas
         </p>
         {exs.map((ex, ei) => {
@@ -222,14 +223,14 @@ export default function WorkoutSession({
               <div className="mb-2 flex items-center justify-between gap-2">
                 <h3 className="font-semibold text-app-texto">{ex.name}</h3>
                 {prNames.has(ex.name) && (
-                  <span className="flex items-center gap-1 rounded-full bg-app-primaria-fundo px-2 py-0.5 text-[11px] font-semibold text-app-primaria">
+                  <span className="flex items-center gap-1 rounded-full bg-app-primaria-fundo px-2 py-0.5 text-[13px] font-semibold text-app-primaria">
                     <Trophy className="h-3 w-3" /> Recorde!
                   </span>
                 )}
               </div>
               {last?.weight != null && (
-                <p className="tabular mb-2 text-xs text-app-texto-2">
-                  Última vez: {last.reps ?? "?"}×{last.weight}kg
+                <p className="tabular mb-2 text-[13px] text-app-texto-2">
+                  Última vez: {last.reps ?? "?"}×{numeroBR(last.weight, 2)} kg
                 </p>
               )}
               <div className="space-y-1.5">
@@ -240,7 +241,7 @@ export default function WorkoutSession({
                       s.done ? "bg-app-primaria-fundo" : ""
                     }`}
                   >
-                    <span className="tabular w-6 shrink-0 text-center text-xs font-medium text-app-texto-2">
+                    <span className="tabular w-6 shrink-0 text-center text-[13px] font-medium text-app-texto-2">
                       {si + 1}
                     </span>
                     <input
@@ -276,7 +277,7 @@ export default function WorkoutSession({
               </div>
               <button
                 onClick={() => addSet(ei)}
-                className="tappable mt-1 inline-flex min-h-[44px] items-center rounded-lg px-1 text-xs font-semibold text-app-primaria hover:underline"
+                className="tappable mt-1 inline-flex min-h-[44px] items-center rounded-lg px-1 text-[13px] font-semibold text-app-primaria hover:underline"
               >
                 + Série
               </button>
@@ -290,7 +291,7 @@ export default function WorkoutSession({
         <div className="fixed inset-x-0 bottom-0 z-50 border-t border-app-linha bg-app-cartao px-4 py-3">
           <div className="mx-auto flex max-w-md items-center gap-3">
             <div className="min-w-0 flex-1">
-              <div className="mb-1 flex items-center justify-between text-xs text-app-texto-2">
+              <div className="mb-1 flex items-center justify-between text-[13px] text-app-texto-2">
                 <span>Descanso</span>
                 <span className="tabular font-semibold text-app-texto">
                   {mmss(rest.remaining)}

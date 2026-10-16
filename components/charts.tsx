@@ -11,6 +11,7 @@ import {
   Bar,
   BarChart,
 } from "recharts";
+import { numeroBR } from "@/lib/numeros";
 
 type Point = { label: string; value: number | null };
 
@@ -24,6 +25,8 @@ type Point = { label: string; value: number | null };
 const COR_PADRAO = "var(--app-primaria)";
 const GRADE = "var(--app-linha)";
 const EIXO = { fontSize: 11, fill: "var(--app-texto-2)" };
+// Os números do eixo e da dica em pt-BR ("67,9", não "67.9").
+const NUM = (v: any) => (typeof v === "number" ? numeroBR(v, 2) : String(v));
 const DICA = {
   borderRadius: 12,
   border: "1px solid var(--app-linha)",
@@ -53,13 +56,14 @@ export function TrendChart({
         />
         <YAxis
           tick={EIXO}
+          tickFormatter={NUM}
           tickLine={false}
           axisLine={false}
           domain={["auto", "auto"]}
         />
         <Tooltip
           contentStyle={DICA}
-          formatter={(v: any) => [`${v}${unit}`, "Valor"]}
+          formatter={(v: any) => [`${NUM(v)}${unit}`, "Valor"]}
         />
         <Line
           type="monotone"
@@ -96,13 +100,14 @@ export function BarsChart({
         />
         <YAxis
           tick={EIXO}
+          tickFormatter={NUM}
           tickLine={false}
           axisLine={false}
         />
         <Tooltip
           cursor={{ fill: "var(--app-primaria-fundo)" }}
           contentStyle={DICA}
-          formatter={(v: any) => [`${v}${unit}`, "Total"]}
+          formatter={(v: any) => [`${NUM(v)}${unit}`, "Total"]}
         />
         <Bar dataKey="value" fill={color} radius={[6, 6, 0, 0]} />
       </BarChart>

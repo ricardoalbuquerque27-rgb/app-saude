@@ -142,7 +142,7 @@ export default function Onboarding({ initialName }: { initialName?: string }) {
             <button
               onClick={skip}
               disabled={saving}
-              className="tappable -mr-3 flex min-h-[44px] items-center rounded-lg px-3 text-xs font-medium text-app-texto-2 hover:text-app-texto disabled:opacity-60"
+              className="tappable -mr-3 flex min-h-[44px] items-center rounded-lg px-3 text-[13px] font-medium text-app-texto-2 hover:text-app-texto disabled:opacity-60"
             >
               Pular
             </button>
