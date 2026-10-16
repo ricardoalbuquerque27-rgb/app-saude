@@ -14,26 +14,108 @@ import {
   type PlanSession,
 } from "@/lib/planCheckIn";
 
-// Os três estilos de botão do check-in, e a mesma regra nas três formas (linha,
-// compacta e padrão) para um treino prescrito: "Fui" é o primário (sólido) desde
-// antes de responder, e "Não fui" o secundário. A única resposta que muda isso é
-// "Não fui": ele vai para o tom de aviso (verde diria que faltar foi bom) e "Fui"
-// volta a secundário. Só o "Fiz" do treino próprio (`linha` com `doNutri` falso)
-// começa secundário e fica sólido ao ser marcado.
+// O check-in tem UMA regra, igual nas três telas que o mostram (o "Para hoje"
+// da Início, a leitura do treino em `treino/[id]` e a semana de Treinos), e
+// ela mora só aqui, em `BotoesDoCheckIn`:
+//
+//   estado         "Fui" ("Fiz" no treino próprio)          "Não fui" (só no prescrito)
+//   sem resposta   sólido (o primário)                      secundário
+//   feito          confirmado: fundo da principal, check     secundário
+//                  e o rótulo "Feito"
+//   não fui        secundário                               aviso, com "Não fui"
+//
+// Antes eram três regras: o mesmo "Fui" sólido queria dizer "sem resposta" na
+// Início e na leitura do treino e "respondido" na semana de Treinos; o "Não
+// fui" marcado era âmbar num lado e rosa sólido no outro; o treino próprio
+// tinha "Fiz" na Início e "Fui/Não fui" em Treinos; e, na linha da Início, o
+// confirmado e o sem resposta só se distinguiam por um ícone. O aviso é âmbar,
+// e não verde, porque verde diria que faltar foi bom.
 const SOLIDO = "bg-app-primaria text-app-sobre-primaria hover:[filter:brightness(0.94)]";
+const CONFIRMADO = "bg-app-primaria-fundo text-app-primaria";
 const SECUNDARIO = "border border-app-campo bg-app-cartao text-app-texto hover:bg-app-primaria-fundo";
 const AVISO = "border border-app-atencao bg-app-atencao-fundo text-app-atencao";
+// 44 px em todas as telas: é a ação de um toque (o "Fui" da Início tinha 40).
+const BOTAO =
+  "tappable inline-flex min-h-[44px] items-center justify-center whitespace-nowrap rounded-[10px] text-sm font-semibold disabled:opacity-60";
+
+/**
+ * Os botões do check-in de uma sessão, com a regra acima. `doNutri` é a sessão
+ * prescrita pelo nutricionista com vínculo ativo (`prescribed_by` e o vínculo,
+ * como em `montarParaHoje`): ela tem "Fui" e "Não fui". A do próprio paciente
+ * tem só "Fiz": "não fui" é uma resposta para o nutricionista, e sem vínculo
+ * ninguém a lê. `esticar` divide a largura entre os botões (a leitura do
+ * treino e a semana de Treinos).
+ */
+export function BotoesDoCheckIn({
+  status,
+  doNutri,
+  ocupado,
+  pop = false,
+  esticar = false,
+  onMarcar,
+}: {
+  /** A resposta gravada: "done", "skipped" ou nenhuma. */
+  status: CheckStatus | null;
+  doNutri: boolean;
+  /** Qual resposta está sendo gravada agora (desliga os dois botões). */
+  ocupado: CheckStatus | null;
+  /** A resposta acabou de ser salva: o "pop" de confirmação. */
+  pop?: boolean;
+  esticar?: boolean;
+  onMarcar: (status: CheckStatus) => void;
+}) {
+  const feito = status === "done";
+  const naoFui = status === "skipped";
+  // Esticado, cada botão fica com metade da largura: no cartão do dia de
+  // Treinos em três colunas (1280 px) sobram ~91 px, e "✕ Não fui" com o
+  // `px-3` de linha quebrava em duas linhas ("✕ Não / fui").
+  const forma = esticar ? "min-w-0 flex-1 gap-1 px-2" : "gap-1.5 px-3";
+  const girando = <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />;
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => onMarcar("done")}
+        disabled={ocupado !== null}
+        aria-pressed={feito}
+        className={`${BOTAO} ${forma} ${feito ? CONFIRMADO : naoFui ? SECUNDARIO : SOLIDO} ${
+          pop && feito ? "pf-pop" : ""
+        }`}
+      >
+        {ocupado === "done" ? girando : feito ? <Check className="h-4 w-4" aria-hidden="true" /> : null}
+        {feito ? "Feito" : doNutri ? "Fui" : "Fiz"}
+      </button>
+      {doNutri && (
+        <button
+          type="button"
+          onClick={() => onMarcar("skipped")}
+          disabled={ocupado !== null}
+          aria-pressed={naoFui}
+          className={`${BOTAO} ${forma} ${naoFui ? AVISO : SECUNDARIO} ${pop && naoFui ? "pf-pop" : ""}`}
+        >
+          {ocupado === "skipped" ? girando : naoFui ? <X className="h-4 w-4" aria-hidden="true" /> : null}
+          Não fui
+        </button>
+      )}
+    </>
+  );
+}
+
+/** A resposta gravada numa completion, do jeito que `BotoesDoCheckIn` a recebe. */
+export function statusDoCheckIn(c: Completion | undefined | null): CheckStatus | null {
+  return c?.status === "done" ? "done" : c?.status === "skipped" ? "skipped" : null;
+}
 
 // Check-in do treino planejado, para o paciente. Aparece no "Para hoje" da
-// Início (`linha`), na leitura do treino (`compact`, só os botões) e na aba
-// Plano. Sem marcação = "sem resposta"; tocar de novo no mesmo botão desfaz.
+// Início (`linha`) e na leitura do treino (`compact`, só os botões); a semana
+// de Treinos usa só os `BotoesDoCheckIn`. Sem marcação = "sem resposta"; tocar
+// de novo no mesmo botão desfaz.
 //
 // `linha` é a forma da Início: cada sessão é um <li> da lista do cartão "Para
 // hoje", com o nome, "{categoria} · do seu nutricionista" (ou "· seu treino")
 // e os botões à direita. Mora numa prop própria, e não no `compact`, porque o
 // `compact` é o da página do treino (app/app/treino/[id]): redesenhá-lo lá
-// punha um <li> fora de lista, repetia o nome e a nota e dava "Fui/Não fui"
-// ao treino do próprio paciente.
+// punha um <li> fora de lista e repetia o nome e a nota.
 export default function PlanCheckIn({
   sessions,
   date,
@@ -51,12 +133,16 @@ export default function PlanCheckIn({
   nota?: boolean;
   /** A forma de linha do "Para hoje" da Início (só dentro de um <ul>). */
   linha?: boolean;
-  /** Só na `linha`: a sessão foi prescrita pelo nutricionista (vínculo ativo). */
+  /**
+   * A sessão foi prescrita pelo nutricionista, com vínculo ativo: "Fui" e "Não
+   * fui". Senão, só "Fiz".
+   */
   doNutri?: boolean;
 }) {
   const supabase = createClient();
   const router = useRouter();
-  const [busy, setBusy] = useState<string | null>(null);
+  // Qual sessão grava, e qual resposta: o giro vai no botão que foi tocado.
+  const [busy, setBusy] = useState<{ id: string; status: CheckStatus } | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   // Em qual sessão a gravação falhou: na `linha` cada sessão é uma linha, e o
   // aviso vai na linha dela.
@@ -66,7 +152,7 @@ export default function PlanCheckIn({
   const idx = indexCompletions(completions);
 
   async function mark(session: PlanSession, status: CheckStatus) {
-    setBusy(session.id);
+    setBusy({ id: session.id, status });
     setErro(null);
     const {
       data: { user },
@@ -118,17 +204,9 @@ export default function PlanCheckIn({
       <>
         {sessions.map((s, i) => {
           const current = idx[completionKey(s.id, date)];
-          const done = current?.status === "done";
-          const skipped = current?.status === "skipped";
-          const loading = busy === s.id;
           const nome = s.title || s.sport || "Treino";
           const origem = doNutri ? "do seu nutricionista" : "seu treino";
           const apoio = s.title && s.sport ? `${s.sport} · ${origem}` : origem;
-          // A hierarquia da maquete (estilos no topo do arquivo). O "Fiz" do
-          // treino próprio é secundário até ser marcado, como na maquete.
-          const BASE =
-            "tappable inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-[10px] px-3 text-sm font-semibold disabled:opacity-60";
-          const estiloFeito = doNutri ? (skipped ? SECUNDARIO : SOLIDO) : done ? SOLIDO : SECUNDARIO;
           return (
             <li key={s.id} className="px-4 py-3.5">
               <div className="flex items-center gap-3">
@@ -139,32 +217,13 @@ export default function PlanCheckIn({
                   <span className="block text-[13px] text-app-texto-2">{apoio}</span>
                 </Link>
                 <div className="flex shrink-0 gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => mark(s, "done")}
-                    disabled={loading}
-                    aria-pressed={done}
-                    className={`${BASE} ${estiloFeito} ${pop === s.id && done ? "pf-pop" : ""}`}
-                  >
-                    {loading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                    ) : done ? (
-                      <Check className="h-4 w-4" aria-hidden="true" />
-                    ) : null}
-                    {doNutri ? "Fui" : "Fiz"}
-                  </button>
-                  {doNutri && (
-                    <button
-                      type="button"
-                      onClick={() => mark(s, "skipped")}
-                      disabled={loading}
-                      aria-pressed={skipped}
-                      className={`${BASE} ${skipped ? AVISO : SECUNDARIO} ${pop === s.id && skipped ? "pf-pop" : ""}`}
-                    >
-                      {skipped && <X className="h-4 w-4" aria-hidden="true" />}
-                      Não fui
-                    </button>
-                  )}
+                  <BotoesDoCheckIn
+                    status={statusDoCheckIn(current)}
+                    doNutri={doNutri}
+                    ocupado={busy?.id === s.id ? busy.status : null}
+                    pop={pop === s.id}
+                    onMarcar={(st) => mark(s, st)}
+                  />
                 </div>
               </div>
               {nota && i === primeiroSemResposta && !current && (
@@ -180,18 +239,11 @@ export default function PlanCheckIn({
 
   // Compacta (leitura do treino) e padrão. O padrão não tem tela hoje, mas
   // segue a mesma linguagem: sessões separadas por traço, sem um cartão por
-  // sessão (quem o usar o põe dentro de um `.card`). Os botões têm 44 px nas
-  // duas: é a ação de um toque, e o `py-1.5` de antes dava ~30 px.
-  const BOTAO =
-    "tappable flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-[10px] px-2 text-sm font-semibold disabled:opacity-60";
-
+  // sessão (quem o usar o põe dentro de um `.card`).
   return (
     <div className={compact ? "" : "divide-y divide-app-linha"}>
       {sessions.map((s, i) => {
         const current = idx[completionKey(s.id, date)];
-        const done = current?.status === "done";
-        const skipped = current?.status === "skipped";
-        const loading = busy === s.id;
 
         return (
           <div
@@ -222,32 +274,14 @@ export default function PlanCheckIn({
             )}
 
             <div className={compact ? "flex w-full gap-1.5" : "mt-2.5 flex gap-2"}>
-              <button
-                onClick={() => mark(s, "done")}
-                disabled={loading}
-                aria-pressed={done}
-                className={`${BOTAO} ${skipped ? SECUNDARIO : SOLIDO} ${
-                  pop === s.id && done ? "pf-pop" : ""
-                }`}
-              >
-                {loading ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Check className="h-3.5 w-3.5" />
-                )}
-                {done ? "Fui treinar" : "Fui"}
-              </button>
-              <button
-                onClick={() => mark(s, "skipped")}
-                disabled={loading}
-                aria-pressed={skipped}
-                className={`${BOTAO} ${skipped ? AVISO : SECUNDARIO} ${
-                  pop === s.id && skipped ? "pf-pop" : ""
-                }`}
-              >
-                <X className="h-3.5 w-3.5" />
-                Não fui
-              </button>
+              <BotoesDoCheckIn
+                status={statusDoCheckIn(current)}
+                doNutri={doNutri}
+                ocupado={busy?.id === s.id ? busy.status : null}
+                pop={pop === s.id}
+                esticar
+                onMarcar={(st) => mark(s, st)}
+              />
             </div>
 
             {nota && i === primeiroSemResposta && !compact && !current && (

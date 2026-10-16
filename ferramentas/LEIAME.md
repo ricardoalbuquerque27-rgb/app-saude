@@ -74,14 +74,21 @@ voltando o mock ao início (`POST /__reset`); `OUT` diz onde vão os PNGs.
 
 `conferir-inicio.cjs` confere a Início da Maria em 390 px e acusa com código de
 saída 1: a ordem das seções, a saudação pela hora de São Paulo, a contagem do
-"Para hoje" e o "Não deu para carregar tudo" com os recados falhando, o
-"Calorias · limite" e o "acima do limite" (com uma refeição de 2.400 kcal que o
-roteiro grava no mock), o centro dos anéis em `tabular-nums`, o Score que abre
-nos quatro pilares, a sugestão de proteína, o "+250 ml" (sobe, "Desfazer",
-uma gravação só com dois toques, e "Não deu para registrar a água" com a
-escrita ou a leitura de `daily_logs` falhando), o "Não deu para carregar os
-números de hoje" com `meals`, `daily_logs` ou `profiles` falhando, o Progresso
-de 30 dias e o "Não deu para carregar o peso", os alvos de 44 px, os links,
+"Para hoje" e o "Não deu para carregar tudo" com os recados falhando (e, aí, o
+cabeçalho sem "N pendentes"), o check-in com uma regra só nas três telas (na
+Início, na leitura do treino e na semana de Treinos, tocando nos botões: sem
+resposta, "Fui" sólido e "Não fui" secundário; feito, "Feito" com o check num
+fundo diferente do sem resposta; não fui, "Não fui" em aviso; tocar de novo
+desfaz; o treino próprio só com "Fiz"; os 44 px; e "Iniciar treino" acima do
+check-in em Treinos; um PNG de cada estado), o "Calorias · limite" e o "acima
+do limite" (com uma refeição de 2.400 kcal que o roteiro grava no mock), o
+centro dos anéis em `tabular-nums`, o Score que abre nos quatro pilares, a
+sugestão de proteína, o "+250 ml" (sobe, "Desfazer", o foco de volta no
+"+250 ml" e o "Desfeito." na região `aria-live`, uma gravação só com dois
+toques, e "Não deu para registrar a água." com a escrita ou a leitura de
+`daily_logs` falhando), o "Não deu para carregar os números de hoje." com
+`meals`, `daily_logs` ou `profiles` falhando, o Progresso de 30 dias e o "Não
+deu para carregar o peso.", os alvos de 44 px, os links,
 nenhuma caixa alta nem degradê e nenhuma rolagem lateral. A Instrument Sans
 vem do `font-family` computado: o `body`, o `h1` e o `h2` da Início da Maria e,
 num segundo contexto logado como `nutri.teste@exemplo.com`, o `body` e o `h1`
@@ -234,8 +241,9 @@ atrás (67,7 kg) é a que o nutri tirou nessa consulta (`measured_by` dele,
 consulta" e não oferece o excluir nessa linha. Com o mock **sem** `CENARIO` e o
 dev no ar, `node ferramentas/conferir-consulta-paciente.cjs` confere esse lado:
 a linha da Início em cada situação (agendada, remarcação pedida, pedido,
-agendada com pedido, cancelada pelo nutri, nenhuma e leitura que falhou) e as
-ações do cartão de "Meu plano", a página Medidas (a marca, o excluir
+agendada com pedido, cancelada pelo nutri, nenhuma e leitura que falhou, com
+"Não deu para carregar a consulta." na linha e no cartão de "Meu plano", em
+`app-atencao`) e as ações do cartão de "Meu plano", a página Medidas (a marca, o excluir
 só nas medidas dela, "Este registro não pode ser apagado." quando o banco recusa
 sem erro e o aviso de erro no DELETE) e que o Perfil do paciente não mostra o CRN.
 
@@ -350,7 +358,7 @@ cobrem as leituras que têm teste; a tabela "Medidas registradas" do Corpo, por
 exemplo, não tem. O de `lib/registroDb.test.ts` é mais simples: o `select`
 ignora a lista de colunas, e ele só confere filtro, ordem e `limit`.
 
-Quatro escritas pelo PostgREST também têm estado (o `/__reset` desfaz):
+Cinco escritas pelo PostgREST também têm estado (o `/__reset` desfaz):
 
 - `PATCH` e `DELETE` em `body_measurements` seguem a RLS do paciente: só enxergam
   a linha dele com `measured_by` nulo. Numa linha da consulta o banco **não dá
@@ -368,12 +376,18 @@ Quatro escritas pelo PostgREST também têm estado (o `/__reset` desfaz):
   o `DELETE` a apaga (o excluir da Dieta). Como no banco, o `DELETE` só enxerga
   a refeição de quem pede: a dos outros afeta zero linhas, sem erro.
   Nos `POST`, linha de outro usuário leva 403.
+- `POST` (o upsert de `setPlanCheck`, com `on_conflict=plan_id,date`) e
+  `DELETE` em `plan_completions`: o check-in do treino, uma linha por sessão e
+  dia, só de quem pede. A Início e a leitura do treino são do servidor: sem
+  guardar, a página recarregada voltava a "sem resposta", e não dava para ver
+  "Feito" nem "Não fui" na tela.
 
 Dois endereços que não são do Supabase (além do `/__cenario`):
 
 - `POST /__reset` volta as consultas, os registros, os adendos, as medidas, os
-  perfis (o CRN), a água do dia e as refeições ao que o cenário subiu, e desliga
-  o `/__falhar`; o roteiro chama no começo e no fim.
+  perfis (o CRN), a água do dia, as refeições e os check-ins ao que o cenário
+  subiu, e desliga o `/__falhar`; os roteiros chamam no começo e no fim (e no
+  `catch` do topo, se um erro derruba o roteiro no meio).
 - `POST /__falhar` com `{ "tabela": "consultation_records" }` faz os `GET` nessa
   tabela devolverem 500 até o próximo `/__reset`. As leituras da página são do
   servidor do Next, que o `page.route` do Playwright não intercepta; sem isto

@@ -395,10 +395,20 @@ cartão, mas **4,43:1 sobre a `pagina` clara**, abaixo de 4,5.
 **`.tabular` no dado.** Na Instrument Sans o algarismo é proporcional (o "1"
 ocupa 391 unidades e o "0", 666), então o número que muda "dança" e a coluna
 não alinha. A classe `.tabular` vai no número que é dado (centro dos anéis,
-peso, Score, kcal e gramas), **não** no número dentro de frase ("1 refeição
-ainda falta"), onde o "1" tabular abre um buraco. Casas e vírgula saem de
-`lib/numeros.ts`, nunca do número cru: a página Medidas mostrou "Quadril:
-99.89999999999999cm".
+peso e a variação dele, o número do "score 72", kcal e gramas), **não** no
+número dentro de frase ("1 refeição ainda falta"), onde o "1" tabular abre um
+buraco. Casas e vírgula saem de `lib/numeros.ts`, nunca do número cru: a página
+Medidas mostrou "Quadril: 99.89999999999999cm", e a água de Hábitos e de Meu
+plano, "1.2 / 2.5 L". A água é `numeroBR(ml / 1000, 2)` em toda parte (o passo
+de um copo é 0,25 L), "kg" e "cm" levam espaço e o "%" vem colado ("30,0%",
+`comUnidade`, que com `fixas` escreve o zero: "66,0 kg").
+
+**Variação sem cor.** O app não sabe a direção boa do peso (não guarda o
+objetivo; ver "Meta ou limite"): a variação vai em `texto-2`, com o sinal no
+número e sem seta colorida, na Início, no `StatCard` e em Medidas, onde o ganho
+era `app-perigo` com seta para cima e a perda, verde. `comSinal` escreve "0"
+quando o número arredonda a zero ("+0" diria que subiu). O Tratamento ainda
+pinta (ver "Em aberto").
 
 **Meta ou limite.** Proteína e água são sempre meta: passar delas fecha o anel
 sem aviso. As calorias são *limite* quando a meta de peso está abaixo do peso
@@ -444,20 +454,34 @@ absurdo. Na Dieta, só com a data em hoje.
 em "Meu plano".
 
 **Leitura que falha, aqui também.** Nas telas novas, o erro do supabase-js vira
-mensagem e nunca estado vazio: o "Para hoje" diz "Não deu para carregar tudo" e
-não "em dia"; o "Seu dia" diz "Não deu para carregar os números de hoje" em
-vez de anéis e Score com 0; o Progresso diz "Não deu para carregar o peso"; a
-linha da consulta, "Não deu para carregar a consulta"; e o plano, na Dieta e em
-Meu plano, não oferece "Comi isso" (convidaria a registrar de novo o que talvez
-já esteja registrado) e diz que não carregou as refeições do dia. O que ficou
-de fora está em "Em aberto".
+mensagem e nunca estado vazio: o "Para hoje" diz "Não deu para carregar tudo."
+e não "em dia", e sem o "N pendentes" (a contagem seria só do que chegou); o
+"Seu dia" diz "Não deu para carregar os números de hoje." em vez de anéis e
+Score com 0; o Progresso diz "Não deu para carregar o peso."; a linha da
+consulta e o cartão de Meu plano, "Não deu para carregar a consulta.", em
+`app-atencao`; e o plano, na Dieta e em Meu plano, não oferece "Comi isso"
+(convidaria a registrar de novo o que talvez já esteja registrado) e diz que
+não carregou as refeições do dia. Toda frase "Não deu para …" termina com
+ponto. O que ficou de fora está em "Em aberto".
 
-**Duas formas, um componente.** O `PlanCheckIn` aparece na Início (`linha`,
-uma linha do "Para hoje") e em `treino/[id]` (`compact`, só os botões); fora
-desses dois, nada o importa, e o lado clínico não o usa. A forma da Início mora
-numa prop própria, e o `compact` mantém a estrutura (só os botões, com 44 px e
-o "Fui" sólido): redesenhá-lo lá punha um `<li>` fora de lista, repetia o nome
-e a nota e dava "Fui" e "Não fui" ao treino do próprio paciente.
+**O check-in tem uma regra só.** `BotoesDoCheckIn`, em
+`components/PlanCheckIn.tsx`, desenha os botões nas três telas: a Início (o
+`PlanCheckIn` em `linha`, uma linha do "Para hoje"), a leitura do treino em
+`treino/[id]` (`compact`, só os botões) e a semana de Treinos (só os
+`BotoesDoCheckIn`). Sem resposta, "Fui" sólido e "Não fui" secundário; feito,
+"Feito" com o check no fundo `primaria-fundo`; não fui, "Fui" secundário e
+"Não fui" no aviso (`app-atencao`). Todos com 44 px. Antes eram três regras:
+o mesmo "Fui" sólido queria dizer "sem resposta" na Início e "respondido" em
+Treinos, e o "Não fui" marcado era âmbar num lado e rosa sólido no outro.
+Nenhuma classe de botão do check-in fica fora desse arquivo. Prescrito é
+`prescribed_by` **com vínculo ativo** (`montarParaHoje`; Treinos e a leitura
+do treino leem `patient_links`, e com essa leitura falhando vale o
+`prescribed_by`): só ele tem "Não fui"; o treino próprio tem só "Fiz", em toda
+parte. A forma da Início mora numa prop própria, e o `compact` mantém a
+estrutura: redesenhá-lo lá punha um `<li>` fora de lista e repetia o nome e a
+nota. O lado clínico não o usa. Em Treinos, "Iniciar treino" (o primário da
+sessão, na largura toda) vem acima do check-in, e no dia sem resposta os dois
+são sólidos (ver "Em aberto").
 
 ## Senha
 
@@ -479,7 +503,7 @@ desligada (ver "Em aberto").
 
 ```bash
 npm run dev      # desenvolvimento
-npm test         # 1002 testes unitários (vitest)
+npm test         # 1004 testes unitários (vitest)
 ferramentas/testar-sql.sh   # migrações e testes SQL num Postgres local
 npm run build    # produção
 ```
@@ -554,9 +578,8 @@ fixed`: todo `Modal` dentro de uma página se posicionava em relação a ela, n�
 à janela (358×1256 em vez de 390×844 numa tela de 390 px; em Medidas a folha
 caía 1.100 px abaixo da dobra). Use `backwards`, que só segura o estado inicial
 durante o atraso: o estado final dos quadros-chave já é o natural. Vale também
-para `.pf-modal` e `.pf-stagger`. `.pf-drawer`, `.pf-panel` e `.pf-sheet` ainda
-usam `both`: as duas últimas nada usa, e o drawer do `AppShell` não tem filho
-`fixed` hoje, mas um descendente `fixed` ali ficaria preso do mesmo jeito.
+para `.pf-modal`, `.pf-stagger`, `.pf-backdrop`, `.pf-panel`, `.pf-sheet` e
+`.pf-drawer` (a gaveta "Mais" do `AppShell`): nenhuma entrada usa `both`.
 Modal fora do lugar: procure um `transform` num ancestral.
 
 ## Convenções
@@ -567,11 +590,11 @@ Modal fora do lugar: procure um `transform` num ancestral.
   aos dois temas** (no claro só `brand-700+` passa em contraste; no escuro
   só `brand-600` para trás). No app do paciente o par já está dentro das
   variáveis `app-*` (ver "Visual do app"), sem `dark:`; o par `brand-*` com
-  `dark:` sobra na landing e em poucos componentes: os editores clínicos, o
-  `FoodSearch` (que a Dieta do paciente também usa) e o `OpenChatButton`, que
-  nada importa. A
-  rota `/estilo`, só em desenvolvimento, mostra a escala com a razão de
-  contraste calculada.
+  `dark:` sobra na landing (com o `MobileMenu` dela), na `/estilo` e em poucos
+  componentes: os editores clínicos (`MealPlanEditor`, `TemplateBar`,
+  `clinico/EditorTreino` e `clinico/Conversa`) e o `FoodSearch` (que a Dieta do
+  paciente também usa). A rota `/estilo`, só em desenvolvimento, mostra a escala
+  com a razão de contraste calculada.
 - A página do paciente do nutricionista tem tema próprio, `.tema-clinico`,
   aplicado por `pacientes/[id]/layout.tsx`. A paleta mora em
   `lib/temaClinico.ts`, com contraste testado em `lib/temaClinico.test.ts`
@@ -652,6 +675,18 @@ Modal fora do lugar: procure um `transform` num ancestral.
   é editada, ou o nutricionista troca a opção, a marca some e o "Comi isso"
   volta (nunca aparece "comi" sem ter comido). Só fica robusto com um
   `meal_plan_item_id` em `meals`, que pede migração.
+- **Em Treinos, "Iniciar treino" e o "Fui" sólido ficam um sobre o outro** na
+  sessão com rotina, em todo dia que já chegou e ainda sem resposta (no
+  celular e nas três colunas do computador). A regra do check-in vale igual
+  nas três telas, e "Iniciar treino" segue o primário da sessão; a ordem
+  (iniciar em cima, check-in embaixo) é porque terminar o treino ao vivo já
+  marca "Feito", e o check-in é de quem treinou sem o cronômetro. Os dois
+  sólidos juntos pedem decisão do dono do produto.
+- **O Tratamento ainda pinta a variação de peso** (perda verde, ganho em
+  `app-perigo`), ao contrário da Início, do `StatCard` e de Medidas.
+- **"do nutri" em Treinos e "Prescrito por" na leitura do treino vêm só de
+  `prescribed_by`.** Depois que o paciente revoga, a sessão segue com o selo,
+  mas os botões já são os do treino próprio ("Fiz").
 - **A Início perde o "limite" ou "meta" do anel de Calorias quando a leitura
   do peso falha.** Os números do anel estão certos e o Progresso diz "Não deu
   para carregar o peso"; aceito, porque a falha já aparece ali.

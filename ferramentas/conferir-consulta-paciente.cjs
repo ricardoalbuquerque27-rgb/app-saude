@@ -338,12 +338,30 @@ async function clicar(loc) {
   });
   try {
     const page = await abrirInicio(cel);
-    const aviso = page.getByText("Não deu para carregar a consulta", { exact: true });
-    ok((await aviso.count()) === 1, 'Início, leitura falhou: a linha diz "Não deu para carregar a consulta"');
+    const aviso = page.getByText("Não deu para carregar a consulta.", { exact: true });
+    ok((await aviso.count()) === 1, 'Início, leitura falhou: a linha diz "Não deu para carregar a consulta."');
     ok((await linha(page).count()) === 0, "e não oferece link para uma consulta que não leu");
     ok(!(await texto(page.locator("body"))).includes("Próxima consulta"), 'e não diz "Próxima consulta"');
     await page.screenshot({ path: `${OUT}/linha-falhou.png`, clip: { x: 0, y: 0, width: 390, height: 300 } });
     await page.close();
+    // O cartão de Meu plano diz a mesma frase, na mesma cor da linha (era "Não
+    // foi possível carregar suas consultas…", em cinza).
+    const plano = await abrir(cel);
+    const avisoDoCartao = cartao(plano).getByText("Não deu para carregar a consulta.", { exact: true });
+    ok((await avisoDoCartao.count()) === 1, 'Meu plano, leitura falhou: o cartão diz "Não deu para carregar a consulta."');
+    if (await avisoDoCartao.count()) {
+      const [cor, atencao] = await avisoDoCartao.evaluate((e) => {
+        const ref = document.createElement("span");
+        ref.style.color = "var(--app-atencao)";
+        document.body.appendChild(ref);
+        const c = getComputedStyle(ref).color;
+        ref.remove();
+        return [getComputedStyle(e).color, c];
+      });
+      ok(cor === atencao, `e em app-atencao (${cor})`);
+    }
+    await cartao(plano).screenshot({ path: `${OUT}/cartao-falhou.png` });
+    await plano.close();
   } finally {
     await fetch(MOCK + "/__reset", { method: "POST" });
   }
@@ -489,7 +507,10 @@ async function clicar(loc) {
   const falhas = resultados.filter((r) => !r).length;
   console.log(`\n${resultados.length - falhas}/${resultados.length} verificações passaram, ${falhas} falharam.`);
   process.exit(falhas ? 1 : 0);
-})().catch((e) => {
+})().catch(async (e) => {
   console.error(e);
+  // Como os outros dois roteiros: um erro no meio não deixa o mock com o
+  // estado (ou o /__falhar) da etapa que caiu para o roteiro seguinte.
+  await fetch(MOCK + "/__reset", { method: "POST" }).catch(() => {});
   process.exit(1);
 });

@@ -28,13 +28,23 @@ export function numeroFixo(n: number, casas = 1): string {
   });
 }
 
-/** "+1,2", "−4,3" (o sinal de menos de verdade, U+2212, como nos gráficos) ou "0". */
+/**
+ * "+1,2", "−4,3" (o sinal de menos de verdade, U+2212, como nos gráficos) ou
+ * "0". O zero é o que a tela MOSTRA, não o número: uma variação de 0,04 kg
+ * saía "+0", e o sinal dizia que o peso subiu enquanto o número dizia que não.
+ */
 export function comSinal(n: number, casas = 1): string {
-  if (n === 0) return "0";
-  return `${n < 0 ? "−" : "+"}${numeroBR(Math.abs(n), casas)}`;
+  const absoluto = numeroBR(Math.abs(n), casas);
+  if (absoluto === "0") return "0";
+  return `${n < 0 ? "−" : "+"}${absoluto}`;
 }
 
-/** "30,4%" (o % colado no número, como no título do gráfico) ou "85 cm". */
-export function comUnidade(n: number, unidade: string, casas = 1): string {
-  return unidade === "%" ? `${numeroBR(n, casas)}%` : `${numeroBR(n, casas)} ${unidade}`;
+/**
+ * "30,4%" (o % colado no número, como no título do gráfico) ou "85 cm". Com
+ * `fixas`, sempre `casas` casas, com o zero ("66,0 kg"): é a lista da página
+ * Medidas, que tinha uma cópia desta função só para isso.
+ */
+export function comUnidade(n: number, unidade: string, casas = 1, fixas = false): string {
+  const numero = fixas ? numeroFixo(n, casas) : numeroBR(n, casas);
+  return unidade === "%" ? `${numero}%` : `${numero} ${unidade}`;
 }

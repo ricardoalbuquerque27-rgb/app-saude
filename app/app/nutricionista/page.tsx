@@ -10,6 +10,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui";
 import { todayISO, formatDate, dataNoBrasil } from "@/lib/date";
+import { numeroBR } from "@/lib/numeros";
 import { CartaoConsulta } from "@/components/CartaoConsulta";
 import { getConsultasDoCartao } from "@/lib/consultasDb";
 import NutriNotes, { type Nota } from "@/components/NutriNotes";
@@ -185,7 +186,7 @@ export default async function MeuNutricionistaPage({
           <p className="truncate font-semibold text-app-texto">
             {nutriNome}
           </p>
-          <p className="text-xs text-app-texto-2">
+          <p className="text-[13px] text-app-texto-2">
             Desde {formatDate(dataNoBrasil(String(link.accepted_at || link.created_at)))}
           </p>
         </div>
@@ -224,7 +225,7 @@ export default async function MeuNutricionistaPage({
             <a.icon className="hidden h-3.5 w-3.5 sm:block" />
             {a.label}
             {a.key === "conversa" && naoLidas > 0 ? (
-              <span className="rounded-full bg-rose-600 px-1.5 text-[11px] font-bold text-white">
+              <span className="rounded-full bg-rose-600 px-1.5 text-[13px] font-bold text-white">
                 {naoLidas}
               </span>
             ) : null}
@@ -244,21 +245,24 @@ export default async function MeuNutricionistaPage({
                   ["Proteína/dia", presc.protein_goal_g, "g"],
                   [
                     "Água/dia",
+                    // Vírgula e até duas casas, como a água da Início e de
+                    // Hábitos: era `toFixed(1)`, "2.5 L".
                     presc.daily_water_goal_ml
-                      ? (presc.daily_water_goal_ml / 1000).toFixed(1)
+                      ? numeroBR(presc.daily_water_goal_ml / 1000, 2)
                       : null,
                     "L",
                   ],
-                  ["Peso alvo", presc.weight_goal_kg, "kg"],
+                  // O peso cru do banco saía com ponto ("62.5 kg").
+                  ["Peso alvo", presc.weight_goal_kg != null ? numeroBR(Number(presc.weight_goal_kg)) : null, "kg"],
                 ].map(([label, valor, unidade]: any) => (
                   <div key={label}>
-                    <dt className="text-xs text-app-texto-2">
+                    <dt className="text-[13px] text-app-texto-2">
                       {label}
                     </dt>
                     <dd className="tabular font-semibold text-app-texto">
                       {valor ?? "—"}
                       {valor ? (
-                        <span className="text-xs font-medium text-app-texto-2">
+                        <span className="text-[13px] font-medium text-app-texto-2">
                           {" "}
                           {unidade}
                         </span>
@@ -267,7 +271,7 @@ export default async function MeuNutricionistaPage({
                   </div>
                 ))}
               </dl>
-              <p className="mt-3 border-t border-app-linha pt-3 text-xs text-app-texto-2">
+              <p className="mt-3 border-t border-app-linha pt-3 text-[13px] text-app-texto-2">
                 Definidas por {nutriNome} em{" "}
                 {formatDate(dataNoBrasil(String(presc.created_at)))}. O
                 acompanhamento do dia contra estas metas aparece em{" "}
@@ -306,7 +310,7 @@ export default async function MeuNutricionistaPage({
             {/* Sem as refeições do dia o cardápio não oferece "Comi isso", e a nota
                 falaria de um botão que não está na tela. */}
             {!refeicoesFalharam && (
-              <p className="text-xs text-app-texto-2">
+              <p className="text-[13px] text-app-texto-2">
                 Tocar em “Comi isso” registra a refeição na sua Dieta — não
                 precisa digitar de novo.
               </p>
@@ -328,7 +332,7 @@ export default async function MeuNutricionistaPage({
                   <p className="eyebrow mb-2 flex items-center gap-1.5">
                     {dia}
                     {i === dowHoje && (
-                      <span className="rounded-full bg-app-primaria-fundo px-2 py-0.5 text-[11px] font-semibold text-app-primaria">
+                      <span className="rounded-full bg-app-primaria-fundo px-2 py-0.5 text-[13px] font-semibold text-app-primaria">
                         hoje
                       </span>
                     )}
@@ -361,7 +365,7 @@ export default async function MeuNutricionistaPage({
                             <p className="text-sm font-semibold text-app-texto">
                               {s.title || rotina?.name || s.sport}
                             </p>
-                            <p className="truncate text-xs text-app-texto-2">
+                            <p className="truncate text-[13px] text-app-texto-2">
                               {resumo}
                             </p>
                           </div>
@@ -373,7 +377,7 @@ export default async function MeuNutricionistaPage({
                 </div>
               );
             })}
-            <p className="text-xs text-app-texto-2">
+            <p className="text-[13px] text-app-texto-2">
               Toque num treino para ver os exercícios. A confirmação
               (“fui” ou “não fui”) fica na própria tela do treino e em{" "}
               <Link

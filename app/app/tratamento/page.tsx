@@ -15,6 +15,7 @@ import { PageHeader, Field } from "@/components/ui";
 import type { Treatment, SideEffect } from "@/lib/types";
 import { ensurePushSubscription } from "@/lib/pushClient";
 import { todayISO, addDaysISO } from "@/lib/date";
+import { comSinal, numeroFixo } from "@/lib/numeros";
 import { useLiveRefresh } from "@/lib/useLiveRefresh";
 
 const MEDS = [
@@ -390,11 +391,13 @@ function ActiveTreatment({
         <h2 className="section-title mb-3">Progresso desde o início</h2>
         {startWeight != null && currentWeight != null ? (
           <div className="grid grid-cols-3 divide-x divide-app-linha text-center">
-            <Stat label="Inicial" value={`${startWeight}`} unit="kg" />
-            <Stat label="Atual" value={`${currentWeight}`} unit="kg" />
+            {/* Os números saem de lib/numeros.ts: o peso cru do banco saía com
+                ponto ("68.4") e a variação com hífen ("-2.6"). */}
+            <Stat label="Inicial" value={numeroFixo(Number(startWeight))} unit="kg" />
+            <Stat label="Atual" value={numeroFixo(Number(currentWeight))} unit="kg" />
             <Stat
               label="Variação"
-              value={`${weightDiff! > 0 ? "+" : ""}${weightDiff}`}
+              value={comSinal(weightDiff!)}
               unit="kg"
               highlight={weightDiff! < 0 ? "good" : weightDiff! > 0 ? "bad" : undefined}
             />

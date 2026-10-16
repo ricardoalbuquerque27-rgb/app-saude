@@ -20,7 +20,8 @@ export function ScoreExplicado({ health }: { health: HealthScore }) {
   return (
     <details className="group">
       <summary className="tappable absolute -top-2 right-0 flex h-11 cursor-pointer list-none items-center gap-1 rounded-lg px-1 text-[13px] text-app-texto-2 [&::-webkit-details-marker]:hidden">
-        score {health.score} · {health.label.toLowerCase()}
+        {/* O número é dado: tabular, como o centro dos anéis. */}
+        score <span className="tabular">{health.score}</span> · {health.label.toLowerCase()}
         <ChevronDown aria-hidden="true" className="h-4 w-4 transition group-open:rotate-180" />
       </summary>
       <div className="card mt-2.5 p-0">

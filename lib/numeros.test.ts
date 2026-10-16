@@ -22,6 +22,18 @@ describe("comSinal", () => {
     expect(comSinal(0)).toBe("0");
     expect(comSinal(-13, 3)).toBe("−13");
   });
+
+  // A variação que arredonda a zero saía "+0" ou "−0": o sinal dizia que o
+  // peso subiu ou desceu, e o número dizia que não.
+  it("o que arredonda a zero sai \"0\", sem + nem −", () => {
+    expect(comSinal(0.04)).toBe("0");
+    expect(comSinal(-0.04)).toBe("0");
+    expect(comSinal(0.004, 2)).toBe("0");
+    expect(comSinal(-0.0004, 3)).toBe("0");
+    // O que não arredonda a zero continua com o sinal.
+    expect(comSinal(0.06)).toBe("+0,1");
+    expect(comSinal(-0.06)).toBe("−0,1");
+  });
 });
 
 describe("comUnidade", () => {
@@ -30,6 +42,17 @@ describe("comUnidade", () => {
     expect(comUnidade(30.4, "%")).toBe("30,4%");
     expect(comUnidade(85, "cm")).toBe("85 cm");
     expect(comUnidade(70.3, "kg")).toBe("70,3 kg");
+  });
+
+  // A página Medidas tinha a própria cópia (`comUnidadeFixa`) só para escrever
+  // "66,0 kg" com o zero; com `fixas`, a conta é uma só.
+  it("com casas fixas, sempre as casas pedidas, com o zero", () => {
+    expect(comUnidade(66, "kg", 1, true)).toBe("66,0 kg");
+    expect(comUnidade(30, "%", 1, true)).toBe("30,0%");
+    expect(comUnidade(99.89999999999999, "cm", 1, true)).toBe("99,9 cm");
+    expect(comUnidade(1.2, "L", 2, true)).toBe("1,20 L");
+    // Sem `fixas`, o zero sai como antes.
+    expect(comUnidade(66, "kg", 1)).toBe("66 kg");
   });
 });
 

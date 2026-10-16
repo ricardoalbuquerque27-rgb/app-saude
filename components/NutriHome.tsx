@@ -48,9 +48,14 @@ function PatientRow({ s }: { s: PatientSummary }) {
   // do traço passou de slate-100 para `linha`.
   //
   // O hover é `pagina` (um passo do cartão, como o slate-50 de antes) e não
-  // `primaria-fundo`: o âmbar do alerta (amber-700) sobre `primaria-fundo` dá
-  // 4,41:1 no claro e reprova o 4,5:1. Sobre `pagina` dá 4,68:1; no escuro, o
-  // amber-400 passa de 11:1 em qualquer um dos dois fundos.
+  // `primaria-fundo`: o aviso do alerta tem par testado sobre `cartao` e sobre
+  // `pagina` (PARES_TEXTO_APP), não sobre `primaria-fundo`; com o amber-700 de
+  // antes, ali dava 4,41:1 e reprovava o 4,5:1.
+  //
+  // O alerta é `app-atencao`, da paleta (era amber-700/amber-400 cru do
+  // Tailwind, sem par testado). Todos os níveis têm a mesma cor, como antes: o
+  // que os distingue é a ordem da fila (`filaDeTriagem`, pela gravidade), o
+  // ícone do tipo e o texto.
   return (
     <div className="border-t border-app-linha first:border-t-0">
       <Link
@@ -68,7 +73,7 @@ function PatientRow({ s }: { s: PatientSummary }) {
               return (
                 <span
                   key={a.texto}
-                  className="inline-flex items-center gap-1 text-[13px] font-medium text-amber-700 dark:text-amber-400"
+                  className="inline-flex items-center gap-1 text-[13px] font-medium text-app-atencao"
                 >
                   <Icone className="h-3.5 w-3.5" />
                   {a.texto}

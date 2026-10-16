@@ -388,7 +388,11 @@ export function proximaConsulta(lista: Consulta[], agora: number | string): Cons
  * cartão mostrava uma consulta cancelada.
  *
  * - `proxima`: a agendada que ainda não acabou, a mais cedo;
- * - `pedido`: o primeiro pedido aberto (a lista vem das mais recentes);
+ * - `pedido`: o pedido aberto. A escolha não depende da ordem da lista
+ *   (getConsultasDoCartao a manda por início crescente): o banco guarda no
+ *   máximo um pedido aberto por paciente (o índice único
+ *   `appointments_um_pedido_aberto`). `proxima` e a mais recente ordenam por
+ *   conta própria;
  * - `canceladaPeloNutri`: só quando não há nenhuma das duas acima e a mais
  *   recente (por início) foi cancelada pelo nutri e começa depois de agora − 7
  *   dias. Sem isso, quem não abre "Meu plano" iria a uma consulta que não existe.

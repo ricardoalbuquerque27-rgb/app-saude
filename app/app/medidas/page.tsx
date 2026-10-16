@@ -7,8 +7,6 @@ import {
   Plus,
   Trash2,
   Loader2,
-  TrendingDown,
-  TrendingUp,
   Target,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -18,16 +16,12 @@ import { TrendChart } from "@/components/charts";
 import { todayISO, formatDate } from "@/lib/date";
 import { useLiveRefresh } from "@/lib/useLiveRefresh";
 import { meuPerfil } from "@/lib/perfil";
-import { comSinal, numeroBR, numeroFixo } from "@/lib/numeros";
+import { comSinal, comUnidade, numeroBR, numeroFixo } from "@/lib/numeros";
 
-// Número do banco em pt-BR, com uma casa fixa: "99.89999999999999cm" (um float
-// gravado) e "65.8kg" apareciam com ponto, sem espaço e sem arredondar. O "%"
-// fica colado ao número, como no título dos gráficos do nutricionista.
-function comUnidadeFixa(valor: unknown, unidade: string): string {
-  const n = Number(valor);
-  if (!Number.isFinite(n)) return `${String(valor)}${unidade}`;
-  return unidade === "%" ? `${numeroFixo(n, 1)}%` : `${numeroFixo(n, 1)} ${unidade}`;
-}
+// Os números desta tela saem de lib/numeros.ts, com uma casa fixa:
+// "99.89999999999999cm" (um float gravado) e "65.8kg" apareciam com ponto, sem
+// espaço e sem arredondar. O "%" fica colado ao número ("30,0%") em toda a
+// tela, como o `comUnidade` escreve e o título dos gráficos do nutricionista.
 
 const FIELDS: { key: keyof BodyMeasurement; label: string; unit: string }[] = [
   { key: "weight_kg", label: "Peso", unit: "kg" },
@@ -184,7 +178,7 @@ export default function MedidasPage() {
         <div className="card">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-medium text-app-texto-2">
+              <p className="text-[13px] font-medium text-app-texto-2">
                 Peso atual
               </p>
               <p className="tabular mt-1 text-3xl font-semibold text-app-texto">
@@ -193,18 +187,12 @@ export default function MedidasPage() {
                   {currentWeight ? "kg" : ""}
                 </span>
               </p>
+              {/* Neutra, com o sinal no número: o app não sabe a direção boa
+                  (quem quer ganhar massa leria o ganho em vermelho como erro).
+                  É a mesma decisão do StatCard e da variação da Início. */}
               {weightDiff != null && (
-                <p
-                  className={`mt-1 flex items-center gap-1 text-xs font-medium ${
-                    weightDiff <= 0 ? "text-app-primaria" : "text-app-perigo"
-                  }`}
-                >
-                  {weightDiff <= 0 ? (
-                    <TrendingDown className="h-3.5 w-3.5" />
-                  ) : (
-                    <TrendingUp className="h-3.5 w-3.5" />
-                  )}
-                  {comSinal(weightDiff)} kg desde o último
+                <p className="mt-1 text-[13px] font-medium text-app-texto-2">
+                  <span className="tabular">{comSinal(weightDiff)} kg</span> desde o último
                 </p>
               )}
             </div>
@@ -215,7 +203,7 @@ export default function MedidasPage() {
 
           {weightGoal != null ? (
             <div className="mt-4">
-              <div className="mb-1.5 flex items-center justify-between text-xs">
+              <div className="mb-1.5 flex items-center justify-between text-[13px]">
                 <span className="flex items-center gap-1 font-medium text-app-texto-2">
                   <Target className="h-3.5 w-3.5 text-app-primaria" />
                   Meta: {numeroBR(weightGoal)} kg
@@ -240,7 +228,7 @@ export default function MedidasPage() {
           ) : (
             <Link
               href="/app/perfil"
-              className="mt-1 inline-flex min-h-[44px] items-center text-xs font-medium text-app-primaria hover:underline"
+              className="mt-1 inline-flex min-h-[44px] items-center text-[13px] font-medium text-app-primaria hover:underline"
             >
               Definir meta de peso
             </Link>
@@ -252,18 +240,19 @@ export default function MedidasPage() {
           <div className="grid grid-cols-2 gap-3">
             {latest?.body_fat_pct != null && (
               <div className="card">
-                <p className="text-xs font-medium text-app-texto-2">
+                <p className="text-[13px] font-medium text-app-texto-2">
                   % Gordura
                 </p>
                 <p className="tabular mt-1 text-2xl font-semibold text-app-texto">
                   {numeroFixo(Number(latest.body_fat_pct), 1)}
-                  <span className="ml-1 text-sm font-medium text-app-texto-2">%</span>
+                  {/* Colado, como na lista e na dica do gráfico ("30,0%"). */}
+                  <span className="text-sm font-medium text-app-texto-2">%</span>
                 </p>
               </div>
             )}
             {latest?.waist_cm != null && (
               <div className="card">
-                <p className="text-xs font-medium text-app-texto-2">
+                <p className="text-[13px] font-medium text-app-texto-2">
                   Cintura
                 </p>
                 <p className="tabular mt-1 text-2xl font-semibold text-app-texto">
@@ -290,7 +279,7 @@ export default function MedidasPage() {
                 className="inline-flex min-h-[44px] items-center"
               >
                 <span
-                  className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+                  className={`rounded-full border px-3 py-1 text-[13px] font-medium transition ${
                     metric === f.key
                       ? "border-app-primaria bg-app-primaria text-app-sobre-primaria"
                       : "border-app-linha bg-app-cartao text-app-texto-2 hover:bg-app-primaria-fundo"
@@ -303,7 +292,9 @@ export default function MedidasPage() {
           </div>
         )}
         {chartData.length > 1 ? (
-          <TrendChart data={chartData} unit={metricUnit} />
+          // A dica escreve o número e a unidade juntos: "65,8kg" sem o espaço.
+          // O "%" fica colado, como no resto da tela.
+          <TrendChart data={chartData} unit={metricUnit === "%" ? "%" : ` ${metricUnit}`} />
         ) : (
           <div className="flex h-[240px] items-center justify-center text-center text-sm text-app-texto-2">
             Registre pelo menos 2 medições de {metricLabel.toLowerCase()} para ver o
@@ -339,15 +330,15 @@ export default function MedidasPage() {
                 <p className="tabular flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold text-app-texto">
                   {formatDate(r.date)}
                   {r.measured_by && (
-                    <span className="rounded-full bg-app-primaria-fundo px-2 py-0.5 text-xs font-medium text-app-primaria">
+                    <span className="rounded-full bg-app-primaria-fundo px-2 py-0.5 text-[13px] font-medium text-app-primaria">
                       Medida na consulta
                     </span>
                   )}
                 </p>
-                <div className="tabular mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-app-texto-2">
+                <div className="tabular mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[13px] text-app-texto-2">
                   {FIELDS.filter((f) => r[f.key] != null).map((f) => (
                     <span key={f.key as string}>
-                      {f.label}: {comUnidadeFixa(r[f.key], f.unit)}
+                      {f.label}: {comUnidade(Number(r[f.key]), f.unit, 1, true)}
                     </span>
                   ))}
                 </div>

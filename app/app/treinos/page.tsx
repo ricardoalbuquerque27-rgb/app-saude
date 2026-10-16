@@ -12,9 +12,7 @@ import {
   History,
   TrendingUp,
   Trophy,
-  Check,
   Stethoscope,
-  X,
   BarChart3,
   Copy,
   Zap,
@@ -35,6 +33,7 @@ import {
 import { todayISO, weekStartISO, formatDate } from "@/lib/date";
 import { useLiveRefresh } from "@/lib/useLiveRefresh";
 import RestTimer from "@/components/RestTimer";
+import { BotoesDoCheckIn, statusDoCheckIn } from "@/components/PlanCheckIn";
 import PlateCalculator from "@/components/PlateCalculator";
 import WorkoutSession, {
   type SessionRoutine,
@@ -77,6 +76,7 @@ type PlanEntry = {
   notes: string | null;
   position: number;
   routine_id: string | null;
+  prescribed_by: string | null;
 };
 
 type SetDraft = { reps: string; weight: string };
@@ -145,9 +145,9 @@ function PlanStat({
     <div className="px-2 text-center">
       <p className="tabular text-xl font-semibold text-app-texto">
         {value}
-        {sub && <span className="ml-1 text-xs font-medium text-app-texto-2">{sub}</span>}
+        {sub && <span className="ml-1 text-[13px] font-medium text-app-texto-2">{sub}</span>}
       </p>
-      <p className="mt-0.5 text-xs text-app-texto-2">{label}</p>
+      <p className="mt-0.5 text-[13px] text-app-texto-2">{label}</p>
     </div>
   );
 }
@@ -166,7 +166,12 @@ export default function TreinosPage() {
   const [completions, setCompletions] = useState<Completion[]>([]);
   const [planOpen, setPlanOpen] = useState(false);
   const [planSaving, setPlanSaving] = useState(false);
-  const [busyDone, setBusyDone] = useState<string | null>(null);
+  // Qual check-in grava (sessão e data) e qual resposta: o giro vai no botão tocado.
+  const [busyDone, setBusyDone] = useState<{ chave: string; status: "done" | "skipped" } | null>(null);
+  // Vínculo ativo com nutricionista: só com ele a sessão `prescribed_by` é
+  // "prescrita" (Fui e Não fui); sem ele, é do paciente (só Fiz). A mesma regra
+  // da Início (montarParaHoje) e da leitura do treino.
+  const [vinculoAtivo, setVinculoAtivo] = useState(false);
   const [pDay, setPDay] = useState(0);
   const [pSport, setPSport] = useState("Musculação");
   const [pTitle, setPTitle] = useState("");
@@ -205,7 +210,7 @@ export default function TreinosPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [planRes, wsRes, compRes, routRes, routExRes] = await Promise.all([
+    const [planRes, wsRes, compRes, routRes, routExRes, vinculoRes] = await Promise.all([
       supabase
         .from("workout_plan")
         .select("*")
@@ -226,9 +231,20 @@ export default function TreinosPage() {
         .from("routine_exercises")
         .select("*")
         .order("position", { ascending: true }),
+      // A RLS só mostra ao paciente os vínculos dele, como na Início.
+      supabase
+        .from("patient_links")
+        .select("nutritionist_id")
+        .eq("status", "active")
+        .limit(1)
+        .maybeSingle(),
     ]);
 
     setPlan((planRes.data ?? []) as PlanEntry[]);
+    // Com a leitura do vínculo falhando, vale o que a sessão diz
+    // (`prescribed_by`): o check-in grava a mesma linha nos dois casos, e tirar
+    // o "Não fui" de quem tem nutricionista por uma falha de leitura seria pior.
+    setVinculoAtivo(!!vinculoRes.data || !!vinculoRes.error);
 
     // Agrupa exercícios por rotina.
     const exByRoutine: Record<string, any[]> = {};
@@ -595,7 +611,7 @@ export default function TreinosPage() {
     date: string,
     status: "done" | "skipped"
   ) {
-    setBusyDone(session.id + date);
+    setBusyDone({ chave: session.id + date, status });
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -862,7 +878,9 @@ export default function TreinosPage() {
           {/* Resumo da semana */}
           <div className="card grid grid-cols-3 divide-x divide-app-linha">
             <PlanStat value={`${daysPlanned}`} sub="/ 7" label="Dias com treino" />
-            <PlanStat value={`${sessionsPlanned.length}`} label="Sessões/semana" />
+            {/* "Sessões/semana" não quebra (não tem espaço) e, com o apoio em
+                13 px, passava por cima do traço da coluna em 390 px. */}
+            <PlanStat value={`${sessionsPlanned.length}`} label="Sessões por semana" />
             <PlanStat
               value={`${adesao.confirmadas}`}
               sub={`/ ${adesao.previstas}`}
@@ -885,11 +903,11 @@ export default function TreinosPage() {
                 >
                 <div className="mb-3 flex items-center gap-2">
                   <h3 className="font-semibold text-app-texto">{dayName}</h3>
-                  <span className="tabular text-xs text-app-texto-2">
+                  <span className="tabular text-[13px] text-app-texto-2">
                     {dataDoDia.slice(8, 10)}/{dataDoDia.slice(5, 7)}
                   </span>
                   {isToday && (
-                    <span className="rounded-full bg-app-primaria-fundo px-2 py-0.5 text-[11px] font-semibold text-app-primaria">
+                    <span className="rounded-full bg-app-primaria-fundo px-2 py-0.5 text-[13px] font-semibold text-app-primaria">
                       hoje
                     </span>
                   )}
@@ -903,9 +921,9 @@ export default function TreinosPage() {
                   <ul className="mb-3 divide-y divide-app-linha">
                     {sessions.map((s) => {
                       const check = compIndex[completionKey(s.id, dataDoDia)];
-                      const done = check?.status === "done";
-                      const skipped = check?.status === "skipped";
-                      const busyKey = busyDone === s.id + dataDoDia;
+                      const ocupado =
+                        busyDone?.chave === s.id + dataDoDia ? busyDone.status : null;
+                      const doNutri = !!s.prescribed_by && vinculoAtivo;
                       return (
                         <li
                           key={s.id}
@@ -914,15 +932,15 @@ export default function TreinosPage() {
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex flex-wrap items-center gap-1">
                               <span
-                                className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${sportChip(
+                                className={`rounded-full px-2 py-0.5 text-[13px] font-semibold ${sportChip(
                                   s.sport
                                 )}`}
                               >
                                 {s.sport}
                               </span>
-                              {(s as any).prescribed_by && (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-app-primaria-fundo px-2 py-0.5 text-[11px] font-semibold text-app-primaria">
-                                  <Stethoscope className="h-2.5 w-2.5" />
+                              {s.prescribed_by && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-app-primaria-fundo px-2 py-0.5 text-[13px] font-semibold text-app-primaria">
+                                  <Stethoscope className="h-3 w-3" />
                                   do nutri
                                 </span>
                               )}
@@ -941,51 +959,33 @@ export default function TreinosPage() {
                             </p>
                           )}
                           {s.notes && (
-                            <p className="mt-0.5 text-xs text-app-texto-2">
+                            <p className="mt-0.5 text-[13px] text-app-texto-2">
                               {s.notes}
                             </p>
                           )}
+                          {/* "Iniciar treino" é o primário da sessão e vem
+                              primeiro, na largura toda: terminar o treino ao
+                              vivo já marca "Feito". O check-in fica embaixo,
+                              para quem treinou sem o cronômetro, e o "Fui"
+                              sólido só aparece em dia que já chegou. */}
                           {s.routine_id &&
                             routines.some((r) => r.id === s.routine_id) && (
                               <button
                                 onClick={() => startPlanSession(s)}
-                                className="btn-primary mt-2 w-full py-1.5 text-xs"
+                                className="btn-primary mt-2 w-full py-1.5 text-[13px]"
                               >
                                 <Play className="h-3.5 w-3.5" /> Iniciar treino
                               </button>
                             )}
                           {jaPassou && (
                             <div className="mt-2 flex gap-1.5">
-                              <button
-                                onClick={() => markPlan(s, dataDoDia, "done")}
-                                disabled={busyKey}
-                                aria-pressed={done}
-                                className={`tappable flex min-h-[44px] flex-1 items-center justify-center gap-1 rounded-lg px-2 text-xs font-semibold disabled:opacity-60 ${
-                                  done
-                                    ? "bg-app-primaria text-app-sobre-primaria"
-                                    : "border border-app-campo text-app-texto-2 hover:bg-app-primaria-fundo"
-                                }`}
-                              >
-                                {busyKey ? (
-                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                ) : (
-                                  <Check className="h-3.5 w-3.5" />
-                                )}
-                                Fui
-                              </button>
-                              <button
-                                onClick={() => markPlan(s, dataDoDia, "skipped")}
-                                disabled={busyKey}
-                                aria-pressed={skipped}
-                                className={`tappable flex min-h-[44px] flex-1 items-center justify-center gap-1 rounded-lg px-2 text-xs font-semibold disabled:opacity-60 ${
-                                  skipped
-                                    ? "bg-rose-600 text-white"
-                                    : "border border-app-campo text-app-texto-2 hover:bg-app-primaria-fundo"
-                                }`}
-                              >
-                                <X className="h-3.5 w-3.5" />
-                                Não fui
-                              </button>
+                              <BotoesDoCheckIn
+                                status={statusDoCheckIn(check)}
+                                doNutri={doNutri}
+                                ocupado={ocupado}
+                                esticar
+                                onMarcar={(st) => markPlan(s, dataDoDia, st)}
+                              />
                             </div>
                           )}
                         </li>
@@ -1023,13 +1023,13 @@ export default function TreinosPage() {
                         {r.name}
                       </h3>
                       {(r as any).prescribed_by && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-app-primaria-fundo px-2 py-0.5 text-[11px] font-semibold text-app-primaria">
-                          <Stethoscope className="h-2.5 w-2.5" />
+                        <span className="inline-flex items-center gap-1 rounded-full bg-app-primaria-fundo px-2 py-0.5 text-[13px] font-semibold text-app-primaria">
+                          <Stethoscope className="h-3 w-3" />
                           do nutri
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-app-texto-2">
+                    <p className="text-[13px] text-app-texto-2">
                       {r.exercises.length} exercício(s)
                       {r.notes ? ` · ${r.notes}` : ""}
                     </p>
@@ -1037,7 +1037,7 @@ export default function TreinosPage() {
                   <div className="flex shrink-0 gap-1">
                     <button
                       onClick={() => openEditRoutine(r)}
-                      className="tappable flex min-h-[44px] items-center rounded-lg px-2 text-xs font-semibold text-app-texto-2 hover:bg-app-primaria-fundo hover:text-app-texto"
+                      className="tappable flex min-h-[44px] items-center rounded-lg px-2 text-[13px] font-semibold text-app-texto-2 hover:bg-app-primaria-fundo hover:text-app-texto"
                       aria-label="Editar rotina"
                     >
                       Editar
@@ -1060,14 +1060,14 @@ export default function TreinosPage() {
                         className="flex items-center justify-between gap-2 text-sm text-app-texto"
                       >
                         <span className="truncate">{e.name}</span>
-                        <span className="tabular shrink-0 text-xs text-app-texto-2">
+                        <span className="tabular shrink-0 text-[13px] text-app-texto-2">
                           {e.target_sets ?? "—"}×{e.target_reps ?? "—"}
                           {e.target_weight_kg != null ? ` · ${e.target_weight_kg}kg` : ""}
                         </span>
                       </li>
                     ))}
                     {r.exercises.length > 6 && (
-                      <li className="text-xs text-app-texto-2">
+                      <li className="text-[13px] text-app-texto-2">
                         +{r.exercises.length - 6} exercício(s)
                       </li>
                     )}
@@ -1085,7 +1085,7 @@ export default function TreinosPage() {
                   </button>
                   <button
                     onClick={() => registerFromRoutine(r)}
-                    className="tappable min-h-[44px] text-xs font-medium text-app-texto-2 hover:text-app-primaria"
+                    className="tappable min-h-[44px] text-[13px] font-medium text-app-texto-2 hover:text-app-primaria"
                   >
                     Registro rápido (sem cronômetro)
                   </button>
@@ -1182,7 +1182,7 @@ export default function TreinosPage() {
                     <div className="mb-3 flex items-center justify-between gap-2">
                       <h3 className="section-title">Evolução da carga</h3>
                       {isRecord && (
-                        <span className="flex items-center gap-1 rounded-full bg-app-primaria-fundo px-2 py-0.5 text-[11px] font-semibold text-app-primaria">
+                        <span className="flex items-center gap-1 rounded-full bg-app-primaria-fundo px-2 py-0.5 text-[13px] font-semibold text-app-primaria">
                           <Trophy className="h-3 w-3" /> Recorde atual!
                         </span>
                       )}
@@ -1201,10 +1201,10 @@ export default function TreinosPage() {
               <div className="card">
                 <div className="mb-3 flex items-center justify-between">
                   <h3 className="section-title">Volume por semana</h3>
-                  <span className="text-xs text-app-texto-2">carga total (kg)</span>
+                  <span className="text-[13px] text-app-texto-2">carga total (kg)</span>
                 </div>
                 <BarsChart data={volumeData} unit=" kg" />
-                <p className="mt-2 text-xs text-app-texto-2">
+                <p className="mt-2 text-[13px] text-app-texto-2">
                   Volume = soma de (repetições × carga) de todos os exercícios na semana.
                 </p>
               </div>
@@ -1242,7 +1242,7 @@ export default function TreinosPage() {
                     <p className="truncate font-semibold text-app-texto">
                       {w.name}
                     </p>
-                    <p className="text-xs text-app-texto-2">
+                    <p className="text-[13px] text-app-texto-2">
                       {formatDate(w.date)}
                       {w.category ? ` · ${w.category}` : ""}
                       {w.duration_min ? ` · ${w.duration_min} min` : ""}
@@ -1279,14 +1279,14 @@ export default function TreinosPage() {
                             {ex.name}
                           </p>
                           {ex.rpe != null && (
-                            <span className="tabular text-xs text-app-texto-2">RPE {ex.rpe}</span>
+                            <span className="tabular text-[13px] text-app-texto-2">RPE {ex.rpe}</span>
                           )}
                         </div>
                         <div className="mt-1 flex flex-wrap gap-1.5">
                           {setsOf(ex).map((s, i) => (
                             <span
                               key={i}
-                              className="tabular rounded-md bg-app-cartao px-2 py-0.5 text-xs text-app-texto-2 ring-1 ring-app-linha"
+                              className="tabular rounded-md bg-app-cartao px-2 py-0.5 text-[13px] text-app-texto-2 ring-1 ring-app-linha"
                             >
                               {s.reps ?? "—"}
                               {s.weight != null ? ` × ${s.weight}kg` : ""}
@@ -1296,7 +1296,7 @@ export default function TreinosPage() {
                       </div>
                     ))}
                     {w.notes && (
-                      <p className="text-xs text-app-texto-2">
+                      <p className="text-[13px] text-app-texto-2">
                         Obs.: {w.notes}
                       </p>
                     )}
@@ -1444,7 +1444,7 @@ export default function TreinosPage() {
               <button
                 type="button"
                 onClick={() => setExercises((p) => [...p, emptyExercise()])}
-                className="inline-flex min-h-[44px] items-center text-xs font-semibold text-app-primaria hover:underline"
+                className="inline-flex min-h-[44px] items-center text-[13px] font-semibold text-app-primaria hover:underline"
               >
                 + Exercício
               </button>
@@ -1481,7 +1481,7 @@ export default function TreinosPage() {
 
                   {/* Sugestão de progressão (baseada no histórico) */}
                   {progressionHint(ex.name) && (
-                    <p className="mt-1.5 flex items-center gap-1 text-xs font-medium text-app-primaria">
+                    <p className="mt-1.5 flex items-center gap-1 text-[13px] font-medium text-app-primaria">
                       <TrendingUp className="h-3.5 w-3.5 shrink-0" />
                       {progressionHint(ex.name)}
                     </p>
@@ -1491,7 +1491,7 @@ export default function TreinosPage() {
                   <div className="mt-2 space-y-1.5">
                     {ex.sets.map((s, si) => (
                       <div key={si} className="flex items-center gap-2">
-                        <span className="w-14 shrink-0 text-xs font-medium text-app-texto-2">
+                        <span className="w-14 shrink-0 text-[13px] font-medium text-app-texto-2">
                           Série {si + 1}
                         </span>
                         <input
@@ -1527,7 +1527,7 @@ export default function TreinosPage() {
                     <button
                       type="button"
                       onClick={() => addSet(ei)}
-                      className="inline-flex min-h-[44px] items-center text-xs font-semibold text-app-primaria hover:underline"
+                      className="inline-flex min-h-[44px] items-center text-[13px] font-semibold text-app-primaria hover:underline"
                     >
                       + Série
                     </button>
@@ -1594,7 +1594,7 @@ export default function TreinosPage() {
               <button
                 type="button"
                 onClick={() => setRExercises((p) => [...p, emptyRoutineEx()])}
-                className="inline-flex min-h-[44px] items-center text-xs font-semibold text-app-primaria hover:underline"
+                className="inline-flex min-h-[44px] items-center text-[13px] font-semibold text-app-primaria hover:underline"
               >
                 + Exercício
               </button>
@@ -1627,7 +1627,7 @@ export default function TreinosPage() {
                   </div>
                   <div className="mt-2 grid grid-cols-4 gap-2">
                     <div>
-                      <span className="mb-0.5 block text-[11px] font-medium text-app-texto-2">
+                      <span className="mb-0.5 block text-[13px] font-medium text-app-texto-2">
                         Séries
                       </span>
                       <input
@@ -1639,7 +1639,7 @@ export default function TreinosPage() {
                       />
                     </div>
                     <div>
-                      <span className="mb-0.5 block text-[11px] font-medium text-app-texto-2">
+                      <span className="mb-0.5 block text-[13px] font-medium text-app-texto-2">
                         Reps
                       </span>
                       <input
@@ -1651,7 +1651,7 @@ export default function TreinosPage() {
                       />
                     </div>
                     <div>
-                      <span className="mb-0.5 block text-[11px] font-medium text-app-texto-2">
+                      <span className="mb-0.5 block text-[13px] font-medium text-app-texto-2">
                         Carga kg
                       </span>
                       <input
@@ -1664,7 +1664,7 @@ export default function TreinosPage() {
                       />
                     </div>
                     <div>
-                      <span className="mb-0.5 block text-[11px] font-medium text-app-texto-2">
+                      <span className="mb-0.5 block text-[13px] font-medium text-app-texto-2">
                         Descanso s
                       </span>
                       <input

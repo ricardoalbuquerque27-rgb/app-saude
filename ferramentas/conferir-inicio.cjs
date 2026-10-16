@@ -209,8 +209,9 @@ async function clicar(loc) {
     const feitas = await s.locator("ul > li", { has: p.locator('[aria-pressed="true"]') }).count();
     ok(!!m && Number(m[1]) === linhas - feitas,
       `"N pendentes" igual às linhas pendentes: ${m ? m[0] : "(sem contagem)"} · ${linhas} linhas, ${feitas} feitas`);
-    // A hierarquia da maquete no treino do nutricionista ainda sem resposta:
-    // "Fui" sólido (primária) e "Não fui" secundário, 40 px e letra de 14 px.
+    // A regra do check-in no treino do nutricionista ainda sem resposta: "Fui"
+    // sólido (primária) e "Não fui" secundário, 44 px e letra de 14 px. Os três
+    // estados, nas três telas, vêm na etapa "Check-in", abaixo.
     const linhaDoNutri = s.locator("ul > li", { hasText: "do seu nutricionista" }).first();
     const estilos = await linhaDoNutri.evaluate((li) => {
       const cor = (v) => {
@@ -227,8 +228,8 @@ async function clicar(loc) {
     });
     ok(!!estilos.fui && estilos.fui.fundo === estilos.primaria && !!estilos.naoFui && estilos.naoFui.fundo === estilos.cartao,
       '"Fui" sólido em app-primaria e "Não fui" secundário (fundo de cartão)', JSON.stringify(estilos));
-    ok(!!estilos.fui && !!estilos.naoFui && estilos.fui.h >= 40 && estilos.naoFui.h >= 40 && estilos.fui.letra === "14px" && estilos.naoFui.letra === "14px",
-      `os dois com 40 px e letra de 14 px (${estilos.fui && estilos.fui.h}/${estilos.naoFui && estilos.naoFui.h} px, ${estilos.fui && estilos.fui.letra})`);
+    ok(!!estilos.fui && !!estilos.naoFui && estilos.fui.h >= 44 && estilos.naoFui.h >= 44 && estilos.fui.letra === "14px" && estilos.naoFui.letra === "14px",
+      `os dois com 44 px e letra de 14 px (${estilos.fui && estilos.fui.h}/${estilos.naoFui && estilos.naoFui.h} px, ${estilos.fui && estilos.fui.letra})`);
   });
   await etapa("Para hoje com leitura falhando", async () => {
     await comFalha("patient_notes", async () => {
@@ -236,9 +237,153 @@ async function clicar(loc) {
       const t = await secao("Para hoje").innerText().catch(() => "");
       ok(t.includes("Não deu para carregar tudo"), 'recados falhando: "Não deu para carregar tudo" aparece', t.slice(0, 160));
       ok(t !== "" && !/em dia/.test(t), 'e o cartão (que está na tela) não diz "em dia"');
+      // A contagem seria só do que chegou: o cabeçalho fica só com o título.
+      const cab = (await secao("Para hoje").locator(":scope > div").first().innerText().catch(() => "")).trim();
+      ok(cab === "Para hoje", `e o cabeçalho não mostra "N pendentes" (a contagem é parcial): "${cab}"`);
       await p.screenshot({ path: `${OUT}/para-hoje-falhou.png`, fullPage: true });
     });
   });
+
+  console.log("\nCheck-in: uma regra só (Início, leitura do treino e Treinos)");
+  // A mesma regra nas três telas (components/PlanCheckIn.tsx,
+  // BotoesDoCheckIn): sem resposta, "Fui" sólido e "Não fui" secundário;
+  // feito, "Feito" com o check no fundo da principal (e não o mesmo sólido do
+  // sem resposta); não fui, "Fui" secundário e "Não fui" em aviso. O treino
+  // próprio só tem "Fiz". O mock guarda o check-in (plan_completions), e o
+  // `comEstado` o apaga no fim.
+  // Antes de ler: o ponteiro sai de cima (o secundário tem fundo de hover) e as
+  // transições terminam. O botão que o React reaproveita (Início e leitura do
+  // treino) passa 200 ms entre uma cor e outra (`.tappable`), e a leitura logo
+  // depois do clique pegava a cor do meio do caminho. Só as animações finitas
+  // da área: o giro do `Loader2` nunca termina.
+  const lerBotoes = async (raiz) => {
+    await p.mouse.move(1, 1);
+    return raiz.evaluate(async (el) => {
+      const finitas = el
+        .getAnimations({ subtree: true })
+        .filter((a) => a.effect && a.effect.getComputedTiming().iterations !== Infinity);
+      await Promise.race([
+        Promise.all(finitas.map((a) => a.finished.catch(() => {}))),
+        new Promise((r) => setTimeout(r, 2000)),
+      ]);
+      const cor = (v) => {
+        const ref = document.createElement("span");
+        ref.style.backgroundColor = `var(${v})`;
+        document.body.appendChild(ref);
+        const c = getComputedStyle(ref).backgroundColor;
+        ref.remove();
+        return c;
+      };
+      return {
+        botoes: [...el.querySelectorAll("button[aria-pressed]")].map((b) => ({
+          texto: b.textContent.trim(),
+          fundo: getComputedStyle(b).backgroundColor,
+          h: Math.round(b.getBoundingClientRect().height * 10) / 10,
+          apertado: b.getAttribute("aria-pressed") === "true",
+          icone: !!b.querySelector("svg"),
+        })),
+        primaria: cor("--app-primaria"),
+        primariaFundo: cor("--app-primaria-fundo"),
+        cartao: cor("--app-cartao"),
+        atencaoFundo: cor("--app-atencao-fundo"),
+      };
+    });
+  };
+  const resumoDosBotoes = (r) => r.botoes.map((b) => `${b.texto}[${b.fundo}${b.apertado ? ", apertado" : ""}]`).join(" ");
+  /** Os três estados de um treino prescrito, tocando nos botões; termina como começou. */
+  async function tresEstados(tela, raiz, prefixo) {
+    const btn = (nome) => raiz().getByRole("button", { name: nome, exact: true });
+    await hidratado(btn("Fui"));
+    const r1 = await lerBotoes(raiz());
+    const [fui1, nao1] = r1.botoes;
+    ok(r1.botoes.length === 2 && fui1.texto === "Fui" && fui1.fundo === r1.primaria && !fui1.apertado &&
+        nao1.texto === "Não fui" && nao1.fundo === r1.cartao && !nao1.apertado,
+      `${tela}, sem resposta: "Fui" sólido e "Não fui" secundário`, resumoDosBotoes(r1));
+    ok(r1.botoes.every((b) => b.h >= 44), `${tela}: os botões com 44 px (${r1.botoes.map((b) => b.h).join(" / ")})`);
+    await raiz().screenshot({ path: `${OUT}/${prefixo}-sem-resposta.png` });
+
+    await clicar(btn("Fui"));
+    await btn("Feito").waitFor({ timeout: 30000 });
+    const r2 = await lerBotoes(raiz());
+    const [feito, nao2] = r2.botoes;
+    ok(r2.botoes.length === 2 && feito.texto === "Feito" && feito.apertado && feito.icone && feito.fundo === r2.primariaFundo &&
+        nao2.fundo === r2.cartao && !nao2.apertado,
+      `${tela}, feito: "Feito" com o check no fundo da principal e "Não fui" secundário`, resumoDosBotoes(r2));
+    ok(feito.fundo !== fui1.fundo, `${tela}: o feito tem outro fundo que o sem resposta (${fui1.fundo} → ${feito.fundo})`);
+    await raiz().screenshot({ path: `${OUT}/${prefixo}-feito.png` });
+
+    await clicar(btn("Não fui"));
+    await raiz().locator('button[aria-pressed="true"]', { hasText: "Não fui" }).waitFor({ timeout: 30000 });
+    const r3 = await lerBotoes(raiz());
+    const [fui3, nao3] = r3.botoes;
+    ok(r3.botoes.length === 2 && fui3.texto === "Fui" && fui3.fundo === r3.cartao && !fui3.apertado &&
+        nao3.texto === "Não fui" && nao3.apertado && nao3.fundo === r3.atencaoFundo,
+      `${tela}, não fui: "Fui" secundário e "Não fui" em aviso`, resumoDosBotoes(r3));
+    await raiz().screenshot({ path: `${OUT}/${prefixo}-nao-fui.png` });
+
+    await clicar(btn("Não fui"));
+    await raiz().locator('button[aria-pressed="true"]').waitFor({ state: "detached", timeout: 30000 });
+    const r4 = await lerBotoes(raiz());
+    ok(r4.botoes.length === 2 && r4.botoes[0].fundo === r4.primaria && !r4.botoes.some((b) => b.apertado),
+      `${tela}: tocar de novo desfaz e volta ao "Fui" sólido`, resumoDosBotoes(r4));
+  }
+  /** O treino próprio: só "Fiz" (sem "Não fui"), sólido, e "Feito" depois de tocar. */
+  async function soFiz(tela, raiz) {
+    const btn = (nome) => raiz().getByRole("button", { name: nome, exact: true });
+    await hidratado(btn("Fiz"));
+    const r1 = await lerBotoes(raiz());
+    ok(r1.botoes.length === 1 && r1.botoes[0].texto === "Fiz" && r1.botoes[0].fundo === r1.primaria && r1.botoes[0].h >= 44,
+      `${tela}, treino próprio: só "Fiz", sólido, com 44 px`, resumoDosBotoes(r1));
+    await clicar(btn("Fiz"));
+    await btn("Feito").waitFor({ timeout: 30000 });
+    const r2 = await lerBotoes(raiz());
+    ok(r2.botoes.length === 1 && r2.botoes[0].apertado && r2.botoes[0].fundo === r2.primariaFundo,
+      `${tela}, treino próprio feito: "Feito" no fundo da principal`, resumoDosBotoes(r2));
+    await clicar(btn("Feito"));
+    await btn("Fiz").waitFor({ timeout: 30000 });
+  }
+  await etapa("check-in na Início", () => comEstado(async () => {
+    await carregar();
+    const doNutri = () => secao("Para hoje").locator("ul > li", { hasText: "do seu nutricionista" }).first();
+    const proprio = () => secao("Para hoje").locator("ul > li", { hasText: "seu treino" }).first();
+    await tresEstados("Início", doNutri, "checkin-inicio");
+    await soFiz("Início", proprio);
+  }));
+  await etapa("check-in na leitura do treino", () => comEstado(async () => {
+    await carregar();
+    const linkDe = async (texto) =>
+      secao("Para hoje").locator("ul > li", { hasText: texto }).first().locator('a[href^="/app/treino/"]').getAttribute("href");
+    const [doNutri, proprio] = [await linkDe("do seu nutricionista"), await linkDe("seu treino")];
+    const cartaoDoCheckIn = () => p.locator(".card", { hasText: "Você treinou hoje?" });
+    await p.goto(APP + doNutri, { waitUntil: "networkidle", timeout: 120000 });
+    await tresEstados("treino/[id]", cartaoDoCheckIn, "checkin-treino");
+    await p.goto(APP + proprio, { waitUntil: "networkidle", timeout: 120000 });
+    await soFiz("treino/[id]", cartaoDoCheckIn);
+  }));
+  await etapa("check-in em Treinos", () => comEstado(async () => {
+    await p.goto(APP + "/app/treinos", { waitUntil: "networkidle", timeout: 120000 });
+    await p.getByRole("heading", { name: "Treinos", exact: true }).waitFor({ timeout: 60000 });
+    // O cartão de hoje; num dia sem treino prescrito (o mock tem de segunda,
+    // terça, quinta, sexta e sábado), a primeira sessão do nutri da semana que
+    // já tem check-in.
+    const hoje = p.locator("div.card", { has: p.getByText("hoje", { exact: true }) });
+    const comCheckIn = (loc) => loc.filter({ has: p.locator("button[aria-pressed]") });
+    const doNutriHoje = comCheckIn(hoje.locator("li", { has: p.getByText("do nutri", { exact: true }) }));
+    await hoje.first().waitFor({ timeout: 60000 });
+    const doNutri = (await doNutriHoje.count())
+      ? () => doNutriHoje.first()
+      : () => comCheckIn(p.locator("li", { has: p.getByText("do nutri", { exact: true }) })).first();
+    await tresEstados("Treinos", doNutri, "checkin-treinos");
+    // "Iniciar treino" continua o primário da sessão, acima do check-in.
+    const ordem = await doNutri().evaluate((li) => {
+      const iniciar = [...li.querySelectorAll("button")].find((b) => b.textContent.trim() === "Iniciar treino");
+      const fui = [...li.querySelectorAll("button")].find((b) => b.textContent.trim() === "Fui");
+      return iniciar && fui ? iniciar.getBoundingClientRect().bottom <= fui.getBoundingClientRect().top : null;
+    });
+    if (ordem !== null) ok(ordem, '"Iniciar treino" vem acima do check-in');
+    const proprio = () => comCheckIn(hoje.locator("li", { hasNot: p.getByText("do nutri", { exact: true }) })).first();
+    await soFiz("Treinos", proprio);
+  }));
 
   console.log("\nSeu dia: anéis");
   await etapa("anéis", async () => {
@@ -370,6 +515,16 @@ async function clicar(loc) {
     }, antes, { timeout: 15000 }).catch(() => {});
     const desfeito = await numeroDoAnel("Água");
     ok(Math.abs(desfeito - antes) < 0.001, `"Desfazer" devolve o anel (${depois} → ${desfeito})`);
+    // O "Desfazer" some com a mensagem: o foco volta ao "+250 ml" (e não cai
+    // no <body>), e a região anuncia "Desfeito.".
+    await p.waitForFunction(() => document.activeElement?.textContent?.trim() === "+250 ml", null, { timeout: 10000 }).catch(() => {});
+    const focado = await p.evaluate(() => {
+      const e = document.activeElement;
+      return e ? `${e.tagName.toLowerCase()} "${(e.textContent || "").trim().slice(0, 30)}"` : "nada";
+    });
+    ok(focado === 'button "+250 ml"', `depois do "Desfazer", o foco está no "+250 ml" (${focado})`);
+    const avisoDesfeito = p.locator('[aria-live="polite"]', { has: p.getByText("Desfeito.", { exact: true }) });
+    ok((await avisoDesfeito.count()) === 1, 'e a região aria-live diz "Desfeito."');
 
     // Dois toques no mesmo instante: o segundo não pode ler o mesmo total e
     // apagar o primeiro. O que a tela mostra tem de ser o que ficou gravado.
@@ -400,8 +555,8 @@ async function clicar(loc) {
     const antes = await numeroDoAnel("Água");
     await comFalha("daily_logs", async () => {
       await botao.click();
-      const aviso = p.getByText("Não deu para registrar a água", { exact: true });
-      ok(await aviso.waitFor({ timeout: 15000 }).then(() => true, () => false), 'gravação falhando: aparece "Não deu para registrar a água"');
+      const aviso = p.getByText("Não deu para registrar a água.", { exact: true });
+      ok(await aviso.waitFor({ timeout: 15000 }).then(() => true, () => false), 'gravação falhando: aparece "Não deu para registrar a água."');
       await p.waitForTimeout(800);
       const depois = await numeroDoAnel("Água");
       ok(depois === antes, `e o anel não muda (${antes} → ${depois})`);
@@ -417,8 +572,8 @@ async function clicar(loc) {
     const antes = await numeroDoAnel("Água");
     await comFalha("daily_logs", async () => {
       await botao.click();
-      const aviso = p.getByText("Não deu para registrar a água", { exact: true });
-      ok(await aviso.waitFor({ timeout: 15000 }).then(() => true, () => false), 'leitura do total falhando: aparece "Não deu para registrar a água"');
+      const aviso = p.getByText("Não deu para registrar a água.", { exact: true });
+      ok(await aviso.waitFor({ timeout: 15000 }).then(() => true, () => false), 'leitura do total falhando: aparece "Não deu para registrar a água."');
       await p.waitForTimeout(800);
       ok((await numeroDoAnel("Água")) === antes, "e o anel não muda");
     });
@@ -493,7 +648,7 @@ async function clicar(loc) {
     await comFalha("body_measurements", async () => {
       await carregar();
       const t = await secao("Progresso").innerText().catch(() => "");
-      ok(t.includes("Não deu para carregar o peso"), 'peso falhando: "Não deu para carregar o peso"', t.slice(0, 160));
+      ok(t.includes("Não deu para carregar o peso."), 'peso falhando: "Não deu para carregar o peso."', t.slice(0, 160));
       ok(!t.includes("Registre seu peso algumas vezes"), "e não o estado vazio");
     });
   });

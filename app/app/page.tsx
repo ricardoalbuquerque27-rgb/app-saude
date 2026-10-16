@@ -155,7 +155,8 @@ export default async function DashboardPage() {
       .eq("status", "active")
       .limit(1)
       .maybeSingle(),
-    // As consultas mais recentes (inclusive as futuras), para a linha.
+    // As consultas da última semana em diante (inclusive as futuras) e os
+    // pedidos abertos, por início crescente (getConsultasDoCartao), para a linha.
     getConsultasDoCartao(supabase, uid),
     getPending(supabase, uid),
   ]);
@@ -507,16 +508,18 @@ export default async function DashboardPage() {
           {pesoFalhou ? (
             // Leitura que falha não é "não tem": sem isto, a falha virava o
             // "Registre seu peso" de quem nunca se pesou.
-            <p className="text-[15px] text-app-atencao">Não deu para carregar o peso</p>
+            <p className="text-[15px] text-app-atencao">Não deu para carregar o peso.</p>
           ) : peso30?.atual != null ? (
             <div className="flex flex-col gap-2.5">
               <p className="flex flex-wrap items-baseline gap-x-2">
                 <span className="tabular text-[22px] font-semibold text-app-texto">
                   {numeroFixo(peso30.atual)} kg
                 </span>
+                {/* A variação é dado (muda a cada pesagem): algarismo tabular,
+                    para não "dançar" ao lado do peso. */}
                 {peso30.variacao != null && (
                   <span className="text-[15px] text-app-texto-2">
-                    {textoVariacaoPeso(peso30.variacao)} em 30 dias
+                    <span className="tabular">{textoVariacaoPeso(peso30.variacao)}</span> em 30 dias
                   </span>
                 )}
               </p>

@@ -13,6 +13,12 @@ import { ProgressRing } from "@/components/ProgressRing";
 import { todayISO, formatDate } from "@/lib/date";
 import { useLiveRefresh } from "@/lib/useLiveRefresh";
 import { meuPerfil } from "@/lib/perfil";
+import { numeroBR } from "@/lib/numeros";
+
+// Litros em pt-BR, com até duas casas: a mesma conta da Início ("1,45 L"), onde
+// o passo é um copo de 250 ml e "1,2" depois de "+250 ml" não mudaria. Aqui era
+// `toFixed(1)` com ponto ("1.2 / 2.5 L", "💧 1.2L").
+const litros = (ml: number) => numeroBR(ml / 1000, 2);
 
 const MOODS = [
   { value: "otimo", label: "😄 Ótimo" },
@@ -166,8 +172,8 @@ export default function HabitosPage() {
         <div className="flex items-center gap-5">
           <ProgressRing
             pct={water / waterGoal}
-            centerMain={`${(water / 1000).toFixed(1)}`}
-            centerSub={`/ ${(waterGoal / 1000).toFixed(1)} L`}
+            centerMain={litros(water)}
+            centerSub={`/ ${litros(waterGoal)} L`}
             label="Hoje"
           />
           <div className="flex-1">
@@ -308,8 +314,9 @@ export default function HabitosPage() {
                   {formatDate(h.date)}
                 </span>
                 <div className="tabular flex flex-wrap gap-x-3 text-xs text-app-texto-2">
-                  <span>💧 {((h.water_ml ?? 0) / 1000).toFixed(1)}L</span>
-                  {h.sleep_hours != null && <span>😴 {h.sleep_hours}h</span>}
+                  <span>💧 {litros(h.water_ml ?? 0)} L</span>
+                  {/* Na mesma linha da água: vírgula também ("7,4 h", não "7.4h"). */}
+                  {h.sleep_hours != null && <span>😴 {numeroBR(Number(h.sleep_hours))} h</span>}
                   {h.steps != null && <span>👟 {h.steps}</span>}
                 </div>
               </div>

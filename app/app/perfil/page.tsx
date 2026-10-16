@@ -198,7 +198,7 @@ export default function PerfilPage() {
             {email}
           </p>
           {memberSince && (
-            <p className="mt-1.5 inline-flex items-center gap-1 text-xs text-app-texto-2">
+            <p className="mt-1.5 inline-flex items-center gap-1 text-[13px] text-app-texto-2">
               <CalendarClock className="h-3.5 w-3.5" />
               Membro desde{" "}
               {/* Com o fuso: sem ele, quem está fora do Brasil via outro mês na
@@ -235,7 +235,7 @@ export default function PerfilPage() {
               </button>
             ))}
           </div>
-          <p className="mt-1 text-xs text-app-texto-2">
+          <p className="mt-1 text-[13px] text-app-texto-2">
             Nutricionista acompanha pacientes; paciente registra a própria rotina.
             Ao salvar, a navegação do app muda.
           </p>
@@ -304,7 +304,7 @@ export default function PerfilPage() {
             <option value="F">Feminino</option>
             <option value="M">Masculino</option>
           </select>
-          <p className="mt-1 text-xs text-app-texto-2">
+          <p className="mt-1 text-[13px] text-app-texto-2">
             Usado para ajustar as faixas de referência dos seus exames (junto
             com a idade). Não é exibido para ninguém.
           </p>
@@ -312,7 +312,7 @@ export default function PerfilPage() {
 
         <h2 className="section-title pt-2">Metas</h2>
         {metasDoNutri && (
-          <p className="rounded-lg bg-app-primaria-fundo px-3 py-2 text-xs text-app-texto-2">
+          <p className="rounded-lg bg-app-primaria-fundo px-3 py-2 text-[13px] text-app-texto-2">
             Estas metas foram definidas pelo seu nutricionista. Você pode
             alterá-las, mas vale combinar antes — ele acompanha esses números.{" "}
             <Link

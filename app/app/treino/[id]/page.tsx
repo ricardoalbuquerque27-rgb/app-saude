@@ -75,11 +75,27 @@ export default async function TreinoDetalhe({
   const dowHoje = (new Date(hoje + "T12:00:00").getDay() + 6) % 7;
   const ehHoje = sessao.day_of_week === dowHoje;
 
-  const { data: feitos } = await supabase
-    .from("plan_completions")
-    .select("id, plan_id, date, status, workout_id")
-    .eq("user_id", uid)
-    .eq("date", hoje);
+  const [{ data: feitos }, vinculoRes] = await Promise.all([
+    supabase
+      .from("plan_completions")
+      .select("id, plan_id, date, status, workout_id")
+      .eq("user_id", uid)
+      .eq("date", hoje),
+    supabase
+      .from("patient_links")
+      .select("nutritionist_id")
+      .eq("patient_id", uid)
+      .eq("status", "active")
+      .limit(1)
+      .maybeSingle(),
+  ]);
+  // Prescrito é `prescribed_by` COM vínculo ativo, a mesma regra do "Para hoje"
+  // (montarParaHoje): depois que o paciente revoga, a sessão segue no plano dele
+  // com `prescribed_by`, e "Não fui" seria uma resposta que ninguém lê. Com a
+  // leitura do vínculo falhando, vale o que a sessão diz (`prescribed_by`): o
+  // check-in grava a mesma linha nos dois casos, e tirar o "Não fui" de quem
+  // tem nutricionista por uma falha de leitura seria pior.
+  const doNutri = !!sessao.prescribed_by && (!!vinculoRes.data || !!vinculoRes.error);
 
   const titulo = sessao.title || rotina?.name || sessao.sport;
 
@@ -142,6 +158,7 @@ export default async function TreinoDetalhe({
             sessions={[sessao] as any}
             date={hoje}
             completions={(feitos ?? []) as any}
+            doNutri={doNutri}
             compact
           />
           <p className="mt-2 text-xs text-app-texto-2">

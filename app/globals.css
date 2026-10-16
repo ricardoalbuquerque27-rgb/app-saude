@@ -204,8 +204,12 @@ input[type="number"] {
   from { transform: translateY(100%); }
   to   { transform: none; }
 }
-.pf-backdrop { animation: pf-fade 0.2s ease-out both; }
-.pf-panel    { animation: pf-zoom 0.26s cubic-bezier(0.16, 1, 0.3, 1) both; }
+/* `backwards` e não `both` em todas as entradas, pelo motivo do `.pf-in`
+   (acima): o `transform` que o fim da animação deixava aplicado vira o bloco
+   de contenção dos filhos `position: fixed`. O fade não tem `transform`, mas
+   fica igual para ninguém copiar o `both` dele. */
+.pf-backdrop { animation: pf-fade 0.2s ease-out backwards; }
+.pf-panel    { animation: pf-zoom 0.26s cubic-bezier(0.16, 1, 0.3, 1) backwards; }
 
 /* O modal sobe como folha no celular e dá zoom no desktop. Precisa ser
    media query no CSS: variantes do Tailwind (sm:) não alcançam classes
@@ -217,13 +221,14 @@ input[type="number"] {
 @media (min-width: 640px) {
   .pf-modal { animation: pf-zoom 0.26s cubic-bezier(0.16, 1, 0.3, 1) backwards; }
 }
-.pf-sheet    { animation: pf-slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.pf-sheet    { animation: pf-slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) backwards; }
 
 @keyframes pf-slide-left {
   from { transform: translateX(100%); }
   to   { transform: none; }
 }
-.pf-drawer { animation: pf-slide-left 0.28s cubic-bezier(0.16, 1, 0.3, 1) both; }
+/* A gaveta "Mais" do AppShell: um filho `fixed` nela ficaria preso a ela com o `both`. */
+.pf-drawer { animation: pf-slide-left 0.28s cubic-bezier(0.16, 1, 0.3, 1) backwards; }
 
 /* Esqueleto de carregamento */
 @keyframes pf-shimmer {

@@ -27,7 +27,10 @@ export function CartaoConsulta({
   nutriNome,
   falhou,
 }: {
-  /** As consultas do paciente, quaisquer, das mais recentes. */
+  /**
+   * As consultas do paciente, na ordem de getConsultasDoCartao (início
+   * crescente). A escolha de `estadoDaConsulta` não depende da ordem.
+   */
   consultas: Consulta[];
   agora: string;
   nutriNome?: string;
@@ -96,10 +99,10 @@ export function CartaoConsulta({
     return (
       <section className="card" aria-label="Consulta">
         {titulo}
-        <p className="text-sm text-app-texto-2">
-          Não foi possível carregar suas consultas. Atualize a página para
-          tentar de novo.
-        </p>
+        {/* A mesma frase e a mesma cor da linha da Início (LinhaDaConsulta):
+            o cartão dizia outra coisa, em cinza, e a falha parecia um aviso
+            qualquer. */}
+        <p className="text-sm text-app-atencao">Não deu para carregar a consulta.</p>
       </section>
     );
   }
