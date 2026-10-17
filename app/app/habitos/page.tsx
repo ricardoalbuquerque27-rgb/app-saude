@@ -184,7 +184,7 @@ export default function HabitosPage() {
                   onClick={() => addWater(ml)}
                   className="btn-ghost flex-col gap-0.5 py-2 text-xs"
                 >
-                  <Plus className="h-4 w-4" /> {ml}ml
+                  <Plus className="h-4 w-4" /> {ml} ml
                 </button>
               ))}
             </div>
@@ -193,7 +193,7 @@ export default function HabitosPage() {
               className="mt-2 flex min-h-[44px] w-full items-center justify-center gap-1 rounded-xl text-xs font-medium text-app-texto-2 transition hover:bg-app-primaria-fundo disabled:opacity-40"
               disabled={water <= 0}
             >
-              <Minus className="h-3.5 w-3.5" /> Remover 200ml
+              <Minus className="h-3.5 w-3.5" /> Remover 200 ml
             </button>
           </div>
         </div>
