@@ -149,7 +149,7 @@ describe("registrar_agua (assistente)", () => {
     const r = await executeAction("registrar_agua", JSON.stringify({ ml: 250 }), banco, UID);
     expect(r).toEqual({
       ok: true,
-      resumo: "+250 ml de água. Total de hoje: 1250 ml (1.3 L).",
+      resumo: "+250 ml de água. Total de hoje: 1250 ml (1,25 L).",
     });
     expect(banco.upserts[0].linha).toEqual({ user_id: UID, date: todayISO(), water_ml: 1250 });
   });
@@ -159,7 +159,7 @@ describe("registrar_agua (assistente)", () => {
     const r = await executeAction("registrar_agua", JSON.stringify({ ml: -250 }), banco, UID);
     expect(r).toEqual({
       ok: true,
-      resumo: "-250 ml de água. Total de hoje: 0 ml (0.0 L).",
+      resumo: "-250 ml de água. Total de hoje: 0 ml (0 L).",
     });
   });
 

@@ -632,7 +632,7 @@ describe("montarLinhaDoTempo", () => {
       HOJE
     );
     expect(itens).toHaveLength(1);
-    expect(itens[0].detail).toBe("1.8 L de água");
+    expect(itens[0].detail).toBe("1,75 L de água");
   });
 
   it("registro retroativo fica no dia a que se refere", () => {

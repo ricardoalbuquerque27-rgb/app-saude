@@ -1,4 +1,5 @@
 import { todayISO, addDaysISO, diasNaJanela, naJanela } from "@/lib/date";
+import { numeroBR } from "@/lib/numeros";
 import { computeAdherence } from "@/lib/planCheckIn";
 import { alertasDeConsulta, COLUNAS_CONSULTA, type Consulta } from "@/lib/consultas";
 
@@ -625,7 +626,7 @@ export function montarLinhaDoTempo(
   }
   for (const l of logs) {
     const parts = [
-      l.water_ml ? `${(Number(l.water_ml) / 1000).toFixed(1)} L de água` : null,
+      l.water_ml ? `${numeroBR(Number(l.water_ml) / 1000, 2)} L de água` : null,
       l.sleep_hours ? `${l.sleep_hours} h de sono` : null,
       l.steps ? `${l.steps} passos` : null,
       l.mood ? `humor: ${l.mood}` : null,

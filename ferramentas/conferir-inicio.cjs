@@ -360,6 +360,32 @@ async function clicar(loc) {
     const proprio = () => secao("Para hoje").locator("ul > li", { hasText: "seu treino" }).first();
     await tresEstados("Início", doNutri, "checkin-inicio");
     await soFiz("Início", proprio);
+
+    // Um "não fui" já gravado no treino próprio (a semana de Treinos oferecia
+    // "Não fui" a todo treino, e a sessão do nutri desvinculado vira própria):
+    // aparece marcado, em aviso, e tocar nele desfaz. Sem isso, a resposta
+    // gravada era um "Fiz" secundário sem nada dizendo que ele não foi.
+    // "p-f" é o treino próprio do mock, no dia de hoje.
+    const maria = await entrarComoMaria();
+    const gravou = await fetch(`${MOCK}/rest/v1/plan_completions`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${maria.access_token}` },
+      body: JSON.stringify({ user_id: maria.user.id, plan_id: "p-f", date: hojeSP(), status: "skipped" }),
+    });
+    ok(gravou.status === 201, `o mock grava "não fui" no treino próprio (${gravou.status})`);
+    await carregar();
+    const naoFui = () => proprio().getByRole("button", { name: "Não fui", exact: true });
+    await hidratado(naoFui());
+    const r5 = await lerBotoes(proprio());
+    const [fiz5, nao5] = r5.botoes;
+    ok(r5.botoes.length === 2 && fiz5.texto === "Fiz" && fiz5.fundo === r5.cartao && !fiz5.apertado &&
+        nao5.texto === "Não fui" && nao5.apertado && nao5.fundo === r5.atencaoFundo && nao5.h >= 44,
+      `Início, treino próprio com "não fui" gravado: "Fiz" secundário e "Não fui" em aviso`, resumoDosBotoes(r5));
+    await clicar(naoFui());
+    await naoFui().waitFor({ state: "detached", timeout: 30000 });
+    const r6 = await lerBotoes(proprio());
+    ok(r6.botoes.length === 1 && r6.botoes[0].texto === "Fiz" && r6.botoes[0].fundo === r6.primaria,
+      `Início, treino próprio: tocar no "Não fui" gravado desfaz, e ele some`, resumoDosBotoes(r6));
   }));
   await etapa("check-in na leitura do treino", () => comEstado(async () => {
     await carregar();

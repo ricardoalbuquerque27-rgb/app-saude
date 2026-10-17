@@ -79,7 +79,8 @@ cabeçalho sem "N pendentes"), o check-in com uma regra só nas três telas (na
 Início, na leitura do treino e na semana de Treinos, tocando nos botões: sem
 resposta, "Fui" sólido e "Não fui" secundário; feito, "Feito" com o check num
 fundo diferente do sem resposta; não fui, "Não fui" em aviso; tocar de novo
-desfaz; o treino próprio só com "Fiz"; os 44 px; e "Iniciar treino" acima do
+desfaz; o treino próprio só com "Fiz", e o "não fui" gravado nele marcado em
+aviso e desfeito ao toque; os 44 px; e "Iniciar treino" acima do
 check-in em Treinos; um PNG de cada estado), o "Calorias · limite" e o "acima
 do limite" (com uma refeição de 2.400 kcal que o roteiro grava no mock), o
 centro dos anéis em `tabular-nums`, o Score que abre nos quatro pilares, a
@@ -106,6 +107,11 @@ vem do `font-family` computado: o `body`, o `h1` e o `h2` da Início da Maria e,
 num segundo contexto logado como `nutri.teste@exemplo.com`, o `body` e o `h1`
 da `NutriHome`. O `next/font` renomeia a família (`__Instrument_Sans_…`), por
 isso a expressão é `/Instrument[ _]Sans/`.
+
+**Na quarta e no domingo as etapas do check-in falham**, porque o mock não tem
+treino prescrito nesses dias da semana (o "Para hoje" fica sem a linha "do seu
+nutricionista"): não é defeito do app. Rode noutro dia, ou acrescente ao mock
+uma sessão prescrita no dia em que for rodar.
 
 `conferir-dieta.cjs` faz o mesmo com a Dieta da Maria (mock sem cenário, dev no
 ar; `SO=regex` roda só as etapas cujo nome casa): o rótulo do dia ("Hoje, qui. 15/10") que abre o seletor de data pelo

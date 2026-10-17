@@ -7,6 +7,7 @@
 
 import { todayISO, addDaysISO } from "@/lib/date";
 import { adicionarAgua } from "@/lib/agua";
+import { numeroBR } from "@/lib/numeros";
 import { classifyExam, EXAM_STATUS_LABEL, type Sex } from "@/lib/examRanges";
 
 // Idade em anos a partir da data de nascimento (AAAA-MM-DD).
@@ -722,7 +723,7 @@ export async function executeAction(
         const sinal = ml > 0 ? `+${ml}` : `${ml}`;
         return {
           ok: true,
-          resumo: `${sinal} ml de água. Total de hoje: ${total} ml (${(total / 1000).toFixed(1)} L).`,
+          resumo: `${sinal} ml de água. Total de hoje: ${total} ml (${numeroBR(total / 1000, 2)} L).`,
         };
       }
 

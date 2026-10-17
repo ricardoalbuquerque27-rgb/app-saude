@@ -18,7 +18,7 @@ import {
 // da Início, a leitura do treino em `treino/[id]` e a semana de Treinos), e
 // ela mora só aqui, em `BotoesDoCheckIn`:
 //
-//   estado         "Fui" ("Fiz" no treino próprio)          "Não fui" (só no prescrito)
+//   estado         "Fui" ("Fiz" no treino próprio)          "Não fui" (no prescrito, ou já gravado)
 //   sem resposta   sólido (o primário)                      secundário
 //   feito          confirmado: fundo da principal, check     secundário
 //                  e o rótulo "Feito"
@@ -30,6 +30,11 @@ import {
 // tinha "Fiz" na Início e "Fui/Não fui" em Treinos; e, na linha da Início, o
 // confirmado e o sem resposta só se distinguiam por um ícone. O aviso é âmbar,
 // e não verde, porque verde diria que faltar foi bom.
+//
+// No treino próprio, o "Não fui" só aparece quando já está gravado: a semana de
+// Treinos oferecia "Não fui" a todo treino, e a sessão do nutri que o paciente
+// desvinculou fica como própria. Sem ele, a resposta gravada virava um "Fiz"
+// secundário sem nada dizendo que ele não foi, e não havia como desfazê-la.
 const SOLIDO = "bg-app-primaria text-app-sobre-primaria hover:[filter:brightness(0.94)]";
 const CONFIRMADO = "bg-app-primaria-fundo text-app-primaria";
 const SECUNDARIO = "border border-app-campo bg-app-cartao text-app-texto hover:bg-app-primaria-fundo";
@@ -43,8 +48,9 @@ const BOTAO =
  * prescrita pelo nutricionista com vínculo ativo (`prescribed_by` e o vínculo,
  * como em `montarParaHoje`): ela tem "Fui" e "Não fui". A do próprio paciente
  * tem só "Fiz": "não fui" é uma resposta para o nutricionista, e sem vínculo
- * ninguém a lê. `esticar` divide a largura entre os botões (a leitura do
- * treino e a semana de Treinos).
+ * ninguém a lê (o "Não fui" só aparece nela já gravado, para ser desfeito).
+ * `esticar` divide a largura entre os botões (a leitura do treino e a semana
+ * de Treinos).
  */
 export function BotoesDoCheckIn({
   status,
@@ -85,7 +91,7 @@ export function BotoesDoCheckIn({
         {ocupado === "done" ? girando : feito ? <Check className="h-4 w-4" aria-hidden="true" /> : null}
         {feito ? "Feito" : doNutri ? "Fui" : "Fiz"}
       </button>
-      {doNutri && (
+      {(doNutri || naoFui) && (
         <button
           type="button"
           onClick={() => onMarcar("skipped")}

@@ -467,6 +467,9 @@ com a altura fixa a segunda linha caía para fora da tela). Mexeu no padding, no
 `EditorRegistro` também conta com ela) e rode `conferir-inicio`, que mede o
 encaixe, o `elementFromPoint` no "Mais" e o caso de 34 px de safe area. O `env`
 vale 0 hoje, porque o `viewport` do layout raiz não pede `viewport-fit: cover`.
+Quem ligar o `cover` confira o "Registrar" de novo: com 34 px de safe area o
+balão sobe com a barra e volta a cobri-lo em 390×844, e o `conferir-inicio` só
+mede o "Registrar" sem safe area.
 No computador (`lg`) o balão é o de sempre, 56 px em `bottom-6 right-6`. Só o
 paciente tem a Gaia (`!isNutri`); a barra do nutricionista só ganhou a altura
 fixa.
@@ -499,9 +502,13 @@ Nenhuma classe de botão do check-in fica fora desse arquivo. Prescrito é
 `prescribed_by` **com vínculo ativo** (`montarParaHoje`; Treinos e a leitura
 do treino leem `patient_links`, e com essa leitura falhando vale o
 `prescribed_by`): só ele tem "Não fui"; o treino próprio tem só "Fiz", em toda
-parte. A forma da Início mora numa prop própria, e o `compact` mantém a
-estrutura: redesenhá-lo lá punha um `<li>` fora de lista e repetia o nome e a
-nota. O lado clínico não o usa. Em Treinos, "Iniciar treino" (o primário da
+parte, menos quando um "não fui" já está gravado nele (de quando Treinos
+oferecia "Não fui" a todo treino, ou de antes de o paciente revogar o vínculo):
+aí o "Não fui" aparece marcado, para poder ser desfeito. Sem ele, a resposta
+gravada virava um "Fiz" secundário sem nada dizendo que ele não foi. A forma
+da Início mora numa prop própria, e o `compact` mantém a estrutura:
+redesenhá-lo lá punha um `<li>` fora de lista e repetia o nome e a nota. O
+lado clínico não o usa. Em Treinos, "Iniciar treino" (o primário da
 sessão, na largura toda) vem acima do check-in, e no dia sem resposta os dois
 são sólidos (ver "Em aberto").
 
@@ -714,6 +721,14 @@ Modal fora do lugar: procure um `transform` num ancestral.
   de 390×844 não cobre mais nenhuma ação da Início nem da Dieta, mas o "Remover"
   de Treinos e um campo do Perfil ficam sob ele (já ficavam), e a 320×800 ele
   encosta no "Fiz" da Início.
+- **A barra de baixo não cresce com o texto ampliado.** A altura é fixa em px
+  (`--barra-h`, o que mantém a Gaia encaixada), e com o tamanho de texto da
+  acessibilidade do Chrome no Android perto de 180% o rótulo de 11 px é cortado
+  na borda de baixo. Antes a barra crescia com ele.
+- **Com a leitura do vínculo falhando, a mesma sessão do nutri tem dois
+  check-ins**: "Fiz" na Início (`montarParaHoje` a trata como sem vínculo) e
+  "Fui/Não fui" em Treinos e na leitura do treino (que caem no
+  `prescribed_by`). A Início avisa "Não deu para carregar tudo." nesse caso.
 - **A Início perde o "limite" ou "meta" do anel de Calorias quando a leitura
   do peso falha.** Os números do anel estão certos e o Progresso diz "Não deu
   para carregar o peso"; aceito, porque a falha já aparece ali.
