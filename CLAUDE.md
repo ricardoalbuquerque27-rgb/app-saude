@@ -711,6 +711,16 @@ Modal fora do lugar: procure um `transform` num ancestral.
   (iniciar em cima, check-in embaixo) é porque terminar o treino ao vivo já
   marca "Feito", e o check-in é de quem treinou sem o cronômetro. Os dois
   sólidos juntos pedem decisão do dono do produto.
+- **Em Treinos, o check-in que falha não avisa.** `markPlan`
+  (`app/app/treinos/page.tsx`) ignora o retorno de `setPlanCheck`; o `load()`
+  logo depois devolve o botão ao que está no banco, então a resposta some sem
+  mensagem.
+- **"Iniciar treino" num dia que já passou grava em hoje.** A sessão ao vivo,
+  ao terminar, grava o treino e o "Feito" com `todayISO()`
+  (`app/app/treinos/page.tsx`, perto das linhas 501 e 546), não no dia da
+  sessão. O "Feito" vai com o id da sessão de segunda e a data de sábado, e
+  nenhum dia da semana o mostra (cada dia procura a data dele): quem inicia no
+  sábado o treino de segunda segue com a segunda sem resposta.
 - **O Tratamento ainda pinta a variação de peso** (perda verde, ganho em
   `app-perigo`), ao contrário da Início, do `StatCard` e de Medidas.
 - **"do nutri" em Treinos e "Prescrito por" na leitura do treino vêm só de
