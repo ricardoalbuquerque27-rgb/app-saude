@@ -89,7 +89,19 @@ toques, e "Não deu para registrar a água." com a escrita ou a leitura de
 `daily_logs` falhando), o "Não deu para carregar os números de hoje." com
 `meals`, `daily_logs` ou `profiles` falhando, o Progresso de 30 dias e o "Não
 deu para carregar o peso.", os alvos de 44 px, os links,
-nenhuma caixa alta nem degradê e nenhuma rolagem lateral. A Instrument Sans
+nenhuma caixa alta nem degradê e nenhuma rolagem lateral. A Gaia encaixada na
+barra de baixo (`ChatWidget` e `AppShell`): o balão com 44×44 px e redondo,
+10 px dentro da borda de cima da barra e a 16 px da margem direita, acima dela
+no empilhamento; a caixa dele sem cruzar o ícone nem o rótulo do "Mais";
+`elementFromPoint` no centro do ícone e do rótulo devolvendo o "Mais"; os 44 px
+de baixo do "Mais" e do "Hábitos" sem balão por cima (grade de 4 em 4 px); a
+barra com 61,5 px de altura fixa; o "Registrar" da aplicação inteiro na primeira
+tela, sem balão nem barra por cima; o painel aberto a 80 px do fundo e sem o
+balão; e, com 34 px de safe area emulados pelo CDP
+(`Emulation.setSafeAreaInsetsOverride`), a barra com 95,5 px, o balão ainda a 10
+px dentro dela e o painel a 114 px do fundo. O roteiro volta ao topo antes de
+medir (`goto` para a mesma rota restaura a rolagem, e rolada a página esconde o
+balão: o dedo não o acharia e a conta daria zero sem provar nada). A Instrument Sans
 vem do `font-family` computado: o `body`, o `h1` e o `h2` da Início da Maria e,
 num segundo contexto logado como `nutri.teste@exemplo.com`, o `body` e o `h1`
 da `NutriHome`. O `next/font` renomeia a família (`__Instrument_Sans_…`), por
@@ -121,8 +133,11 @@ pelo `page.route`) e na Início, e a rolagem até
 linha que diz que as refeições do dia não carregaram e **sem a nota "Tocar em
 Comi isso registra a refeição na sua Dieta"**, que falaria de um botão que não
 está na tela), o formulário de refeição
-(só a linguagem mudou), os atalhos `?novo=1` e `?foto=1`, nenhuma caixa alta nem
-classe da paleta antiga e nenhuma rolagem lateral.
+(só a linguagem mudou), os atalhos `?novo=1` e `?foto=1`, o "ver em Meu plano"
+inteiro na primeira tela sem o balão da Gaia nem a barra por cima (o balão
+flutuava sobre ele; o roteiro volta ao topo antes de medir, pelo mesmo motivo
+da Início), nenhuma caixa alta nem classe da paleta antiga e nenhuma rolagem
+lateral.
 
 | `CENARIO`  | Quem entra          | Para quê |
 |------------|---------------------|----------|

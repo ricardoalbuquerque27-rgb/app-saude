@@ -134,6 +134,18 @@ async function clicar(loc) {
     await p.locator("h1").first().waitFor({ timeout: 60000 });
     await p.waitForTimeout(600);
   };
+  /** O painel da Gaia aberto: a que distância do fundo e da barra ele acaba, e se o balão saiu de cena. */
+  const medirPainel = () =>
+    p.evaluate(() => {
+      const painel = document.querySelector('button[aria-label="Fechar"]')?.closest("div.fixed");
+      const nav = document.querySelector("nav.fixed.inset-x-0.bottom-0");
+      if (!painel || !nav) return null;
+      const r = painel.getBoundingClientRect();
+      return {
+        top: Math.round(r.top), b: r.bottom, doFundo: Math.round((innerHeight - r.bottom) * 100) / 100,
+        barra: nav.getBoundingClientRect().top, balao: !!document.querySelector('button[aria-label="Abrir a Gaia"]'),
+      };
+    });
   const antesMs = Date.now();
   await carregar();
   const depoisMs = Date.now();
@@ -684,6 +696,183 @@ async function clicar(loc) {
 
   await p.screenshot({ path: `${OUT}/inicio-390.png`, fullPage: true });
   await p.screenshot({ path: `${OUT}/v-topo.png` });
+
+  console.log("\nGaia na barra de baixo");
+  // O balão da Gaia (44 px) fica na borda de cima da barra de baixo, à direita,
+  // e não flutua mais sobre o conteúdo: em 390 px ele cortava o "Registrar" da
+  // aplicação ("Regis") e cobria o "ver em Meu plano" da Dieta. A barra tem
+  // altura fixa (`--barra-h`), e o balão entra só na folga de cima dela, para
+  // não cobrir o ícone nem o rótulo do "Mais", que fica logo abaixo. Tudo
+  // medido com o dedo: `elementFromPoint`, não só com caixas.
+  await etapa("Gaia na barra de baixo", async () => {
+    await carregar();
+    // O `goto` para a mesma rota recarrega com a rolagem de volta, e rolada a
+    // página esconde o balão (o dedo não o acharia): volta ao topo (`instant`:
+    // o html tem scroll-behavior: smooth) e espera o balão voltar.
+    await p.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+    await p.waitForTimeout(500);
+    const g = await p.evaluate(() => {
+      const caixa = (e) => {
+        const b = e.getBoundingClientRect();
+        return { x: b.left, y: b.top, r: b.right, b: b.bottom, w: b.width, h: b.height };
+      };
+      const cruza = (a, c) => a.x < c.r && a.r > c.x && a.y < c.b && a.b > c.y;
+      const fab = document.querySelector('button[aria-label="Abrir a Gaia"]');
+      const nav = document.querySelector("nav.fixed.inset-x-0.bottom-0");
+      const mais = [...nav.querySelectorAll("button")].find((b) => b.textContent.trim() === "Mais");
+      const habitos = [...nav.querySelectorAll("a")].find((a) => a.textContent.trim() === "Hábitos");
+      const registrar = [...document.querySelectorAll("li")]
+        .filter((li) => /Aplicação (de hoje|atrasada)/.test(li.textContent))
+        .map((li) => [...li.querySelectorAll("a")].find((a) => a.textContent.trim() === "Registrar"))
+        .find(Boolean);
+      const rotulo = [...mais.childNodes].find((n) => n.nodeType === 3 && n.textContent.trim() === "Mais");
+      const faixa = document.createRange();
+      faixa.selectNodeContents(rotulo);
+      const icone = mais.querySelector("svg");
+      const ponto = mais.querySelector("span > span");
+      const centro = (c) => [c.x + c.w / 2, c.y + c.h / 2];
+      const acerta = (el, [x, y]) => {
+        const h = document.elementFromPoint(x, y);
+        return !!h && el.contains(h);
+      };
+      // Grade (de 4 em 4 px) sobre os 44 px de baixo da célula inteira.
+      const livre = (el) => {
+        const c = caixa(el);
+        const erros = [];
+        let n = 0;
+        for (let x = c.x + 2; x < c.r; x += 4) {
+          for (let y = c.b - 44 + 2; y < c.b; y += 4) {
+            n++;
+            if (!acerta(el, [x, y])) erros.push(`${Math.round(x)},${Math.round(y)}`);
+          }
+        }
+        return { larg: c.w, n, erros: erros.slice(0, 5), nErros: erros.length };
+      };
+      const cf = caixa(fab);
+      // O balão é redondo e o ponto de novidade fica no canto do ícone: o que
+      // vale é o círculo, não a caixa do balão (cujo canto vazio o dedo não toca).
+      const cruzaCirculo = (c) => {
+        const cx = cf.x + cf.w / 2, cy = cf.y + cf.h / 2;
+        const px = Math.min(Math.max(cx, c.x), c.r), py = Math.min(Math.max(cy, c.y), c.b);
+        return Math.hypot(cx - px, cy - py) < cf.w / 2;
+      };
+      const cm = caixa(mais);
+      const cI = caixa(icone);
+      const cR = (() => { const b = faixa.getBoundingClientRect(); return { x: b.left, y: b.top, r: b.right, b: b.bottom, w: b.width, h: b.height }; })();
+      const cP = ponto ? caixa(ponto) : null;
+      const cN = caixa(nav);
+      const cReg = registrar ? caixa(registrar) : null;
+      const regErros = [];
+      if (cReg) {
+        // De 3 em 3 px e SEMPRE com a última linha e a última coluna: o topo
+        // do balão chegou a entrar 1,5 px no pé do botão, e uma grade que
+        // para antes da borda não via. "Tapado" é o dedo achar o balão ou a
+        // barra ali; o canto arredondado do botão, que devolve a linha da
+        // lista, não é tapado por ninguém.
+        const pontos = (de, ate) => {
+          const v = [];
+          for (let t = de + 0.5; t < ate - 0.5; t += 3) v.push(t);
+          v.push(ate - 0.5);
+          return v;
+        };
+        for (const x of pontos(cReg.x, cReg.r)) {
+          for (const y of pontos(cReg.y, cReg.b)) {
+            const h = document.elementFromPoint(x, y);
+            if (h && (fab.contains(h) || nav.contains(h))) regErros.push(`${Math.round(x)},${Math.round(y)}`);
+          }
+        }
+      }
+      return {
+        fab: cf, nav: cN, mais: cm, icone: cI, rotulo: cR, ponto: cP,
+        raio: getComputedStyle(fab).borderTopLeftRadius,
+        z: [Number(getComputedStyle(fab).zIndex), Number(getComputedStyle(nav).zIndex)],
+        cruzaIcone: cruza(cf, cI), cruzaRotulo: cruza(cf, cR), cruzaPonto: cP ? cruzaCirculo(cP) : false, temPonto: !!cP,
+        noIcone: acerta(mais, centro(cI)), noRotulo: acerta(mais, centro(cR)),
+        noFab: (() => { const h = document.elementFromPoint(...centro(cf)); return !!h && fab.contains(h); })(),
+        livreMais: livre(mais), livreHabitos: livre(habitos),
+        janela: innerWidth, registrar: cReg, regErros: regErros.slice(0, 5), nRegErros: regErros.length, altJanela: innerHeight,
+      };
+    });
+    const f = g.fab;
+    ok(Math.abs(f.w - 44) < 0.5 && Math.abs(f.h - 44) < 0.5, `o balão da Gaia tem 44×44 px (${f.w}×${f.h})`);
+    ok(parseFloat(g.raio) >= 22, `e é redondo (raio ${g.raio})`);
+    // "Na borda de cima": a linha de cima da barra atravessa o balão, e só os
+    // últimos 10 px dele entram na barra (a folga acima do ícone do Mais é de
+    // 11 px: 1 de borda e 10 de respiro; 10 deixa o topo do balão abaixo do
+    // pé do "Registrar", que acaba em 748 px, e 1 px antes do ícone).
+    const entra = f.b - g.nav.y;
+    ok(entra >= 1 && entra <= 10.5 && f.y < g.nav.y,
+      `o balão está na borda de cima da barra (entra ${Math.round(entra * 10) / 10} px; esperado de 1 a 10)`,
+      `balão y=${Math.round(f.y)}..${Math.round(f.b)} · barra y=${Math.round(g.nav.y)}`);
+    ok(Math.abs(g.janela - 16 - f.r) < 0.5, `à direita, na margem de 16 px da página (${Math.round((g.janela - f.r) * 10) / 10} px)`);
+    ok(g.z[0] > g.z[1] && g.noFab, `acima da barra no empilhamento (z ${g.z[0]} > ${g.z[1]}) e é o que o dedo acha no centro dele`);
+    ok(!g.cruzaIcone && !g.cruzaRotulo && !g.cruzaPonto,
+      `a caixa do balão não cruza o ícone nem o rótulo do Mais${g.temPonto ? ", e o círculo não toca o ponto de novidade" : ""}`,
+      `balão ${Math.round(f.y)}..${Math.round(f.b)} · ícone ${Math.round(g.icone.y)}..${Math.round(g.icone.b)} · rótulo ${Math.round(g.rotulo.y)}..${Math.round(g.rotulo.b)}`);
+    ok(g.noIcone, 'elementFromPoint no centro do ícone devolve o "Mais"');
+    ok(g.noRotulo, 'elementFromPoint no centro do rótulo devolve o "Mais"');
+    ok(g.livreMais.larg >= 44 && g.livreMais.nErros === 0,
+      `o "Mais" mantém 44×44 livres (${Math.round(g.livreMais.larg)} px de largura; ${g.livreMais.n - g.livreMais.nErros}/${g.livreMais.n} pontos da faixa de baixo)`,
+      g.livreMais.erros.join(" "));
+    ok(g.livreHabitos.larg >= 44 && g.livreHabitos.nErros === 0,
+      `o "Hábitos", vizinho dele, também (${Math.round(g.livreHabitos.larg)} px; ${g.livreHabitos.n - g.livreHabitos.nErros}/${g.livreHabitos.n} pontos)`,
+      g.livreHabitos.erros.join(" "));
+    ok(Math.abs(g.nav.h - 61.5) < 0.1, `a barra tem altura fixa de 61,5 px (${g.nav.h}), o que o balão usa para achar a borda dela`);
+    ok(!!g.registrar && g.registrar.b <= g.nav.y && g.nRegErros === 0,
+      `o "Registrar" da aplicação está inteiro na primeira tela e o dedo o acha em toda a caixa (${g.registrar ? Math.round(g.registrar.w) + "×" + Math.round(g.registrar.h) : "ausente"}, ${g.nRegErros} pontos tapados)`,
+      g.regErros.join(" "));
+    await p.screenshot({ path: `${OUT}/gaia-na-barra.png` });
+
+    // Aberto, o painel segue 80 px acima do fundo (61,5 da barra e 18,5 de
+    // vão, como era com o `bottom-20`), acima da barra, e o balão sai de cena:
+    // um não fica por cima do outro.
+    await clicar(p.locator('button[aria-label="Abrir a Gaia"]'));
+    await p.locator('button[aria-label="Fechar"]').waitFor({ timeout: 10000 });
+    const painel = await medirPainel();
+    ok(painel && Math.abs(painel.doFundo - 80) < 0.1 && painel.top === 64 && painel.b <= painel.barra - 18 && !painel.balao,
+      `aberto, o painel acaba 80 px acima do fundo e 18,5 acima da barra, sem o balão por cima (${painel ? painel.doFundo : "?"} px do fundo, topo ${painel ? painel.top : "?"}, balão ${painel && painel.balao ? "ainda na tela" : "fora"})`);
+    await p.locator('button[aria-label="Fechar"]').click();
+    await p.locator('button[aria-label="Abrir a Gaia"]').waitFor({ timeout: 10000 });
+  });
+
+  // Com recorte do aparelho (a barra de início do iPhone), a barra engorda por
+  // baixo e o balão acompanha a borda dela: a posição vem da mesma conta
+  // (`--barra-h` + `env(safe-area-inset-bottom)`), não de um número que só vale
+  // sem o recorte. O Chromium emula o recorte pelo CDP.
+  await etapa("Gaia na barra de baixo com safe area", async () => {
+    const cdp = await ctx.newCDPSession(p);
+    try {
+      await cdp.send("Emulation.setSafeAreaInsetsOverride", { insets: { top: 0, bottom: 34, left: 0, right: 0 } });
+      await p.waitForTimeout(400);
+      const m = await p.evaluate(() => {
+        const sonda = document.createElement("div");
+        sonda.style.cssText = "position:fixed;left:0;top:0;padding-bottom:env(safe-area-inset-bottom);visibility:hidden";
+        document.body.appendChild(sonda);
+        const env = parseFloat(getComputedStyle(sonda).paddingBottom);
+        sonda.remove();
+        const nav = document.querySelector("nav.fixed.inset-x-0.bottom-0").getBoundingClientRect();
+        const fab = document.querySelector('button[aria-label="Abrir a Gaia"]').getBoundingClientRect();
+        const mais = [...document.querySelectorAll("nav.fixed button")].find((b) => b.textContent.trim() === "Mais");
+        const icone = mais.querySelector("svg").getBoundingClientRect();
+        const h = document.elementFromPoint(icone.left + icone.width / 2, icone.top + icone.height / 2);
+        return { env, navH: nav.height, entra: fab.bottom - nav.top, folga: icone.top - fab.bottom, noIcone: !!h && mais.contains(h), fabH: fab.height };
+      });
+      ok(m.env === 34, `preparo: o Chromium emulou 34 px de safe area (${m.env})`);
+      ok(Math.abs(m.navH - 95.5) < 0.1, `a barra engordou por baixo: 61,5 + 34 = 95,5 px (${m.navH})`);
+      ok(Math.abs(m.entra - 10) < 0.1 && m.fabH === 44, `o balão acompanhou a borda: segue 10 px dentro da barra (${m.entra}) e com 44 px`);
+      ok(m.folga >= 0.5 && m.noIcone, `e não encosta no ícone do Mais (${m.folga} px livres; o dedo no centro do ícone acha o Mais: ${m.noIcone})`);
+      await clicar(p.locator('button[aria-label="Abrir a Gaia"]'));
+      await p.locator('button[aria-label="Fechar"]').waitFor({ timeout: 10000 });
+      const painel = await medirPainel();
+      ok(painel && Math.abs(painel.doFundo - 114) < 0.1 && painel.b <= painel.barra - 18,
+        `o painel aberto sobe com a barra: 80 + 34 = 114 px do fundo (${painel ? painel.doFundo : "?"}) e 18,5 acima dela`);
+      await p.locator('button[aria-label="Fechar"]').click();
+    } finally {
+      await cdp.send("Emulation.setSafeAreaInsetsOverride", { insets: { top: 0, bottom: 0, left: 0, right: 0 } }).catch(() => {});
+      await cdp.detach().catch(() => {});
+      await carregar();
+    }
+  });
 
   console.log("\nGaia");
   // (3) o balão da Gaia some ao descer

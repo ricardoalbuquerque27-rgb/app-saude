@@ -25,10 +25,10 @@ export default function ChatWidget() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // O balão fica fixo no canto inferior direito e cobre o que estiver ali —
-  // no celular, bem em cima dos botões "Comi isso" do cardápio, que são
-  // alinhados à direita. Some ao descer (que é quando se está lendo) e
-  // volta ao subir ou ao chegar no topo.
+  // O balão some ao descer (que é quando se está lendo) e volta ao subir ou
+  // ao chegar no topo. No computador ele flutua no canto de baixo e cobre o
+  // que estiver ali; no celular ele fica encaixado na barra de baixo (ver o
+  // botão, adiante), e o esconder ao rolar só tira o que sobrou dele.
   const [escondido, setEscondido] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   // Começa onde a página REALMENTE está. Com 0, depois de recarregar com a
@@ -141,24 +141,58 @@ export default function ChatWidget() {
 
   return (
     <>
-      {/* Botão flutuante (balãozinho) */}
+      {/* Botão flutuante (balãozinho).
+
+          Celular (< lg): ENCAIXADO na borda de cima da barra de baixo, à
+          direita, com 44×44 px. Antes flutuava a 80 px do fundo, com 56 px,
+          em cima do conteúdo: em 390 px cortava o "Registrar" da aplicação
+          ("Regis") e cobria o "ver em Meu plano" da Dieta, e um toque ali
+          abria a Gaia em vez da ação. A geometria, em 390 px (a barra tem
+          61,5 px: 1 de borda, 10 de folga, 22 do ícone, 2 de vão, 16,5 do
+          rótulo e 10 de folga, e o "Mais" é a última célula, de 65 px):
+          - o balão afunda 10 px na barra, que é a borda (1) mais 9 dos 10 px
+            de folga em cima dos ícones. O ícone do "Mais" começa a 11 px da
+            borda, então a caixa do balão para 1 px antes dele (a olho são
+            ~5,6 px, porque o traço de cima do ícone Menu desenha 4,6 px
+            abaixo do topo da caixa). O rótulo começa a 35 px: longe. O ponto
+            de novidade do "Mais", quando há, começa a 9 px da borda e fica a
+            2,4 px do círculo (só o canto vazio da caixa o cruza);
+          - sobram 51,5 px de altura × 65 de largura do "Mais" sem balão
+            nenhum por cima (≥ 44×44), e o "Hábitos" não encosta no balão
+            (o balão começa em x=330 e a célula dele acaba em 325). Como a
+            separação é vertical, vale em qualquer largura (a 320 px o balão
+            invade 7 px da célula do "Hábitos", só nos 10 de cima);
+          - o balão fica a 16 px da borda direita, na margem da página, e
+            sobe só 34 px acima da barra (44 − 10), o que cabe nos 50,5 px
+            que o `main` deixa embaixo (pb-28 − a barra), então no fim da
+            página ele não cobre a última linha;
+          - 10 px e não 8: com 8, o topo do balão (746,5 px) entrava 1,5 px
+            no "Registrar" da Início (que acaba em 748 px em 390×844). Em 10
+            ele fica a 748,5. Subir para 11 já encostaria no ícone do "Mais".
+          `bottom` é a altura da barra mais a safe area menos esses 10 px, a
+          mesma conta do AppShell (`--barra-h` + `env(safe-area-inset-bottom)`),
+          e não um número solto que só valesse sem o recorte do aparelho.
+          Computador (≥ lg): como era, 56 px em bottom-6 right-6. */}
       {!open && (
         <button
           onClick={() => setOpen(true)}
           aria-label="Abrir a Gaia"
-          className={`fixed bottom-20 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-app-primaria text-app-sobre-primaria transition duration-200 hover:scale-105 active:scale-95 lg:bottom-6 lg:right-6 ${
+          className={`fixed bottom-[calc(var(--barra-h)_+_env(safe-area-inset-bottom)_-_10px)] right-4 z-40 flex h-11 w-11 items-center justify-center rounded-full bg-app-primaria text-app-sobre-primaria transition duration-200 hover:scale-105 active:scale-95 lg:bottom-6 lg:right-6 lg:h-14 lg:w-14 ${
             escondido
               ? "pointer-events-none translate-y-24 opacity-0 focus-visible:translate-y-0 focus-visible:opacity-100"
               : "translate-y-0 opacity-100"
           }`}
         >
-          <Leaf className="h-6 w-6" />
+          <Leaf className="h-5 w-5 lg:h-6 lg:w-6" />
         </button>
       )}
 
-      {/* Painel do chat */}
+      {/* Painel do chat. No celular ele acaba 80 px acima do fundo, como era
+          com o `bottom-20`: 61,5 da barra e 18,5 de vão, mais a safe area (a
+          barra engorda com ela). O balão some enquanto o painel está aberto
+          (`!open` acima), então um não cobre o outro. */}
       {open && (
-        <div className="fixed inset-x-2 bottom-20 top-16 z-50 flex flex-col overflow-hidden rounded-[14px] border border-app-linha bg-app-cartao shadow-2xl sm:inset-x-auto sm:right-4 sm:top-auto sm:h-[70vh] sm:max-h-[640px] sm:w-[400px] lg:bottom-6 lg:right-6">
+        <div className="fixed inset-x-2 bottom-[calc(var(--barra-h)_+_env(safe-area-inset-bottom)_+_18.5px)] top-16 z-50 flex flex-col overflow-hidden rounded-[14px] border border-app-linha bg-app-cartao shadow-2xl sm:inset-x-auto sm:right-4 sm:top-auto sm:h-[70vh] sm:max-h-[640px] sm:w-[400px] lg:bottom-6 lg:right-6">
           {/* Cabeçalho */}
           <div className="flex items-center justify-between gap-2 border-b border-app-linha bg-app-cartao px-4 py-3">
             <div className="flex items-center gap-2.5">

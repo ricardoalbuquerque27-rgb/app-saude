@@ -291,17 +291,26 @@ export default function AppShell({
 
       {/* Conteúdo */}
       <main
-        className={`px-4 pb-28 pt-6 lg:pl-64 lg:pr-8 ${telaLarga ? "" : "mx-auto max-w-5xl"}`}
+        className={`px-4 pb-[calc(7rem_+_env(safe-area-inset-bottom))] pt-6 lg:pl-64 lg:pr-8 ${telaLarga ? "" : "mx-auto max-w-5xl"}`}
       >
         <div className={`lg:pl-4 ${telaLarga ? "mx-auto max-w-[1456px]" : ""}`}>
           <PageTransition>{children}</PageTransition>
         </div>
       </main>
 
-      {/* Bottom nav — mobile */}
-      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-app-linha bg-app-cartao lg:hidden">
+      {/* Bottom nav — mobile. Altura FIXA: `--barra-h` (globals.css, 61,5 px)
+          mais a safe area do aparelho (`env(safe-area-inset-bottom)`, que
+          engorda a barra por baixo, sem mexer nos itens). A Gaia (ChatWidget)
+          se encaixa na borda de cima desta barra pela mesma conta, então a
+          altura não pode depender do conteúdo. Por isso o rótulo não quebra
+          linha (`whitespace-nowrap`): em 320 px o "Meu plano" não cabe nos
+          53 px da célula e quebraria em duas, e com a altura fixa a segunda
+          linha cairia para fora da tela. Hoje o `env` vale 0 em todo lugar,
+          porque o `viewport` do layout raiz não pede `viewport-fit: cover`;
+          se pedir um dia, a barra e a Gaia já acompanham. */}
+      <nav className="fixed inset-x-0 bottom-0 z-30 h-[calc(var(--barra-h)_+_env(safe-area-inset-bottom))] border-t border-app-linha bg-app-cartao pb-[env(safe-area-inset-bottom)] lg:hidden">
         <div
-          className="mx-auto grid max-w-lg"
+          className="mx-auto grid h-full max-w-lg"
           style={{
             gridTemplateColumns: `repeat(${mobNav.length + 1}, minmax(0, 1fr))`,
           }}
@@ -310,7 +319,7 @@ export default function AppShell({
             <Link
               key={item.href}
               href={item.href}
-              className={`tappable relative flex flex-col items-center gap-0.5 py-2.5 text-[11px] ${
+              className={`tappable relative flex flex-col items-center gap-0.5 whitespace-nowrap py-2.5 text-[11px] ${
                 isActive(item)
                   ? "font-semibold text-app-primaria"
                   : "font-medium text-app-texto-2"
@@ -334,7 +343,7 @@ export default function AppShell({
           ))}
           <button
             onClick={() => setMenuOpen(true)}
-            className={`tappable flex flex-col items-center gap-0.5 py-2.5 text-[11px] ${
+            className={`tappable flex flex-col items-center gap-0.5 whitespace-nowrap py-2.5 text-[11px] ${
               menuHrefs.includes(pathname)
                 ? "font-semibold text-app-primaria"
                 : "font-medium text-app-texto-2"

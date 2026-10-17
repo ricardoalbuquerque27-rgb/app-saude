@@ -637,6 +637,39 @@ async function entrar(ctx, email = "maria.teste@exemplo.com") {
     ok(iTitulo >= 0 && iObs > iTitulo && iCafe > iObs, "a observação do plano vem depois do título e antes das refeições");
     const alvoVer = await alvoReal(ver);
     ok(alvoVer.h >= 44, `o link "ver em Meu plano" tem 44 px de altura de toque (${JSON.stringify(alvoVer)})`);
+    // O balão da Gaia flutuava por cima dele em 390 px (um toque ali abria a
+    // Gaia); agora fica na borda de cima da barra. O dedo, de 3 em 3 px, mais a
+    // última linha e a última coluna: nenhum ponto do link pode achar o balão
+    // nem a barra.
+    // O `goto` para a mesma rota recarrega com a rolagem de volta, e com a
+    // página rolada o balão está escondido (opacity 0 e pointer-events none:
+    // o dedo não o acha, e a conta daria zero sem provar nada). Volta ao topo
+    // (`instant`: o html tem scroll-behavior: smooth) e espera o balão voltar.
+    await p.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+    await p.waitForTimeout(500);
+    const tapados = await ver.evaluate((a) => {
+      const fab = document.querySelector('button[aria-label="Abrir a Gaia"]');
+      const nav = document.querySelector("nav.fixed.inset-x-0.bottom-0");
+      const r = a.getBoundingClientRect();
+      const pontos = (de, ate) => {
+        const v = [];
+        for (let t = de + 0.5; t < ate - 0.5; t += 3) v.push(t);
+        v.push(ate - 0.5);
+        return v;
+      };
+      let n = 0, tapados = 0;
+      for (const x of pontos(r.left, r.right)) {
+        for (const y of pontos(r.top, r.bottom)) {
+          n++;
+          const h = document.elementFromPoint(x, y);
+          if (h && ((fab && fab.contains(h)) || (nav && nav.contains(h)))) tapados++;
+        }
+      }
+      return { n, tapados, dentro: r.bottom <= innerHeight && r.top >= 0, balao: !!fab && getComputedStyle(fab).opacity === "1", barra: !!nav };
+    });
+    // Sem o balão visível ou sem a barra, a conta daria zero sem provar nada.
+    ok(tapados.balao && tapados.barra && tapados.dentro && tapados.tapados === 0,
+      `o link "ver em Meu plano" está inteiro na primeira tela, sem o balão da Gaia nem a barra por cima (${tapados.tapados} de ${tapados.n} pontos tapados; balão ${tapados.balao ? "visível" : "ESCONDIDO OU AUSENTE"})`);
 
     ok((await plano.getByText(/Não deu para carregar as refeições do dia/).count()) === 0, "com as refeições carregadas, o plano não traz o aviso de leitura");
     const subtitulos = (await plano.locator("h3").allInnerTexts()).map((s) => s.replace(/\s+/g, " ").trim());

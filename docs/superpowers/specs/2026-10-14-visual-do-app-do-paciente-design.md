@@ -204,6 +204,16 @@ Vale para os dois lados (`AppShell`).
   cabeçalho da conversa sai do degradê e fica `app-cartao`, com título em
   `app-texto` e borda de baixo `app-linha`.
 
+> **Emenda (2026-10-17):** o dono do produto mudou o lugar do balão da Gaia no
+> celular (abaixo de `lg`) para que ele deixe de cobrir ações: com 56 px e a
+> 80 px do fundo ele cortava o "Registrar" da Início ("Regis") e cobria o "ver
+> em Meu plano" da Dieta, e um toque ali abria a Gaia. Agora ele tem 44×44 px e
+> fica encaixado na borda de cima da barra de baixo, à direita, afundando 10 px
+> nela (só na folga de cima dos ícones, sem cobrir o ícone nem o rótulo do
+> "Mais"). A barra passou a ter altura fixa (`--barra-h`, 61,5 px, mais a safe
+> area) para o balão achar a borda dela. O `aria-label`, o esconder ao rolar, a
+> cor e o foco ficam como estavam; no computador (`lg`) o balão é o de antes.
+
 ## Início (paciente)
 
 De cima para baixo, numa coluna só, no celular e no computador. A área de

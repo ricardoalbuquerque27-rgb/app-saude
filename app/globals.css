@@ -87,6 +87,16 @@ input[type="number"] {
 }
 
 @layer base {
+  /* Altura da barra de baixo do celular (AppShell), SEM a safe area: 1 px de
+     borda + 60,5 dos itens (10 de folga, 22 do ícone, 2 de vão, 16,5 do
+     rótulo e 10 de folga). É fixa, e não a que os itens dariam sozinhos,
+     porque o balão da Gaia (ChatWidget) se ancora na borda de cima dela e o
+     CSS não lê a altura de outro elemento: as duas contas leem esta variável.
+     O 61,5 é o que a barra já tinha; o `sticky bottom-[61px]` do
+     EditorRegistro conta com ele. */
+  :root {
+    --barra-h: 61.5px;
+  }
   h1,
   h2,
   h3,

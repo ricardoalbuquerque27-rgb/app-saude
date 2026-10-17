@@ -449,6 +449,28 @@ fome; o excesso já aparece no anel). Opção de 0 g não conta: o nutricionista
 lança 0 para fruta, e "lanche da tarde, 0 g (1 maçã)" para fechar 40 g seria
 absurdo. Na Dieta, só com a data em hoje.
 
+**A Gaia, no celular, fica encaixada na barra de baixo.** O balão
+(`ChatWidget`, 44×44 px) afunda 10 px na borda de cima da barra do `AppShell`,
+à direita, e não flutua mais sobre o conteúdo: a 80 px do fundo e com 56 px ele
+cortava o "Registrar" da Início ("Regis") e cobria o "ver em Meu plano" da
+Dieta, e um toque ali abria a Gaia em vez da ação (decisão do dono do produto,
+17/10). Os 10 px saem da folga de cima dos ícones (o ícone do "Mais" começa a
+11 px da borda: 1 de borda e 10 de folga), então o "Mais" e o "Hábitos" mantêm
+44×44 sem balão por cima, e o topo do balão fica abaixo do pé do "Registrar"
+em 390×844. **A barra tem altura fixa**: `--barra-h` (61,5 px, em
+`globals.css`) mais `env(safe-area-inset-bottom)`, e o balão e o painel aberto
+leem a mesma variável, porque o CSS não lê a altura de outro elemento e uma
+barra que cresce com o conteúdo desencaixaria o balão. Por isso o rótulo da
+barra não quebra linha (`whitespace-nowrap`: em 320 px o "Meu plano" quebrava, e
+com a altura fixa a segunda linha caía para fora da tela). Mexeu no padding, no
+ícone ou no rótulo da barra? Mude `--barra-h` (o `sticky bottom-[61px]` do
+`EditorRegistro` também conta com ela) e rode `conferir-inicio`, que mede o
+encaixe, o `elementFromPoint` no "Mais" e o caso de 34 px de safe area. O `env`
+vale 0 hoje, porque o `viewport` do layout raiz não pede `viewport-fit: cover`.
+No computador (`lg`) o balão é o de sempre, 56 px em `bottom-6 right-6`. Só o
+paciente tem a Gaia (`!isNutri`); a barra do nutricionista só ganhou a altura
+fixa.
+
 **A consulta é uma linha** (`LinhaDaConsulta`, a situação por
 `estadoDaConsulta`; veja "Consultas e agenda"), e o cartão com as ações mora
 em "Meu plano".
@@ -687,6 +709,11 @@ Modal fora do lugar: procure um `transform` num ancestral.
 - **"do nutri" em Treinos e "Prescrito por" na leitura do treino vêm só de
   `prescribed_by`.** Depois que o paciente revoga, a sessão segue com o selo,
   mas os botões já são os do treino próprio ("Fiz").
+- **O balão da Gaia ainda cobre o que rola por baixo dele**, 34 px acima da
+  barra na margem da direita (some ao descer e volta ao subir). Na primeira tela
+  de 390×844 não cobre mais nenhuma ação da Início nem da Dieta, mas o "Remover"
+  de Treinos e um campo do Perfil ficam sob ele (já ficavam), e a 320×800 ele
+  encosta no "Fiz" da Início.
 - **A Início perde o "limite" ou "meta" do anel de Calorias quando a leitura
   do peso falha.** Os números do anel estão certos e o Progresso diz "Não deu
   para carregar o peso"; aceito, porque a falha já aparece ali.
