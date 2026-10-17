@@ -9,9 +9,12 @@ export const SENHA_MINIMO = 8;
 
 export const AJUDA_DA_SENHA = "Mínimo de 8 caracteres, com letras e números.";
 
-// `new RegExp` e não o literal /\p{L}/u: o tsconfig mira es5 e o tsc recusa a
-// flag `u` num literal (mesmo motivo do EMOJI em healthScore.test).
-const LETRA = new RegExp("\\p{L}", "u");
+// Letra é só a-z, A-Z, e não qualquer letra Unicode: o "Letters and digits" do
+// Supabase confere ASCII. Com `\p{L}`, "ãéíõ1234" passava aqui e o servidor a
+// recusava (em inglês, depois do envio). A regra do app é a do servidor, para
+// nunca aceitar o que o Supabase vai recusar. "ação1234" continua valendo
+// porque tem `a` e `o`; acento não atrapalha, só não conta como a letra.
+const LETRA = /[A-Za-z]/;
 const NUMERO = /[0-9]/;
 
 /**
@@ -35,15 +38,21 @@ export function problemaDaSenha(senha: string): string | null {
  * "weak_password"` e `name: "AuthWeakPasswordError"`; a mensagem em inglês
  * ("Password should be at least 8 characters", "Password should contain at
  * least one character of each: …") é o que sobra em resposta de servidor mais
- * velha, sem `code`. Qualquer um dos três basta.
+ * velha, sem `code`. Qualquer um dos três basta, e a mensagem vale também
+ * quando o erro é só o texto.
  */
 export function ehErroDeSenhaFraca(err: unknown): boolean {
-  if (typeof err !== "object" || err === null) return false;
-  const e = err as { code?: unknown; name?: unknown; message?: unknown };
-  if (e.code === "weak_password") return true;
-  if (e.name === "AuthWeakPasswordError") return true;
-  if (typeof e.message !== "string") return false;
-  const m = e.message.toLowerCase();
+  let mensagem: unknown = err;
+  if (typeof err === "object" && err !== null) {
+    const e = err as { code?: unknown; name?: unknown; message?: unknown };
+    if (e.code === "weak_password") return true;
+    if (e.name === "AuthWeakPasswordError") return true;
+    mensagem = e.message;
+  }
+  // Texto puro também vale: o `traduzErro` do login aceita erro que já é a
+  // mensagem, e aquela mensagem em inglês não pode escapar só por isso.
+  if (typeof mensagem !== "string") return false;
+  const m = mensagem.toLowerCase();
   return (
     m.includes("password should be at least") ||
     m.includes("password should contain")

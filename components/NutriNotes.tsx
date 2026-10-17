@@ -133,7 +133,7 @@ export default function NutriNotes({
   return (
     <div className="card">
       {ordenadas.length === 0 ? (
-        <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
+        <p className="mb-4 text-sm text-app-texto-2">
           Nenhuma mensagem ainda. Você pode escrever para o seu nutricionista
           aqui.
         </p>
@@ -147,16 +147,22 @@ export default function NutriNotes({
                 className={`flex ${meu ? "justify-end" : "justify-start"}`}
               >
                 <div
+                  // A minha em `primaria` sólido; a do nutricionista em `pagina`
+                  // com borda, porque sobre o cartão (branco) o cinza da
+                  // página quase não aparece sozinho.
                   className={`max-w-[85%] rounded-2xl px-3 py-2 ${
                     meu
-                      ? "bg-brand-700 text-white"
-                      : "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-100"
+                      ? "bg-app-primaria text-app-sobre-primaria"
+                      : "border border-app-linha bg-app-pagina text-app-texto"
                   }`}
                 >
                   <p className="whitespace-pre-wrap text-sm">{n.body}</p>
                   <p
-                    className={`mt-1 text-[11px] ${
-                      meu ? "text-white/70" : "text-slate-500 dark:text-slate-400"
+                    // `opacity` e não `/70` na cor: as cores do app são variáveis, e
+                    // o branco a 70% sobre a primária do escuro (um verde claro)
+                    // sumiria. 80% da cor `sobre-primaria` fica a ~5:1 nos dois temas.
+                    className={`tabular mt-1 text-[13px] ${
+                      meu ? "opacity-80" : "text-app-texto-2"
                     }`}
                   >
                     {formatDate(dataNoBrasil(n.created_at))}
@@ -179,7 +185,7 @@ export default function NutriNotes({
             maxLength={4000}
           />
           {erro && (
-            <p className="mt-1 text-xs text-rose-600 dark:text-rose-400">{erro}</p>
+            <p className="mt-1 text-[13px] text-app-perigo">{erro}</p>
           )}
           <button
             type="submit"

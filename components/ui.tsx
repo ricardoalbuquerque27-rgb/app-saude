@@ -15,13 +15,11 @@ export function PageHeader({
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-          {title}
-        </h1>
+        <h1 className="text-2xl font-semibold text-app-texto">{title}</h1>
+        {/* Direto no chão da página: `texto-2`, nunca slate-500, que dá 4,43:1
+            sobre a página clara e reprova o WCAG 1.4.3. */}
         {subtitle && (
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            {subtitle}
-          </p>
+          <p className="mt-1 text-sm text-app-texto-2">{subtitle}</p>
         )}
       </div>
       {action}
@@ -29,45 +27,34 @@ export function PageHeader({
   );
 }
 
+// Sem `accent`: azul, violeta e âmbar por cartão era enfeite (a spec tira a cor
+// decorativa), e a variação negativa em rosa dizia "ruim" para uma carga que
+// só baixou. O ícone é sempre `primaria` sobre `primaria-fundo`, como o
+// `.icon-badge`. Sem o `hover:-translate-y`: o cartão não é clicável.
 export function StatCard({
   label,
   value,
   unit,
   icon,
-  accent = "brand",
 }: {
   label: string;
   value: string | number;
   unit?: string;
   icon?: React.ReactNode;
-  accent?: "brand" | "blue" | "amber" | "violet" | "rose";
 }) {
-  const accents: Record<string, string> = {
-    brand: "bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300",
-    blue: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
-    amber:
-      "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
-    violet:
-      "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300",
-    rose: "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300",
-  };
   return (
-    <div className="card flex items-center gap-4 transition duration-200 hover:-translate-y-0.5">
+    <div className="card flex items-center gap-4">
       {icon && (
-        <div
-          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ring-1 ring-inset ring-black/[0.03] dark:ring-white/[0.06] ${accents[accent]}`}
-        >
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-app-primaria-fundo text-app-primaria">
           {icon}
         </div>
       )}
       <div className="min-w-0">
-        <p className="truncate text-xs font-medium text-slate-500 dark:text-slate-400">
-          {label}
-        </p>
-        <p className="mt-0.5 text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+        <p className="truncate text-[13px] font-medium text-app-texto-2">{label}</p>
+        <p className="tabular mt-0.5 text-2xl font-semibold text-app-texto">
           {value}
           {unit && (
-            <span className="ml-1 text-sm font-medium text-slate-500">
+            <span className="ml-1 text-sm font-medium text-app-texto-2">
               {unit}
             </span>
           )}
@@ -87,13 +74,11 @@ export function EmptyState({
   description?: string;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 py-12 text-center dark:border-slate-700">
-      {icon && <div className="mb-3 text-slate-500">{icon}</div>}
-      <p className="font-medium text-slate-700 dark:text-slate-300">{title}</p>
+    <div className="flex flex-col items-center justify-center rounded-[14px] border border-dashed border-app-campo py-12 text-center">
+      {icon && <div className="mb-3 text-app-texto-2">{icon}</div>}
+      <p className="font-medium text-app-texto">{title}</p>
       {description && (
-        <p className="mt-1 max-w-xs text-sm text-slate-500 dark:text-slate-400">
-          {description}
-        </p>
+        <p className="mt-1 max-w-xs text-sm text-app-texto-2">{description}</p>
       )}
     </div>
   );
@@ -124,22 +109,24 @@ export function Modal({
   if (!open) return null;
 
   return (
-    <div className="pf-backdrop fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 backdrop-blur-[2px] sm:items-center sm:p-4">
+    <div className="pf-backdrop fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4">
       <div
         className="absolute inset-0"
         onClick={onClose}
         aria-hidden="true"
       />
-      <div className="pf-modal relative z-10 max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-white p-5 shadow-2xl sm:rounded-2xl dark:bg-slate-900">
+      {/* Sem sombra: o cartão não tem o segundo nível, e a folha já se separa da
+          página pelo escurecimento do fundo e pela borda. */}
+      <div className="pf-modal relative z-10 max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-app-linha bg-app-cartao p-5 sm:rounded-2xl">
         {/* Alça da folha, só no celular */}
-        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-300 sm:hidden dark:bg-slate-700" />
+        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-app-campo sm:hidden" />
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-            {title}
-          </h2>
+          <h2 className="section-title">{title}</h2>
+          {/* 44 px de toque; as margens negativas devolvem o que o botão
+              acrescenta, e o cabeçalho segue com a altura de antes. */}
           <button
             onClick={onClose}
-            className="tappable rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+            className="tappable -my-2 -mr-2 flex h-11 w-11 items-center justify-center rounded-lg text-app-texto-2 hover:bg-app-primaria-fundo"
             aria-label="Fechar"
           >
             <X className="h-5 w-5" />

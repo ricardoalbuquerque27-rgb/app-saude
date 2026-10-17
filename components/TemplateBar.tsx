@@ -13,6 +13,13 @@ export type Modelo = {
   created_at: string;
 };
 
+// Só aparece dentro do `.tema-clinico` (MealPlanEditor e EditorTreino), que
+// "não muda na tela": por isso as classes `slate-*`, `brand-*` e `rose-*`
+// daqui ficam como estão. O `app-*` é variável global, e trocá-las mudaria o
+// tom do clínico (o `texto-2` do app é mais escuro que o slate-500). Se um dia
+// a barra sair do clínico, ela ganha a linguagem do app como o FoodSearch, com
+// uma prop de tema.
+//
 // Barra de modelos do nutricionista: salvar o que está montado como modelo e
 // aplicar um modelo salvo. Serve cardápio e treino — a forma do `content`
 // muda, mas o fluxo é o mesmo, então o componente é agnóstico e quem usa

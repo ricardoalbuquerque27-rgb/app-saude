@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState, useCallback } from "react";
-import { LogOut, Loader2, Check, User, Target, CalendarClock } from "lucide-react";
+import { LogOut, Loader2, Check, CalendarClock } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { Profile } from "@/lib/types";
 import { PageHeader, Field } from "@/components/ui";
@@ -174,7 +174,7 @@ export default function PerfilPage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center py-20 text-slate-500">
+      <div className="flex justify-center py-20 text-app-texto-2">
         <Loader2 className="h-6 w-6 animate-spin" />
       </div>
     );
@@ -184,38 +184,37 @@ export default function PerfilPage() {
     <div className="max-w-xl">
       <PageHeader title="Perfil" subtitle="Seus dados e metas." />
 
-      {/* Cabeçalho premium */}
-      <div className="card mb-6 overflow-hidden p-0">
-        <div className="h-20 bg-gradient-to-r from-brand-500 to-brand-700" />
-        <div className="-mt-9 flex items-end gap-4 p-5">
-          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600 text-xl font-bold text-white ring-4 ring-white shadow-lg dark:ring-slate-900">
-            {initials(fullName)}
-          </div>
-          <div className="min-w-0 pb-1">
-            <p className="truncate text-lg font-bold tracking-tight text-slate-900 dark:text-white">
-              {fullName || "Sem nome"}
+      {/* Quem é: as iniciais, o nome e o e-mail num cartão só. A faixa de
+          degradê e o nome por cima da borda dela saíram com a cor decorativa. */}
+      <div className="card mb-6 flex items-center gap-4">
+        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-app-primaria-fundo text-lg font-semibold text-app-primaria">
+          {initials(fullName)}
+        </div>
+        <div className="min-w-0">
+          <p className="truncate text-lg font-semibold text-app-texto">
+            {fullName || "Sem nome"}
+          </p>
+          <p className="truncate text-sm text-app-texto-2">
+            {email}
+          </p>
+          {memberSince && (
+            <p className="mt-1.5 inline-flex items-center gap-1 text-[13px] text-app-texto-2">
+              <CalendarClock className="h-3.5 w-3.5" />
+              Membro desde{" "}
+              {/* Com o fuso: sem ele, quem está fora do Brasil via outro mês na
+                  noite do dia 1º. */}
+              {new Date(memberSince).toLocaleDateString("pt-BR", {
+                month: "short",
+                year: "numeric",
+                timeZone: "America/Sao_Paulo",
+              })}
             </p>
-            <p className="truncate text-sm text-slate-500 dark:text-slate-400">
-              {email}
-            </p>
-            {memberSince && (
-              <p className="mt-1.5 inline-flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
-                <CalendarClock className="h-3.5 w-3.5" />
-                Membro desde{" "}
-                {new Date(memberSince).toLocaleDateString("pt-BR", {
-                  month: "short",
-                  year: "numeric",
-                })}
-              </p>
-            )}
-          </div>
+          )}
         </div>
       </div>
 
       <form onSubmit={save} className="card space-y-4">
-        <h2 className="flex items-center gap-2 font-semibold text-slate-900 dark:text-white">
-          <User className="h-4 w-4 text-brand-700 dark:text-brand-400" /> Dados
-        </h2>
+        <h2 className="section-title">Dados</h2>
         <Field label="Tipo de conta">
           <div className="flex gap-2">
             {[
@@ -226,17 +225,17 @@ export default function PerfilPage() {
                 key={o.v}
                 type="button"
                 onClick={() => setRole(o.v)}
-                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition ${
+                className={`min-h-[44px] flex-1 rounded-lg border px-3 text-sm font-medium transition ${
                   role === o.v
-                    ? "border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-300"
-                    : "border-slate-300 text-slate-600 dark:border-slate-700 dark:text-slate-400"
+                    ? "border-app-primaria bg-app-primaria-fundo text-app-primaria"
+                    : "border-app-campo text-app-texto-2 hover:bg-app-primaria-fundo"
                 }`}
               >
                 {o.label}
               </button>
             ))}
           </div>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          <p className="mt-1 text-[13px] text-app-texto-2">
             Nutricionista acompanha pacientes; paciente registra a própria rotina.
             Ao salvar, a navegação do app muda.
           </p>
@@ -271,6 +270,10 @@ export default function PerfilPage() {
             />
           </Field>
         )}
+        {/* Os campos vazios dizem a unidade ("em cm", "kcal por dia"), e não um
+            valor de exemplo: "175" ao lado de dados reais lia-se como dado
+            salvo, e o nutricionista podia tomar a altura de exemplo pela da
+            paciente. Vale para as metas, mais abaixo. */}
         <div className="grid grid-cols-2 gap-3">
           <Field label="Altura (cm)">
             <input
@@ -278,7 +281,7 @@ export default function PerfilPage() {
               className="input"
               value={height}
               onChange={(e) => setHeight(e.target.value)}
-              placeholder="175"
+              placeholder="em cm"
             />
           </Field>
           <Field label="Data de nascimento">
@@ -301,22 +304,20 @@ export default function PerfilPage() {
             <option value="F">Feminino</option>
             <option value="M">Masculino</option>
           </select>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          <p className="mt-1 text-[13px] text-app-texto-2">
             Usado para ajustar as faixas de referência dos seus exames (junto
             com a idade). Não é exibido para ninguém.
           </p>
         </Field>
 
-        <h2 className="flex items-center gap-2 pt-2 font-semibold text-slate-900 dark:text-white">
-          <Target className="h-4 w-4 text-brand-700 dark:text-brand-400" /> Metas
-        </h2>
+        <h2 className="section-title pt-2">Metas</h2>
         {metasDoNutri && (
-          <p className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-xs text-brand-800 dark:border-brand-800/50 dark:bg-brand-500/10 dark:text-brand-200">
+          <p className="rounded-lg bg-app-primaria-fundo px-3 py-2 text-[13px] text-app-texto-2">
             Estas metas foram definidas pelo seu nutricionista. Você pode
             alterá-las, mas vale combinar antes — ele acompanha esses números.{" "}
             <Link
               href="/app/nutricionista?aba=metas"
-              className="font-semibold underline underline-offset-2 hover:no-underline"
+              className="font-semibold text-app-primaria underline underline-offset-2 hover:no-underline"
             >
               Ver em Meu plano
             </Link>
@@ -330,7 +331,7 @@ export default function PerfilPage() {
               className="input"
               value={weightGoal}
               onChange={(e) => setWeightGoal(e.target.value)}
-              placeholder="75"
+              placeholder="em kg"
             />
           </Field>
           <Field label="Calorias/dia">
@@ -339,7 +340,7 @@ export default function PerfilPage() {
               className="input"
               value={calorieGoal}
               onChange={(e) => setCalorieGoal(e.target.value)}
-              placeholder="2000"
+              placeholder="kcal por dia"
             />
           </Field>
           <Field label="Proteína/dia (g)">
@@ -348,7 +349,7 @@ export default function PerfilPage() {
               className="input"
               value={proteinGoal}
               onChange={(e) => setProteinGoal(e.target.value)}
-              placeholder="110"
+              placeholder="g por dia"
             />
           </Field>
           <Field label="Água/dia (ml)">
@@ -357,7 +358,7 @@ export default function PerfilPage() {
               className="input"
               value={waterGoal}
               onChange={(e) => setWaterGoal(e.target.value)}
-              placeholder="2500"
+              placeholder="ml por dia"
             />
           </Field>
         </div>
@@ -382,7 +383,7 @@ export default function PerfilPage() {
 
       <button
         onClick={signOut}
-        className="btn-ghost mt-6 w-full py-2.5 text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/30"
+        className="btn-ghost mt-6 min-h-[44px] w-full py-2.5 text-app-perigo hover:bg-app-perigo-fundo"
       >
         <LogOut className="h-4 w-4" /> Sair da conta
       </button>

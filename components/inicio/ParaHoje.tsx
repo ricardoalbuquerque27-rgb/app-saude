@@ -44,10 +44,13 @@ export function ParaHoje({
   temTreinoHoje: boolean;
 }) {
   const { linhas, pendentes, estado } = paraHoje;
+  // Com uma leitura falhando (`incompleto`), a contagem é só do que chegou: "2
+  // pendentes" com um recado que não carregou seria um número errado dito com
+  // certeza. O cabeçalho fica só com "Para hoje", e o aviso diz o resto.
   const contagem =
     estado === "em-dia"
       ? "em dia"
-      : pendentes > 0
+      : estado === "pendente" && pendentes > 0
         ? `${pendentes} ${pendentes === 1 ? "pendente" : "pendentes"}`
         : null;
 

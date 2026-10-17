@@ -8,9 +8,14 @@ import { adicionarAgua } from "@/lib/agua";
 // "+250 ml" embaixo do anel de água da Início (spec "Água em um toque"). Grava
 // por `adicionarAgua` (lib/agua.ts), a mesma conta do assistente, e atualiza a
 // página com `router.refresh()`: o anel é do servidor e só muda quando a
-// gravação deu certo. Com erro, a tela diz "Não deu para registrar a água" e o
+// gravação deu certo. Com erro, a tela diz "Não deu para registrar a água." e o
 // anel fica como estava; o texto do erro que `adicionarAgua` devolve é
 // diagnóstico, não frase para o paciente.
+//
+// Depois do "Desfazer", o foco volta para o "+250 ml" e a região diz
+// "Desfeito.": o "Desfazer" some da tela com a mensagem, e o foco caía no
+// <body> (quem usa teclado ou leitor de tela recomeçava do topo da página, sem
+// ouvir que a água voltou).
 
 const COPO = 250;
 const MENSAGEM_MS = 6000;
@@ -18,7 +23,12 @@ const MENSAGEM_MS = 6000;
 export default function AdicionarAgua({ uid }: { uid: string }) {
   const router = useRouter();
   const [gravando, setGravando] = useState(false);
-  const [mensagem, setMensagem] = useState<"registrado" | "erro" | null>(null);
+  const [mensagem, setMensagem] = useState<"registrado" | "desfeito" | "erro" | null>(null);
+  // O foco só volta ao "+250 ml" depois que o React o redesenha sem o
+  // `disabled` (um botão desabilitado não recebe foco): por isso o efeito
+  // abaixo, e não um `focus()` logo depois da gravação.
+  const [focarNoCopo, setFocarNoCopo] = useState(false);
+  const copo = useRef<HTMLButtonElement | null>(null);
   // Uma gravação por vez. O `disabled` do botão só chega ao DOM quando o React
   // redesenha, e dois toques no mesmo instante passariam os dois: cada um leria
   // o mesmo total, e o segundo apagaria o primeiro. A referência barra na hora.
@@ -32,6 +42,12 @@ export default function AdicionarAgua({ uid }: { uid: string }) {
     []
   );
 
+  useEffect(() => {
+    if (!focarNoCopo || gravando) return;
+    copo.current?.focus();
+    setFocarNoCopo(false);
+  }, [focarNoCopo, gravando]);
+
   async function gravar(ml: number) {
     if (ocupado.current) return;
     ocupado.current = true;
@@ -40,22 +56,22 @@ export default function AdicionarAgua({ uid }: { uid: string }) {
     ocupado.current = false;
     setGravando(false);
     if (relogio.current) clearTimeout(relogio.current);
+    // Veio do "Desfazer" (que some com a mensagem, dê certo ou não).
+    if (ml < 0) setFocarNoCopo(true);
     if (!r.ok) {
       setMensagem("erro");
       return;
     }
-    if (ml > 0) {
-      setMensagem("registrado");
-      relogio.current = setTimeout(() => setMensagem(null), MENSAGEM_MS);
-    } else {
-      setMensagem(null);
-    }
+    // "Desfeito." some no mesmo tempo da mensagem de registro.
+    setMensagem(ml > 0 ? "registrado" : "desfeito");
+    relogio.current = setTimeout(() => setMensagem(null), MENSAGEM_MS);
     router.refresh();
   }
 
   return (
     <div className="mt-2 flex flex-col items-center">
       <button
+        ref={copo}
         type="button"
         onClick={() => gravar(COPO)}
         disabled={gravando}
@@ -81,7 +97,8 @@ export default function AdicionarAgua({ uid }: { uid: string }) {
             </button>
           </>
         )}
-        {mensagem === "erro" && <span className="text-app-perigo">Não deu para registrar a água</span>}
+        {mensagem === "desfeito" && <span className="text-app-texto-2">Desfeito.</span>}
+        {mensagem === "erro" && <span className="text-app-perigo">Não deu para registrar a água.</span>}
       </div>
     </div>
   );

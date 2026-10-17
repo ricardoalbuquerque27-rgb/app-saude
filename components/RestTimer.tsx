@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Timer, Play, Pause, RotateCcw, Plus, Minus } from "lucide-react";
+import { Play, Pause, RotateCcw, Plus, Minus } from "lucide-react";
 
 const PRESETS = [45, 60, 90, 120, 180];
 
@@ -80,16 +80,15 @@ export default function RestTimer() {
   const pct = total > 0 ? remaining / total : 0;
   const done = remaining === 0;
 
+  // Todos os botões têm 44 px. Com os quatro de ação (−15, iniciar, reiniciar,
+  // +15) ao lado do anel, o "Iniciar" sobrava com ~50 px em 390 px de tela e
+  // não cabia o texto; por isso os controles descem para a largura do cartão e
+  // os tempos prontos ficam ao lado do anel.
+  const ACAO = "btn-ghost min-h-[44px] min-w-[44px] px-2";
+
   return (
     <div className="card">
-      <div className="mb-3 flex items-center gap-2">
-        <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
-          <Timer className="h-4 w-4" />
-        </span>
-        <h3 className="font-semibold text-slate-900 dark:text-white">
-          Cronômetro de descanso
-        </h3>
-      </div>
+      <h3 className="section-title mb-3">Cronômetro de descanso</h3>
 
       <div className="flex items-center gap-4">
         <div className="relative flex h-24 w-24 shrink-0 items-center justify-center">
@@ -100,7 +99,7 @@ export default function RestTimer() {
               r={42}
               fill="none"
               strokeWidth={7}
-              className="stroke-slate-100 dark:stroke-slate-800"
+              className="stroke-app-linha"
             />
             <circle
               cx={48}
@@ -112,54 +111,49 @@ export default function RestTimer() {
               stroke="currentColor"
               strokeDasharray={2 * Math.PI * 42}
               strokeDashoffset={2 * Math.PI * 42 * (1 - pct)}
-              className={
-                done
-                  ? "text-rose-600 dark:text-rose-400"
-                  : "text-brand-700 dark:text-brand-400"
-              }
+              className={done ? "text-app-perigo" : "text-app-primaria"}
             />
           </svg>
           <span
-            className={`tabular absolute text-xl font-bold ${
-              done ? "text-rose-600 dark:text-rose-400" : "text-slate-900 dark:text-white"
+            className={`tabular absolute text-xl font-semibold ${
+              done ? "text-app-perigo" : "text-app-texto"
             }`}
           >
             {mm}:{ss.toString().padStart(2, "0")}
           </span>
         </div>
 
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <button onClick={() => bump(-15)} className="btn-ghost px-2 py-1.5" aria-label="-15s">
-              <Minus className="h-4 w-4" />
+        <div className="flex min-w-0 flex-1 flex-wrap gap-1.5">
+          {PRESETS.map((s) => (
+            <button
+              key={s}
+              onClick={() => setPreset(s)}
+              className={`tappable tabular inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg px-2.5 text-[13px] font-semibold ${
+                total === s
+                  ? "bg-app-primaria text-app-sobre-primaria"
+                  : "border border-app-campo text-app-texto hover:bg-app-primaria-fundo"
+              }`}
+            >
+              {s < 60 ? `${s}s` : `${s / 60}min`}
             </button>
-            <button onClick={toggle} className="btn-primary flex-1 py-2">
-              {running ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-              {running ? "Pausar" : done ? "Repetir" : "Iniciar"}
-            </button>
-            <button onClick={reset} className="btn-ghost px-2 py-1.5" aria-label="Reiniciar">
-              <RotateCcw className="h-4 w-4" />
-            </button>
-            <button onClick={() => bump(15)} className="btn-ghost px-2 py-1.5" aria-label="+15s">
-              <Plus className="h-4 w-4" />
-            </button>
-          </div>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {PRESETS.map((s) => (
-              <button
-                key={s}
-                onClick={() => setPreset(s)}
-                className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
-                  total === s
-                    ? "bg-brand-700 text-white"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300"
-                }`}
-              >
-                {s < 60 ? `${s}s` : `${s / 60}min`}
-              </button>
-            ))}
-          </div>
+          ))}
         </div>
+      </div>
+
+      <div className="mt-3 flex items-center gap-2">
+        <button onClick={() => bump(-15)} className={ACAO} aria-label="-15s">
+          <Minus className="h-4 w-4" />
+        </button>
+        <button onClick={toggle} className="btn-primary flex-1 py-2">
+          {running ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+          {running ? "Pausar" : done ? "Repetir" : "Iniciar"}
+        </button>
+        <button onClick={reset} className={ACAO} aria-label="Reiniciar">
+          <RotateCcw className="h-4 w-4" />
+        </button>
+        <button onClick={() => bump(15)} className={ACAO} aria-label="+15s">
+          <Plus className="h-4 w-4" />
+        </button>
       </div>
     </div>
   );

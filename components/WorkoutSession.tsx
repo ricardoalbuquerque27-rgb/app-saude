@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { X, Check, Play, Pause, RotateCcw, Plus, Trophy, Loader2 } from "lucide-react";
+import { numeroBR } from "@/lib/numeros";
 
 type RoutineEx = {
   name: string;
@@ -176,43 +177,43 @@ export default function WorkoutSession({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-slate-50 dark:bg-slate-950">
+    <div className="fixed inset-0 z-50 flex flex-col bg-app-pagina">
       {/* Cabeçalho */}
-      <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
+      <div className="flex items-center justify-between border-b border-app-linha bg-app-cartao px-4 py-3">
         <button
           onClick={() => {
             if (doneSets === 0 || confirm("Descartar este treino? O que você marcou será perdido."))
               onClose();
           }}
-          className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+          className="tappable -my-1 -ml-2 flex h-11 w-11 items-center justify-center rounded-lg text-app-texto-2 hover:bg-app-primaria-fundo"
           aria-label="Fechar"
         >
           <X className="h-5 w-5" />
         </button>
         <div className="text-center">
-          <p className="text-sm font-semibold text-slate-900 dark:text-white">{routine.name}</p>
-          <p className="tabular text-xs text-slate-500 dark:text-slate-400">{mmss(elapsed)}</p>
+          <p className="text-sm font-semibold text-app-texto">{routine.name}</p>
+          <p className="tabular text-[13px] text-app-texto-2">{mmss(elapsed)}</p>
         </div>
         <button
           onClick={finish}
           disabled={saving}
-          className="rounded-lg bg-brand-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-60"
+          className="tappable min-h-[44px] rounded-lg bg-app-primaria px-3 text-sm font-semibold text-app-sobre-primaria hover:[filter:brightness(0.94)] disabled:opacity-60"
         >
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Finalizar"}
         </button>
       </div>
 
       {/* Progresso */}
-      <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-800">
+      <div className="h-1.5 w-full bg-app-linha">
         <div
-          className="h-full bg-brand-500 transition-all"
+          className="h-full bg-app-primaria transition-all"
           style={{ width: `${Math.round(progress * 100)}%` }}
         />
       </div>
 
       {/* Exercícios */}
       <div className="flex-1 space-y-4 overflow-y-auto p-4 pb-40">
-        <p className="text-center text-xs text-slate-500">
+        <p className="tabular text-center text-[13px] text-app-texto-2">
           {doneSets}/{totalSets} séries concluídas
         </p>
         {exs.map((ex, ei) => {
@@ -220,16 +221,16 @@ export default function WorkoutSession({
           return (
             <div key={ei} className="card">
               <div className="mb-2 flex items-center justify-between gap-2">
-                <h3 className="font-semibold text-slate-900 dark:text-white">{ex.name}</h3>
+                <h3 className="font-semibold text-app-texto">{ex.name}</h3>
                 {prNames.has(ex.name) && (
-                  <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                  <span className="flex items-center gap-1 rounded-full bg-app-primaria-fundo px-2 py-0.5 text-[13px] font-semibold text-app-primaria">
                     <Trophy className="h-3 w-3" /> Recorde!
                   </span>
                 )}
               </div>
               {last?.weight != null && (
-                <p className="mb-2 text-xs text-slate-500">
-                  Última vez: {last.reps ?? "?"}×{last.weight}kg
+                <p className="tabular mb-2 text-[13px] text-app-texto-2">
+                  Última vez: {last.reps ?? "?"}×{numeroBR(last.weight, 2)} kg
                 </p>
               )}
               <div className="space-y-1.5">
@@ -237,10 +238,10 @@ export default function WorkoutSession({
                   <div
                     key={si}
                     className={`flex items-center gap-2 rounded-lg p-1.5 ${
-                      s.done ? "bg-brand-50 dark:bg-brand-950/20" : ""
+                      s.done ? "bg-app-primaria-fundo" : ""
                     }`}
                   >
-                    <span className="w-6 shrink-0 text-center text-xs font-medium text-slate-500">
+                    <span className="tabular w-6 shrink-0 text-center text-[13px] font-medium text-app-texto-2">
                       {si + 1}
                     </span>
                     <input
@@ -262,10 +263,10 @@ export default function WorkoutSession({
                     />
                     <button
                       onClick={() => toggleDone(ei, si)}
-                      className={`flex h-9 w-10 shrink-0 items-center justify-center rounded-lg transition ${
+                      className={`tappable flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${
                         s.done
-                          ? "bg-brand-700 text-white"
-                          : "border border-slate-300 text-slate-500 hover:border-brand-400 dark:border-slate-700"
+                          ? "bg-app-primaria text-app-sobre-primaria"
+                          : "border border-app-campo text-app-texto-2 hover:bg-app-primaria-fundo"
                       }`}
                       aria-label="Concluir série"
                     >
@@ -276,7 +277,7 @@ export default function WorkoutSession({
               </div>
               <button
                 onClick={() => addSet(ei)}
-                className="mt-2 text-xs font-semibold text-brand-700 hover:underline dark:text-brand-400"
+                className="tappable mt-1 inline-flex min-h-[44px] items-center rounded-lg px-1 text-[13px] font-semibold text-app-primaria hover:underline"
               >
                 + Série
               </button>
@@ -287,25 +288,25 @@ export default function WorkoutSession({
 
       {/* Cronômetro de descanso (aparece durante o descanso) */}
       {rest && (
-        <div className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200 bg-white px-4 py-3 shadow-2xl dark:border-slate-800 dark:bg-slate-900">
+        <div className="fixed inset-x-0 bottom-0 z-50 border-t border-app-linha bg-app-cartao px-4 py-3">
           <div className="mx-auto flex max-w-md items-center gap-3">
             <div className="min-w-0 flex-1">
-              <div className="mb-1 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+              <div className="mb-1 flex items-center justify-between text-[13px] text-app-texto-2">
                 <span>Descanso</span>
-                <span className="tabular font-semibold text-slate-900 dark:text-white">
+                <span className="tabular font-semibold text-app-texto">
                   {mmss(rest.remaining)}
                 </span>
               </div>
-              <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+              <div className="h-2 w-full overflow-hidden rounded-full bg-app-linha">
                 <div
-                  className="h-full bg-brand-500 transition-all"
+                  className="h-full bg-app-primaria transition-all"
                   style={{ width: `${Math.round((rest.remaining / rest.total) * 100)}%` }}
                 />
               </div>
             </div>
             <button
               onClick={() => setRest((r) => (r ? { ...r, remaining: r.remaining + 15, total: r.total + 15 } : r))}
-              className="btn-ghost px-2 py-1.5"
+              className="btn-ghost min-h-[44px] min-w-[44px] px-2 py-1.5"
               aria-label="+15s"
             >
               <Plus className="h-4 w-4" />

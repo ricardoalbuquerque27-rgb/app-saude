@@ -4,12 +4,9 @@ import { useEffect, useState, useCallback } from "react";
 import {
   Sparkles,
   CheckCircle2,
-  TrendingUp,
   AlertTriangle,
-  ListChecks,
   Loader2,
   BarChart3,
-  History,
   Trash2,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -27,12 +24,15 @@ type ReportRow = { id: string; created_at: string; content: Report };
 
 function formatDateTime(iso: string) {
   const d = new Date(iso);
+  // Sempre a hora de São Paulo (CLAUDE.md, "Fuso horário"): no navegador, sem
+  // `timeZone`, quem está fora do Brasil leria outra data e outra hora.
   return d.toLocaleString("pt-BR", {
     day: "2-digit",
     month: "2-digit",
     year: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "America/Sao_Paulo",
   });
 }
 
@@ -122,8 +122,8 @@ export default function RelatoriosPage() {
 
       {generating && (
         <div className="card mb-6 flex flex-col items-center py-16 text-center">
-          <Loader2 className="mb-3 h-7 w-7 animate-spin text-brand-700 dark:text-brand-400" />
-          <p className="text-sm text-slate-500 dark:text-slate-400">
+          <Loader2 className="mb-3 h-7 w-7 animate-spin text-app-primaria" />
+          <p className="text-sm text-app-texto-2">
             Analisando seus dados… isso leva alguns segundos.
           </p>
         </div>
@@ -131,13 +131,13 @@ export default function RelatoriosPage() {
 
       {!generating && !loadingList && reports.length === 0 && (
         <div className="card flex flex-col items-center py-12 text-center">
-          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
+          <div className="icon-badge mb-4 h-14 w-14 rounded-2xl">
             <BarChart3 className="h-7 w-7" />
           </div>
-          <p className="text-lg font-semibold text-slate-900 dark:text-white">
+          <p className="text-lg font-semibold text-app-texto">
             Seu relatório inteligente
           </p>
-          <p className="mt-1 max-w-md text-sm text-slate-500 dark:text-slate-400">
+          <p className="mt-1 max-w-md text-sm text-app-texto-2">
             A IA analisa seus treinos, dieta, hábitos, medidas e exames dos últimos
             30 dias e traz pontos fortes, o que melhorar e padrões a evitar. Cada
             relatório fica salvo no histórico para você comparar sua evolução.
@@ -151,12 +151,14 @@ export default function RelatoriosPage() {
       {!generating && reports.length > 0 && (
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Relatório selecionado */}
-          <div className="space-y-6 lg:col-span-2">
+          {/* `min-w-0`: sem ele, a linha do histórico (`truncate`, sem quebra) alarga
+              a coluna única do celular, e os cartões passam da borda direita. */}
+          <div className="min-w-0 space-y-6 lg:col-span-2">
             {report && (
               <>
                 {current && (
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-xs font-medium text-slate-500">
+                    <p className="text-xs font-medium text-app-texto-2">
                       Relatório de {formatDateTime(current.created_at)}
                     </p>
                     <span className="chip">Últimos 30 dias</span>
@@ -164,16 +166,14 @@ export default function RelatoriosPage() {
                 )}
 
                 {report.resumo && (
-                  <div className="card bg-gradient-to-br from-brand-50 to-white dark:from-brand-950/20 dark:to-slate-900">
+                  <div className="card">
                     <div className="flex items-start gap-3">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
-                        <Sparkles className="h-5 w-5" />
+                      <div className="icon-badge">
+                        <Sparkles className="h-4 w-4" />
                       </div>
                       <div>
-                        <p className="mb-0.5 text-xs font-semibold uppercase tracking-wide text-brand-700 dark:text-brand-400">
-                          Resumo
-                        </p>
-                        <p className="text-sm leading-relaxed text-slate-800 dark:text-slate-200">
+                        <p className="eyebrow mb-0.5">Resumo</p>
+                        <p className="text-sm leading-relaxed text-app-texto">
                           {report.resumo}
                         </p>
                       </div>
@@ -183,17 +183,14 @@ export default function RelatoriosPage() {
 
                 {report.pontos_fortes.length > 0 && (
                   <section>
-                    <h2 className="mb-3 flex items-center gap-2 font-semibold text-slate-900 dark:text-white">
-                      <TrendingUp className="h-5 w-5 text-brand-700 dark:text-brand-400" />
-                      Pontos fortes
-                    </h2>
+                    <h2 className="section-title mb-3">Pontos fortes</h2>
                     <ul className="space-y-2">
                       {report.pontos_fortes.map((p, i) => (
                         <li
                           key={i}
-                          className="card flex items-start gap-3 py-3 text-sm text-slate-700 dark:text-slate-300"
+                          className="card flex items-start gap-3 py-3 text-sm text-app-texto"
                         >
-                          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-brand-700 dark:text-brand-400" />
+                          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-app-primaria" />
                           <span>{p}</span>
                         </li>
                       ))}
@@ -203,21 +200,18 @@ export default function RelatoriosPage() {
 
                 {report.a_melhorar.length > 0 && (
                   <section>
-                    <h2 className="mb-3 flex items-center gap-2 font-semibold text-slate-900 dark:text-white">
-                      <ListChecks className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                      O que melhorar
-                    </h2>
+                    <h2 className="section-title mb-3">O que melhorar</h2>
                     <div className="grid gap-3 sm:grid-cols-2">
                       {report.a_melhorar.map((m, i) => (
                         <div key={i} className="card">
-                          <span className="inline-block rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-semibold text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">
+                          <span className="inline-block rounded-full bg-app-primaria-fundo px-2 py-0.5 text-[11px] font-semibold text-app-primaria">
                             {m.area}
                           </span>
-                          <p className="mt-2 text-sm text-slate-700 dark:text-slate-300">
+                          <p className="mt-2 text-sm text-app-texto">
                             {m.observacao}
                           </p>
                           {m.sugestao && (
-                            <p className="mt-2 border-t border-slate-100 pt-2 text-sm font-medium text-slate-800 dark:border-slate-800 dark:text-slate-200">
+                            <p className="mt-2 border-t border-app-linha pt-2 text-sm font-medium text-app-texto">
                               💡 {m.sugestao}
                             </p>
                           )}
@@ -229,10 +223,7 @@ export default function RelatoriosPage() {
 
                 {report.padroes_a_evitar.length > 0 && (
                   <section>
-                    <h2 className="mb-3 flex items-center gap-2 font-semibold text-slate-900 dark:text-white">
-                      <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-                      Padrões a evitar
-                    </h2>
+                    <h2 className="section-title mb-3">Padrões a evitar</h2>
                     <ul className="space-y-2">
                       {report.padroes_a_evitar.map((p, i) => (
                         <li
@@ -249,17 +240,14 @@ export default function RelatoriosPage() {
 
                 {report.proximos_passos.length > 0 && (
                   <section>
-                    <h2 className="mb-3 flex items-center gap-2 font-semibold text-slate-900 dark:text-white">
-                      <CheckCircle2 className="h-5 w-5 text-brand-700 dark:text-brand-400" />
-                      Próximos passos
-                    </h2>
+                    <h2 className="section-title mb-3">Próximos passos</h2>
                     <ol className="space-y-2">
                       {report.proximos_passos.map((p, i) => (
                         <li
                           key={i}
-                          className="card flex items-start gap-3 py-3 text-sm text-slate-700 dark:text-slate-300"
+                          className="card flex items-start gap-3 py-3 text-sm text-app-texto"
                         >
-                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-700 text-xs font-bold text-white">
+                          <span className="tabular flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-app-primaria text-xs font-semibold text-app-sobre-primaria">
                             {i + 1}
                           </span>
                           <span>{p}</span>
@@ -269,7 +257,7 @@ export default function RelatoriosPage() {
                   </section>
                 )}
 
-                <p className="text-center text-[11px] text-slate-500 dark:text-slate-400">
+                <p className="text-center text-[11px] text-app-texto-2">
                   Análise gerada por IA a partir dos seus registros. Não substitui um
                   profissional de saúde.
                 </p>
@@ -278,37 +266,34 @@ export default function RelatoriosPage() {
           </div>
 
           {/* Histórico */}
-          <div className="lg:col-span-1">
+          <div className="min-w-0 lg:col-span-1">
             <div className="card lg:sticky lg:top-6">
-              <h2 className="mb-3 flex items-center gap-2 font-semibold text-slate-900 dark:text-white">
-                <History className="h-5 w-5 text-slate-500" /> Histórico
-              </h2>
-              <div className="space-y-2">
+              <h2 className="section-title mb-3">Histórico</h2>
+              <div className="-mx-2 divide-y divide-app-linha">
                 {reports.map((r) => {
                   const active = r.id === selectedId;
                   return (
                     <div
                       key={r.id}
-                      className={`flex items-center gap-2 rounded-xl border px-3 py-2 transition ${
-                        active
-                          ? "border-brand-400 bg-brand-50/60 dark:border-brand-700 dark:bg-brand-950/30"
-                          : "border-slate-200 hover:bg-slate-50 dark:border-white/[0.06] dark:hover:bg-slate-800/40"
+                      className={`flex items-center gap-2 rounded-lg px-2 py-1 transition ${
+                        active ? "bg-app-primaria-fundo" : "hover:bg-app-pagina"
                       }`}
                     >
                       <button
                         onClick={() => setSelectedId(r.id)}
-                        className="min-w-0 flex-1 text-left"
+                        aria-current={active || undefined}
+                        className="min-h-[44px] min-w-0 flex-1 text-left"
                       >
-                        <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
+                        <p className="tabular text-sm font-medium text-app-texto">
                           {formatDateTime(r.created_at)}
                         </p>
-                        <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                        <p className="truncate text-xs text-app-texto-2">
                           {r.content?.resumo || "Relatório"}
                         </p>
                       </button>
                       <button
                         onClick={() => removeReport(r.id)}
-                        className="rounded-lg p-1 text-slate-500 hover:text-rose-600"
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-app-texto-2 hover:text-app-perigo"
                         aria-label="Excluir"
                       >
                         <Trash2 className="h-4 w-4" />

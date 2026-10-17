@@ -87,6 +87,16 @@ input[type="number"] {
 }
 
 @layer base {
+  /* Altura da barra de baixo do celular (AppShell), SEM a safe area: 1 px de
+     borda + 60,5 dos itens (10 de folga, 22 do ícone, 2 de vão, 16,5 do
+     rótulo e 10 de folga). É fixa, e não a que os itens dariam sozinhos,
+     porque o balão da Gaia (ChatWidget) se ancora na borda de cima dela e o
+     CSS não lê a altura de outro elemento: as duas contas leem esta variável.
+     O 61,5 é o que a barra já tinha; o `sticky bottom-[61px]` do
+     EditorRegistro conta com ele. */
+  :root {
+    --barra-h: 61.5px;
+  }
   h1,
   h2,
   h3,
@@ -153,19 +163,29 @@ input[type="number"] {
    =================================================================== */
 
 /* Entrada de conteúdo: sobe e aparece. Usada na troca de página e em
-   blocos que surgem depois de carregar. */
+   blocos que surgem depois de carregar.
+
+   O preenchimento é `backwards` (segura o estado inicial durante o atraso) e
+   NÃO `both`. Com `both`, o fim da animação (`transform: none`) continuava
+   aplicado como uma matriz identidade, e um elemento com `transform` vira o
+   bloco de contenção dos filhos `position: fixed`: todo `Modal` dentro de uma
+   página (`.pf-in`) se posicionava em relação à página, e não à janela. A
+   folha caía no fim da página (em Medidas, 1.100 px abaixo da dobra) e o
+   fundo escuro cobria só a coluna de conteúdo (358 px de largura em 390 px de
+   tela). O estado final dos quadros-chave já é o natural (opacidade 1, sem
+   transformação), então não precisa ficar preso. */
 @keyframes pf-in {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: none; }
 }
 .pf-in {
-  animation: pf-in 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pf-in 0.32s cubic-bezier(0.16, 1, 0.3, 1) backwards;
 }
 
 /* Lista em cascata: cada filho entra um pouco depois do anterior.
    Para em 8 para não deixar listas longas lentas. */
 .pf-stagger > * {
-  animation: pf-in 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pf-in 0.34s cubic-bezier(0.16, 1, 0.3, 1) backwards;
 }
 .pf-stagger > *:nth-child(1) { animation-delay: 0.02s; }
 .pf-stagger > *:nth-child(2) { animation-delay: 0.06s; }
@@ -194,23 +214,31 @@ input[type="number"] {
   from { transform: translateY(100%); }
   to   { transform: none; }
 }
-.pf-backdrop { animation: pf-fade 0.2s ease-out both; }
-.pf-panel    { animation: pf-zoom 0.26s cubic-bezier(0.16, 1, 0.3, 1) both; }
+/* `backwards` e não `both` em todas as entradas, pelo motivo do `.pf-in`
+   (acima): o `transform` que o fim da animação deixava aplicado vira o bloco
+   de contenção dos filhos `position: fixed`. O fade não tem `transform`, mas
+   fica igual para ninguém copiar o `both` dele. */
+.pf-backdrop { animation: pf-fade 0.2s ease-out backwards; }
+.pf-panel    { animation: pf-zoom 0.26s cubic-bezier(0.16, 1, 0.3, 1) backwards; }
 
 /* O modal sobe como folha no celular e dá zoom no desktop. Precisa ser
    media query no CSS: variantes do Tailwind (sm:) não alcançam classes
-   declaradas fora do build dele. */
-.pf-modal { animation: pf-slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) both; }
+   declaradas fora do build dele. `backwards` e não `both`, pelo mesmo motivo
+   do `.pf-in` (acima): a folha tem filhos que abrem outro `Modal` (a
+   calculadora de anilhas dentro de "Novo treino"), e o `transform` que ficava
+   ao fim da animação prendia esse segundo `fixed` à folha de baixo. */
+.pf-modal { animation: pf-slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) backwards; }
 @media (min-width: 640px) {
-  .pf-modal { animation: pf-zoom 0.26s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .pf-modal { animation: pf-zoom 0.26s cubic-bezier(0.16, 1, 0.3, 1) backwards; }
 }
-.pf-sheet    { animation: pf-slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.pf-sheet    { animation: pf-slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) backwards; }
 
 @keyframes pf-slide-left {
   from { transform: translateX(100%); }
   to   { transform: none; }
 }
-.pf-drawer { animation: pf-slide-left 0.28s cubic-bezier(0.16, 1, 0.3, 1) both; }
+/* A gaveta "Mais" do AppShell: um filho `fixed` nela ficaria preso a ela com o `both`. */
+.pf-drawer { animation: pf-slide-left 0.28s cubic-bezier(0.16, 1, 0.3, 1) backwards; }
 
 /* Esqueleto de carregamento */
 @keyframes pf-shimmer {
@@ -244,6 +272,9 @@ input[type="number"] {
   );
 }
 
+/* Sem animação não há quadro inicial nem final: o elemento fica no estado
+   natural (visível, sem `transform`), que é o que o `backwards` deixa depois
+   do fim. Os dois caminhos acabam no mesmo lugar. */
 @media (prefers-reduced-motion: reduce) {
   .pf-in,
   .pf-stagger > *,
@@ -278,7 +309,10 @@ input[type="number"] {
   /* ---- Hierarquia visual ----------------------------------------- */
 
   /* Selo atrás do ícone, onde o ícone diz algo (estado vazio, linha de
-     lista). Os títulos de seção do paciente não o levam mais. */
+     lista). Os títulos de seção do paciente não o levam mais (a spec manda
+     `.section-title` sem ícone); o lado clínico ainda o leva em alguns
+     (EditorTreino e TemplateBar), porque a página do nutricionista não muda
+     na tela. */
   .icon-badge {
     @apply flex h-8 w-8 shrink-0 items-center justify-center rounded-xl
       bg-app-primaria-fundo text-app-primaria;

@@ -13,7 +13,8 @@
 // escritas de escrever(): o upsert do perfil (o CRN), o PATCH/DELETE de
 // body_measurements com a RLS do paciente (a medida da consulta não se altera
 // nem se apaga, e o banco recusa sem erro), o upsert da água do dia
-// (daily_logs) e o insert e o delete de refeição (meals). POST
+// (daily_logs), o insert e o delete de refeição (meals) e o check-in do treino
+// (plan_completions). POST
 // /__reset volta tudo ao que o cenário subiu; POST /__falhar derruba os GET de
 // uma tabela (500) até o próximo /__reset, ou só as escritas, com "escrita": true.
 
@@ -867,9 +868,13 @@ T.consultation_addenda ||= [];
 // e `body_measurements` porque publica a medida da consulta.
 // `daily_logs` e `meals` porque o "+250 ml" da Início e a refeição que o
 // roteiro da Início lança para passar da meta de calorias gravam de verdade.
+// `plan_completions` porque o roteiro da Início confere os três estados do
+// check-in ("Fui", "Feito" e "Não fui") na Início, na leitura do treino e em
+// Treinos, e a Início e a leitura do treino são do servidor: sem guardar, a
+// página recarregada voltava a "sem resposta".
 const TABELAS_COM_ESTADO = [
   "appointments", "consultation_records", "consultation_addenda", "body_measurements", "profiles",
-  "daily_logs", "meals",
+  "daily_logs", "meals", "plan_completions",
 ];
 const ESTADO_INICIAL = JSON.stringify(Object.fromEntries(TABELAS_COM_ESTADO.map((n) => [n, T[n] ?? []])));
 
@@ -1306,6 +1311,9 @@ const sessao = (id) => ({
  *    registrar um "Comi isso" e ver o plano dizer "feito".
  *  - meals, DELETE: apaga a refeição de quem pede (o excluir da Dieta). Como no
  *    banco, a RLS esconde a linha dos outros: zero linhas afetadas, sem erro.
+ *  - plan_completions, POST (o upsert de `setPlanCheck`, com
+ *    `on_conflict=plan_id,date`) e DELETE (desmarcar): o check-in do treino,
+ *    uma linha por sessão e dia, só de quem pede.
  *  Nas escritas de insert, só linha de quem pede (a RLS `user_id = auth.uid()`),
  *  senão 403.
  */
@@ -1346,6 +1354,29 @@ function escrever(tabela, metodo, params, corpo, quem, prefer) {
       return linha;
     });
     return { status: 201, dados: representacao ? gravados : [], cabecalhos: {} };
+  }
+
+  if (tabela === "plan_completions" && metodo === "POST") {
+    const novos = (Array.isArray(dados) ? dados : [dados]).filter((x) => x && typeof x === "object");
+    if (novos.some((n) => n.user_id !== quem))
+      return { status: 403, dados: { code: "42501", message: 'new row violates row-level security policy for table "plan_completions"' }, cabecalhos: {} };
+    const lista = (T.plan_completions ||= []);
+    const gravados = novos.map((n) => {
+      // O upsert pela chave (plan_id, date): trocar "Fui" por "Não fui" é a
+      // mesma linha, com o status novo.
+      let linha = lista.find((l) => l.plan_id === n.plan_id && l.date === n.date);
+      if (linha) Object.assign(linha, n);
+      else lista.push((linha = { id: `plan_completions-novo-${++seqEscrita}`, workout_id: null, created_at: new Date().toISOString(), ...n }));
+      return linha;
+    });
+    return { status: 201, dados: representacao ? gravados : [], cabecalhos: {} };
+  }
+
+  if (tabela === "plan_completions" && metodo === "DELETE") {
+    const visiveis = aplicaFiltros(T.plan_completions || [], params).filter((l) => l.user_id === quem);
+    T.plan_completions = (T.plan_completions || []).filter((l) => !visiveis.includes(l));
+    if (representacao) return { status: 200, dados: visiveis, cabecalhos: contagem(visiveis.length) };
+    return { status: 204, dados: null, cabecalhos: contagem(visiveis.length) };
   }
 
   if (tabela === "meals" && metodo === "DELETE") {

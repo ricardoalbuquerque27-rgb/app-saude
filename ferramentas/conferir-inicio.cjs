@@ -134,6 +134,18 @@ async function clicar(loc) {
     await p.locator("h1").first().waitFor({ timeout: 60000 });
     await p.waitForTimeout(600);
   };
+  /** O painel da Gaia aberto: a que distância do fundo e da barra ele acaba, e se o balão saiu de cena. */
+  const medirPainel = () =>
+    p.evaluate(() => {
+      const painel = document.querySelector('button[aria-label="Fechar"]')?.closest("div.fixed");
+      const nav = document.querySelector("nav.fixed.inset-x-0.bottom-0");
+      if (!painel || !nav) return null;
+      const r = painel.getBoundingClientRect();
+      return {
+        top: Math.round(r.top), b: r.bottom, doFundo: Math.round((innerHeight - r.bottom) * 100) / 100,
+        barra: nav.getBoundingClientRect().top, balao: !!document.querySelector('button[aria-label="Abrir a Gaia"]'),
+      };
+    });
   const antesMs = Date.now();
   await carregar();
   const depoisMs = Date.now();
@@ -209,8 +221,9 @@ async function clicar(loc) {
     const feitas = await s.locator("ul > li", { has: p.locator('[aria-pressed="true"]') }).count();
     ok(!!m && Number(m[1]) === linhas - feitas,
       `"N pendentes" igual às linhas pendentes: ${m ? m[0] : "(sem contagem)"} · ${linhas} linhas, ${feitas} feitas`);
-    // A hierarquia da maquete no treino do nutricionista ainda sem resposta:
-    // "Fui" sólido (primária) e "Não fui" secundário, 40 px e letra de 14 px.
+    // A regra do check-in no treino do nutricionista ainda sem resposta: "Fui"
+    // sólido (primária) e "Não fui" secundário, 44 px e letra de 14 px. Os três
+    // estados, nas três telas, vêm na etapa "Check-in", abaixo.
     const linhaDoNutri = s.locator("ul > li", { hasText: "do seu nutricionista" }).first();
     const estilos = await linhaDoNutri.evaluate((li) => {
       const cor = (v) => {
@@ -227,8 +240,8 @@ async function clicar(loc) {
     });
     ok(!!estilos.fui && estilos.fui.fundo === estilos.primaria && !!estilos.naoFui && estilos.naoFui.fundo === estilos.cartao,
       '"Fui" sólido em app-primaria e "Não fui" secundário (fundo de cartão)', JSON.stringify(estilos));
-    ok(!!estilos.fui && !!estilos.naoFui && estilos.fui.h >= 40 && estilos.naoFui.h >= 40 && estilos.fui.letra === "14px" && estilos.naoFui.letra === "14px",
-      `os dois com 40 px e letra de 14 px (${estilos.fui && estilos.fui.h}/${estilos.naoFui && estilos.naoFui.h} px, ${estilos.fui && estilos.fui.letra})`);
+    ok(!!estilos.fui && !!estilos.naoFui && estilos.fui.h >= 44 && estilos.naoFui.h >= 44 && estilos.fui.letra === "14px" && estilos.naoFui.letra === "14px",
+      `os dois com 44 px e letra de 14 px (${estilos.fui && estilos.fui.h}/${estilos.naoFui && estilos.naoFui.h} px, ${estilos.fui && estilos.fui.letra})`);
   });
   await etapa("Para hoje com leitura falhando", async () => {
     await comFalha("patient_notes", async () => {
@@ -236,9 +249,179 @@ async function clicar(loc) {
       const t = await secao("Para hoje").innerText().catch(() => "");
       ok(t.includes("Não deu para carregar tudo"), 'recados falhando: "Não deu para carregar tudo" aparece', t.slice(0, 160));
       ok(t !== "" && !/em dia/.test(t), 'e o cartão (que está na tela) não diz "em dia"');
+      // A contagem seria só do que chegou: o cabeçalho fica só com o título.
+      const cab = (await secao("Para hoje").locator(":scope > div").first().innerText().catch(() => "")).trim();
+      ok(cab === "Para hoje", `e o cabeçalho não mostra "N pendentes" (a contagem é parcial): "${cab}"`);
       await p.screenshot({ path: `${OUT}/para-hoje-falhou.png`, fullPage: true });
     });
   });
+
+  console.log("\nCheck-in: uma regra só (Início, leitura do treino e Treinos)");
+  // A mesma regra nas três telas (components/PlanCheckIn.tsx,
+  // BotoesDoCheckIn): sem resposta, "Fui" sólido e "Não fui" secundário;
+  // feito, "Feito" com o check no fundo da principal (e não o mesmo sólido do
+  // sem resposta); não fui, "Fui" secundário e "Não fui" em aviso. O treino
+  // próprio só tem "Fiz". O mock guarda o check-in (plan_completions), e o
+  // `comEstado` o apaga no fim.
+  // Antes de ler: o ponteiro sai de cima (o secundário tem fundo de hover) e as
+  // transições terminam. O botão que o React reaproveita (Início e leitura do
+  // treino) passa 200 ms entre uma cor e outra (`.tappable`), e a leitura logo
+  // depois do clique pegava a cor do meio do caminho. Só as animações finitas
+  // da área: o giro do `Loader2` nunca termina.
+  const lerBotoes = async (raiz) => {
+    await p.mouse.move(1, 1);
+    return raiz.evaluate(async (el) => {
+      const finitas = el
+        .getAnimations({ subtree: true })
+        .filter((a) => a.effect && a.effect.getComputedTiming().iterations !== Infinity);
+      await Promise.race([
+        Promise.all(finitas.map((a) => a.finished.catch(() => {}))),
+        new Promise((r) => setTimeout(r, 2000)),
+      ]);
+      const cor = (v) => {
+        const ref = document.createElement("span");
+        ref.style.backgroundColor = `var(${v})`;
+        document.body.appendChild(ref);
+        const c = getComputedStyle(ref).backgroundColor;
+        ref.remove();
+        return c;
+      };
+      return {
+        botoes: [...el.querySelectorAll("button[aria-pressed]")].map((b) => ({
+          texto: b.textContent.trim(),
+          fundo: getComputedStyle(b).backgroundColor,
+          h: Math.round(b.getBoundingClientRect().height * 10) / 10,
+          apertado: b.getAttribute("aria-pressed") === "true",
+          icone: !!b.querySelector("svg"),
+        })),
+        primaria: cor("--app-primaria"),
+        primariaFundo: cor("--app-primaria-fundo"),
+        cartao: cor("--app-cartao"),
+        atencaoFundo: cor("--app-atencao-fundo"),
+      };
+    });
+  };
+  const resumoDosBotoes = (r) => r.botoes.map((b) => `${b.texto}[${b.fundo}${b.apertado ? ", apertado" : ""}]`).join(" ");
+  /** Os três estados de um treino prescrito, tocando nos botões; termina como começou. */
+  async function tresEstados(tela, raiz, prefixo) {
+    const btn = (nome) => raiz().getByRole("button", { name: nome, exact: true });
+    await hidratado(btn("Fui"));
+    const r1 = await lerBotoes(raiz());
+    const [fui1, nao1] = r1.botoes;
+    ok(r1.botoes.length === 2 && fui1.texto === "Fui" && fui1.fundo === r1.primaria && !fui1.apertado &&
+        nao1.texto === "Não fui" && nao1.fundo === r1.cartao && !nao1.apertado,
+      `${tela}, sem resposta: "Fui" sólido e "Não fui" secundário`, resumoDosBotoes(r1));
+    ok(r1.botoes.every((b) => b.h >= 44), `${tela}: os botões com 44 px (${r1.botoes.map((b) => b.h).join(" / ")})`);
+    await raiz().screenshot({ path: `${OUT}/${prefixo}-sem-resposta.png` });
+
+    await clicar(btn("Fui"));
+    await btn("Feito").waitFor({ timeout: 30000 });
+    const r2 = await lerBotoes(raiz());
+    const [feito, nao2] = r2.botoes;
+    ok(r2.botoes.length === 2 && feito.texto === "Feito" && feito.apertado && feito.icone && feito.fundo === r2.primariaFundo &&
+        nao2.fundo === r2.cartao && !nao2.apertado,
+      `${tela}, feito: "Feito" com o check no fundo da principal e "Não fui" secundário`, resumoDosBotoes(r2));
+    ok(feito.fundo !== fui1.fundo, `${tela}: o feito tem outro fundo que o sem resposta (${fui1.fundo} → ${feito.fundo})`);
+    await raiz().screenshot({ path: `${OUT}/${prefixo}-feito.png` });
+
+    await clicar(btn("Não fui"));
+    await raiz().locator('button[aria-pressed="true"]', { hasText: "Não fui" }).waitFor({ timeout: 30000 });
+    const r3 = await lerBotoes(raiz());
+    const [fui3, nao3] = r3.botoes;
+    ok(r3.botoes.length === 2 && fui3.texto === "Fui" && fui3.fundo === r3.cartao && !fui3.apertado &&
+        nao3.texto === "Não fui" && nao3.apertado && nao3.fundo === r3.atencaoFundo,
+      `${tela}, não fui: "Fui" secundário e "Não fui" em aviso`, resumoDosBotoes(r3));
+    await raiz().screenshot({ path: `${OUT}/${prefixo}-nao-fui.png` });
+
+    await clicar(btn("Não fui"));
+    await raiz().locator('button[aria-pressed="true"]').waitFor({ state: "detached", timeout: 30000 });
+    const r4 = await lerBotoes(raiz());
+    ok(r4.botoes.length === 2 && r4.botoes[0].fundo === r4.primaria && !r4.botoes.some((b) => b.apertado),
+      `${tela}: tocar de novo desfaz e volta ao "Fui" sólido`, resumoDosBotoes(r4));
+  }
+  /** O treino próprio: só "Fiz" (sem "Não fui"), sólido, e "Feito" depois de tocar. */
+  async function soFiz(tela, raiz) {
+    const btn = (nome) => raiz().getByRole("button", { name: nome, exact: true });
+    await hidratado(btn("Fiz"));
+    const r1 = await lerBotoes(raiz());
+    ok(r1.botoes.length === 1 && r1.botoes[0].texto === "Fiz" && r1.botoes[0].fundo === r1.primaria && r1.botoes[0].h >= 44,
+      `${tela}, treino próprio: só "Fiz", sólido, com 44 px`, resumoDosBotoes(r1));
+    await clicar(btn("Fiz"));
+    await btn("Feito").waitFor({ timeout: 30000 });
+    const r2 = await lerBotoes(raiz());
+    ok(r2.botoes.length === 1 && r2.botoes[0].apertado && r2.botoes[0].fundo === r2.primariaFundo,
+      `${tela}, treino próprio feito: "Feito" no fundo da principal`, resumoDosBotoes(r2));
+    await clicar(btn("Feito"));
+    await btn("Fiz").waitFor({ timeout: 30000 });
+  }
+  await etapa("check-in na Início", () => comEstado(async () => {
+    await carregar();
+    const doNutri = () => secao("Para hoje").locator("ul > li", { hasText: "do seu nutricionista" }).first();
+    const proprio = () => secao("Para hoje").locator("ul > li", { hasText: "seu treino" }).first();
+    await tresEstados("Início", doNutri, "checkin-inicio");
+    await soFiz("Início", proprio);
+
+    // Um "não fui" já gravado no treino próprio (a semana de Treinos oferecia
+    // "Não fui" a todo treino, e a sessão do nutri desvinculado vira própria):
+    // aparece marcado, em aviso, e tocar nele desfaz. Sem isso, a resposta
+    // gravada era um "Fiz" secundário sem nada dizendo que ele não foi.
+    // "p-f" é o treino próprio do mock, no dia de hoje.
+    const maria = await entrarComoMaria();
+    const gravou = await fetch(`${MOCK}/rest/v1/plan_completions`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${maria.access_token}` },
+      body: JSON.stringify({ user_id: maria.user.id, plan_id: "p-f", date: hojeSP(), status: "skipped" }),
+    });
+    ok(gravou.status === 201, `o mock grava "não fui" no treino próprio (${gravou.status})`);
+    await carregar();
+    const naoFui = () => proprio().getByRole("button", { name: "Não fui", exact: true });
+    await hidratado(naoFui());
+    const r5 = await lerBotoes(proprio());
+    const [fiz5, nao5] = r5.botoes;
+    ok(r5.botoes.length === 2 && fiz5.texto === "Fiz" && fiz5.fundo === r5.cartao && !fiz5.apertado &&
+        nao5.texto === "Não fui" && nao5.apertado && nao5.fundo === r5.atencaoFundo && nao5.h >= 44,
+      `Início, treino próprio com "não fui" gravado: "Fiz" secundário e "Não fui" em aviso`, resumoDosBotoes(r5));
+    await clicar(naoFui());
+    await naoFui().waitFor({ state: "detached", timeout: 30000 });
+    const r6 = await lerBotoes(proprio());
+    ok(r6.botoes.length === 1 && r6.botoes[0].texto === "Fiz" && r6.botoes[0].fundo === r6.primaria,
+      `Início, treino próprio: tocar no "Não fui" gravado desfaz, e ele some`, resumoDosBotoes(r6));
+  }));
+  await etapa("check-in na leitura do treino", () => comEstado(async () => {
+    await carregar();
+    const linkDe = async (texto) =>
+      secao("Para hoje").locator("ul > li", { hasText: texto }).first().locator('a[href^="/app/treino/"]').getAttribute("href");
+    const [doNutri, proprio] = [await linkDe("do seu nutricionista"), await linkDe("seu treino")];
+    const cartaoDoCheckIn = () => p.locator(".card", { hasText: "Você treinou hoje?" });
+    await p.goto(APP + doNutri, { waitUntil: "networkidle", timeout: 120000 });
+    await tresEstados("treino/[id]", cartaoDoCheckIn, "checkin-treino");
+    await p.goto(APP + proprio, { waitUntil: "networkidle", timeout: 120000 });
+    await soFiz("treino/[id]", cartaoDoCheckIn);
+  }));
+  await etapa("check-in em Treinos", () => comEstado(async () => {
+    await p.goto(APP + "/app/treinos", { waitUntil: "networkidle", timeout: 120000 });
+    await p.getByRole("heading", { name: "Treinos", exact: true }).waitFor({ timeout: 60000 });
+    // O cartão de hoje; num dia sem treino prescrito (o mock tem de segunda,
+    // terça, quinta, sexta e sábado), a primeira sessão do nutri da semana que
+    // já tem check-in.
+    const hoje = p.locator("div.card", { has: p.getByText("hoje", { exact: true }) });
+    const comCheckIn = (loc) => loc.filter({ has: p.locator("button[aria-pressed]") });
+    const doNutriHoje = comCheckIn(hoje.locator("li", { has: p.getByText("do nutri", { exact: true }) }));
+    await hoje.first().waitFor({ timeout: 60000 });
+    const doNutri = (await doNutriHoje.count())
+      ? () => doNutriHoje.first()
+      : () => comCheckIn(p.locator("li", { has: p.getByText("do nutri", { exact: true }) })).first();
+    await tresEstados("Treinos", doNutri, "checkin-treinos");
+    // "Iniciar treino" continua o primário da sessão, acima do check-in.
+    const ordem = await doNutri().evaluate((li) => {
+      const iniciar = [...li.querySelectorAll("button")].find((b) => b.textContent.trim() === "Iniciar treino");
+      const fui = [...li.querySelectorAll("button")].find((b) => b.textContent.trim() === "Fui");
+      return iniciar && fui ? iniciar.getBoundingClientRect().bottom <= fui.getBoundingClientRect().top : null;
+    });
+    if (ordem !== null) ok(ordem, '"Iniciar treino" vem acima do check-in');
+    const proprio = () => comCheckIn(hoje.locator("li", { hasNot: p.getByText("do nutri", { exact: true }) })).first();
+    await soFiz("Treinos", proprio);
+  }));
 
   console.log("\nSeu dia: anéis");
   await etapa("anéis", async () => {
@@ -370,6 +553,16 @@ async function clicar(loc) {
     }, antes, { timeout: 15000 }).catch(() => {});
     const desfeito = await numeroDoAnel("Água");
     ok(Math.abs(desfeito - antes) < 0.001, `"Desfazer" devolve o anel (${depois} → ${desfeito})`);
+    // O "Desfazer" some com a mensagem: o foco volta ao "+250 ml" (e não cai
+    // no <body>), e a região anuncia "Desfeito.".
+    await p.waitForFunction(() => document.activeElement?.textContent?.trim() === "+250 ml", null, { timeout: 10000 }).catch(() => {});
+    const focado = await p.evaluate(() => {
+      const e = document.activeElement;
+      return e ? `${e.tagName.toLowerCase()} "${(e.textContent || "").trim().slice(0, 30)}"` : "nada";
+    });
+    ok(focado === 'button "+250 ml"', `depois do "Desfazer", o foco está no "+250 ml" (${focado})`);
+    const avisoDesfeito = p.locator('[aria-live="polite"]', { has: p.getByText("Desfeito.", { exact: true }) });
+    ok((await avisoDesfeito.count()) === 1, 'e a região aria-live diz "Desfeito."');
 
     // Dois toques no mesmo instante: o segundo não pode ler o mesmo total e
     // apagar o primeiro. O que a tela mostra tem de ser o que ficou gravado.
@@ -400,8 +593,8 @@ async function clicar(loc) {
     const antes = await numeroDoAnel("Água");
     await comFalha("daily_logs", async () => {
       await botao.click();
-      const aviso = p.getByText("Não deu para registrar a água", { exact: true });
-      ok(await aviso.waitFor({ timeout: 15000 }).then(() => true, () => false), 'gravação falhando: aparece "Não deu para registrar a água"');
+      const aviso = p.getByText("Não deu para registrar a água.", { exact: true });
+      ok(await aviso.waitFor({ timeout: 15000 }).then(() => true, () => false), 'gravação falhando: aparece "Não deu para registrar a água."');
       await p.waitForTimeout(800);
       const depois = await numeroDoAnel("Água");
       ok(depois === antes, `e o anel não muda (${antes} → ${depois})`);
@@ -417,8 +610,8 @@ async function clicar(loc) {
     const antes = await numeroDoAnel("Água");
     await comFalha("daily_logs", async () => {
       await botao.click();
-      const aviso = p.getByText("Não deu para registrar a água", { exact: true });
-      ok(await aviso.waitFor({ timeout: 15000 }).then(() => true, () => false), 'leitura do total falhando: aparece "Não deu para registrar a água"');
+      const aviso = p.getByText("Não deu para registrar a água.", { exact: true });
+      ok(await aviso.waitFor({ timeout: 15000 }).then(() => true, () => false), 'leitura do total falhando: aparece "Não deu para registrar a água."');
       await p.waitForTimeout(800);
       ok((await numeroDoAnel("Água")) === antes, "e o anel não muda");
     });
@@ -493,7 +686,7 @@ async function clicar(loc) {
     await comFalha("body_measurements", async () => {
       await carregar();
       const t = await secao("Progresso").innerText().catch(() => "");
-      ok(t.includes("Não deu para carregar o peso"), 'peso falhando: "Não deu para carregar o peso"', t.slice(0, 160));
+      ok(t.includes("Não deu para carregar o peso."), 'peso falhando: "Não deu para carregar o peso."', t.slice(0, 160));
       ok(!t.includes("Registre seu peso algumas vezes"), "e não o estado vazio");
     });
   });
@@ -529,6 +722,183 @@ async function clicar(loc) {
 
   await p.screenshot({ path: `${OUT}/inicio-390.png`, fullPage: true });
   await p.screenshot({ path: `${OUT}/v-topo.png` });
+
+  console.log("\nGaia na barra de baixo");
+  // O balão da Gaia (44 px) fica na borda de cima da barra de baixo, à direita,
+  // e não flutua mais sobre o conteúdo: em 390 px ele cortava o "Registrar" da
+  // aplicação ("Regis") e cobria o "ver em Meu plano" da Dieta. A barra tem
+  // altura fixa (`--barra-h`), e o balão entra só na folga de cima dela, para
+  // não cobrir o ícone nem o rótulo do "Mais", que fica logo abaixo. Tudo
+  // medido com o dedo: `elementFromPoint`, não só com caixas.
+  await etapa("Gaia na barra de baixo", async () => {
+    await carregar();
+    // O `goto` para a mesma rota recarrega com a rolagem de volta, e rolada a
+    // página esconde o balão (o dedo não o acharia): volta ao topo (`instant`:
+    // o html tem scroll-behavior: smooth) e espera o balão voltar.
+    await p.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+    await p.waitForTimeout(500);
+    const g = await p.evaluate(() => {
+      const caixa = (e) => {
+        const b = e.getBoundingClientRect();
+        return { x: b.left, y: b.top, r: b.right, b: b.bottom, w: b.width, h: b.height };
+      };
+      const cruza = (a, c) => a.x < c.r && a.r > c.x && a.y < c.b && a.b > c.y;
+      const fab = document.querySelector('button[aria-label="Abrir a Gaia"]');
+      const nav = document.querySelector("nav.fixed.inset-x-0.bottom-0");
+      const mais = [...nav.querySelectorAll("button")].find((b) => b.textContent.trim() === "Mais");
+      const habitos = [...nav.querySelectorAll("a")].find((a) => a.textContent.trim() === "Hábitos");
+      const registrar = [...document.querySelectorAll("li")]
+        .filter((li) => /Aplicação (de hoje|atrasada)/.test(li.textContent))
+        .map((li) => [...li.querySelectorAll("a")].find((a) => a.textContent.trim() === "Registrar"))
+        .find(Boolean);
+      const rotulo = [...mais.childNodes].find((n) => n.nodeType === 3 && n.textContent.trim() === "Mais");
+      const faixa = document.createRange();
+      faixa.selectNodeContents(rotulo);
+      const icone = mais.querySelector("svg");
+      const ponto = mais.querySelector("span > span");
+      const centro = (c) => [c.x + c.w / 2, c.y + c.h / 2];
+      const acerta = (el, [x, y]) => {
+        const h = document.elementFromPoint(x, y);
+        return !!h && el.contains(h);
+      };
+      // Grade (de 4 em 4 px) sobre os 44 px de baixo da célula inteira.
+      const livre = (el) => {
+        const c = caixa(el);
+        const erros = [];
+        let n = 0;
+        for (let x = c.x + 2; x < c.r; x += 4) {
+          for (let y = c.b - 44 + 2; y < c.b; y += 4) {
+            n++;
+            if (!acerta(el, [x, y])) erros.push(`${Math.round(x)},${Math.round(y)}`);
+          }
+        }
+        return { larg: c.w, n, erros: erros.slice(0, 5), nErros: erros.length };
+      };
+      const cf = caixa(fab);
+      // O balão é redondo e o ponto de novidade fica no canto do ícone: o que
+      // vale é o círculo, não a caixa do balão (cujo canto vazio o dedo não toca).
+      const cruzaCirculo = (c) => {
+        const cx = cf.x + cf.w / 2, cy = cf.y + cf.h / 2;
+        const px = Math.min(Math.max(cx, c.x), c.r), py = Math.min(Math.max(cy, c.y), c.b);
+        return Math.hypot(cx - px, cy - py) < cf.w / 2;
+      };
+      const cm = caixa(mais);
+      const cI = caixa(icone);
+      const cR = (() => { const b = faixa.getBoundingClientRect(); return { x: b.left, y: b.top, r: b.right, b: b.bottom, w: b.width, h: b.height }; })();
+      const cP = ponto ? caixa(ponto) : null;
+      const cN = caixa(nav);
+      const cReg = registrar ? caixa(registrar) : null;
+      const regErros = [];
+      if (cReg) {
+        // De 3 em 3 px e SEMPRE com a última linha e a última coluna: o topo
+        // do balão chegou a entrar 1,5 px no pé do botão, e uma grade que
+        // para antes da borda não via. "Tapado" é o dedo achar o balão ou a
+        // barra ali; o canto arredondado do botão, que devolve a linha da
+        // lista, não é tapado por ninguém.
+        const pontos = (de, ate) => {
+          const v = [];
+          for (let t = de + 0.5; t < ate - 0.5; t += 3) v.push(t);
+          v.push(ate - 0.5);
+          return v;
+        };
+        for (const x of pontos(cReg.x, cReg.r)) {
+          for (const y of pontos(cReg.y, cReg.b)) {
+            const h = document.elementFromPoint(x, y);
+            if (h && (fab.contains(h) || nav.contains(h))) regErros.push(`${Math.round(x)},${Math.round(y)}`);
+          }
+        }
+      }
+      return {
+        fab: cf, nav: cN, mais: cm, icone: cI, rotulo: cR, ponto: cP,
+        raio: getComputedStyle(fab).borderTopLeftRadius,
+        z: [Number(getComputedStyle(fab).zIndex), Number(getComputedStyle(nav).zIndex)],
+        cruzaIcone: cruza(cf, cI), cruzaRotulo: cruza(cf, cR), cruzaPonto: cP ? cruzaCirculo(cP) : false, temPonto: !!cP,
+        noIcone: acerta(mais, centro(cI)), noRotulo: acerta(mais, centro(cR)),
+        noFab: (() => { const h = document.elementFromPoint(...centro(cf)); return !!h && fab.contains(h); })(),
+        livreMais: livre(mais), livreHabitos: livre(habitos),
+        janela: innerWidth, registrar: cReg, regErros: regErros.slice(0, 5), nRegErros: regErros.length, altJanela: innerHeight,
+      };
+    });
+    const f = g.fab;
+    ok(Math.abs(f.w - 44) < 0.5 && Math.abs(f.h - 44) < 0.5, `o balão da Gaia tem 44×44 px (${f.w}×${f.h})`);
+    ok(parseFloat(g.raio) >= 22, `e é redondo (raio ${g.raio})`);
+    // "Na borda de cima": a linha de cima da barra atravessa o balão, e só os
+    // últimos 10 px dele entram na barra (a folga acima do ícone do Mais é de
+    // 11 px: 1 de borda e 10 de respiro; 10 deixa o topo do balão abaixo do
+    // pé do "Registrar", que acaba em 748 px, e 1 px antes do ícone).
+    const entra = f.b - g.nav.y;
+    ok(entra >= 1 && entra <= 10.5 && f.y < g.nav.y,
+      `o balão está na borda de cima da barra (entra ${Math.round(entra * 10) / 10} px; esperado de 1 a 10)`,
+      `balão y=${Math.round(f.y)}..${Math.round(f.b)} · barra y=${Math.round(g.nav.y)}`);
+    ok(Math.abs(g.janela - 16 - f.r) < 0.5, `à direita, na margem de 16 px da página (${Math.round((g.janela - f.r) * 10) / 10} px)`);
+    ok(g.z[0] > g.z[1] && g.noFab, `acima da barra no empilhamento (z ${g.z[0]} > ${g.z[1]}) e é o que o dedo acha no centro dele`);
+    ok(!g.cruzaIcone && !g.cruzaRotulo && !g.cruzaPonto,
+      `a caixa do balão não cruza o ícone nem o rótulo do Mais${g.temPonto ? ", e o círculo não toca o ponto de novidade" : ""}`,
+      `balão ${Math.round(f.y)}..${Math.round(f.b)} · ícone ${Math.round(g.icone.y)}..${Math.round(g.icone.b)} · rótulo ${Math.round(g.rotulo.y)}..${Math.round(g.rotulo.b)}`);
+    ok(g.noIcone, 'elementFromPoint no centro do ícone devolve o "Mais"');
+    ok(g.noRotulo, 'elementFromPoint no centro do rótulo devolve o "Mais"');
+    ok(g.livreMais.larg >= 44 && g.livreMais.nErros === 0,
+      `o "Mais" mantém 44×44 livres (${Math.round(g.livreMais.larg)} px de largura; ${g.livreMais.n - g.livreMais.nErros}/${g.livreMais.n} pontos da faixa de baixo)`,
+      g.livreMais.erros.join(" "));
+    ok(g.livreHabitos.larg >= 44 && g.livreHabitos.nErros === 0,
+      `o "Hábitos", vizinho dele, também (${Math.round(g.livreHabitos.larg)} px; ${g.livreHabitos.n - g.livreHabitos.nErros}/${g.livreHabitos.n} pontos)`,
+      g.livreHabitos.erros.join(" "));
+    ok(Math.abs(g.nav.h - 61.5) < 0.1, `a barra tem altura fixa de 61,5 px (${g.nav.h}), o que o balão usa para achar a borda dela`);
+    ok(!!g.registrar && g.registrar.b <= g.nav.y && g.nRegErros === 0,
+      `o "Registrar" da aplicação está inteiro na primeira tela e o dedo o acha em toda a caixa (${g.registrar ? Math.round(g.registrar.w) + "×" + Math.round(g.registrar.h) : "ausente"}, ${g.nRegErros} pontos tapados)`,
+      g.regErros.join(" "));
+    await p.screenshot({ path: `${OUT}/gaia-na-barra.png` });
+
+    // Aberto, o painel segue 80 px acima do fundo (61,5 da barra e 18,5 de
+    // vão, como era com o `bottom-20`), acima da barra, e o balão sai de cena:
+    // um não fica por cima do outro.
+    await clicar(p.locator('button[aria-label="Abrir a Gaia"]'));
+    await p.locator('button[aria-label="Fechar"]').waitFor({ timeout: 10000 });
+    const painel = await medirPainel();
+    ok(painel && Math.abs(painel.doFundo - 80) < 0.1 && painel.top === 64 && painel.b <= painel.barra - 18 && !painel.balao,
+      `aberto, o painel acaba 80 px acima do fundo e 18,5 acima da barra, sem o balão por cima (${painel ? painel.doFundo : "?"} px do fundo, topo ${painel ? painel.top : "?"}, balão ${painel && painel.balao ? "ainda na tela" : "fora"})`);
+    await p.locator('button[aria-label="Fechar"]').click();
+    await p.locator('button[aria-label="Abrir a Gaia"]').waitFor({ timeout: 10000 });
+  });
+
+  // Com recorte do aparelho (a barra de início do iPhone), a barra engorda por
+  // baixo e o balão acompanha a borda dela: a posição vem da mesma conta
+  // (`--barra-h` + `env(safe-area-inset-bottom)`), não de um número que só vale
+  // sem o recorte. O Chromium emula o recorte pelo CDP.
+  await etapa("Gaia na barra de baixo com safe area", async () => {
+    const cdp = await ctx.newCDPSession(p);
+    try {
+      await cdp.send("Emulation.setSafeAreaInsetsOverride", { insets: { top: 0, bottom: 34, left: 0, right: 0 } });
+      await p.waitForTimeout(400);
+      const m = await p.evaluate(() => {
+        const sonda = document.createElement("div");
+        sonda.style.cssText = "position:fixed;left:0;top:0;padding-bottom:env(safe-area-inset-bottom);visibility:hidden";
+        document.body.appendChild(sonda);
+        const env = parseFloat(getComputedStyle(sonda).paddingBottom);
+        sonda.remove();
+        const nav = document.querySelector("nav.fixed.inset-x-0.bottom-0").getBoundingClientRect();
+        const fab = document.querySelector('button[aria-label="Abrir a Gaia"]').getBoundingClientRect();
+        const mais = [...document.querySelectorAll("nav.fixed button")].find((b) => b.textContent.trim() === "Mais");
+        const icone = mais.querySelector("svg").getBoundingClientRect();
+        const h = document.elementFromPoint(icone.left + icone.width / 2, icone.top + icone.height / 2);
+        return { env, navH: nav.height, entra: fab.bottom - nav.top, folga: icone.top - fab.bottom, noIcone: !!h && mais.contains(h), fabH: fab.height };
+      });
+      ok(m.env === 34, `preparo: o Chromium emulou 34 px de safe area (${m.env})`);
+      ok(Math.abs(m.navH - 95.5) < 0.1, `a barra engordou por baixo: 61,5 + 34 = 95,5 px (${m.navH})`);
+      ok(Math.abs(m.entra - 10) < 0.1 && m.fabH === 44, `o balão acompanhou a borda: segue 10 px dentro da barra (${m.entra}) e com 44 px`);
+      ok(m.folga >= 0.5 && m.noIcone, `e não encosta no ícone do Mais (${m.folga} px livres; o dedo no centro do ícone acha o Mais: ${m.noIcone})`);
+      await clicar(p.locator('button[aria-label="Abrir a Gaia"]'));
+      await p.locator('button[aria-label="Fechar"]').waitFor({ timeout: 10000 });
+      const painel = await medirPainel();
+      ok(painel && Math.abs(painel.doFundo - 114) < 0.1 && painel.b <= painel.barra - 18,
+        `o painel aberto sobe com a barra: 80 + 34 = 114 px do fundo (${painel ? painel.doFundo : "?"}) e 18,5 acima dela`);
+      await p.locator('button[aria-label="Fechar"]').click();
+    } finally {
+      await cdp.send("Emulation.setSafeAreaInsetsOverride", { insets: { top: 0, bottom: 0, left: 0, right: 0 } }).catch(() => {});
+      await cdp.detach().catch(() => {});
+      await carregar();
+    }
+  });
 
   console.log("\nGaia");
   // (3) o balão da Gaia some ao descer

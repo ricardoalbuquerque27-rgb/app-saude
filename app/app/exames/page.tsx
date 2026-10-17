@@ -29,7 +29,7 @@ function ageFromBirth(birth?: string | null): number | null {
 }
 
 const STATUS = [
-  { value: "normal", label: "Normal", cls: "bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300" },
+  { value: "normal", label: "Normal", cls: "bg-app-primaria-fundo text-app-primaria" },
   { value: "atencao", label: "Atenção", cls: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" },
   { value: "alterado", label: "Alterado", cls: "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300" },
 ];
@@ -290,16 +290,16 @@ export default function ExamesPage() {
         onChange={analyzeExam}
       />
 
-      <div className="card mb-6 border-brand-200 bg-brand-50/50 dark:border-brand-900/40 dark:bg-brand-950/20">
+      <div className="card mb-6">
         <div className="flex items-start gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
-            <Sparkles className="h-5 w-5" />
+          <div className="icon-badge">
+            <Sparkles className="h-4 w-4" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="font-semibold text-slate-900 dark:text-white">
+            <p className="font-semibold text-app-texto">
               Ler exame com IA
             </p>
-            <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+            <p className="mt-0.5 text-sm text-app-texto-2">
               Envie o PDF ou uma foto do exame. A IA lê, explica em linguagem
               simples e destaca o que está fora da referência.
             </p>
@@ -325,40 +325,38 @@ export default function ExamesPage() {
         )}
 
         {analysis && (
-          <div className="mt-4 space-y-4 border-t border-brand-200/60 pt-4 dark:border-brand-900/30">
+          <div className="mt-4 space-y-4 border-t border-app-linha pt-4">
             {analysis.resumo && (
-              <p className="text-sm leading-relaxed text-slate-800 dark:text-slate-200">
+              <p className="text-sm leading-relaxed text-app-texto">
                 {analysis.resumo}
               </p>
             )}
 
             {analysis.itens.length > 0 && (
               <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Resultados
-                </p>
-                <div className="space-y-1.5">
+                <p className="eyebrow mb-1">Resultados</p>
+                <div className="divide-y divide-app-linha">
                   {analysis.itens.map((it, i) => {
                     const st =
                       STATUS.find((s) => s.value === it.status) ?? STATUS[0];
                     return (
                       <div
                         key={i}
-                        className="flex items-center justify-between gap-2 rounded-lg bg-white px-3 py-2 text-sm dark:bg-slate-900/60"
+                        className="flex items-center justify-between gap-2 py-2.5 text-sm"
                       >
                         <div className="min-w-0">
-                          <span className="font-medium text-slate-800 dark:text-slate-200">
+                          <span className="font-medium text-app-texto">
                             {it.nome}
                           </span>
                           {(it.valor || it.unidade) && (
-                            <span className="text-slate-600 dark:text-slate-400">
+                            <span className="tabular text-app-texto-2">
                               {" "}
                               — {it.valor}
                               {it.unidade ? ` ${it.unidade}` : ""}
                             </span>
                           )}
                           {it.referencia && (
-                            <span className="text-slate-500">
+                            <span className="tabular text-app-texto-2">
                               {" "}
                               (ref.: {it.referencia})
                             </span>
@@ -378,10 +376,8 @@ export default function ExamesPage() {
 
             {analysis.interpretacao.length > 0 && (
               <div>
-                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  O que significa
-                </p>
-                <ul className="list-disc space-y-1 pl-5 text-sm text-slate-700 dark:text-slate-300">
+                <p className="eyebrow mb-1">O que significa</p>
+                <ul className="list-disc space-y-1 pl-5 text-sm text-app-texto">
                   {analysis.interpretacao.map((t, i) => (
                     <li key={i}>{t}</li>
                   ))}
@@ -391,10 +387,8 @@ export default function ExamesPage() {
 
             {analysis.recomendacoes.length > 0 && (
               <div>
-                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Recomendações
-                </p>
-                <ul className="list-disc space-y-1 pl-5 text-sm text-slate-700 dark:text-slate-300">
+                <p className="eyebrow mb-1">Recomendações</p>
+                <ul className="list-disc space-y-1 pl-5 text-sm text-app-texto">
                   {analysis.recomendacoes.map((t, i) => (
                     <li key={i}>{t}</li>
                   ))}
@@ -418,13 +412,13 @@ export default function ExamesPage() {
                 </button>
               )}
               {savedMsg && (
-                <span className="text-xs font-medium text-brand-700 dark:text-brand-400">
+                <span className="text-xs font-medium text-app-primaria">
                   {savedMsg}
                 </span>
               )}
             </div>
 
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+            <p className="text-[11px] text-app-texto-2">
               Leitura automática por IA — pode conter erros e não substitui a
               avaliação de um médico.
             </p>
@@ -435,28 +429,28 @@ export default function ExamesPage() {
       {!loading && exams.length > 0 && (
         <div className="mb-4 grid grid-cols-3 gap-3">
           <div className="card py-3 text-center">
-            <p className="tabular text-2xl font-bold text-rose-600 dark:text-rose-400">
+            <p className="tabular text-2xl font-semibold text-rose-600 dark:text-rose-400">
               {statusCounts.alterado}
             </p>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Alterados</p>
+            <p className="text-xs text-app-texto-2">Alterados</p>
           </div>
           <div className="card py-3 text-center">
-            <p className="tabular text-2xl font-bold text-amber-600 dark:text-amber-400">
+            <p className="tabular text-2xl font-semibold text-amber-600 dark:text-amber-400">
               {statusCounts.atencao}
             </p>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Em atenção</p>
+            <p className="text-xs text-app-texto-2">Em atenção</p>
           </div>
           <div className="card py-3 text-center">
-            <p className="tabular text-2xl font-bold text-brand-700 dark:text-brand-400">
+            <p className="tabular text-2xl font-semibold text-app-primaria">
               {statusCounts.normal}
             </p>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Normais</p>
+            <p className="text-xs text-app-texto-2">Normais</p>
           </div>
         </div>
       )}
 
       {loading ? (
-        <div className="flex justify-center py-16 text-slate-500">
+        <div className="flex justify-center py-16 text-app-texto-2">
           <Loader2 className="h-6 w-6 animate-spin" />
         </div>
       ) : exams.length === 0 ? (
@@ -479,22 +473,16 @@ export default function ExamesPage() {
               ctx: profileCtx,
             });
             const showDir = dir.matched && dir.direction !== "normal";
-            const accent =
-              key === "alterado"
-                ? "border-l-rose-400 dark:border-l-rose-500/70"
-                : key === "atencao"
-                  ? "border-l-amber-400 dark:border-l-amber-500/70"
-                  : "border-l-brand-400 dark:border-l-brand-500/70";
             const iconTint =
               key === "alterado"
                 ? "bg-rose-100 text-rose-600 dark:bg-rose-950/40 dark:text-rose-300"
                 : key === "atencao"
                   ? "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
-                  : "bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300";
+                  : "bg-app-primaria-fundo text-app-primaria";
             return (
               <div
                 key={ex.id}
-                className={`card flex items-start gap-3 border-l-4 ${accent}`}
+                className="card flex items-start gap-3"
               >
                 <div
                   className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${iconTint}`}
@@ -503,7 +491,7 @@ export default function ExamesPage() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-semibold text-slate-900 dark:text-white">
+                    <p className="font-semibold text-app-texto">
                       {ex.title}
                     </p>
                     <span
@@ -523,18 +511,18 @@ export default function ExamesPage() {
                       )}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                  <p className="tabular text-xs text-app-texto-2">
                     {formatDate(ex.date)}
                     {ex.exam_type ? ` · ${ex.exam_type}` : ""}
                   </p>
                   {ex.result_value && (
-                    <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">
+                    <p className="tabular mt-1 text-sm text-app-texto">
                       <span className="font-semibold">
                         {ex.result_value}
                         {ex.unit ? ` ${ex.unit}` : ""}
                       </span>
                       {ex.reference_range && (
-                        <span className="text-slate-500">
+                        <span className="text-app-texto-2">
                           {" "}
                           (ref.: {ex.reference_range})
                         </span>
@@ -542,14 +530,15 @@ export default function ExamesPage() {
                     </p>
                   )}
                   {ex.notes && (
-                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    <p className="mt-1 text-xs text-app-texto-2">
                       {ex.notes}
                     </p>
                   )}
                 </div>
                 <button
                   onClick={() => remove(ex.id)}
-                  className="rounded-lg p-1.5 text-slate-500 hover:text-rose-600"
+                  aria-label={`Excluir exame ${ex.title}`}
+                  className="tappable flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-app-texto-2 hover:text-app-perigo"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
@@ -645,17 +634,17 @@ export default function ExamesPage() {
                   key={s.value}
                   type="button"
                   onClick={() => setStatus(s.value)}
-                  className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition ${
+                  className={`min-h-[44px] flex-1 rounded-lg border px-3 text-sm font-medium transition ${
                     status === s.value
-                      ? "border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-300"
-                      : "border-slate-300 text-slate-600 dark:border-slate-700 dark:text-slate-400"
+                      ? "border-app-primaria bg-app-primaria-fundo text-app-primaria"
+                      : "border-app-campo text-app-texto-2 hover:bg-app-primaria-fundo"
                   }`}
                 >
                   {s.label}
                 </button>
               ))}
             </div>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            <p className="mt-1 text-xs text-app-texto-2">
               {auto.matched
                 ? "Preenchida automaticamente pela faixa de referência — você pode ajustar se quiser."
                 : auto.needs?.includes("sexo")

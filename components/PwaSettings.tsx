@@ -236,19 +236,17 @@ export default function PwaSettings() {
       {/* Instalar o app */}
       <div className="card">
         <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
-            <Smartphone className="h-5 w-5" />
+          <div className="icon-badge">
+            <Smartphone className="h-4 w-4" />
           </div>
           <div className="min-w-0 flex-1">
-            <h2 className="font-semibold text-slate-900 dark:text-white">
-              Instalar no celular
-            </h2>
+            <h2 className="section-title">Instalar no celular</h2>
             {installed ? (
-              <p className="mt-1 flex items-center gap-1.5 text-sm text-brand-700 dark:text-brand-400">
+              <p className="mt-1 flex items-center gap-1.5 text-sm text-app-primaria">
                 <Check className="h-4 w-4" /> App instalado. Aproveite! 🎉
               </p>
             ) : (
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              <p className="mt-1 text-sm text-app-texto-2">
                 Adicione o Pace Fit à tela inicial e use como um app de verdade,
                 em tela cheia.
               </p>
@@ -265,21 +263,21 @@ export default function PwaSettings() {
                 </button>
 
                 {(showIosHelp || (isIOS() && !canPrompt)) && (
-                  <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
-                    <p className="font-medium text-slate-800 dark:text-slate-200">
+                  <div className="mt-3 rounded-xl bg-app-pagina p-3 text-sm text-app-texto-2">
+                    <p className="font-medium text-app-texto">
                       No iPhone/iPad (Safari):
                     </p>
                     <ol className="mt-2 space-y-1.5">
                       <li className="flex items-center gap-2">
-                        <Share className="h-4 w-4 shrink-0 text-brand-700" /> 1.
+                        <Share className="h-4 w-4 shrink-0 text-app-primaria" /> 1.
                         Toque no botão <b>Compartilhar</b>.
                       </li>
                       <li className="flex items-center gap-2">
-                        <PlusSquare className="h-4 w-4 shrink-0 text-brand-700" />{" "}
+                        <PlusSquare className="h-4 w-4 shrink-0 text-app-primaria" />{" "}
                         2. Escolha <b>Adicionar à Tela de Início</b>.
                       </li>
                       <li className="flex items-center gap-2">
-                        <Check className="h-4 w-4 shrink-0 text-brand-700" /> 3.
+                        <Check className="h-4 w-4 shrink-0 text-app-primaria" /> 3.
                         Abra o app pela tela inicial para ativar os lembretes.
                       </li>
                     </ol>
@@ -294,52 +292,61 @@ export default function PwaSettings() {
       {/* Lembretes */}
       <div className="card">
         <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+          <div className="icon-badge">
             {reminderOn ? (
-              <Bell className="h-5 w-5" />
+              <Bell className="h-4 w-4" />
             ) : (
-              <BellOff className="h-5 w-5" />
+              <BellOff className="h-4 w-4" />
             )}
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="font-semibold text-slate-900 dark:text-white">
-                Lembrete diário
-              </h2>
+              <h2 className="section-title">Lembrete diário</h2>
+              {/* O botão tem 44×44 px de toque (a trilha, 44×24, fica no meio):
+                  a de antes era só a trilha, e um polegar errava. As margens
+                  negativas devolvem a altura que ele acrescenta à linha. */}
               <button
                 onClick={toggleReminder}
                 disabled={!supported || busy}
                 role="switch"
                 aria-checked={reminderOn}
-                className={`relative h-6 w-11 shrink-0 rounded-full transition ${
-                  reminderOn ? "bg-brand-500" : "bg-slate-300 dark:bg-slate-700"
-                } disabled:opacity-50`}
+                aria-label="Lembrete diário"
+                className="tappable -my-2 flex h-11 w-11 shrink-0 items-center rounded-full disabled:opacity-50"
               >
-                {busy ? (
-                  <Loader2 className="absolute left-1/2 top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 animate-spin text-white" />
-                ) : (
-                  <span
-                    className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition ${
-                      reminderOn ? "left-[22px]" : "left-0.5"
-                    }`}
-                  />
-                )}
+                <span
+                  className={`relative h-6 w-11 rounded-full transition ${
+                    reminderOn ? "bg-app-primaria" : "bg-app-campo"
+                  }`}
+                >
+                  {/* Ocupado, a trilha é sempre `campo` (ao desligar, o estado já
+                      virou falso antes do await), e `texto` passa 4,5:1 sobre
+                      ela nos dois temas; `sobre-primaria` caía a 2,6:1 no escuro. */}
+                  {busy ? (
+                    <Loader2 className="absolute left-1/2 top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 animate-spin text-app-texto" />
+                  ) : (
+                    <span
+                      className={`absolute top-0.5 h-5 w-5 rounded-full bg-app-cartao transition ${
+                        reminderOn ? "left-[22px]" : "left-0.5"
+                      }`}
+                    />
+                  )}
+                </span>
               </button>
             </div>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            <p className="mt-1 text-sm text-app-texto-2">
               Uma notificação no seu celular para não perder a sequência — mesmo
               com o app fechado.
             </p>
 
             {!supported && (
-              <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+              <p className="mt-2 rounded-lg bg-app-atencao-fundo px-3 py-2 text-sm text-app-atencao">
                 {isIOS()
                   ? "No iPhone, instale o app na tela inicial (passo acima) e abra por lá para ativar os lembretes."
                   : "Seu navegador não suporta notificações push."}
               </p>
             )}
             {permDenied && (
-              <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+              <p className="mt-2 rounded-lg bg-app-atencao-fundo px-3 py-2 text-sm text-app-atencao">
                 As notificações estão bloqueadas. Libere nas configurações do
                 navegador para usar os lembretes.
               </p>
@@ -347,7 +354,7 @@ export default function PwaSettings() {
 
             {reminderOn && (
               <div className="mt-3 flex flex-wrap items-center gap-3">
-                <label className="text-sm text-slate-600 dark:text-slate-300">
+                <label className="text-sm text-app-texto-2">
                   Horário
                 </label>
                 <input
@@ -358,11 +365,11 @@ export default function PwaSettings() {
                 />
                 <button
                   onClick={testNotification}
-                  className="btn-ghost text-sm"
+                  className="btn-ghost min-h-[44px] text-sm"
                 >
                   {tested ? (
                     <>
-                      <Check className="h-4 w-4 text-brand-700" /> Enviada
+                      <Check className="h-4 w-4 text-app-primaria" /> Enviada
                     </>
                   ) : (
                     "Testar agora"
@@ -371,7 +378,7 @@ export default function PwaSettings() {
               </div>
             )}
             {testMsg && (
-              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+              <p className="mt-2 text-[13px] text-app-texto-2">
                 {testMsg}
               </p>
             )}

@@ -26,13 +26,17 @@ Isso não é óbvio lendo a árvore de arquivos.
   (prontuário), em página própria, `pacientes/[id]/consultas/[consulta]`
   (veja "Registro da consulta"). Não há aba Prescrição. Veja "A página do
   paciente" abaixo.
-- **Lógica testada:** `lib/date.ts` (datas e janelas, `dataNoBrasil`),
+- **Lógica testada:** `lib/date.ts` (datas e janelas, `dataNoBrasil`, e a
+  `saudacao` pela hora de São Paulo),
   `lib/planCheckIn.ts` (adesão, `estadosDaSemana`), `lib/foods.ts` (tabela
   TACO), `lib/edicao.ts` (`reduzirEdicao`, a regra de uma edição por vez,
   e `oQueSeguraATroca`), `lib/abas.ts` (a aba que o endereço pede),
   `lib/consultas.ts` (situação de cada consulta, hora de São Paulo, choque,
   grade do mês e da semana, o que cabe num dia do Mês, alertas de consulta,
-  `resumoDaConsulta`), `lib/desdeConsulta.ts` ("desde a última consulta"),
+  `resumoDaConsulta`; `estadoDaConsulta`, que escolhe entre a próxima, o pedido
+  e a cancelada pelo nutri para o cartão e para a linha da Início; e
+  `rotuloDoDia`, o rótulo da Dieta), `lib/desdeConsulta.ts` ("desde a última
+  consulta"),
   `lib/registro.ts` (o registro da consulta: faixas e leitura das medidas,
   `lerMedida`, `medidasValidas`, `errosDasMedidas`; `situacaoDoRegistro`; o
   botão do painel, `entradaDoRegistro`; o Observar, `observarDaConsulta` e
@@ -49,16 +53,28 @@ Isso não é óbvio lendo a árvore de arquivos.
   `fraseSemComparacao`, `dataDoComparativo`), a faixa, o nome e a unidade de
   exame em `lib/examRanges.ts` (`parseReferenceRange`, `dentroDaFaixa`,
   `chaveDoExame`, `faixaDaTabela`, `unidadeDoExame`, `ehTextoDaTabela`,
-  `classifyExam`), os números em pt-BR em `lib/numeros.ts`, a leitura em
+  `classifyExam`), os números em pt-BR em `lib/numeros.ts` (`numeroBR` e
+  `numeroFixo`, que mantém o zero: "66,0"), a leitura em
   páginas em `lib/paginacao.ts` (`lerEmPaginas`),
-  `lib/temaClinico.ts` com `lib/contraste.ts` (paleta e razão de contraste)
+  `lib/temaClinico.ts` e `lib/temaApp.ts` com `lib/contraste.ts` (as duas
+  paletas e a razão de contraste), a regra de senha nova em `lib/senha.ts`
+  (`problemaDaSenha`, `ehErroDeSenhaFraca`), as contas da Início e da Dieta do
+  paciente (`lib/paraHoje.ts`, `montarParaHoje`; `lib/cardapio.ts`,
+  `sugestaoDeProteina`, `partesDaSugestao` e `textoDaSugestao`; `lib/anel.ts`,
+  `rotuloDoAnel` e `avisoDoAnel`; `lib/healthScore.ts`, `computeHealthScore`,
+  com `semRegistro` e `topPilar`; `lib/agua.ts`, `adicionarAgua`, contra um
+  banco falso no próprio arquivo)
   e, em `lib/nutri.ts`, a conta do resumo, da fila de triagem e da linha do
   tempo do nutri (`montarResumos`, `filaDeTriagem`, `montarLinhaDoTempo`),
   as médias da semana e a comparação com a meta (`mediasDaSemana`,
   `compararComMeta`), os textos de meta e de desvio (`textoDaMeta`,
   `textoDoDesvio`, `textoDoDesvioDoPlano`), a divisão dos avisos entre meta
-  e plano de treino (`separarDesvios`) e o peso que vale num dia com duas
-  medidas (`pesoDoDia`). As consultas ao banco não têm teste (nem
+  e plano de treino (`separarDesvios`), o peso que vale num dia com duas
+  medidas (`pesoDoDia`), o peso de 30 dias (`pesoDe30Dias`, o mesmo número no
+  resumo do nutri e na Início do paciente), o último peso sem janela
+  (`pesoMaisRecente`: a Dieta e o "em dd/mm" da Início) e o papel das calorias
+  (`papelDasCalorias`). As
+  consultas ao banco não têm teste (nem
   `lib/perfil.ts`, que é só uma consulta), menos as que rodam contra um
   Supabase em memória: as leituras do resumo, da linha do tempo e da série
   em `lib/nutri.test.ts`, o "antes" das medidas em `lib/registroDb.test.ts`
@@ -243,9 +259,14 @@ componentes (`components/consultas/`). Sem `?vista=`, vale a última usada
 remarcação, sem desfecho) vira alerta de tipo `consulta` na fila (nível 2 e
 4) e aparece tracejada na agenda, com uma linha de aviso no topo; não há
 coluna de pendências (o dono do produto achou "bagunçado"). Choque de
-horário avisa e não impede. O paciente vê o cartão de consulta
-(`components/CartaoConsulta.tsx`) na Início e em "Meu plano", no visual do
-app dele, e não recebe aviso fora do app (sem Web Push).
+horário avisa e não impede. O paciente vê a consulta no visual do app dele:
+na Início, **uma linha no topo** (`components/LinhaDaConsulta.tsx`) que leva a
+"Meu plano" (`#consulta`), onde mora o cartão inteiro, com as ações
+(`components/CartaoConsulta.tsx`; pedir, remarcar, cancelar). A linha e o
+cartão escolhem a situação pela mesma `estadoDaConsulta`: quando a conta
+morava dentro do cartão, uma linha refeita à mão podia dizer "nenhuma"
+enquanto o cartão mostrava uma consulta cancelada pelo nutri. Ele não recebe
+aviso fora do app (sem Web Push).
 
 ## Registro da consulta
 
@@ -320,23 +341,216 @@ adivinhado. O "Observar no retorno" ali é o do registro concluído da
 (`ultimoObservarPorPaciente`): quem preenche hoje o registro de uma consulta
 antiga faria a instrução velha passar por atual.
 
+## Visual do app (paciente)
+
+Spec: `docs/superpowers/specs/2026-10-14-visual-do-app-do-paciente-design.md`.
+O dono do produto achou o app do paciente "genérico" e "carregado": cor sem
+função em 30 arquivos, caixa dentro de caixa, degradê e brilho, duas letras. A
+linguagem nova ("calmo e confiável") vale no app inteiro; só a Início e a
+Dieta foram redesenhadas. **O lado clínico não muda na tela** (página do
+paciente e agenda): quem prova é `tirar-prints-nutri.cjs`, e é por isso que
+as cópias de `.card`, `.input` e companhia sob `:where(.tema-clinico)` seguem
+em `globals.css`.
+
+**A paleta é `lib/temaApp.ts`**, e vale fora de `.tema-clinico`: variáveis
+`--app-*` em `:root` e `.dark` (`cssDoTemaApp()`, num `<style>` do layout
+raiz) e as classes `bg-app-*`, `text-app-*`, `border-app-*`. O par claro e
+escuro está dentro da variável, então a classe **não leva `dark:`**; o
+`clin-*`, ao contrário, só existe dentro do tema clínico. Os papéis comuns aos
+dois lados são importados de `TEMA_CLINICO`, não copiados: a principal do
+paciente é a do nutricionista por construção. Próprios do app: `pagina`,
+`cartao` (o `chao` do clínico) e as três cores de macro. Hex só em
+`lib/temaApp.ts` (o `tailwind.config.ts` o importa, e o carregador de config
+não resolve `@/`: o import é relativo). Cor com função, e só ela: erro em
+`app-perigo` e aviso em `app-atencao` (as telas fora da Início e da Dieta ainda
+têm rosa e âmbar de erro e de aviso que passam no contraste), nada de violeta,
+azul ou degradê. Par novo entra em `PARES_TEXTO_APP` ou `PARES_GRAFICO_APP`,
+testado nos dois temas em `lib/temaApp.test.ts`. Os tons claros da barra de
+macros não passam 3:1 contra o fundo, de propósito: a legenda ao lado dá nome e
+gramas em texto.
+
+**Uma letra só.** Instrument Sans (400 a 700) por `next/font` no layout raiz,
+variável `--font-sans`; `font-sans`, `font-display` e `font-clinico` apontam
+para ela (`font-display` só existe para a landing compilar). Saíram Inter e
+Sora. A landing recebeu só a letra, e seus degradês ficam até ela ser
+reescrita (ver "Em aberto"). O `next/font` renomeia a família
+(`__Instrument_Sans_…`): quem confere o `font-family` usa
+`/Instrument[ _]Sans/`.
+
+**Cartão de um nível.** `.card` é borda de 1 px `app-linha`, cantos de 14,
+sem sombra, sem degradê e sem faixa à esquerda (o `.card-accent` saiu). Dentro
+dele, linhas separadas por traço (`divide-y divide-app-linha`), nunca outro
+cartão: cada nível soma borda e come largura em 390 px. Botão primário sólido
+em `app-primaria` (44 px de altura mínima), secundário `.btn-ghost` (40 px).
+Rótulo em frase normal: nada de `uppercase` nem `tracking-wide` no app do
+paciente. O `.eyebrow` do lado clínico **segue em caixa alta** (a cópia sob
+`:where(.tema-clinico)` em `globals.css`), porque o clínico não muda na tela:
+não é para "corrigir". Título de seção sem ícone; o `.icon-badge` fica onde o
+ícone diz algo (estado vazio, linha de lista).
+
+**Texto direto no chão é `app-texto` ou `app-texto-2`.** Nunca `text-slate-500`
+nem `slate-400` (ver "Armadilhas"): o slate-500 dá 4,76:1 sobre o branco do
+cartão, mas **4,43:1 sobre a `pagina` clara**, abaixo de 4,5.
+
+**`.tabular` no dado.** Na Instrument Sans o algarismo é proporcional (o "1"
+ocupa 391 unidades e o "0", 666), então o número que muda "dança" e a coluna
+não alinha. A classe `.tabular` vai no número que é dado (centro dos anéis,
+peso e a variação dele, o número do "score 72", kcal e gramas), **não** no
+número dentro de frase ("1 refeição ainda falta"), onde o "1" tabular abre um
+buraco. Casas e vírgula saem de `lib/numeros.ts`, nunca do número cru: a página
+Medidas mostrou "Quadril: 99.89999999999999cm", e a água de Hábitos e de Meu
+plano, "1.2 / 2.5 L". A água é `numeroBR(ml / 1000, 2)` em toda parte (o passo
+de um copo é 0,25 L), "kg" e "cm" levam espaço e o "%" vem colado ("30,0%",
+`comUnidade`, que com `fixas` escreve o zero: "66,0 kg").
+
+**Variação sem cor.** O app não sabe a direção boa do peso (não guarda o
+objetivo; ver "Meta ou limite"): a variação vai em `texto-2`, com o sinal no
+número e sem seta colorida, na Início, no `StatCard` e em Medidas, onde o ganho
+era `app-perigo` com seta para cima e a perda, verde. `comSinal` escreve "0"
+quando o número arredonda a zero ("+0" diria que subiu). O Tratamento ainda
+pinta (ver "Em aberto").
+
+**Meta ou limite.** Proteína e água são sempre meta: passar delas fecha o anel
+sem aviso. As calorias são *limite* quando a meta de peso está abaixo do peso
+atual (passar dá "acima do limite", em `app-atencao`), *meta* quando está
+acima, e neutras sem meta de peso ou na manutenção (±0,5 kg):
+`papelDasCalorias`. O app não guarda o objetivo do paciente, então a meta de
+peso é o que diz a direção; avisar sempre nas calorias dava um aviso laranja
+a quem quer ganhar massa e comeu o que devia. O peso atual da Dieta vem de
+`pesoMaisRecente` (o do dia mais recente com peso, até hoje). A Início usa o
+`atual` de `pesoDe30Dias` quando há peso nos 30 dias e `pesoMaisRecente` só
+fora dessa janela; os dois passam por `pesoDoDia` (no dia com duas medidas, a
+da consulta vence a de casa), então concordam. Cada conta tem de ter uma
+função só: a Início chegou a ter a sua à mão, e duas cópias acabam
+discordando, como nas janelas de N dias.
+
+**Água.** `adicionarAgua` (`lib/agua.ts`) lê o total do dia e grava só
+`water_ml`; é a gravação do assistente (`registrar_agua`) e do "+250 ml" da
+Início, com "Desfazer". Com a leitura do total falhando ela **não grava**: o
+`registrar_agua` antigo tratava o total como 0 e escrevia só os `ml` por cima
+do dia. **Hábitos não a usa**: `addWater`, em `app/app/habitos/page.tsx`, grava
+pelo `persist` próprio (ver "Em aberto"), e a água tem duas contas até alguém
+trocá-lo.
+
+**O Score se explica.** Tocar em "score 72 · bom" abre os quatro pilares
+(`ScoreExplicado`), e o pilar sem registro diz "sem registro hoje · conta N":
+o sono sem horas conta 60, a nutrição sem refeição conta 40 e a hidratação
+sem água, humor nem energia, 24. `computeHealthScore` devolve `semRegistro` por
+pilar e `topPilar` (o mais fraco), e a Início decide a dica por ele, não
+comparando texto: com a sugestão de proteína na tela e a Nutrição como pilar
+mais fraco, as duas diriam "faltam N g", e a dica sai.
+
+**A sugestão é só do plano.** `sugestaoDeProteina` (`lib/cardapio.ts`) diz
+quanto falta de proteína e qual refeição **do cardápio do nutricionista** cobre
+parte disso. Sem plano, sem meta de proteína ou com o vínculo revogado, não há
+sugestão: o app sugerir comida por conta própria seria prescrever. Não há
+sugestão de calorias ("faltam 600 kcal" empurra quem emagrece a comer sem
+fome; o excesso já aparece no anel). Opção de 0 g não conta: o nutricionista
+lança 0 para fruta, e "lanche da tarde, 0 g (1 maçã)" para fechar 40 g seria
+absurdo. Na Dieta, só com a data em hoje.
+
+**A Gaia, no celular, fica encaixada na barra de baixo.** O balão
+(`ChatWidget`, 44×44 px) afunda 10 px na borda de cima da barra do `AppShell`,
+à direita, e não flutua mais sobre o conteúdo: a 80 px do fundo e com 56 px ele
+cortava o "Registrar" da Início ("Regis") e cobria o "ver em Meu plano" da
+Dieta, e um toque ali abria a Gaia em vez da ação (decisão do dono do produto,
+17/10). Os 10 px saem da folga de cima dos ícones (o ícone do "Mais" começa a
+11 px da borda: 1 de borda e 10 de folga), então o "Mais" e o "Hábitos" mantêm
+44×44 sem balão por cima, e o topo do balão fica abaixo do pé do "Registrar"
+em 390×844. **A barra tem altura fixa**: `--barra-h` (61,5 px, em
+`globals.css`) mais `env(safe-area-inset-bottom)`, e o balão e o painel aberto
+leem a mesma variável, porque o CSS não lê a altura de outro elemento e uma
+barra que cresce com o conteúdo desencaixaria o balão. Por isso o rótulo da
+barra não quebra linha (`whitespace-nowrap`: em 320 px o "Meu plano" quebrava, e
+com a altura fixa a segunda linha caía para fora da tela). Mexeu no padding, no
+ícone ou no rótulo da barra? Mude `--barra-h` (o `sticky bottom-[61px]` do
+`EditorRegistro` também conta com ela) e rode `conferir-inicio`, que mede o
+encaixe, o `elementFromPoint` no "Mais" e o caso de 34 px de safe area. O `env`
+vale 0 hoje, porque o `viewport` do layout raiz não pede `viewport-fit: cover`.
+Quem ligar o `cover` confira o "Registrar" de novo: com 34 px de safe area o
+balão sobe com a barra e volta a cobri-lo em 390×844, e o `conferir-inicio` só
+mede o "Registrar" sem safe area.
+No computador (`lg`) o balão é o de sempre, 56 px em `bottom-6 right-6`. Só o
+paciente tem a Gaia (`!isNutri`); a barra do nutricionista só ganhou a altura
+fixa.
+
+**A consulta é uma linha** (`LinhaDaConsulta`, a situação por
+`estadoDaConsulta`; veja "Consultas e agenda"), e o cartão com as ações mora
+em "Meu plano".
+
+**Leitura que falha, aqui também.** Nas telas novas, o erro do supabase-js vira
+mensagem e nunca estado vazio: o "Para hoje" diz "Não deu para carregar tudo."
+e não "em dia", e sem o "N pendentes" (a contagem seria só do que chegou); o
+"Seu dia" diz "Não deu para carregar os números de hoje." em vez de anéis e
+Score com 0; o Progresso diz "Não deu para carregar o peso."; a linha da
+consulta e o cartão de Meu plano, "Não deu para carregar a consulta.", em
+`app-atencao`; e o plano, na Dieta e em Meu plano, não oferece "Comi isso"
+(convidaria a registrar de novo o que talvez já esteja registrado) e diz que
+não carregou as refeições do dia. Toda frase "Não deu para …" termina com
+ponto. O que ficou de fora está em "Em aberto".
+
+**O check-in tem uma regra só.** `BotoesDoCheckIn`, em
+`components/PlanCheckIn.tsx`, desenha os botões nas três telas: a Início (o
+`PlanCheckIn` em `linha`, uma linha do "Para hoje"), a leitura do treino em
+`treino/[id]` (`compact`, só os botões) e a semana de Treinos (só os
+`BotoesDoCheckIn`). Sem resposta, "Fui" sólido e "Não fui" secundário; feito,
+"Feito" com o check no fundo `primaria-fundo`; não fui, "Fui" secundário e
+"Não fui" no aviso (`app-atencao`). Todos com 44 px. Antes eram três regras:
+o mesmo "Fui" sólido queria dizer "sem resposta" na Início e "respondido" em
+Treinos, e o "Não fui" marcado era âmbar num lado e rosa sólido no outro.
+Nenhuma classe de botão do check-in fica fora desse arquivo. Prescrito é
+`prescribed_by` **com vínculo ativo** (`montarParaHoje`; Treinos e a leitura
+do treino leem `patient_links`, e com essa leitura falhando vale o
+`prescribed_by`): só ele tem "Não fui"; o treino próprio tem só "Fiz", em toda
+parte, menos quando um "não fui" já está gravado nele (de quando Treinos
+oferecia "Não fui" a todo treino, ou de antes de o paciente revogar o vínculo):
+aí o "Não fui" aparece marcado, para poder ser desfeito. Sem ele, a resposta
+gravada virava um "Fiz" secundário sem nada dizendo que ele não foi. A forma
+da Início mora numa prop própria, e o `compact` mantém a estrutura:
+redesenhá-lo lá punha um `<li>` fora de lista e repetia o nome e a nota. O
+lado clínico não o usa. Em Treinos, "Iniciar treino" (o primário da
+sessão, na largura toda) vem acima do check-in, e no dia sem resposta os dois
+são sólidos (ver "Em aberto").
+
+## Senha
+
+Senha **nova** (criar conta e redefinir) tem pelo menos 8 caracteres, com uma
+letra ASCII (a–z, A–Z) e um número: `lib/senha.ts`, com `minLength` 8 e a
+ajuda sob o campo. **A mesma regra está ligada no Supabase Auth** (Email:
+mínimo 8, "Letters and digits"): mude uma, mude a outra, senão o servidor
+recusa em inglês, depois do envio, o que o app aceitou (`weak_password`, que
+`ehErroDeSenhaFraca` reconhece e as duas telas traduzem). A letra é ASCII
+porque o "Letters and digits" confere ASCII: com `\p{L}`, "ãéíõ1234" passava no
+app e o servidor a recusava. **O "Entrar" não usa a regra** (`minLength` 6):
+quem tem senha antiga de 6 ou 7 caracteres precisa continuar entrando, e o
+caminho dela é o "Esqueci a senha", que já pede a regra nova. Que o Supabase siga
+deixando entrar essas contas com a regra ligada não foi conferido contra o
+servidor de verdade. A proteção contra senhas vazadas é só do plano Pro e está
+desligada (ver "Em aberto").
+
 ## Comandos
 
 ```bash
 npm run dev      # desenvolvimento
-npm test         # 836 testes unitários (vitest)
+npm test         # 1004 testes unitários (vitest)
 ferramentas/testar-sql.sh   # migrações e testes SQL num Postgres local
 npm run build    # produção
 ```
 
 Testes visuais e de tela: veja `ferramentas/LEIAME.md`. Eles sobem um
 Supabase falso e dirigem o Chromium — é a única forma de ver as telas
-logadas num ambiente sem acesso ao banco. Para a página do paciente, o mock
-com `CENARIO=carteira` e `ferramentas/tirar-prints-nutri.cjs`.
+logadas num ambiente sem acesso ao banco. Para a página do paciente do
+nutricionista, o mock com `CENARIO=carteira` e
+`ferramentas/tirar-prints-nutri.cjs`. Para o app do paciente, o mock sem
+cenário e `tirar-prints.cjs`, `conferir-inicio.cjs`, `conferir-dieta.cjs` e
+`conferir-consulta-paciente.cjs`. Esses processos se param e se esperam pelo
+PID, nunca por `pkill -f` nem `until ! pgrep -f` (o laço casa consigo mesmo e
+não termina): veja o LEIAME.
 
 ## Armadilhas que já custaram caro
 
-Cada uma destas quebrou em produção. Estão listadas porque voltam.
+Cada uma destas quebrou em produção, ou só não quebrou porque a conferência
+de tela pegou antes. Estão listadas porque voltam.
 
 **Janelas de N dias.** `data >= addDaysISO(hoje, -7)` com comparação `>=`
 abrange **oito** dias, não sete. E sem teto, um registro com data futura
@@ -380,14 +594,36 @@ o nome do `CACHE` para apagar o antigo.
 baixa navegadores e atrasa o build na Vercel). Qualquer `npm install`
 remove ele. `MODULE_NOT_FOUND` nos scripts de `ferramentas/` é isso.
 
+**`text-slate-500` direto sobre a página.** O slate-500 dá 4,76:1 sobre o branco
+do cartão, e por isso parecia seguro, mas sobre o fundo `app-pagina` claro
+(#f6f7f6) dá **4,43:1**, abaixo dos 4,5 do WCAG. Texto no chão usa
+`text-app-texto-2` (7,04:1 no claro); o `slate-400` já reprovava (2,56:1 sobre
+branco). O contraste de cada par do app está em `lib/temaApp.test.ts`.
+
+**`animation-fill-mode: both` numa animação de entrada** (`.pf-in`). O fim da
+animação (`transform: none`) ficava aplicado como uma matriz identidade, e um
+elemento com `transform` vira o bloco de contenção dos filhos `position:
+fixed`: todo `Modal` dentro de uma página se posicionava em relação a ela, não
+à janela (358×1256 em vez de 390×844 numa tela de 390 px; em Medidas a folha
+caía 1.100 px abaixo da dobra). Use `backwards`, que só segura o estado inicial
+durante o atraso: o estado final dos quadros-chave já é o natural. Vale também
+para `.pf-modal`, `.pf-stagger`, `.pf-backdrop`, `.pf-panel`, `.pf-sheet` e
+`.pf-drawer` (a gaveta "Mais" do `AppShell`): nenhuma entrada usa `both`.
+Modal fora do lugar: procure um `transform` num ancestral.
+
 ## Convenções
 
 - Comentário explica **por quê**, não o quê — de preferência citando o bug
   que motivou o código. Veja `lib/date.ts` e `lib/perfil.ts`.
 - Cor sempre em par claro/escuro: **não existe um tom da marca que sirva
   aos dois temas** (no claro só `brand-700+` passa em contraste; no escuro
-  só `brand-600` para trás). A rota `/estilo`, só em desenvolvimento,
-  mostra a escala com a razão de contraste calculada.
+  só `brand-600` para trás). No app do paciente o par já está dentro das
+  variáveis `app-*` (ver "Visual do app"), sem `dark:`; o par `brand-*` com
+  `dark:` sobra na landing (com o `MobileMenu` dela), na `/estilo` e em poucos
+  componentes: os editores clínicos (`MealPlanEditor`, `TemplateBar`,
+  `clinico/EditorTreino` e `clinico/Conversa`) e o `FoodSearch` (que a Dieta do
+  paciente também usa). A rota `/estilo`, só em desenvolvimento, mostra a escala
+  com a razão de contraste calculada.
 - A página do paciente do nutricionista tem tema próprio, `.tema-clinico`,
   aplicado por `pacientes/[id]/layout.tsx`. A paleta mora em
   `lib/temaClinico.ts`, com contraste testado em `lib/temaClinico.test.ts`
@@ -408,11 +644,16 @@ remove ele. `MODULE_NOT_FOUND` nos scripts de `ferramentas/` é isso.
 - **Nenhum nutricionista real usou o produto.** É a maior incerteza, e
   nenhuma ferramenta resolve. A página do paciente foi aprovada pelo dono do
   produto, não por um nutricionista.
-- A landing fala com consumidor final, não com nutricionista.
+- A landing fala com consumidor final, não com nutricionista, e só recebeu a
+  letra nova: segue com os degradês e animações do visual antigo (a spec do
+  visual deixou assim até ela ser reescrita), e por isso tem `brand-*`,
+  `uppercase` e cor decorativa que o app do paciente não tem mais.
 - Sem Web Push (falta VAPID) e sem cobrança.
 - Conta de teste (`Maria Souza (teste)`) e a rota `/estilo` precisam sair
   antes de usuários reais.
-- No painel do Supabase, falta ligar a proteção contra senhas vazadas.
+- **Sem proteção contra senhas vazadas.** É só do plano Pro do Supabase e está
+  desligada; vale a regra de 8 caracteres com letras e números (ver "Senha").
+  Liga-se quando o plano subir.
 - **Prontuário de ex-paciente sem tela.** O registro concluído segue legível
   pelo autor no banco (as leituras do autor e `adicionar_adendo` não pedem
   vínculo), mas o perfil e a consulta (`appointments_nutri_read`) pedem vínculo
@@ -441,5 +682,53 @@ remove ele. `MODULE_NOT_FOUND` nos scripts de `ferramentas/` é isso.
   dia) também segue em aberto.
 - **O `persist` de Hábitos (`app/app/habitos/page.tsx`) regrava a linha inteira
   do dia a partir do estado da tela e não confere o `error`.** O que mudou fora
-  da tela (o assistente registrando água) pode voltar ao valor velho, e uma
-  gravação que falha parece salva.
+  da tela (o assistente ou o "+250 ml" da Início registrando água) pode voltar
+  ao valor velho, e uma gravação que falha parece salva. A água de Hábitos
+  (`addWater`) grava por ele, e não por `adicionarAgua`: soma ao estado da tela,
+  não ao total do banco, e com a gravação falhando não diz nada.
+- **O `save` e o `remove` da Dieta ignoram o erro de gravação.** Uma exclusão
+  que falha não avisa (a refeição só continua na lista), e um registro que
+  falha fecha o formulário como se tivesse salvo.
+- **As outras telas do paciente ainda leem no navegador com `data ?? []`**
+  (Medidas, Exames, Treinos, Tratamento, Relatórios, Saúde e o histórico de
+  Hábitos): leitura que falha vira "não tem", a regra que a Início e a Dieta
+  (e as refeições e a consulta de Meu plano) já seguem. O resto de Meu plano
+  (`nutricionista/page.tsx`: prescrição, plano, itens do cardápio, sessões,
+  notas e rotinas) também ignora o `error`.
+- **Se a leitura do papel falha, um nutricionista cai no painel do paciente.**
+  É o `roleRow` do começo de `DashboardPage`, em `app/app/page.tsx`: vem nulo e
+  a página segue como se fosse paciente; falta conferir o `error` e mostrar a
+  falha.
+- **O "comi" do plano casa por descrição.** `MealPlanView` marca a opção como
+  "comi" quando há uma refeição do mesmo tipo com o mesmo texto; se a descrição
+  é editada, ou o nutricionista troca a opção, a marca some e o "Comi isso"
+  volta (nunca aparece "comi" sem ter comido). Só fica robusto com um
+  `meal_plan_item_id` em `meals`, que pede migração.
+- **Em Treinos, "Iniciar treino" e o "Fui" sólido ficam um sobre o outro** na
+  sessão com rotina, em todo dia que já chegou e ainda sem resposta (no
+  celular e nas três colunas do computador). A regra do check-in vale igual
+  nas três telas, e "Iniciar treino" segue o primário da sessão; a ordem
+  (iniciar em cima, check-in embaixo) é porque terminar o treino ao vivo já
+  marca "Feito", e o check-in é de quem treinou sem o cronômetro. Os dois
+  sólidos juntos pedem decisão do dono do produto.
+- **O Tratamento ainda pinta a variação de peso** (perda verde, ganho em
+  `app-perigo`), ao contrário da Início, do `StatCard` e de Medidas.
+- **"do nutri" em Treinos e "Prescrito por" na leitura do treino vêm só de
+  `prescribed_by`.** Depois que o paciente revoga, a sessão segue com o selo,
+  mas os botões já são os do treino próprio ("Fiz").
+- **O balão da Gaia ainda cobre o que rola por baixo dele**, 34 px acima da
+  barra na margem da direita (some ao descer e volta ao subir). Na primeira tela
+  de 390×844 não cobre mais nenhuma ação da Início nem da Dieta, mas o "Remover"
+  de Treinos e um campo do Perfil ficam sob ele (já ficavam), e a 320×800 ele
+  encosta no "Fiz" da Início.
+- **A barra de baixo não cresce com o texto ampliado.** A altura é fixa em px
+  (`--barra-h`, o que mantém a Gaia encaixada), e com o tamanho de texto da
+  acessibilidade do Chrome no Android perto de 180% o rótulo de 11 px é cortado
+  na borda de baixo. Antes a barra crescia com ele.
+- **Com a leitura do vínculo falhando, a mesma sessão do nutri tem dois
+  check-ins**: "Fiz" na Início (`montarParaHoje` a trata como sem vínculo) e
+  "Fui/Não fui" em Treinos e na leitura do treino (que caem no
+  `prescribed_by`). A Início avisa "Não deu para carregar tudo." nesse caso.
+- **A Início perde o "limite" ou "meta" do anel de Calorias quando a leitura
+  do peso falha.** Os números do anel estão certos e o Progresso diz "Não deu
+  para carregar o peso"; aceito, porque a falha já aparece ali.

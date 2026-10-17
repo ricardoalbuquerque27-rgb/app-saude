@@ -34,7 +34,11 @@ export function LinhaDaConsulta({
   nutriNome,
   falhou,
 }: {
-  /** As consultas do paciente com o nutricionista de agora, das mais recentes. */
+  /**
+   * As consultas do paciente com o nutricionista de agora, na ordem de
+   * getConsultasDoCartao (início crescente). A escolha de `estadoDaConsulta`
+   * não depende da ordem.
+   */
   consultas: Consulta[];
   agora: string;
   nutriNome?: string;
@@ -46,7 +50,7 @@ export function LinhaDaConsulta({
   if (falhou) {
     return (
       <p className="card px-4 py-3 text-[15px] text-app-atencao">
-        Não deu para carregar a consulta
+        Não deu para carregar a consulta.
       </p>
     );
   }

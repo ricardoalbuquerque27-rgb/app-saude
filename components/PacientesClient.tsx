@@ -20,6 +20,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { PageHeader, Modal, Field, EmptyState } from "@/components/ui";
 import type { PatientSummary } from "@/lib/nutri";
+import { comSinal, numeroFixo } from "@/lib/numeros";
 
 export type LinkRow = {
   id: string;
@@ -148,18 +149,18 @@ export default function PacientesClient({
                   <button
                     key={f.key}
                     onClick={() => setFilter(f.key)}
-                    className={`tappable rounded-lg px-3 py-1.5 text-sm font-medium ${
+                    className={`tappable min-h-[44px] rounded-lg px-3 text-sm font-medium ${
                       filter === f.key
-                        ? "bg-brand-700 text-white"
-                        : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+                        ? "bg-app-primaria text-app-sobre-primaria"
+                        : "text-app-texto-2 hover:bg-app-primaria-fundo"
                     }`}
                   >
                     {f.label}
+                    {/* `opacity` e não `/70` na cor: as cores do app são
+                        variáveis e não aceitam alfa no Tailwind. */}
                     <span
-                      className={`ml-1.5 text-xs ${
-                        filter === f.key
-                          ? "text-white/70"
-                          : "text-slate-500 dark:text-slate-400"
+                      className={`tabular ml-1.5 text-[13px] ${
+                        filter === f.key ? "opacity-80" : "text-app-texto-2"
                       }`}
                     >
                       {f.count}
@@ -169,7 +170,7 @@ export default function PacientesClient({
               </div>
 
               {shown.length === 0 ? (
-                <p className="card text-sm text-slate-500 dark:text-slate-400">
+                <p className="card text-sm text-app-texto-2">
                   Nenhum paciente neste filtro.
                 </p>
               ) : (
@@ -185,7 +186,7 @@ export default function PacientesClient({
                           className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl font-semibold ${
                             alert
                               ? "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
-                              : "bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300"
+                              : "bg-app-primaria-fundo text-app-primaria"
                           }`}
                         >
                           {name.slice(0, 1).toUpperCase()}
@@ -194,16 +195,16 @@ export default function PacientesClient({
                           href={`/app/pacientes/${l.patient_id}`}
                           className="min-w-0 flex-1"
                         >
-                          <p className="truncate font-semibold text-slate-900 dark:text-white">
+                          <p className="truncate font-semibold text-app-texto">
                             {name}
                           </p>
                           {alert ? (
-                            <p className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 dark:text-amber-400">
-                              <AlertTriangle className="h-3 w-3" />
+                            <p className="mt-0.5 flex items-start gap-1 text-[13px] font-medium text-amber-700 dark:text-amber-400">
+                              <AlertTriangle className="mt-[3px] h-3.5 w-3.5 shrink-0" />
                               {s!.alerts.join(" · ")}
                             </p>
                           ) : (
-                            <p className="mt-0.5 flex flex-wrap gap-x-2.5 text-[11px] text-slate-500 dark:text-slate-400">
+                            <p className="tabular mt-0.5 flex flex-wrap gap-x-2.5 text-[13px] text-app-texto-2">
                               <span className="inline-flex items-center gap-1">
                                 <CalendarCheck className="h-3 w-3" />
                                 {s?.daysLogged7 ?? 0}/7 dias
@@ -217,28 +218,34 @@ export default function PacientesClient({
                               {s?.weightLast != null ? (
                                 <span className="inline-flex items-center gap-1">
                                   <Scale className="h-3 w-3" />
-                                  {s.weightLast} kg
+                                  {numeroFixo(s.weightLast, 1)} kg
                                   {s.weightDelta30 != null
-                                    ? ` (${s.weightDelta30 > 0 ? "+" : ""}${s.weightDelta30})`
+                                    ? ` (${comSinal(s.weightDelta30)})`
                                     : ""}
                                 </span>
                               ) : null}
                             </p>
                           )}
                         </Link>
-                        <button
-                          onClick={() => removePatient(l.id)}
-                          className="tappable rounded-lg p-1.5 text-slate-500 hover:text-rose-600"
-                          aria-label="Remover paciente"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                        <Link
-                          href={`/app/pacientes/${l.patient_id}`}
-                          className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
-                        >
-                          <ChevronRight className="h-5 w-5" />
-                        </Link>
+                        {/* Os dois com 44 px de toque, lado a lado e sem o vão
+                            do card entre eles: com o vão, o nome perdia largura
+                            em 390 px. */}
+                        <div className="flex shrink-0 items-center">
+                          <button
+                            onClick={() => removePatient(l.id)}
+                            className="tappable flex h-11 w-11 items-center justify-center rounded-lg text-app-texto-2 hover:text-app-perigo"
+                            aria-label="Remover paciente"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                          <Link
+                            href={`/app/pacientes/${l.patient_id}`}
+                            className="tappable flex h-11 w-11 items-center justify-center rounded-lg text-app-texto-2 hover:bg-app-primaria-fundo"
+                            aria-label={`Abrir ${name}`}
+                          >
+                            <ChevronRight className="h-5 w-5" />
+                          </Link>
+                        </div>
                       </div>
                     );
                   })}
@@ -249,41 +256,45 @@ export default function PacientesClient({
 
           {pending.length > 0 && (
             <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              <p className="eyebrow mb-2">
                 Convites pendentes ({pending.length})
               </p>
               <div className="pf-stagger space-y-2">
                 {pending.map((l) => (
                   <div key={l.id} className="card card-interactive flex items-center gap-3 p-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                    {/* Convite esperando não é alerta: neutro, e o âmbar fica para
+                        o paciente que precisa do nutricionista. */}
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-app-pagina text-app-texto-2">
                       <Clock className="h-5 w-5" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-semibold text-slate-900 dark:text-white">
+                      <p className="truncate font-semibold text-app-texto">
                         {l.patient_label || "Convite"}
                       </p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                      <p className="text-[13px] text-app-texto-2">
                         Código:{" "}
-                        <span className="font-mono font-semibold">
+                        <span className="font-mono font-semibold text-app-texto">
                           {l.invite_code}
                         </span>{" "}
                         · aguardando aceite
                       </p>
                     </div>
-                    <button
-                      onClick={() => l.invite_code && copyInvite(l.invite_code)}
-                      className="tappable rounded-lg p-1.5 text-slate-500 hover:text-brand-700"
-                      aria-label="Copiar convite"
-                    >
-                      <Copy className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => cancelInvite(l.id)}
-                      className="tappable rounded-lg p-1.5 text-slate-500 hover:text-rose-600"
-                      aria-label="Cancelar convite"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    <div className="flex shrink-0 items-center">
+                      <button
+                        onClick={() => l.invite_code && copyInvite(l.invite_code)}
+                        className="tappable flex h-11 w-11 items-center justify-center rounded-lg text-app-texto-2 hover:text-app-primaria"
+                        aria-label="Copiar convite"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => cancelInvite(l.id)}
+                        className="tappable flex h-11 w-11 items-center justify-center rounded-lg text-app-texto-2 hover:text-app-perigo"
+                        aria-label="Cancelar convite"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -299,16 +310,16 @@ export default function PacientesClient({
       >
         {newCode ? (
           <div className="space-y-4">
-            <p className="text-sm text-slate-600 dark:text-slate-300">
+            <p className="text-sm text-app-texto-2">
               Convite criado! Envie o código (ou o link) para o paciente. Ele cria
               a conta, insere o código e aceita — aí você passa a acompanhar os
               dados.
             </p>
-            <div className="rounded-xl border border-brand-200 bg-brand-50/50 p-4 text-center dark:border-brand-900/40 dark:bg-brand-950/20">
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Código do convite
-              </p>
-              <p className="font-mono text-3xl font-bold tracking-widest text-brand-700 dark:text-brand-300">
+            <div className="rounded-xl bg-app-primaria-fundo p-4 text-center">
+              <p className="text-[13px] text-app-texto-2">Código do convite</p>
+              {/* Sem o espaçamento largo entre as letras de antes: a fonte
+                  monoespaçada já dá a mesma largura a cada caractere. */}
+              <p className="font-mono text-3xl font-semibold text-app-primaria">
                 {newCode}
               </p>
             </div>
@@ -321,7 +332,7 @@ export default function PacientesClient({
             </button>
             <button
               onClick={() => setInviteOpen(false)}
-              className="btn-ghost w-full py-2.5"
+              className="btn-ghost min-h-[44px] w-full py-2.5"
             >
               Concluir
             </button>
@@ -335,7 +346,7 @@ export default function PacientesClient({
                 onChange={(e) => setLabel(e.target.value)}
                 placeholder="Ex.: Maria Silva"
               />
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-[13px] text-app-texto-2">
                 Só para você identificar o convite enquanto o paciente não aceita.
               </p>
             </Field>

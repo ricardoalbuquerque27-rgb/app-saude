@@ -6,7 +6,6 @@ import {
   Loader2,
   Sparkles,
   HeartPulse,
-  Target,
   Check,
   FileText,
   Salad,
@@ -48,9 +47,9 @@ const AREA_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
 
 const SEV = {
   bom: {
-    ring: "border-brand-200 dark:border-brand-900/50",
-    chip: "bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300",
-    icon: "text-brand-700 dark:text-brand-400",
+    ring: "border-app-linha",
+    chip: "bg-app-primaria-fundo text-app-primaria",
+    icon: "text-app-primaria",
   },
   atencao: {
     ring: "border-amber-200 dark:border-amber-900/50",
@@ -159,18 +158,18 @@ export default function SaudePage() {
       )}
 
       {loading ? (
-        <div className="flex justify-center py-10 text-slate-500">
+        <div className="flex justify-center py-10 text-app-texto-2">
           <Loader2 className="h-6 w-6 animate-spin" />
         </div>
       ) : !a ? (
         <div className="card flex flex-col items-center py-10 text-center">
-          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
+          <div className="icon-badge mb-3 h-12 w-12 rounded-2xl">
             <HeartPulse className="h-6 w-6" />
           </div>
-          <p className="font-medium text-slate-900 dark:text-white">
+          <p className="font-medium text-app-texto">
             Nenhuma análise ainda
           </p>
-          <p className="mt-1 max-w-xs text-sm text-slate-500 dark:text-slate-400">
+          <p className="mt-1 max-w-xs text-sm text-app-texto-2">
             Toque em “Gerar minha análise” para a IA cruzar seus dados e revelar
             conexões entre eles.
           </p>
@@ -178,19 +177,19 @@ export default function SaudePage() {
       ) : (
         <div className="space-y-5">
           {current && (
-            <p className="text-xs text-slate-500 dark:text-slate-400">
+            <p className="text-xs text-app-texto-2">
               Análise de {formatDate(dataNoBrasil(current.created_at))}
             </p>
           )}
 
           {/* Resumo */}
           {a.resumo && (
-            <div className="card bg-gradient-to-br from-brand-50 to-white dark:from-brand-950/20 dark:to-slate-900">
+            <div className="card">
               <div className="flex items-start gap-3">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
-                  <HeartPulse className="h-5 w-5" />
+                <div className="icon-badge">
+                  <HeartPulse className="h-4 w-4" />
                 </div>
-                <p className="text-sm text-slate-700 dark:text-slate-200">{a.resumo}</p>
+                <p className="text-sm text-app-texto">{a.resumo}</p>
               </div>
             </div>
           )}
@@ -198,19 +197,14 @@ export default function SaudePage() {
           {/* Prioridades */}
           {a.prioridades?.length > 0 && (
             <div className="card">
-              <div className="mb-3 flex items-center gap-2">
-                <Target className="h-5 w-5 text-brand-700 dark:text-brand-400" />
-                <h2 className="font-semibold text-slate-900 dark:text-white">
-                  Prioridades agora
-                </h2>
-              </div>
+              <h2 className="section-title mb-3">Prioridades agora</h2>
               <ol className="space-y-2">
                 {a.prioridades.map((p, i) => (
                   <li key={i} className="flex items-start gap-2.5 text-sm">
-                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-700 text-[11px] font-bold text-white">
+                    <span className="tabular mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-app-primaria text-[11px] font-semibold text-app-sobre-primaria">
                       {i + 1}
                     </span>
-                    <span className="text-slate-700 dark:text-slate-200">{p}</span>
+                    <span className="text-app-texto">{p}</span>
                   </li>
                 ))}
               </ol>
@@ -220,9 +214,7 @@ export default function SaudePage() {
           {/* Insights conectados */}
           {a.insights?.length > 0 && (
             <div className="space-y-3">
-              <h2 className="font-semibold text-slate-900 dark:text-white">
-                Conexões encontradas
-              </h2>
+              <h2 className="section-title">Conexões encontradas</h2>
               {a.insights.map((ins, i) => {
                 const Icon = AREA_ICON[ins.area] ?? Activity;
                 const st = sevStyle(ins.severidade);
@@ -230,7 +222,7 @@ export default function SaudePage() {
                   <div key={i} className={`card border ${st.ring}`}>
                     <div className="flex items-center gap-2">
                       <Icon className={`h-5 w-5 shrink-0 ${st.icon}`} />
-                      <h3 className="flex-1 text-sm font-semibold text-slate-900 dark:text-white">
+                      <h3 className="flex-1 text-sm font-semibold text-app-texto">
                         {ins.titulo}
                       </h3>
                       <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${st.chip}`}>
@@ -238,15 +230,15 @@ export default function SaudePage() {
                       </span>
                     </div>
                     {ins.observacao && (
-                      <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                      <p className="mt-2 text-sm text-app-texto-2">
                         {ins.observacao}
                       </p>
                     )}
                     {ins.conexao && (
-                      <p className="mt-1.5 flex items-start gap-1.5 text-sm text-slate-500 dark:text-slate-400">
+                      <p className="mt-1.5 flex items-start gap-1.5 text-sm text-app-texto-2">
                         <Activity className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                         <span>
-                          <b className="font-medium text-slate-600 dark:text-slate-300">
+                          <b className="font-medium text-app-texto">
                             Conexão:
                           </b>{" "}
                           {ins.conexao}
@@ -254,8 +246,8 @@ export default function SaudePage() {
                       </p>
                     )}
                     {ins.acao && (
-                      <p className="mt-2 flex items-start gap-1.5 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:bg-slate-800/50 dark:text-slate-200">
-                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-brand-700" />
+                      <p className="mt-2 flex items-start gap-1.5 rounded-lg bg-app-pagina px-3 py-2 text-sm text-app-texto">
+                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-app-primaria" />
                         {ins.acao}
                       </p>
                     )}
@@ -268,13 +260,11 @@ export default function SaudePage() {
           {/* Pontos fortes */}
           {a.pontos_fortes?.length > 0 && (
             <div className="card">
-              <h2 className="mb-2 font-semibold text-slate-900 dark:text-white">
-                O que já está indo bem 🎉
-              </h2>
+              <h2 className="section-title mb-2">O que já está indo bem 🎉</h2>
               <ul className="space-y-1.5">
                 {a.pontos_fortes.map((p, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-200">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-brand-700" />
+                  <li key={i} className="flex items-start gap-2 text-sm text-app-texto">
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-app-primaria" />
                     {p}
                   </li>
                 ))}
@@ -285,7 +275,7 @@ export default function SaudePage() {
           {/* Histórico */}
           {rows.length > 1 && (
             <div>
-              <h2 className="mb-2 text-sm font-medium text-slate-500 dark:text-slate-400">
+              <h2 className="mb-2 text-sm font-medium text-app-texto-2">
                 Análises anteriores
               </h2>
               <div className="flex flex-wrap gap-2">
@@ -293,10 +283,10 @@ export default function SaudePage() {
                   <button
                     key={r.id}
                     onClick={() => setCurrent(r)}
-                    className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+                    className={`tabular min-h-[44px] rounded-lg border px-3 text-xs font-medium transition ${
                       current?.id === r.id
-                        ? "border-brand-400 bg-brand-50 text-brand-700 dark:border-brand-700 dark:bg-brand-950/30 dark:text-brand-300"
-                        : "border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-900"
+                        ? "border-app-primaria bg-app-primaria-fundo text-app-primaria"
+                        : "border-app-campo text-app-texto-2 hover:bg-app-primaria-fundo"
                     }`}
                   >
                     {formatDate(dataNoBrasil(r.created_at))}
@@ -308,7 +298,7 @@ export default function SaudePage() {
         </div>
       )}
 
-      <p className="flex items-start gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+      <p className="flex items-start gap-1.5 text-[11px] text-app-texto-2">
         <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
         Esta análise é educativa e não substitui um profissional de saúde. Para
         exames alterados ou dúvidas sobre medicação, procure seu médico.

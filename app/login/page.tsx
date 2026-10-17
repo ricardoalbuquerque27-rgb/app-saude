@@ -40,6 +40,12 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
+  // Senha recusada (pela regra do app ou pelo Supabase) não ganha uma segunda
+  // caixa com a mesma frase: a ajuda fixa embaixo do campo muda de cor, e a
+  // frase não aparece duas vezes na tela. Só no cadastro, único modo em que
+  // essa ajuda existe; fora dele, o erro segue na caixa de sempre.
+  const ajudaEmDestaque = mode === "signup" && error === AJUDA_DA_SENHA;
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -129,45 +135,36 @@ export default function LoginPage() {
 
   return (
     <main className="min-h-dvh lg:grid lg:grid-cols-2">
-      {/* Painel esquerdo — atlético/premium (somente desktop) */}
-      <div className="relative hidden overflow-hidden bg-slate-950 p-12 lg:flex lg:flex-col lg:justify-between">
-        <div
-          className="pointer-events-none absolute inset-0"
-          style={{
-            backgroundImage:
-              "radial-gradient(600px 340px at 85% 0%, rgba(24,184,94,0.28), transparent 60%), radial-gradient(500px 300px at 0% 100%, rgba(24,184,94,0.14), transparent 55%)",
-          }}
-        />
-        <div className="pointer-events-none absolute inset-0 opacity-[0.04] [background-image:linear-gradient(white_1px,transparent_1px),linear-gradient(90deg,white_1px,transparent_1px)] [background-size:40px_40px]" />
-
-        <div className="relative flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 text-white shadow-[0_8px_20px_-8px_rgba(24,184,94,0.9)]">
+      {/* Painel esquerdo (somente desktop): uma superfície lisa em
+          `primaria-fundo`. Antes era um bloco escuro com dois brilhos verdes
+          de canto, uma grade de linhas, a marca com degradê e sombra verde e a
+          palavra "evolução" com degradê no texto: tudo enfeite (a spec tira
+          degradê e brilho). Os pares de texto são os da
+          paleta, todos com 4,5:1 ou mais sobre `primaria-fundo`, nos dois temas
+          (lib/temaApp.ts, PARES_TEXTO_APP). */}
+      <div className="hidden bg-app-primaria-fundo p-12 lg:flex lg:flex-col lg:justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-app-primaria text-app-sobre-primaria">
             <Dumbbell className="h-5 w-5" />
           </div>
-          <span className="text-lg font-bold tracking-tight text-white">
-            Pace Fit
-          </span>
+          <span className="text-lg font-semibold text-app-texto">Pace Fit</span>
         </div>
 
-        <div className="relative">
-          <h2 className="text-4xl font-extrabold leading-[1.05] tracking-tight text-white xl:text-5xl">
+        <div>
+          <h2 className="text-4xl font-semibold leading-[1.1] text-app-texto xl:text-5xl">
             Supere seus limites.
             <br />
-            Acompanhe cada{" "}
-            <span className="bg-gradient-to-r from-brand-400 to-brand-300 bg-clip-text text-transparent">
-              evolução
-            </span>
-            .
+            Acompanhe cada <span className="text-app-primaria">evolução</span>.
           </h2>
-          <p className="mt-4 max-w-sm text-base text-slate-300">
+          <p className="mt-4 max-w-sm text-base text-app-texto-2">
             Treinos, dieta, hábitos e exames — com inteligência que trabalha por
             você.
           </p>
 
           <ul className="mt-8 space-y-3">
             {HIGHLIGHTS.map((h) => (
-              <li key={h} className="flex items-center gap-3 text-sm text-slate-200">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-500/15 text-brand-300 ring-1 ring-brand-500/25">
+              <li key={h} className="flex items-center gap-3 text-sm text-app-texto">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-app-cartao text-app-primaria">
                   <Check className="h-3.5 w-3.5" />
                 </span>
                 {h}
@@ -176,45 +173,43 @@ export default function LoginPage() {
           </ul>
         </div>
 
-        <div className="relative">
-          <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs text-slate-400">
+        <div>
+          <div className="flex flex-wrap gap-x-5 gap-y-2 text-[13px] text-app-texto-2">
             <span className="flex items-center gap-1.5">
-              <ShieldCheck className="h-3.5 w-3.5 text-brand-400" /> Dados isolados
+              <ShieldCheck className="h-3.5 w-3.5 text-app-primaria" /> Dados isolados
               por conta
             </span>
             <span className="flex items-center gap-1.5">
-              <Lock className="h-3.5 w-3.5 text-brand-400" /> Conexão criptografada
+              <Lock className="h-3.5 w-3.5 text-app-primaria" /> Conexão criptografada
             </span>
           </div>
-          <p className="mt-3 text-xs text-slate-400">
+          <p className="mt-3 text-[13px] text-app-texto-2">
             © {new Date().getFullYear()} Pace Fit
           </p>
         </div>
       </div>
 
       {/* Painel direito — formulário limpo */}
-      <div className="flex min-h-dvh items-center justify-center bg-white px-5 py-10 dark:bg-slate-950 lg:min-h-0">
+      <div className="flex min-h-dvh items-center justify-center bg-app-pagina px-5 py-10 lg:min-h-0">
         <div className="w-full max-w-sm">
           <Link
             href="/"
-            className="mb-8 flex items-center justify-center gap-2.5 lg:hidden"
+            className="tappable mb-8 flex min-h-[44px] items-center justify-center gap-2.5 lg:hidden"
           >
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 text-white shadow-[0_8px_20px_-8px_rgba(24,184,94,0.8)]">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-app-primaria text-app-sobre-primaria">
               <Dumbbell className="h-5 w-5" />
             </div>
-            <span className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">
-              Pace Fit
-            </span>
+            <span className="text-lg font-semibold text-app-texto">Pace Fit</span>
           </Link>
 
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+          <h1 className="text-2xl font-semibold text-app-texto">
             {mode === "login"
               ? "Bem-vindo de volta"
               : mode === "signup"
                 ? "Crie sua conta"
                 : "Recuperar senha"}
           </h1>
-          <p className="mt-1.5 text-sm text-slate-500 dark:text-slate-400">
+          <p className="mt-1.5 text-sm text-app-texto-2">
             {mode === "login"
               ? "Entre para continuar sua evolução."
               : mode === "signup"
@@ -264,7 +259,23 @@ export default function LoginPage() {
             </div>
             {mode !== "recover" && (
               <div>
-                <div className="flex items-center justify-between">
+                {/* No entrar, a linha do rótulo tem 44 px para o "Esqueci a senha" ter o
+                    alvo inteiro, sem sobrepor nenhum vizinho: o `-mt-4` come o vão de
+                    16 px do `space-y-4` (a linha encosta no campo de e-mail), o
+                    rótulo e o link ficam colados ao campo da senha (`items-end`) e a
+                    linha cresce só ~4 px. A linha tem 45 px e o link 44, com 1 px de
+                    folga embaixo: o botão do olho do campo da senha tem 44 px sobre
+                    um campo de 42 e invade 1 px para cima, e sem a folga ele comia o
+                    último pixel do link. Antes eram margens negativas, e os 6 px do
+                    botão sobre o campo da senha ficavam por baixo dele: só uns 38 px
+                    respondiam ao toque. */}
+                <div
+                  className={
+                    mode === "login"
+                      ? "-mt-4 flex min-h-[45px] items-end justify-between"
+                      : "flex items-center justify-between"
+                  }
+                >
                   <label className="label">Senha</label>
                   {mode === "login" && (
                     <button
@@ -274,7 +285,7 @@ export default function LoginPage() {
                         setError(null);
                         setMessage(null);
                       }}
-                      className="mb-1.5 text-xs font-medium text-brand-700 hover:underline dark:text-brand-400"
+                      className="tappable mb-px flex h-11 items-end rounded-lg px-1 pb-[5px] text-[13px] font-medium text-app-primaria hover:underline"
                     >
                       Esqueci a senha
                     </button>
@@ -299,7 +310,7 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={() => setShowPw((v) => !v)}
-                    className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-500 hover:text-slate-600 dark:hover:text-slate-200"
+                    className="tappable absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-lg text-app-texto-2 hover:text-app-texto"
                     aria-label={showPw ? "Ocultar senha" : "Mostrar senha"}
                     tabIndex={-1}
                   >
@@ -311,23 +322,36 @@ export default function LoginPage() {
                   </button>
                 </div>
                 {mode === "signup" && (
+                  // aria-live: a frase é a mesma antes e depois do erro, e
+                  // leitor de tela só anuncia o que muda; o prefixo só para
+                  // ele (sr-only) entra com o erro e faz a ajuda ser lida.
+                  // `font-medium` junto da cor: cor sozinha não basta.
                   <p
                     id="ajuda-da-senha"
-                    className="mt-1.5 text-[13px] text-slate-600 dark:text-slate-400"
+                    aria-live="polite"
+                    aria-atomic="true"
+                    className={
+                      ajudaEmDestaque
+                        ? "mt-1.5 text-[13px] font-medium text-app-atencao"
+                        : "mt-1.5 text-[13px] text-app-texto-2"
+                    }
                   >
+                    {ajudaEmDestaque && (
+                      <span className="sr-only">Senha não aceita. </span>
+                    )}
                     {AJUDA_DA_SENHA}
                   </p>
                 )}
               </div>
             )}
 
-            {error && (
-              <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
+            {error && !ajudaEmDestaque && (
+              <p className="rounded-lg bg-app-perigo-fundo px-3 py-2 text-sm text-app-perigo">
                 {error}
               </p>
             )}
             {message && (
-              <p className="rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-700 dark:bg-brand-950/40 dark:text-brand-300">
+              <p className="rounded-lg bg-app-primaria-fundo px-3 py-2 text-sm text-app-primaria">
                 {message}
               </p>
             )}
@@ -352,7 +376,7 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
+          <div className="mt-6 text-center text-sm text-app-texto-2">
             {mode === "login" ? (
               <>
                 Não tem conta?{" "}
@@ -362,7 +386,7 @@ export default function LoginPage() {
                     setError(null);
                     setMessage(null);
                   }}
-                  className="font-semibold text-brand-700 hover:underline dark:text-brand-400"
+                  className="tappable inline-flex min-h-[44px] items-center rounded-lg px-1 font-semibold text-app-primaria hover:underline"
                 >
                   Criar agora
                 </button>
@@ -376,7 +400,7 @@ export default function LoginPage() {
                     setError(null);
                     setMessage(null);
                   }}
-                  className="font-semibold text-brand-700 hover:underline dark:text-brand-400"
+                  className="tappable inline-flex min-h-[44px] items-center rounded-lg px-1 font-semibold text-app-primaria hover:underline"
                 >
                   Entrar
                 </button>
@@ -388,7 +412,7 @@ export default function LoginPage() {
                   setError(null);
                   setMessage(null);
                 }}
-                className="font-semibold text-brand-700 hover:underline dark:text-brand-400"
+                className="tappable inline-flex min-h-[44px] items-center rounded-lg px-1 font-semibold text-app-primaria hover:underline"
               >
                 ← Voltar para o login
               </button>
@@ -396,13 +420,13 @@ export default function LoginPage() {
           </div>
 
           {/* Confiança (mobile) */}
-          <div className="mt-8 flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs text-slate-500 lg:hidden dark:text-slate-400">
+          <div className="mt-8 flex flex-wrap justify-center gap-x-4 gap-y-2 text-[13px] text-app-texto-2 lg:hidden">
             <span className="flex items-center gap-1.5">
-              <ShieldCheck className="h-3.5 w-3.5 text-brand-700 dark:text-brand-400" />
+              <ShieldCheck className="h-3.5 w-3.5 text-app-primaria" />
               Dados isolados
             </span>
             <span className="flex items-center gap-1.5">
-              <Lock className="h-3.5 w-3.5 text-brand-700 dark:text-brand-400" />
+              <Lock className="h-3.5 w-3.5 text-app-primaria" />
               Criptografia
             </span>
           </div>

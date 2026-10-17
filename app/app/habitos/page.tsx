@@ -2,8 +2,6 @@
 
 import { useEffect, useState, useCallback } from "react";
 import {
-  Droplets,
-  Smile,
   Loader2,
   Plus,
   Minus,
@@ -15,6 +13,12 @@ import { ProgressRing } from "@/components/ProgressRing";
 import { todayISO, formatDate } from "@/lib/date";
 import { useLiveRefresh } from "@/lib/useLiveRefresh";
 import { meuPerfil } from "@/lib/perfil";
+import { numeroBR } from "@/lib/numeros";
+
+// Litros em pt-BR, com até duas casas: a mesma conta da Início ("1,45 L"), onde
+// o passo é um copo de 250 ml e "1,2" depois de "+250 ml" não mudaria. Aqui era
+// `toFixed(1)` com ponto ("1.2 / 2.5 L", "💧 1.2L").
+const litros = (ml: number) => numeroBR(ml / 1000, 2);
 
 const MOODS = [
   { value: "otimo", label: "😄 Ótimo" },
@@ -44,10 +48,10 @@ function ScalePicker({
           key={n}
           type="button"
           onClick={() => onChange(n)}
-          className={`h-9 w-9 rounded-lg text-sm font-semibold transition ${
+          className={`tabular h-11 w-11 rounded-lg border text-sm font-semibold transition ${
             value === n
-              ? "bg-brand-700 text-white shadow-sm"
-              : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+              ? "border-app-primaria bg-app-primaria text-app-sobre-primaria"
+              : "border-app-campo bg-app-cartao text-app-texto hover:bg-app-primaria-fundo"
           }`}
         >
           {n}
@@ -133,7 +137,7 @@ export default function HabitosPage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center py-20 text-slate-500">
+      <div className="flex justify-center py-20 text-app-texto-2">
         <Loader2 className="h-6 w-6 animate-spin" />
       </div>
     );
@@ -158,12 +162,9 @@ export default function HabitosPage() {
       {/* Água */}
       <div className="card mb-4">
         <div className="mb-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Droplets className="h-5 w-5 text-blue-500" />
-            <h2 className="font-semibold text-slate-900 dark:text-white">Água</h2>
-          </div>
+          <h2 className="section-title">Água</h2>
           {waterPct >= 100 && (
-            <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">
+            <span className="rounded-full bg-app-primaria-fundo px-2.5 py-0.5 text-xs font-semibold text-app-primaria">
               Meta batida 💧
             </span>
           )}
@@ -171,8 +172,8 @@ export default function HabitosPage() {
         <div className="flex items-center gap-5">
           <ProgressRing
             pct={water / waterGoal}
-            centerMain={`${(water / 1000).toFixed(1)}`}
-            centerSub={`/ ${(waterGoal / 1000).toFixed(1)} L`}
+            centerMain={litros(water)}
+            centerSub={`/ ${litros(waterGoal)} L`}
             label="Hoje"
           />
           <div className="flex-1">
@@ -189,7 +190,7 @@ export default function HabitosPage() {
             </div>
             <button
               onClick={() => addWater(-200)}
-              className="mt-2 flex w-full items-center justify-center gap-1 rounded-xl py-1.5 text-xs font-medium text-slate-500 transition hover:bg-slate-100 disabled:opacity-40 dark:text-slate-400 dark:hover:bg-slate-800"
+              className="mt-2 flex min-h-[44px] w-full items-center justify-center gap-1 rounded-xl text-xs font-medium text-app-texto-2 transition hover:bg-app-primaria-fundo disabled:opacity-40"
               disabled={water <= 0}
             >
               <Minus className="h-3.5 w-3.5" /> Remover 200ml
@@ -199,7 +200,9 @@ export default function HabitosPage() {
       </div>
 
       {/* Dois números não precisam de dois cartões com ícone e título cada.
-          Lado a lado também no celular: os campos são curtos. */}
+          Lado a lado também no celular: os campos são curtos. Vazios, dizem a
+          unidade ("em horas"), e não um valor de exemplo: "8" e "8000" liam-se
+          como dado salvo, o mesmo problema dos campos do Perfil. */}
       <div className="card mb-4">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Sono (horas)">
@@ -216,7 +219,7 @@ export default function HabitosPage() {
                 }))
               }
               onBlur={() => persist({ sleep_hours: log.sleep_hours })}
-              placeholder="8"
+              placeholder="em horas"
             />
           </Field>
           <Field label="Passos no dia">
@@ -232,7 +235,7 @@ export default function HabitosPage() {
                 }))
               }
               onBlur={() => persist({ steps: log.steps })}
-              placeholder="8000"
+              placeholder="em passos"
             />
           </Field>
         </div>
@@ -242,21 +245,16 @@ export default function HabitosPage() {
           hoje?" — e estavam em dois cartões, com dois títulos e dois
           ícones. Viraram um. */}
       <div className="card mb-4">
-        <div className="mb-3 flex items-center gap-2">
-          <Smile className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-          <h2 className="font-semibold text-slate-900 dark:text-white">
-            Como você está hoje?
-          </h2>
-        </div>
+        <h2 className="section-title mb-3">Como você está hoje?</h2>
         <div className="flex flex-wrap gap-2">
           {MOODS.map((m) => (
             <button
               key={m.value}
               onClick={() => persist({ mood: m.value })}
-              className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
+              className={`min-h-[44px] rounded-lg border px-3 text-sm font-medium transition ${
                 log.mood === m.value
-                  ? "border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-300"
-                  : "border-slate-300 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
+                  ? "border-app-primaria bg-app-primaria-fundo text-app-primaria"
+                  : "border-app-campo text-app-texto-2 hover:bg-app-primaria-fundo"
               }`}
             >
               {m.label}
@@ -265,7 +263,7 @@ export default function HabitosPage() {
         </div>
 
 
-        <div className="mt-4 space-y-3 border-t border-slate-100 pt-4 dark:border-slate-800">
+        <div className="mt-4 space-y-3 border-t border-app-linha pt-4">
           <div>
             <label className="label">Energia (1 = baixa · 5 = alta)</label>
             <ScalePicker
@@ -297,7 +295,7 @@ export default function HabitosPage() {
       </div>
 
       {saving && (
-        <p className="mb-4 flex items-center gap-2 text-xs text-slate-500">
+        <p className="mb-4 flex items-center gap-2 text-xs text-app-texto-2">
           <Loader2 className="h-3 w-3 animate-spin" /> salvando...
         </p>
       )}
@@ -305,21 +303,20 @@ export default function HabitosPage() {
       {/* Histórico */}
       {history.length > 0 && (
         <div className="card">
-          <h2 className="mb-3 font-semibold text-slate-900 dark:text-white">
-            Últimos dias
-          </h2>
-          <div className="space-y-2">
+          <h2 className="section-title mb-3">Últimos dias</h2>
+          <div className="divide-y divide-app-linha">
             {history.map((h) => (
               <div
                 key={h.id}
-                className="flex items-center justify-between border-b border-slate-100 py-2 text-sm last:border-0 dark:border-slate-800"
+                className="flex items-center justify-between py-2.5 text-sm"
               >
-                <span className="font-medium text-slate-700 dark:text-slate-300">
+                <span className="tabular font-medium text-app-texto">
                   {formatDate(h.date)}
                 </span>
-                <div className="flex flex-wrap gap-x-3 text-xs text-slate-500 dark:text-slate-400">
-                  <span>💧 {((h.water_ml ?? 0) / 1000).toFixed(1)}L</span>
-                  {h.sleep_hours != null && <span>😴 {h.sleep_hours}h</span>}
+                <div className="tabular flex flex-wrap gap-x-3 text-xs text-app-texto-2">
+                  <span>💧 {litros(h.water_ml ?? 0)} L</span>
+                  {/* Na mesma linha da água: vírgula também ("7,4 h", não "7.4h"). */}
+                  {h.sleep_hours != null && <span>😴 {numeroBR(Number(h.sleep_hours))} h</span>}
                   {h.steps != null && <span>👟 {h.steps}</span>}
                 </div>
               </div>

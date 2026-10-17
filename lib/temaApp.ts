@@ -99,10 +99,18 @@ export const PARES_TEXTO_APP: [NomeCorApp, NomeCorApp][] = [
   ["sobre-primaria", "primaria"],
   ["primaria", "primaria-fundo"],
   ["texto-2", "primaria-fundo"],
+  // O texto comum sobre o fundo da principal: hover de botão e de linha, e a
+  // linha ativa do histórico de Relatórios (as telas do paciente fora da Início
+  // e da Dieta).
+  ["texto", "primaria-fundo"],
   ["atencao", "atencao-fundo"],
   ["texto", "atencao-fundo"],
   ["atencao-texto-2", "atencao-fundo"],
   ["atencao", "cartao"],
+  // A ajuda da senha em destaque, no login, fica direto no chão (`pagina`), que
+  // o par sobre o cartão não cobre. Na redefinir-senha ela está dentro do
+  // `.card` e vale o par `atencao` sobre `cartao`, acima.
+  ["atencao", "pagina"],
   ["perigo", "perigo-fundo"],
   ["perigo", "cartao"],
 ];

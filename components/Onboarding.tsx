@@ -8,10 +8,8 @@ import {
   ArrowLeft,
   Loader2,
   Check,
-  Target,
   Beef,
   Droplets,
-  Syringe,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { ensurePushSubscription } from "@/lib/pushClient";
@@ -129,33 +127,33 @@ export default function Onboarding({ initialName }: { initialName?: string }) {
     step === 0 ? true : step === 1 ? true : true; // todas as etapas são opcionais
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
-      <div className="flex max-h-[92dvh] w-full max-w-md flex-col overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-slate-950">
-        {/* Cabeçalho */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-brand-600 to-brand-800 px-6 pb-5 pt-6 text-white">
-          <div className="pointer-events-none absolute -right-10 -top-12 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
-          <div className="relative flex items-center justify-between">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+      <div className="flex max-h-[92dvh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-app-linha bg-app-cartao">
+        {/* Cabeçalho: o cartão comum, sem o bloco verde com degradê e brilho de
+            antes. A marca é o quadrado `primaria` da casca. */}
+        <div className="border-b border-app-linha px-6 pb-5 pt-4">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/15">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-app-primaria text-app-sobre-primaria">
                 <Dumbbell className="h-5 w-5" />
               </div>
-              <span className="font-bold">Pace Fit</span>
+              <span className="font-semibold text-app-texto">Pace Fit</span>
             </div>
             <button
               onClick={skip}
               disabled={saving}
-              className="text-xs font-medium text-brand-50/80 hover:text-white"
+              className="tappable -mr-3 flex min-h-[44px] items-center rounded-lg px-3 text-[13px] font-medium text-app-texto-2 hover:text-app-texto disabled:opacity-60"
             >
               Pular
             </button>
           </div>
           {/* Progresso */}
-          <div className="relative mt-4 flex gap-1.5">
+          <div className="mt-2 flex gap-1.5">
             {Array.from({ length: TOTAL }).map((_, i) => (
               <div
                 key={i}
                 className={`h-1.5 flex-1 rounded-full transition ${
-                  i <= step ? "bg-white" : "bg-white/25"
+                  i <= step ? "bg-app-primaria" : "bg-app-linha"
                 }`}
               />
             ))}
@@ -167,10 +165,10 @@ export default function Onboarding({ initialName }: { initialName?: string }) {
           {step === 0 && (
             <div className="space-y-4">
               <div>
-                <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+                <h2 className="text-xl font-semibold text-app-texto">
                   Bem-vindo(a)! 👋
                 </h2>
-                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                <p className="mt-1 text-sm text-app-texto-2">
                   Vamos configurar seu app em 1 minuto para deixá-lo sob medida.
                 </p>
               </div>
@@ -184,10 +182,10 @@ export default function Onboarding({ initialName }: { initialName?: string }) {
                     key={o.v}
                     type="button"
                     onClick={() => setRole(o.v)}
-                    className={`flex-1 rounded-xl border px-3 py-2.5 text-sm font-semibold transition ${
+                    className={`min-h-[44px] flex-1 rounded-xl border px-3 text-sm font-semibold transition ${
                       role === o.v
-                        ? "border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-300"
-                        : "border-slate-300 text-slate-600 dark:border-slate-700 dark:text-slate-400"
+                        ? "border-app-primaria bg-app-primaria-fundo text-app-primaria"
+                        : "border-app-campo text-app-texto hover:bg-app-primaria-fundo"
                     }`}
                   >
                     {o.label}
@@ -204,7 +202,7 @@ export default function Onboarding({ initialName }: { initialName?: string }) {
               />
 
               {role === "nutritionist" ? (
-                <p className="rounded-xl bg-brand-50 px-3 py-2.5 text-sm text-brand-800 dark:bg-brand-950/30 dark:text-brand-200">
+                <p className="rounded-xl bg-app-primaria-fundo px-3 py-2.5 text-sm text-app-texto">
                   Perfeito! Vamos criar sua conta profissional. No próximo passo
                   você já pode convidar seus pacientes.
                 </p>
@@ -258,7 +256,7 @@ export default function Onboarding({ initialName }: { initialName?: string }) {
                   />
                 </div>
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              <p className="text-[13px] text-app-texto-2">
                 Usamos sexo e idade só para ajustar as faixas de referência dos
                 seus exames. Você pode deixar em branco.
               </p>
@@ -270,10 +268,8 @@ export default function Onboarding({ initialName }: { initialName?: string }) {
           {step === 1 && (
             <div className="space-y-4">
               <div>
-                <h2 className="flex items-center gap-2 text-xl font-bold text-slate-900 dark:text-white">
-                  <Target className="h-5 w-5 text-brand-700" /> Suas metas
-                </h2>
-                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                <h2 className="text-xl font-semibold text-app-texto">Suas metas</h2>
+                <p className="mt-1 text-sm text-app-texto-2">
                   Isso ajuda a acompanhar seu dia a dia. Pode ajustar depois.
                 </p>
               </div>
@@ -302,7 +298,7 @@ export default function Onboarding({ initialName }: { initialName?: string }) {
                   onChange={(e) => setProteinGoal(e.target.value)}
                   placeholder="ex: 110"
                 />
-                <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+                <p className="mt-1.5 text-[13px] text-app-texto-2">
                   Dica: proteína ajuda a preservar músculo. Se não souber, deixe em
                   branco.
                 </p>
@@ -313,10 +309,8 @@ export default function Onboarding({ initialName }: { initialName?: string }) {
           {step === 2 && (
             <div className="space-y-4">
               <div>
-                <h2 className="flex items-center gap-2 text-xl font-bold text-slate-900 dark:text-white">
-                  <Syringe className="h-5 w-5 text-brand-700" /> Tratamento
-                </h2>
-                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                <h2 className="text-xl font-semibold text-app-texto">Tratamento</h2>
+                <p className="mt-1 text-sm text-app-texto-2">
                   Você usa alguma caneta emagrecedora (GLP-1)?
                 </p>
               </div>
@@ -324,10 +318,10 @@ export default function Onboarding({ initialName }: { initialName?: string }) {
                 <button
                   type="button"
                   onClick={() => setUsesPen(false)}
-                  className={`rounded-xl border py-3 text-sm font-medium transition ${
+                  className={`min-h-[44px] rounded-xl border py-3 text-sm font-medium transition ${
                     usesPen === false
-                      ? "border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-950/30 dark:text-brand-300"
-                      : "border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-900"
+                      ? "border-app-primaria bg-app-primaria-fundo text-app-primaria"
+                      : "border-app-campo text-app-texto hover:bg-app-primaria-fundo"
                   }`}
                 >
                   Não uso
@@ -335,10 +329,10 @@ export default function Onboarding({ initialName }: { initialName?: string }) {
                 <button
                   type="button"
                   onClick={() => setUsesPen(true)}
-                  className={`rounded-xl border py-3 text-sm font-medium transition ${
+                  className={`min-h-[44px] rounded-xl border py-3 text-sm font-medium transition ${
                     usesPen === true
-                      ? "border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-950/30 dark:text-brand-300"
-                      : "border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-900"
+                      ? "border-app-primaria bg-app-primaria-fundo text-app-primaria"
+                      : "border-app-campo text-app-texto hover:bg-app-primaria-fundo"
                   }`}
                 >
                   Sim, uso
@@ -346,7 +340,7 @@ export default function Onboarding({ initialName }: { initialName?: string }) {
               </div>
 
               {usesPen && (
-                <div className="space-y-3 rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+                <div className="space-y-3 rounded-xl border border-app-linha p-3">
                   <div>
                     <FieldLabel>Medicamento</FieldLabel>
                     <select
@@ -401,7 +395,7 @@ export default function Onboarding({ initialName }: { initialName?: string }) {
                       onChange={(e) => setNextDose(e.target.value)}
                     />
                   </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                  <p className="text-[13px] text-app-texto-2">
                     Vamos te lembrar no dia da aplicação. Isso não substitui seu
                     médico.
                   </p>
@@ -412,12 +406,12 @@ export default function Onboarding({ initialName }: { initialName?: string }) {
         </div>
 
         {/* Rodapé / navegação */}
-        <div className="flex items-center gap-2 border-t border-slate-200 px-6 py-4 dark:border-slate-800">
+        <div className="flex items-center gap-2 border-t border-app-linha px-6 py-4">
           {step > 0 && (
             <button
               onClick={() => setStep((s) => s - 1)}
               disabled={saving}
-              className="btn-ghost px-3"
+              className="btn-ghost min-h-[44px] px-3"
             >
               <ArrowLeft className="h-4 w-4" /> Voltar
             </button>
@@ -453,8 +447,6 @@ export default function Onboarding({ initialName }: { initialName?: string }) {
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
-    <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
-      {children}
-    </label>
+    <label className="label">{children}</label>
   );
 }

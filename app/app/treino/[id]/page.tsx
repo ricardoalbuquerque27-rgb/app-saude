@@ -4,8 +4,6 @@ import {
   ArrowLeft,
   Stethoscope,
   Timer,
-  Dumbbell,
-  NotebookPen,
   Play,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -77,11 +75,27 @@ export default async function TreinoDetalhe({
   const dowHoje = (new Date(hoje + "T12:00:00").getDay() + 6) % 7;
   const ehHoje = sessao.day_of_week === dowHoje;
 
-  const { data: feitos } = await supabase
-    .from("plan_completions")
-    .select("id, plan_id, date, status, workout_id")
-    .eq("user_id", uid)
-    .eq("date", hoje);
+  const [{ data: feitos }, vinculoRes] = await Promise.all([
+    supabase
+      .from("plan_completions")
+      .select("id, plan_id, date, status, workout_id")
+      .eq("user_id", uid)
+      .eq("date", hoje),
+    supabase
+      .from("patient_links")
+      .select("nutritionist_id")
+      .eq("patient_id", uid)
+      .eq("status", "active")
+      .limit(1)
+      .maybeSingle(),
+  ]);
+  // Prescrito é `prescribed_by` COM vínculo ativo, a mesma regra do "Para hoje"
+  // (montarParaHoje): depois que o paciente revoga, a sessão segue no plano dele
+  // com `prescribed_by`, e "Não fui" seria uma resposta que ninguém lê. Com a
+  // leitura do vínculo falhando, vale o que a sessão diz (`prescribed_by`): o
+  // check-in grava a mesma linha nos dois casos, e tirar o "Não fui" de quem
+  // tem nutricionista por uma falha de leitura seria pior.
+  const doNutri = !!sessao.prescribed_by && (!!vinculoRes.data || !!vinculoRes.error);
 
   const titulo = sessao.title || rotina?.name || sessao.sport;
 
@@ -91,32 +105,28 @@ export default async function TreinoDetalhe({
           plano" despejava quem não tem nutricionista na tela de convite. */}
       <Link
         href={sessao.prescribed_by ? "/app/nutricionista?aba=treino" : "/app/treinos"}
-        className="tappable mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-brand-700 dark:text-slate-300 dark:hover:text-brand-400"
+        className="tappable mb-2 inline-flex min-h-[44px] items-center gap-1.5 text-sm font-medium text-app-texto-2 hover:text-app-primaria"
       >
         <ArrowLeft className="h-4 w-4" />
         {sessao.prescribed_by ? "Meu plano" : "Treinos"}
       </Link>
 
       <div className="mb-1 flex flex-wrap items-center gap-2">
-        <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-          {DIAS[sessao.day_of_week]}
-        </span>
+        <span className="chip">{DIAS[sessao.day_of_week]}</span>
         {ehHoje && (
-          <span className="rounded-full bg-brand-100 px-2.5 py-0.5 text-xs font-bold text-brand-800 dark:bg-brand-500/20 dark:text-brand-200">
+          <span className="rounded-full bg-app-primaria-fundo px-2.5 py-0.5 text-xs font-semibold text-app-primaria">
             hoje
           </span>
         )}
-        <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-          {sessao.sport}
-        </span>
+        <span className="chip">{sessao.sport}</span>
       </div>
 
-      <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-3xl">
+      <h1 className="text-2xl font-semibold text-app-texto">
         {titulo}
       </h1>
 
       {sessao.prescribed_by && (
-        <p className="mt-1.5 flex items-center gap-1.5 text-sm font-medium text-brand-700 dark:text-brand-300">
+        <p className="mt-1.5 flex items-center gap-1.5 text-sm font-medium text-app-primaria">
           <Stethoscope className="h-4 w-4" />
           Prescrito por {nutriNome || "seu nutricionista"}
         </p>
@@ -124,17 +134,14 @@ export default async function TreinoDetalhe({
 
       {(sessao.notes || rotina?.notes) && (
         <div className="card mt-4">
-          <p className="eyebrow mb-1.5 flex items-center gap-1.5">
-            <NotebookPen className="h-3.5 w-3.5" />
-            Orientações
-          </p>
+          <p className="eyebrow mb-1.5">Orientações</p>
           {sessao.notes && (
-            <p className="whitespace-pre-wrap text-base text-slate-700 dark:text-slate-200">
+            <p className="whitespace-pre-wrap text-base text-app-texto">
               {sessao.notes}
             </p>
           )}
           {rotina?.notes && (
-            <p className="mt-1 whitespace-pre-wrap text-base text-slate-700 dark:text-slate-200">
+            <p className="mt-1 whitespace-pre-wrap text-base text-app-texto">
               {rotina.notes}
             </p>
           )}
@@ -151,9 +158,10 @@ export default async function TreinoDetalhe({
             sessions={[sessao] as any}
             date={hoje}
             completions={(feitos ?? []) as any}
+            doNutri={doNutri}
             compact
           />
-          <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+          <p className="mt-2 text-xs text-app-texto-2">
             Seu nutricionista vê essa confirmação.
           </p>
         </div>
@@ -164,32 +172,29 @@ export default async function TreinoDetalhe({
       {exercicios.length > 0 ? (
         <section className="mt-5">
           <h2 className="section-title mb-3">
-            <span className="icon-badge">
-              <Dumbbell className="h-4 w-4" />
-            </span>
             {exercicios.length} exercício{exercicios.length > 1 ? "s" : ""}
           </h2>
 
-          <ol className="divide-y divide-slate-200/70 overflow-hidden rounded-2xl border border-slate-200/70 bg-white dark:divide-white/[0.06] dark:border-white/[0.06] dark:bg-slate-900/50">
+          <ol className="card divide-y divide-app-linha overflow-hidden p-0">
             {exercicios.map((e, i) => (
               <li key={e.id} className="flex gap-3 p-4">
-                <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                <span className="tabular mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-app-primaria-fundo text-sm font-semibold text-app-primaria">
                   {i + 1}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-base font-semibold text-slate-900 dark:text-white">
+                  <p className="text-base font-semibold text-app-texto">
                     {e.name}
                   </p>
                   <dl className="mt-1.5 flex flex-wrap gap-x-5 gap-y-1">
                     {e.target_sets != null && (
                       <div>
-                        <dt className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        <dt className="text-[13px] text-app-texto-2">
                           Séries
                         </dt>
-                        <dd className="text-base font-semibold tabular text-slate-900 dark:text-white">
+                        <dd className="tabular text-base font-semibold text-app-texto">
                           {e.target_sets}
                           {e.target_reps != null && (
-                            <span className="font-normal text-slate-500 dark:text-slate-400">
+                            <span className="font-normal text-app-texto-2">
                               {" × "}
                               {e.target_reps} reps
                             </span>
@@ -199,12 +204,12 @@ export default async function TreinoDetalhe({
                     )}
                     {e.target_weight_kg != null && (
                       <div>
-                        <dt className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        <dt className="text-[13px] text-app-texto-2">
                           Carga
                         </dt>
-                        <dd className="text-base font-semibold tabular text-slate-900 dark:text-white">
+                        <dd className="tabular text-base font-semibold text-app-texto">
                           {e.target_weight_kg}
-                          <span className="font-normal text-slate-500 dark:text-slate-400">
+                          <span className="font-normal text-app-texto-2">
                             {" "}
                             kg
                           </span>
@@ -213,13 +218,13 @@ export default async function TreinoDetalhe({
                     )}
                     {e.rest_seconds != null && (
                       <div>
-                        <dt className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        <dt className="text-[13px] text-app-texto-2">
                           Descanso
                         </dt>
-                        <dd className="flex items-center gap-1 text-base font-semibold tabular text-slate-900 dark:text-white">
-                          <Timer className="h-3.5 w-3.5 text-slate-400" />
+                        <dd className="tabular flex items-center gap-1 text-base font-semibold text-app-texto">
+                          <Timer className="h-3.5 w-3.5 text-app-texto-2" />
                           {e.rest_seconds}
-                          <span className="font-normal text-slate-500 dark:text-slate-400">
+                          <span className="font-normal text-app-texto-2">
                             s
                           </span>
                         </dd>
@@ -227,7 +232,7 @@ export default async function TreinoDetalhe({
                     )}
                   </dl>
                   {e.notes && (
-                    <p className="mt-1.5 whitespace-pre-wrap text-sm text-slate-600 dark:text-slate-300">
+                    <p className="mt-1.5 whitespace-pre-wrap text-sm text-app-texto">
                       {e.notes}
                     </p>
                   )}
@@ -243,13 +248,13 @@ export default async function TreinoDetalhe({
             <Play className="h-4 w-4" />
             Iniciar treino
           </Link>
-          <p className="mt-1.5 text-center text-xs text-slate-500 dark:text-slate-400">
+          <p className="mt-1.5 text-center text-xs text-app-texto-2">
             A execução com cronômetro e registro de séries fica em Treinos.
           </p>
         </section>
       ) : (
-        <div className="mt-5 rounded-xl border border-dashed border-slate-200 p-8 text-center dark:border-slate-700">
-          <p className="text-sm text-slate-500 dark:text-slate-400">
+        <div className="mt-5 rounded-xl border border-dashed border-app-campo p-8 text-center">
+          <p className="text-sm text-app-texto-2">
             Este dia não tem exercícios detalhados — só a modalidade
             {sessao.notes ? " e a orientação acima" : ""}.
           </p>

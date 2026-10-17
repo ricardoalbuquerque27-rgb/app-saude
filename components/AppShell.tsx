@@ -272,31 +272,45 @@ export default function AppShell({
           <Dumbbell className="h-5 w-5" />
           Pace Fit
         </Link>
+        {/* 44 px de toque (eram 40), sem mexer um pixel no que se vê: o -my-0.5
+            devolve os 4 px à barra (que é fixa e conta na rolagem das âncoras),
+            o -mr-0.5 mantém o ícone onde estava (o botão cresce 2 px para cada
+            lado e o ícone fica centrado nele), e o ponto de novidade vai de
+            1,5 para 2 pelo mesmo motivo. */}
         <button
           onClick={() => setMenuOpen(true)}
-          className="relative rounded-lg p-2 text-app-texto-2 hover:bg-app-primaria-fundo"
+          className="relative -my-0.5 -mr-0.5 flex h-11 w-11 items-center justify-center rounded-lg text-app-texto-2 hover:bg-app-primaria-fundo"
           aria-label="Abrir menu"
         >
           <Menu className="h-6 w-6" />
           {morePending && (
-            <span className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-app-primaria ring-2 ring-app-cartao" />
+            <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-app-primaria ring-2 ring-app-cartao" />
           )}
         </button>
       </header>
 
       {/* Conteúdo */}
       <main
-        className={`px-4 pb-28 pt-6 lg:pl-64 lg:pr-8 ${telaLarga ? "" : "mx-auto max-w-5xl"}`}
+        className={`px-4 pb-[calc(7rem_+_env(safe-area-inset-bottom))] pt-6 lg:pl-64 lg:pr-8 ${telaLarga ? "" : "mx-auto max-w-5xl"}`}
       >
         <div className={`lg:pl-4 ${telaLarga ? "mx-auto max-w-[1456px]" : ""}`}>
           <PageTransition>{children}</PageTransition>
         </div>
       </main>
 
-      {/* Bottom nav — mobile */}
-      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-app-linha bg-app-cartao lg:hidden">
+      {/* Bottom nav — mobile. Altura FIXA: `--barra-h` (globals.css, 61,5 px)
+          mais a safe area do aparelho (`env(safe-area-inset-bottom)`, que
+          engorda a barra por baixo, sem mexer nos itens). A Gaia (ChatWidget)
+          se encaixa na borda de cima desta barra pela mesma conta, então a
+          altura não pode depender do conteúdo. Por isso o rótulo não quebra
+          linha (`whitespace-nowrap`): em 320 px o "Meu plano" não cabe nos
+          53 px da célula e quebraria em duas, e com a altura fixa a segunda
+          linha cairia para fora da tela. Hoje o `env` vale 0 em todo lugar,
+          porque o `viewport` do layout raiz não pede `viewport-fit: cover`;
+          se pedir um dia, a barra e a Gaia já acompanham. */}
+      <nav className="fixed inset-x-0 bottom-0 z-30 h-[calc(var(--barra-h)_+_env(safe-area-inset-bottom))] border-t border-app-linha bg-app-cartao pb-[env(safe-area-inset-bottom)] lg:hidden">
         <div
-          className="mx-auto grid max-w-lg"
+          className="mx-auto grid h-full max-w-lg"
           style={{
             gridTemplateColumns: `repeat(${mobNav.length + 1}, minmax(0, 1fr))`,
           }}
@@ -305,7 +319,7 @@ export default function AppShell({
             <Link
               key={item.href}
               href={item.href}
-              className={`tappable relative flex flex-col items-center gap-0.5 py-2.5 text-[11px] ${
+              className={`tappable relative flex flex-col items-center gap-0.5 whitespace-nowrap py-2.5 text-[11px] ${
                 isActive(item)
                   ? "font-semibold text-app-primaria"
                   : "font-medium text-app-texto-2"
@@ -329,7 +343,7 @@ export default function AppShell({
           ))}
           <button
             onClick={() => setMenuOpen(true)}
-            className={`tappable flex flex-col items-center gap-0.5 py-2.5 text-[11px] ${
+            className={`tappable flex flex-col items-center gap-0.5 whitespace-nowrap py-2.5 text-[11px] ${
               menuHrefs.includes(pathname)
                 ? "font-semibold text-app-primaria"
                 : "font-medium text-app-texto-2"
@@ -360,7 +374,7 @@ export default function AppShell({
               </span>
               <button
                 onClick={() => setMenuOpen(false)}
-                className="tappable rounded-lg p-1.5 text-app-texto-2 hover:bg-app-primaria-fundo"
+                className="tappable -my-1.5 -mr-1.5 flex h-11 w-11 items-center justify-center rounded-lg text-app-texto-2 hover:bg-app-primaria-fundo"
                 aria-label="Fechar menu"
               >
                 <X className="h-5 w-5" />
