@@ -35,6 +35,7 @@ import { useLiveRefresh } from "@/lib/useLiveRefresh";
 import RestTimer from "@/components/RestTimer";
 import { BotoesDoCheckIn, ERRO_DO_CHECKIN, statusDoCheckIn } from "@/components/PlanCheckIn";
 import { gravarTreinoAoVivo, ERRO_DO_TREINO } from "@/lib/treinoAoVivo";
+import { gravarTreino, salvarRotina } from "@/lib/treinos";
 import PlateCalculator from "@/components/PlateCalculator";
 import WorkoutSession, {
   type SessionRoutine,
@@ -117,6 +118,29 @@ type RoutineWithEx = {
   }[];
 };
 
+const ERRO_DA_ROTINA = "Não deu para salvar a rotina. Tente de novo.";
+const ERRO_DO_PLANO = "Não deu para adicionar a sessão. Tente de novo.";
+
+/** O aviso de uma gravação que falhou, embaixo do item em que ela foi tocada. */
+function AvisoDoItem({ aviso, alvo }: { aviso: { alvo: string; texto: string } | null; alvo: string }) {
+  if (aviso?.alvo !== alvo) return null;
+  return (
+    <p role="alert" className="mt-2 text-[13px] text-app-perigo">
+      {aviso.texto}
+    </p>
+  );
+}
+
+/** O aviso do formulário que não gravou, logo acima do botão de enviar. */
+function ErroDoFormulario({ texto }: { texto: string | null }) {
+  if (!texto) return null;
+  return (
+    <p role="alert" className="text-[13px] text-app-perigo">
+      {texto}
+    </p>
+  );
+}
+
 function todayIndex() {
   return (new Date(todayISO() + "T12:00:00").getDay() + 6) % 7; // 0=Segunda
 }
@@ -169,8 +193,16 @@ export default function TreinosPage() {
   const [planSaving, setPlanSaving] = useState(false);
   // Qual check-in grava (sessão e data) e qual resposta: o giro vai no botão tocado.
   const [busyDone, setBusyDone] = useState<{ chave: string; status: "done" | "skipped" } | null>(null);
-  // Em qual sessão e dia o check-in falhou: o aviso vai embaixo dos botões dela.
-  const [erroDoCheckIn, setErroDoCheckIn] = useState<string | null>(null);
+  // A gravação que falhou num item da tela (o check-in ou o remover de uma
+  // sessão, o excluir de uma rotina ou de um treino): o aviso vai embaixo do
+  // item, onde a pessoa tocou, e não no topo, que pode estar fora da tela.
+  // `alvo` é "sessao:<id>", "rotina:<id>" ou "treino:<id>".
+  const [avisoEm, setAvisoEm] = useState<{ alvo: string; texto: string } | null>(null);
+  // As gravações dos três formulários: o aviso fica no formulário, que segue
+  // aberto com o que foi digitado.
+  const [erroDoTreino, setErroDoTreino] = useState<string | null>(null);
+  const [erroDaRotina, setErroDaRotina] = useState<string | null>(null);
+  const [erroDoPlano, setErroDoPlano] = useState<string | null>(null);
   // Vínculo ativo com nutricionista: só com ele a sessão `prescribed_by` é
   // "prescrita" (Fui e Não fui); sem ele, é do paciente (só Fiz). A mesma regra
   // da Início (montarParaHoje) e da leitura do treino.
@@ -399,55 +431,48 @@ export default function TreinosPage() {
     e.preventDefault();
     if (!rName.trim()) return;
     setRoutineSaving(true);
+    setErroDaRotina(null);
     const {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) {
       setRoutineSaving(false);
+      setErroDaRotina(ERRO_DA_ROTINA);
       return;
     }
-    let routineId = editingRoutineId;
-    if (routineId) {
-      await supabase
-        .from("routines")
-        .update({ name: rName.trim(), notes: rNotes.trim() || null })
-        .eq("id", routineId);
-      await supabase.from("routine_exercises").delete().eq("routine_id", routineId);
-    } else {
-      const { data: r } = await supabase
-        .from("routines")
-        .insert({
-          user_id: user.id,
-          name: rName.trim(),
-          notes: rNotes.trim() || null,
-          position: routines.length,
-        })
-        .select()
-        .single();
-      routineId = (r as any)?.id ?? null;
-    }
-    if (routineId) {
-      const rows = rExercises
-        .filter((ex) => ex.name.trim())
-        .map((ex, i) => ({
-          routine_id: routineId as string,
-          user_id: user.id,
-          name: ex.name.trim(),
-          target_sets: ex.sets ? Number(ex.sets) : null,
-          target_reps: ex.reps ? Number(ex.reps) : null,
-          target_weight_kg: ex.weight ? Number(ex.weight) : null,
-          rest_seconds: ex.rest ? Number(ex.rest) : 90,
-          position: i,
-        }));
-      if (rows.length) await supabase.from("routine_exercises").insert(rows);
-    }
+    const exercicios = rExercises
+      .filter((ex) => ex.name.trim())
+      .map((ex, i) => ({
+        name: ex.name.trim(),
+        target_sets: ex.sets ? Number(ex.sets) : null,
+        target_reps: ex.reps ? Number(ex.reps) : null,
+        target_weight_kg: ex.weight ? Number(ex.weight) : null,
+        rest_seconds: ex.rest ? Number(ex.rest) : 90,
+        position: i,
+      }));
+    const r = await salvarRotina(
+      supabase,
+      user.id,
+      { id: editingRoutineId, nome: rName.trim(), notas: rNotes.trim() || null, posicao: routines.length },
+      exercicios
+    );
     setRoutineSaving(false);
+    if (!r.ok) {
+      setErroDaRotina(ERRO_DA_ROTINA);
+      return;
+    }
     setRoutineOpen(false);
     await load();
   }
   async function removeRoutine(id: string) {
     if (!confirm("Excluir esta rotina?")) return;
-    await supabase.from("routines").delete().eq("id", id);
+    setAvisoEm(null);
+    const { error } = await supabase.from("routines").delete().eq("id", id);
+    // Saía da tela mesmo com o delete falhando, e voltava ao recarregar.
+    if (error) {
+      setAvisoEm({ alvo: "rotina:" + id, texto: "Não deu para excluir a rotina. Tente de novo." });
+      return;
+    }
     setRoutines((prev) => prev.filter((r) => r.id !== id));
   }
   // Ponte até o M1b (sessão ao vivo): registra um treino já preenchido pela rotina.
@@ -532,12 +557,17 @@ export default function TreinosPage() {
     e.preventDefault();
     if (!pSport.trim()) return;
     setPlanSaving(true);
+    setErroDoPlano(null);
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) {
+      setPlanSaving(false);
+      setErroDoPlano(ERRO_DO_PLANO);
+      return;
+    }
     const position = plan.filter((p) => p.day_of_week === pDay).length;
-    await supabase.from("workout_plan").insert({
+    const { error } = await supabase.from("workout_plan").insert({
       user_id: user.id,
       day_of_week: pDay,
       sport: pSport.trim(),
@@ -547,6 +577,10 @@ export default function TreinosPage() {
       routine_id: pRoutineId || null,
     });
     setPlanSaving(false);
+    if (error) {
+      setErroDoPlano(ERRO_DO_PLANO);
+      return;
+    }
     setPlanOpen(false);
     await load();
   }
@@ -567,7 +601,13 @@ export default function TreinosPage() {
   }
 
   async function removePlanEntry(id: string) {
-    await supabase.from("workout_plan").delete().eq("id", id);
+    setAvisoEm(null);
+    const { error } = await supabase.from("workout_plan").delete().eq("id", id);
+    // Saía da tela mesmo com o delete falhando, e voltava ao recarregar.
+    if (error) {
+      setAvisoEm({ alvo: "sessao:" + id, texto: "Não deu para remover a sessão. Tente de novo." });
+      return;
+    }
     setPlan((prev) => prev.filter((p) => p.id !== id));
   }
 
@@ -580,13 +620,13 @@ export default function TreinosPage() {
     status: "done" | "skipped"
   ) {
     setBusyDone({ chave: session.id + date, status });
-    setErroDoCheckIn(null);
+    setAvisoEm(null);
     const {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) {
       setBusyDone(null);
-      setErroDoCheckIn(session.id + date);
+      setAvisoEm({ alvo: "sessao:" + session.id, texto: ERRO_DO_CHECKIN });
       return;
     }
     const current = compIndex[completionKey(session.id, date)] ?? null;
@@ -595,7 +635,7 @@ export default function TreinosPage() {
     // banco, e a resposta sumia sem mensagem.
     const { error } = await setPlanCheck(supabase, user.id, session, date, next, current);
     setBusyDone(null);
-    if (error) setErroDoCheckIn(session.id + date);
+    if (error) setAvisoEm({ alvo: "sessao:" + session.id, texto: ERRO_DO_CHECKIN });
     await load();
   }
 
@@ -612,55 +652,57 @@ export default function TreinosPage() {
     e.preventDefault();
     if (!name.trim()) return;
     setSaving(true);
+    setErroDoTreino(null);
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const { data: workout, error } = await supabase
-      .from("workouts")
-      .insert({
+    // Sem usuário, o botão ficava girando para sempre.
+    if (!user) {
+      setSaving(false);
+      setErroDoTreino(ERRO_DO_TREINO);
+      return;
+    }
+    const series = exercises
+      .filter((ex) => ex.name.trim())
+      .map((ex, i) => {
+        const sets = ex.sets
+          .map((s) => ({
+            reps: s.reps ? Number(s.reps) : null,
+            weight: s.weight ? Number(s.weight) : null,
+          }))
+          .filter((s) => s.reps != null || s.weight != null);
+        const weights = sets
+          .map((s) => s.weight)
+          .filter((w): w is number => w != null);
+        return {
+          user_id: user.id,
+          name: ex.name.trim(),
+          sets: sets.length || null,
+          reps: sets[0]?.reps ?? null,
+          weight_kg: weights.length ? Math.max(...weights) : null,
+          sets_json: sets.length ? sets : null,
+          rpe: ex.rpe ? Number(ex.rpe) : null,
+          position: i,
+        };
+      });
+    const r = await gravarTreino(
+      supabase,
+      {
         user_id: user.id,
         date,
         name: name.trim(),
         category: category.trim() || null,
         duration_min: duration ? Number(duration) : null,
         notes: notes.trim() || null,
-      })
-      .select()
-      .single();
-
-    if (!error && workout) {
-      const rows = exercises
-        .filter((ex) => ex.name.trim())
-        .map((ex, i) => {
-          const sets = ex.sets
-            .map((s) => ({
-              reps: s.reps ? Number(s.reps) : null,
-              weight: s.weight ? Number(s.weight) : null,
-            }))
-            .filter((s) => s.reps != null || s.weight != null);
-          const weights = sets
-            .map((s) => s.weight)
-            .filter((w): w is number => w != null);
-          return {
-            workout_id: (workout as Workout).id,
-            user_id: user.id,
-            name: ex.name.trim(),
-            sets: sets.length || null,
-            reps: sets[0]?.reps ?? null,
-            weight_kg: weights.length ? Math.max(...weights) : null,
-            sets_json: sets.length ? sets : null,
-            rpe: ex.rpe ? Number(ex.rpe) : null,
-            position: i,
-          };
-        });
-      if (rows.length > 0) {
-        await supabase.from("exercises").insert(rows);
-      }
-    }
-
+      },
+      series
+    );
     setSaving(false);
+    // O formulário fechava e limpava o que foi digitado mesmo sem gravar.
+    if (!r.ok) {
+      setErroDoTreino(ERRO_DO_TREINO);
+      return;
+    }
     setOpen(false);
     resetForm();
     await load();
@@ -668,7 +710,12 @@ export default function TreinosPage() {
 
   async function remove(id: string) {
     if (!confirm("Excluir este treino?")) return;
-    await supabase.from("workouts").delete().eq("id", id);
+    setAvisoEm(null);
+    const { error } = await supabase.from("workouts").delete().eq("id", id);
+    if (error) {
+      setAvisoEm({ alvo: "treino:" + id, texto: "Não deu para excluir o treino. Tente de novo." });
+      return;
+    }
     await load();
   }
 
@@ -831,6 +878,7 @@ export default function TreinosPage() {
             onClick={() => {
               setTab(t.id as typeof tab);
               setAvisoDoTreino(null);
+              setAvisoEm(null);
             }}
             className={`tappable flex min-h-[44px] shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-medium ${
               tab === t.id
@@ -970,11 +1018,7 @@ export default function TreinosPage() {
                               />
                             </div>
                           )}
-                          {erroDoCheckIn === s.id + dataDoDia && (
-                            <p role="alert" className="mt-2 text-[13px] text-app-perigo">
-                              {ERRO_DO_CHECKIN}
-                            </p>
-                          )}
+                          <AvisoDoItem aviso={avisoEm} alvo={"sessao:" + s.id} />
                         </li>
                       );
                     })}
@@ -1038,6 +1082,7 @@ export default function TreinosPage() {
                     </button>
                   </div>
                 </div>
+                <AvisoDoItem aviso={avisoEm} alvo={"rotina:" + r.id} />
 
                 {r.exercises.length > 0 && (
                   <ul className="mb-4 flex-1 space-y-1.5">
@@ -1257,6 +1302,11 @@ export default function TreinosPage() {
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
+                {avisoEm?.alvo === "treino:" + w.id && (
+                  <div className="-mt-2 px-4 pb-3">
+                    <AvisoDoItem aviso={avisoEm} alvo={"treino:" + w.id} />
+                  </div>
+                )}
                 {isOpen && exs.length > 0 && (
                   <div className="space-y-3 border-t border-app-linha bg-app-pagina px-4 py-3">
                     {exs.map((ex) => (
@@ -1298,7 +1348,14 @@ export default function TreinosPage() {
       )}
 
       {/* Modal — adicionar ao plano */}
-      <Modal open={planOpen} onClose={() => setPlanOpen(false)} title="Adicionar ao plano">
+      <Modal
+        open={planOpen}
+        onClose={() => {
+          setPlanOpen(false);
+          setErroDoPlano(null);
+        }}
+        title="Adicionar ao plano"
+      >
         <form onSubmit={savePlanEntry} className="space-y-4">
           <Field label="Dia da semana">
             <select
@@ -1365,6 +1422,7 @@ export default function TreinosPage() {
               placeholder="Ex.: manhã, intensidade leve..."
             />
           </Field>
+          <ErroDoFormulario texto={erroDoPlano} />
           <button type="submit" disabled={planSaving} className="btn-primary w-full py-2.5">
             {planSaving && <Loader2 className="h-4 w-4 animate-spin" />}
             Adicionar
@@ -1378,6 +1436,7 @@ export default function TreinosPage() {
         onClose={() => {
           setOpen(false);
           resetForm();
+          setErroDoTreino(null);
         }}
         title="Novo treino"
       >
@@ -1543,6 +1602,7 @@ export default function TreinosPage() {
             />
           </Field>
 
+          <ErroDoFormulario texto={erroDoTreino} />
           <button type="submit" disabled={saving} className="btn-primary w-full py-2.5">
             {saving && <Loader2 className="h-4 w-4 animate-spin" />}
             Salvar treino
@@ -1553,7 +1613,10 @@ export default function TreinosPage() {
       {/* Modal — criar/editar rotina */}
       <Modal
         open={routineOpen}
-        onClose={() => setRoutineOpen(false)}
+        onClose={() => {
+          setRoutineOpen(false);
+          setErroDaRotina(null);
+        }}
         title={editingRoutineId ? "Editar rotina" : "Nova rotina"}
       >
         <form onSubmit={saveRoutine} className="space-y-4">
@@ -1668,6 +1731,7 @@ export default function TreinosPage() {
             </div>
           </div>
 
+          <ErroDoFormulario texto={erroDaRotina} />
           <button
             type="submit"
             disabled={routineSaving}

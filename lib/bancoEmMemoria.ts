@@ -16,16 +16,17 @@
 // Não sabe quais colunas a tabela tem e não aplica a RLS.
 //
 // Grava também, para os testes das gravações de treino
-// (lib/treinoAoVivo.test.ts e lib/planCheckIn.test.ts): `insert` (com
-// `select().single()` devolvendo a linha criada, com um `id` quando ela não
-// traz), `upsert` pela chave do `onConflict`, `delete` com os filtros e o `in`.
+// (lib/treinoAoVivo.test.ts, lib/treinos.test.ts e lib/planCheckIn.test.ts):
+// `insert` (com `select().single()` devolvendo a linha criada, com um `id`
+// quando ela não traz), `upsert` pela chave do `onConflict`, `update` e
+// `delete` com os filtros e o `in`.
 // A gravação que falha (`falhar`, que vê o `op` da chamada) não muda a tabela.
 
 type Linha = Record<string, any>;
 
 export type Chamada = {
   tabela: string;
-  op: "select" | "insert" | "upsert" | "delete";
+  op: "select" | "insert" | "upsert" | "update" | "delete";
   filtros: [string, string, unknown][];
   range: [number, number] | null;
   /** O `count` que o `select` pediu, ou nulo. */
@@ -73,6 +74,7 @@ export function bancoEmMemoria(
           (chaveDoUpsert = (o?.onConflict ?? "id").split(",").map((x) => x.trim())),
           q
         ),
+        update: (l: Linha) => ((chamada.op = "update"), (novas = [l]), q),
         delete: () => ((chamada.op = "delete"), q),
         in: (c: string, v: unknown[]) => filtro("in", c, v, (l) => v.includes(l[c])),
         eq: (c: string, v: unknown) => filtro("eq", c, v, (l) => l[c] === v),
@@ -97,6 +99,9 @@ export function bancoEmMemoria(
               if (chamada.op === "delete") {
                 afetadas = tabelaAtual.filter((l) => testes.every((t) => t(l)));
                 tabelas[tabela] = tabelaAtual.filter((l) => !afetadas.includes(l));
+              } else if (chamada.op === "update") {
+                afetadas = tabelaAtual.filter((l) => testes.every((t) => t(l)));
+                for (const l of afetadas) Object.assign(l, novas[0]);
               } else {
                 for (const n of novas) {
                   const existente =

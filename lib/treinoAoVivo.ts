@@ -14,6 +14,7 @@
 // planejado.
 
 import { todayISO } from "@/lib/date";
+import { gravarTreino } from "@/lib/treinos";
 
 export type TreinoAoVivo = {
   name: string;
@@ -39,27 +40,12 @@ export async function gravarTreinoAoVivo(
   sessao: SessaoDoPlano | null,
   hoje: string = todayISO()
 ): Promise<ResultadoDoTreino> {
-  const { data: workout, error: erroDoTreino } = await supabase
-    .from("workouts")
-    .insert({
-      user_id: uid,
-      date: hoje,
-      name: p.name,
-      category: null,
-      duration_min: p.durationMin,
-      notes: "Sessão ao vivo",
-    })
-    .select()
-    .single();
-  if (erroDoTreino || !workout) return { ok: false, erro: ERRO_DO_TREINO };
-
-  const linhas = p.exercises
+  const series = p.exercises
     .map((ex, i) => {
       const sets = ex.sets.filter((s) => s.reps != null || s.weight != null);
       if (!sets.length) return null;
       const pesos = sets.map((s) => s.weight).filter((w): w is number => w != null);
       return {
-        workout_id: workout.id,
         user_id: uid,
         name: ex.name,
         sets: sets.length,
@@ -70,16 +56,22 @@ export async function gravarTreinoAoVivo(
         position: i,
       };
     })
-    .filter(Boolean);
-  if (linhas.length) {
-    const { error } = await supabase.from("exercises").insert(linhas);
-    if (error) {
-      // Sem as séries, o treino fica sem o que importa; apagado, o "Finalizar"
-      // pode ser tocado de novo sem duplicar o treino no Histórico.
-      await supabase.from("workouts").delete().eq("id", workout.id);
-      return { ok: false, erro: ERRO_DO_TREINO };
-    }
-  }
+    .filter((s): s is NonNullable<typeof s> => s !== null);
+  // Com as séries falhando, `gravarTreino` apaga o treino: o "Finalizar" pode
+  // ser tocado de novo sem duplicar o treino no Histórico.
+  const treino = await gravarTreino(
+    supabase,
+    {
+      user_id: uid,
+      date: hoje,
+      name: p.name,
+      category: null,
+      duration_min: p.durationMin,
+      notes: "Sessão ao vivo",
+    },
+    series
+  );
+  if (!treino.ok) return { ok: false, erro: ERRO_DO_TREINO };
 
   // Dia que ainda não chegou não tem check-in (a semana só oferece "Fui" em
   // dia que já chegou): o treino adiantado fica só no Histórico, como o de uma
@@ -106,7 +98,7 @@ export async function gravarTreinoAoVivo(
       plan_id: sessao.planId,
       date: sessao.data,
       status: "done",
-      workout_id: workout.id,
+      workout_id: treino.id,
     },
     { onConflict: "plan_id,date" }
   );
