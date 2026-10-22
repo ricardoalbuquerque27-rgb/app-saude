@@ -129,8 +129,13 @@ Histórico); editar uma rotina diz "Não deu para salvar a rotina. Tente de
 novo.", fica aberto, e os exercícios e o nome dela no mock ficam como estavam;
 excluir um treino ou uma rotina e remover uma sessão do plano avisam embaixo do
 item e o deixam na tela; e o "Adicionar" do plano avisa e fica aberto. Os
-excluir pedem `confirm`, que o roteiro aceita. O check-in e o treino ao vivo
-de Treinos são do `conferir-inicio.cjs`.
+excluir pedem `confirm`, que o roteiro aceita. E cada leitura derrubada (o GET
+de `workout_plan`, `plan_completions`, `routines`, `routine_exercises`,
+`workouts` e `exercises`): a aba diz "Não deu para carregar …" em vez do "não
+tem" ("Nada planejado.", "Nenhuma rotina ainda", "Nenhum treino registrado"),
+sem as respostas a semana fica sem os botões do check-in e sem o "Confirmados",
+e "Tentar de novo" carrega. O check-in e o treino ao vivo de Treinos são do
+`conferir-inicio.cjs`.
 
 `conferir-dieta.cjs` faz o mesmo com a Dieta da Maria (mock sem cenário, dev no
 ar; `SO=regex` roda só as etapas cujo nome casa): o rótulo do dia ("Hoje, qui. 15/10") que abre o seletor de data pelo

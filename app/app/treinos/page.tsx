@@ -36,6 +36,7 @@ import RestTimer from "@/components/RestTimer";
 import { BotoesDoCheckIn, ERRO_DO_CHECKIN, statusDoCheckIn } from "@/components/PlanCheckIn";
 import { gravarTreinoAoVivo, ERRO_DO_TREINO } from "@/lib/treinoAoVivo";
 import { gravarTreino, salvarRotina } from "@/lib/treinos";
+import { lerTreinos, type RotinaComExercicios, type SessaoDoPlano } from "@/lib/treinosDb";
 import PlateCalculator from "@/components/PlateCalculator";
 import WorkoutSession, {
   type SessionRoutine,
@@ -70,16 +71,7 @@ function sportChip(sport: string) {
   return "bg-app-primaria-fundo text-app-primaria";
 }
 
-type PlanEntry = {
-  id: string;
-  day_of_week: number;
-  sport: string;
-  title: string | null;
-  notes: string | null;
-  position: number;
-  routine_id: string | null;
-  prescribed_by: string | null;
-};
+type PlanEntry = SessaoDoPlano;
 
 type SetDraft = { reps: string; weight: string };
 type ExerciseDraft = { name: string; rpe: string; sets: SetDraft[] };
@@ -105,18 +97,7 @@ const emptyRoutineEx = (): RoutineExDraft => ({
   weight: "",
   rest: "90",
 });
-type RoutineWithEx = {
-  id: string;
-  name: string;
-  notes: string | null;
-  exercises: {
-    name: string;
-    target_sets: number | null;
-    target_reps: number | null;
-    target_weight_kg: number | null;
-    rest_seconds: number | null;
-  }[];
-};
+type RoutineWithEx = RotinaComExercicios;
 
 const ERRO_DA_ROTINA = "Não deu para salvar a rotina. Tente de novo.";
 const ERRO_DO_PLANO = "Não deu para adicionar a sessão. Tente de novo.";
@@ -128,6 +109,21 @@ function AvisoDoItem({ aviso, alvo }: { aviso: { alvo: string; texto: string } |
     <p role="alert" className="mt-2 text-[13px] text-app-perigo">
       {aviso.texto}
     </p>
+  );
+}
+
+/**
+ * A leitura que falhou, no lugar do "não tem" que a aba mostraria ("Nada
+ * planejado.", "Nenhuma rotina ainda", "Nenhum treino registrado").
+ */
+function FalhaDeLeitura({ texto, onTentar }: { texto: string; onTentar: () => void }) {
+  return (
+    <div role="alert" className="card flex flex-wrap items-center justify-between gap-3">
+      <p className="text-sm text-app-atencao">{texto}</p>
+      <button type="button" onClick={onTentar} className="btn-ghost">
+        Tentar de novo
+      </button>
+    </div>
   );
 }
 
@@ -245,86 +241,20 @@ export default function TreinosPage() {
   const [avisoDoTreino, setAvisoDoTreino] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(true);
+  // O que não carregou, por área (`lerTreinos`): a aba diz "Não deu para
+  // carregar …" em vez do "não tem" de antes.
+  const [falhou, setFalhou] = useState({ plano: false, respostas: false, rotinas: false, historico: false });
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [planRes, wsRes, compRes, routRes, routExRes, vinculoRes] = await Promise.all([
-      supabase
-        .from("workout_plan")
-        .select("*")
-        .order("day_of_week", { ascending: true })
-        .order("position", { ascending: true }),
-      supabase.from("workouts").select("*").order("date", { ascending: false }),
-      supabase
-        .from("plan_completions")
-        .select("id, plan_id, date, status, workout_id")
-        .gte("date", weekDates()[0])
-        .lte("date", weekDates()[6]),
-      supabase
-        .from("routines")
-        .select("*")
-        .order("position", { ascending: true })
-        .order("created_at", { ascending: true }),
-      supabase
-        .from("routine_exercises")
-        .select("*")
-        .order("position", { ascending: true }),
-      // A RLS só mostra ao paciente os vínculos dele, como na Início.
-      supabase
-        .from("patient_links")
-        .select("nutritionist_id")
-        .eq("status", "active")
-        .limit(1)
-        .maybeSingle(),
-    ]);
-
-    setPlan((planRes.data ?? []) as PlanEntry[]);
-    // Com a leitura do vínculo falhando, vale o que a sessão diz
-    // (`prescribed_by`): o check-in grava a mesma linha nos dois casos, e tirar
-    // o "Não fui" de quem tem nutricionista por uma falha de leitura seria pior.
-    setVinculoAtivo(!!vinculoRes.data || !!vinculoRes.error);
-
-    // Agrupa exercícios por rotina.
-    const exByRoutine: Record<string, any[]> = {};
-    (routExRes.data ?? []).forEach((e: any) => {
-      (exByRoutine[e.routine_id] ||= []).push(e);
-    });
-    setRoutines(
-      (routRes.data ?? []).map((r: any) => ({
-        id: r.id,
-        name: r.name,
-        notes: r.notes,
-        exercises: (exByRoutine[r.id] ?? []).map((e: any) => ({
-          name: e.name,
-          target_sets: e.target_sets,
-          target_reps: e.target_reps,
-          target_weight_kg: e.target_weight_kg,
-          rest_seconds: e.rest_seconds,
-        })),
-      }))
-    );
-
-    setCompletions((compRes.data ?? []) as Completion[]);
-
-    const list = (wsRes.data ?? []) as Workout[];
-    setWorkouts(list);
-    if (list.length > 0) {
-      const { data: exs } = await supabase
-        .from("exercises")
-        .select("*")
-        .in(
-          "workout_id",
-          list.map((w) => w.id)
-        )
-        .order("position", { ascending: true });
-      const grouped: Record<string, Exercise[]> = {};
-      (exs ?? []).forEach((e) => {
-        (grouped[(e as Exercise).workout_id] ||= []).push(e as Exercise);
-      });
-      setExercisesByWorkout(grouped);
-    } else {
-      setExercisesByWorkout({});
-    }
+    const r = await lerTreinos(supabase, weekDates());
+    setPlan(r.plano);
+    setVinculoAtivo(r.vinculoAtivo);
+    setRoutines(r.rotinas);
+    setCompletions(r.respostas);
+    setWorkouts(r.treinos);
+    setExercisesByWorkout(r.seriesPorTreino);
+    setFalhou(r.falhou);
     setLoading(false);
   }, [supabase]);
 
@@ -848,7 +778,7 @@ export default function TreinosPage() {
         action={
           tab === "historico" ? (
             <div className="flex gap-2">
-              {workouts.length > 0 && (
+              {!falhou.historico && workouts.length > 0 && (
                 <button onClick={repeatLast} className="btn-ghost">
                   <Copy className="h-4 w-4" /> Repetir último
                 </button>
@@ -903,19 +833,36 @@ export default function TreinosPage() {
         <div className="flex justify-center py-16 text-app-texto-2">
           <Loader2 className="h-6 w-6 animate-spin" />
         </div>
+      ) : tab === "plano" && falhou.plano ? (
+        <FalhaDeLeitura texto="Não deu para carregar o plano da semana." onTentar={load} />
       ) : tab === "plano" ? (
         <div className="space-y-4">
+          {/* Sem as respostas, o "Confirmados" seria zero e o check-in poria o
+              "Fui" sólido em dia já respondido: a semana aparece sem eles. */}
+          {(falhou.respostas || falhou.rotinas) && (
+            <FalhaDeLeitura
+              texto={[
+                falhou.respostas && "Não deu para carregar as respostas da semana.",
+                falhou.rotinas && "Não deu para carregar as rotinas.",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              onTentar={load}
+            />
+          )}
           {/* Resumo da semana */}
           <div className="card grid grid-cols-3 divide-x divide-app-linha">
             <PlanStat value={`${daysPlanned}`} sub="/ 7" label="Dias com treino" />
             {/* "Sessões/semana" não quebra (não tem espaço) e, com o apoio em
                 13 px, passava por cima do traço da coluna em 390 px. */}
             <PlanStat value={`${sessionsPlanned.length}`} label="Sessões por semana" />
-            <PlanStat
-              value={`${adesao.confirmadas}`}
-              sub={`/ ${adesao.previstas}`}
-              label="Confirmados na semana"
-            />
+            {!falhou.respostas && (
+              <PlanStat
+                value={`${adesao.confirmadas}`}
+                sub={`/ ${adesao.previstas}`}
+                label="Confirmados na semana"
+              />
+            )}
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -1007,7 +954,7 @@ export default function TreinosPage() {
                                 <Play className="h-3.5 w-3.5" /> Iniciar treino
                               </button>
                             )}
-                          {jaPassou && (
+                          {jaPassou && !falhou.respostas && (
                             <div className="mt-2 flex gap-1.5">
                               <BotoesDoCheckIn
                                 status={statusDoCheckIn(check)}
@@ -1036,6 +983,8 @@ export default function TreinosPage() {
             })}
           </div>
         </div>
+      ) : tab === "rotinas" && falhou.rotinas ? (
+        <FalhaDeLeitura texto="Não deu para carregar as rotinas." onTentar={load} />
       ) : tab === "rotinas" ? (
         routines.length === 0 ? (
           <EmptyState
@@ -1053,7 +1002,7 @@ export default function TreinosPage() {
                       <h3 className="font-semibold text-app-texto">
                         {r.name}
                       </h3>
-                      {(r as any).prescribed_by && (
+                      {r.prescribed_by && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-app-primaria-fundo px-2 py-0.5 text-[13px] font-semibold text-app-primaria">
                           <Stethoscope className="h-3 w-3" />
                           do nutri
@@ -1126,6 +1075,8 @@ export default function TreinosPage() {
             ))}
           </div>
         )
+      ) : (tab === "progressao" || tab === "historico") && falhou.historico ? (
+        <FalhaDeLeitura texto="Não deu para carregar o histórico." onTentar={load} />
       ) : tab === "progressao" ? (
         exerciseNames.length === 0 && volumeData.length === 0 ? (
           <EmptyState
@@ -1413,6 +1364,13 @@ export default function TreinosPage() {
                 ))}
               </select>
             </Field>
+          )}
+          {/* Sem as rotinas, o campo some e a sessão sairia sem "Iniciar
+              treino" sem que se soubesse por quê. */}
+          {falhou.rotinas && (
+            <p className="text-[13px] text-app-atencao">
+              Não deu para carregar as rotinas, e sem elas não há como escolher uma para esta sessão.
+            </p>
           )}
           <Field label="Observações (opcional)">
             <textarea
