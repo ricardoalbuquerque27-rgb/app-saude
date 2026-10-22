@@ -10,6 +10,12 @@
 //   recarregava) sem dizer que não excluiu;
 // - o "Adicionar" do plano fechava o formulário sem a sessão.
 //
+// E as leituras que falham (o GET da tabela derrubado): eram `data ?? []`, e a
+// semana dizia "Nada planejado.", o check-in punha o "Fui" sólido em dia já
+// respondido, as Rotinas diziam "Nenhuma rotina ainda" e o Histórico, "Nenhum
+// treino registrado". Agora cada aba diz o que não carregou, com "Tentar de
+// novo".
+//
 // O check-in e o treino ao vivo têm as conferências deles no
 // `conferir-inicio.cjs`. Precisa do mock SEM cenário e do dev no ar (ver
 // LEIAME.md). Acusa com código de saída 1.
@@ -47,6 +53,17 @@ const reset = () => fetch(MOCK + "/__reset", { method: "POST" });
 async function comEscritaFalhando(tabela, fn) {
   await fetch(MOCK + "/__falhar", {
     method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ tabela, escrita: true }),
+  });
+  try {
+    return await fn();
+  } finally {
+    await reset();
+  }
+}
+/** Roda `fn` com os GET de `tabela` dando 500, e SEMPRE volta o mock depois. */
+async function comLeituraFalhando(tabela, fn) {
+  await fetch(MOCK + "/__falhar", {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ tabela }),
   });
   try {
     return await fn();
@@ -218,6 +235,69 @@ async function entrar(ctx) {
     ok(await modal().isVisible(), "o formulário fica aberto");
     await p.screenshot({ path: `${OUT}/adicionar-falhou.png` });
   }));
+
+  // Cada aba carrega pelo `load()` do navegador: a falha vale a partir do
+  // `goto`. "Tentar de novo" lê outra vez, já sem a falha.
+  const semAvisoVazio = async (vazio) => (await p.getByText(vazio, { exact: true }).count()) === 0;
+  const tentarDeNovo = async (depois) => {
+    await reset();
+    await clicar(p.getByRole("button", { name: "Tentar de novo" }).first());
+    return aparece(depois);
+  };
+
+  await etapa("Semana com o plano sem carregar", () => comLeituraFalhando("workout_plan", async () => {
+    await abrir("Semana");
+    const viu = await aparece(p.getByText("Não deu para carregar o plano da semana.", { exact: true }));
+    ok(viu, 'diz "Não deu para carregar o plano da semana."');
+    ok(await semAvisoVazio("Nada planejado."), 'e nenhum dia diz "Nada planejado."');
+    ok((await p.getByText("Dias com treino", { exact: true }).count()) === 0, "nem os números da semana, que seriam zero");
+    await p.screenshot({ path: `${OUT}/semana-falhou.png` });
+    ok(await tentarDeNovo(p.getByRole("heading", { name: "Segunda", exact: true })), '"Tentar de novo" carrega a semana');
+  }));
+
+  await etapa("Semana com as respostas sem carregar", () => comLeituraFalhando("plan_completions", async () => {
+    await abrir("Semana");
+    const viu = await aparece(p.getByText("Não deu para carregar as respostas da semana.", { exact: true }));
+    ok(viu, 'diz "Não deu para carregar as respostas da semana."');
+    ok((await p.locator("button[aria-pressed]").count()) === 0,
+      'e não mostra os botões do check-in (sem as respostas, o "Fui" sólido mentiria sobre dia já respondido)');
+    ok((await p.getByText("Confirmados na semana", { exact: true }).count()) === 0, 'nem o "Confirmados na semana", que seria zero');
+    ok(await p.getByRole("heading", { name: "Segunda", exact: true }).isVisible(), "e o plano da semana continua lá");
+    ok(await tentarDeNovo(p.locator("button[aria-pressed]").first()), '"Tentar de novo" traz o check-in de volta');
+  }));
+
+  for (const tabela of ["routines", "routine_exercises"]) {
+    await etapa(`Rotinas sem carregar (${tabela})`, () => comLeituraFalhando(tabela, async () => {
+      await abrir("Rotinas");
+      const viu = await aparece(p.getByText("Não deu para carregar as rotinas.", { exact: true }));
+      ok(viu, 'diz "Não deu para carregar as rotinas."');
+      ok(await semAvisoVazio("Nenhuma rotina ainda"), 'e não "Nenhuma rotina ainda"');
+      ok(await tentarDeNovo(p.getByRole("button", { name: "Editar rotina" }).first()), '"Tentar de novo" carrega as rotinas');
+    }));
+  }
+
+  await etapa("Semana com as rotinas sem carregar", () => comLeituraFalhando("routines", async () => {
+    // Sem as rotinas, o "Iniciar treino" sumia calado das sessões com rotina.
+    await abrir("Semana");
+    const viu = await aparece(p.getByText("Não deu para carregar as rotinas.", { exact: true }));
+    ok(viu, 'a Semana também diz "Não deu para carregar as rotinas." (o "Iniciar treino" depende delas)');
+  }));
+
+  for (const tabela of ["workouts", "exercises"]) {
+    await etapa(`Histórico sem carregar (${tabela})`, () => comLeituraFalhando(tabela, async () => {
+      await abrir("Histórico");
+      const viu = await aparece(p.getByText("Não deu para carregar o histórico.", { exact: true }));
+      ok(viu, 'diz "Não deu para carregar o histórico."');
+      ok(await semAvisoVazio("Nenhum treino registrado"), 'e não "Nenhum treino registrado"');
+      ok((await p.getByRole("button", { name: /Repetir último/ }).count()) === 0, 'nem oferece "Repetir último"');
+      await clicar(p.getByRole("button", { name: "Progressão", exact: true }));
+      const viuProgressao = await aparece(p.getByText("Não deu para carregar o histórico.", { exact: true }));
+      ok(viuProgressao, "a Progressão diz o mesmo");
+      ok(await semAvisoVazio("Sem dados de progressão ainda"), 'e não "Sem dados de progressão ainda"');
+      await clicar(p.getByRole("button", { name: "Histórico", exact: true }));
+      ok(await tentarDeNovo(p.getByRole("button", { name: /^Excluir treino / }).first()), '"Tentar de novo" carrega o histórico');
+    }));
+  }
 
   await b.close();
   await reset();

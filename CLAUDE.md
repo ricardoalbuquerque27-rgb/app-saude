@@ -80,12 +80,13 @@ Isso não é óbvio lendo a árvore de arquivos.
   consultas ao banco não têm teste (nem
   `lib/perfil.ts`, que é só uma consulta), menos as que rodam contra um
   Supabase em memória: as leituras do resumo, da linha do tempo e da série
-  em `lib/nutri.test.ts`, o "antes" das medidas em `lib/registroDb.test.ts`
-  e as leituras em páginas do Corpo e dos exames em `lib/evolucaoDb.test.ts`
-  e `lib/examesDb.test.ts` (o banco delas, `lib/bancoEmMemoria.ts`, tem
-  `range`, `count: "exact"` e o `max-rows` do projeto, e devolve `error` quando
-  o teste pede; grava também, com `insert`, `upsert`, `delete` e `in`, para os
-  testes do check-in e do treino ao vivo).
+  em `lib/nutri.test.ts`, o "antes" das medidas em `lib/registroDb.test.ts`,
+  as leituras em páginas do Corpo e dos exames em `lib/evolucaoDb.test.ts`
+  e `lib/examesDb.test.ts`, e as de Treinos (`lerTreinos`) em
+  `lib/treinosDb.test.ts`. O banco delas, `lib/bancoEmMemoria.ts`, tem `range`,
+  `count: "exact"` e o `max-rows` do projeto, e devolve `error` quando o teste
+  pede; grava também, com `insert`, `upsert`, `update`, `delete` e `in`, para
+  os testes do check-in, do treino ao vivo e das rotinas.
 
 Toda segurança é por **RLS no Postgres**, nunca por service role no app.
 Ao mexer em política, teste com `BEGIN ... ROLLBACK` e
@@ -547,6 +548,20 @@ tela depois de excluir, e o aviso vai embaixo do item tocado (`AvisoDoItem`),
 não no topo, que pode estar fora da tela. Quem prova é o `conferir-treinos.cjs`,
 com cada escrita derrubada.
 
+**As leituras de Treinos** são uma só, `lerTreinos` (`lib/treinosDb.ts`), que
+devolve `falhou` por área (plano, respostas, rotinas, histórico) e a área que
+falhou vazia. Eram `data ?? []`: o plano que não carregava dizia "Nada
+planejado." na semana toda, e as respostas que não carregavam punham o "Fui"
+sólido em dia já respondido. Agora cada aba diz "Não deu para carregar …" com
+"Tentar de novo" (`FalhaDeLeitura`); sem as respostas, a semana aparece sem os
+botões do check-in e sem o "Confirmados na semana"; sem as rotinas, a Semana
+avisa (o "Iniciar treino" depende delas); sem o histórico, o Histórico e a
+Progressão avisam e o "Repetir último" sai. O histórico (treinos e séries) lê
+em páginas, por `lerEmPaginas`: sem elas, o PostgREST cortava em 1.000 linhas
+sem erro, e as séries eram pedidas com a lista de todos os treinos no endereço.
+As rotinas passaram a trazer o `prescribed_by`, e o selo "do nutri" das rotinas,
+que nunca aparecia, aparece.
+
 ## Senha
 
 Senha **nova** (criar conta e redefinir) tem pelo menos 8 caracteres, com uma
@@ -567,7 +582,7 @@ desligada (ver "Em aberto").
 
 ```bash
 npm run dev      # desenvolvimento
-npm test         # 1033 testes unitários (vitest)
+npm test         # 1043 testes unitários (vitest)
 ferramentas/testar-sql.sh   # migrações e testes SQL num Postgres local
 npm run build    # produção
 ```
@@ -725,8 +740,7 @@ Modal fora do lugar: procure um `transform` num ancestral.
   que falha não avisa (a refeição só continua na lista), e um registro que
   falha fecha o formulário como se tivesse salvo.
 - **As outras telas do paciente ainda leem no navegador com `data ?? []`**
-  (Medidas, Exames, Treinos, Tratamento, Relatórios, Saúde e o histórico de
-  Hábitos): leitura que falha vira "não tem", a regra que a Início e a Dieta
+  (Medidas, Exames, Tratamento, Relatórios, Saúde e o histórico de Hábitos): leitura que falha vira "não tem", a regra que a Início e a Dieta
   (e as refeições e a consulta de Meu plano) já seguem. O resto de Meu plano
   (`nutricionista/page.tsx`: prescrição, plano, itens do cardápio, sessões,
   notas e rotinas) também ignora o `error`.
@@ -746,6 +760,11 @@ Modal fora do lugar: procure um `transform` num ancestral.
   (iniciar em cima, check-in embaixo) é porque terminar o treino ao vivo já
   marca "Feito", e o check-in é de quem treinou sem o cronômetro. Os dois
   sólidos juntos pedem decisão do dono do produto.
+- **Treinos lê o histórico inteiro a cada vez** (todos os treinos e todas as
+  séries, em páginas de 1.000), para o Histórico, a Progressão e as sugestões da
+  sessão ao vivo. Passando de 5.000 treinos ou 30.000 séries (`TETO_DE_TREINOS`,
+  `TETO_DE_SERIES`), o Histórico diz que não carregou, para sempre. Falta ler
+  só o recente e paginar a lista.
 - **O Tratamento ainda pinta a variação de peso** (perda verde, ganho em
   `app-perigo`), ao contrário da Início, do `StatCard` e de Medidas.
 - **"do nutri" em Treinos e "Prescrito por" na leitura do treino vêm só de

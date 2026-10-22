@@ -490,11 +490,14 @@ async function clicar(loc) {
 
     const antes = (await treinosNoMock()).length;
     await clicar(finalizar);
-    await finalizar.waitFor({ state: "detached", timeout: 30000 });
+    // Esperar o "Finalizar" sumir não basta: gravando, ele troca o rótulo pelo
+    // giro e deixa de casar com o nome, e o roteiro lia o mock antes de a
+    // gravação terminar. A sessão fechou quando a tela cheia dela sai.
+    await p.locator("div.fixed.inset-0.z-50.flex-col").waitFor({ state: "detached", timeout: 30000 });
     const depois = await treinosNoMock();
     const novo = depois.find((w) => w.notes === "Sessão ao vivo");
     ok(depois.length === antes + 1 && !!novo && novo.date === hojeSP(),
-      `sessão ao vivo: o treino fica no Histórico com a data de hoje (${novo ? novo.date : "nenhum"})`);
+      `sessão ao vivo: o treino fica no Histórico com a data de hoje (${novo ? novo.date : "nenhum"}; ${antes} → ${depois.length})`);
 
     await p.getByRole("button", { name: "Semana", exact: true }).click();
     const feito = () => segunda().getByRole("button", { name: "Feito", exact: true });
