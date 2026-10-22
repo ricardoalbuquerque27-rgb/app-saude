@@ -33,7 +33,8 @@ import {
 import { todayISO, weekStartISO, formatDate } from "@/lib/date";
 import { useLiveRefresh } from "@/lib/useLiveRefresh";
 import RestTimer from "@/components/RestTimer";
-import { BotoesDoCheckIn, statusDoCheckIn } from "@/components/PlanCheckIn";
+import { BotoesDoCheckIn, ERRO_DO_CHECKIN, statusDoCheckIn } from "@/components/PlanCheckIn";
+import { gravarTreinoAoVivo, ERRO_DO_TREINO } from "@/lib/treinoAoVivo";
 import PlateCalculator from "@/components/PlateCalculator";
 import WorkoutSession, {
   type SessionRoutine,
@@ -168,6 +169,8 @@ export default function TreinosPage() {
   const [planSaving, setPlanSaving] = useState(false);
   // Qual check-in grava (sessão e data) e qual resposta: o giro vai no botão tocado.
   const [busyDone, setBusyDone] = useState<{ chave: string; status: "done" | "skipped" } | null>(null);
+  // Em qual sessão e dia o check-in falhou: o aviso vai embaixo dos botões dela.
+  const [erroDoCheckIn, setErroDoCheckIn] = useState<string | null>(null);
   // Vínculo ativo com nutricionista: só com ele a sessão `prescribed_by` é
   // "prescrita" (Fui e Não fui); sem ele, é do paciente (só Fiz). A mesma regra
   // da Início (montarParaHoje) e da leitura do treino.
@@ -205,6 +208,9 @@ export default function TreinosPage() {
   // Sessão ao vivo (M1b)
   const [sessionRoutine, setSessionRoutine] = useState<SessionRoutine | null>(null);
   const [sessionSaving, setSessionSaving] = useState(false);
+  const [sessionErro, setSessionErro] = useState<string | null>(null);
+  // O treino salvo cujo check-in falhou: o aviso fica no topo até a próxima aba.
+  const [avisoDoTreino, setAvisoDoTreino] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(true);
 
@@ -487,69 +493,28 @@ export default function TreinosPage() {
 
   async function finishSession(p: FinishPayload) {
     setSessionSaving(true);
+    setSessionErro(null);
     const {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) {
       setSessionSaving(false);
+      setSessionErro(ERRO_DO_TREINO);
       return;
     }
-    const { data: workout } = await supabase
-      .from("workouts")
-      .insert({
-        user_id: user.id,
-        date: todayISO(),
-        name: p.name,
-        category: null,
-        duration_min: p.durationMin,
-        notes: "Sessão ao vivo",
-      })
-      .select()
-      .single();
-    if (workout) {
-      const rows = p.exercises
-        .map((ex, i) => {
-          const sets = ex.sets.filter((s) => s.reps != null || s.weight != null);
-          if (!sets.length) return null;
-          const weights = sets
-            .map((s) => s.weight)
-            .filter((w): w is number => w != null);
-          return {
-            workout_id: (workout as Workout).id,
-            user_id: user.id,
-            name: ex.name,
-            sets: sets.length,
-            reps: sets[0]?.reps ?? null,
-            weight_kg: weights.length ? Math.max(...weights) : null,
-            sets_json: sets,
-            rpe: null,
-            position: i,
-          };
-        })
-        .filter(Boolean) as any[];
-      if (rows.length) await supabase.from("exercises").insert(rows);
-    }
-    // Se veio de um dia do plano, marca como concluído hoje.
-    const planId = sessionRoutine?.planId;
-    if (planId && workout) {
-      const { data: already } = await supabase
-        .from("plan_completions")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("plan_id", planId)
-        .eq("date", todayISO())
-        .limit(1);
-      if ((already ?? []).length === 0) {
-        await supabase.from("plan_completions").insert({
-          user_id: user.id,
-          plan_id: planId,
-          date: todayISO(),
-          workout_id: (workout as Workout).id,
-        });
-      }
-    }
+    const sessaoDoPlano =
+      sessionRoutine?.planId && sessionRoutine.planDate
+        ? { planId: sessionRoutine.planId, data: sessionRoutine.planDate }
+        : null;
+    const r = await gravarTreinoAoVivo(supabase, user.id, p, sessaoDoPlano);
     setSessionSaving(false);
+    // Com o treino não salvo, a sessão fica aberta: fechar perderia as séries.
+    if (!r.ok) {
+      setSessionErro(r.erro);
+      return;
+    }
     setSessionRoutine(null);
+    setAvisoDoTreino(r.aviso);
     setTab("historico");
     await load();
   }
@@ -587,14 +552,17 @@ export default function TreinosPage() {
   }
 
   // Inicia a sessão ao vivo a partir de uma sessão do plano (se tiver rotina).
-  function startPlanSession(session: PlanEntry) {
+  // `data` é o dia dela na semana: o "Feito" vai nele, e não em hoje.
+  function startPlanSession(session: PlanEntry, data: string) {
     const r = routines.find((x) => x.id === session.routine_id);
     if (!r) return;
+    setSessionErro(null);
     setSessionRoutine({
       id: r.id,
       name: r.name,
       exercises: r.exercises,
       planId: session.id,
+      planDate: data,
     });
   }
 
@@ -612,17 +580,22 @@ export default function TreinosPage() {
     status: "done" | "skipped"
   ) {
     setBusyDone({ chave: session.id + date, status });
+    setErroDoCheckIn(null);
     const {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) {
       setBusyDone(null);
+      setErroDoCheckIn(session.id + date);
       return;
     }
     const current = compIndex[completionKey(session.id, date)] ?? null;
     const next = current?.status === status ? null : status;
-    await setPlanCheck(supabase, user.id, session, date, next, current);
+    // O retorno era ignorado: o `load()` devolvia o botão ao que estava no
+    // banco, e a resposta sumia sem mensagem.
+    const { error } = await setPlanCheck(supabase, user.id, session, date, next, current);
     setBusyDone(null);
+    if (error) setErroDoCheckIn(session.id + date);
     await load();
   }
 
@@ -855,7 +828,10 @@ export default function TreinosPage() {
         ].map((t) => (
           <button
             key={t.id}
-            onClick={() => setTab(t.id as typeof tab)}
+            onClick={() => {
+              setTab(t.id as typeof tab);
+              setAvisoDoTreino(null);
+            }}
             className={`tappable flex min-h-[44px] shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-medium ${
               tab === t.id
                 ? "bg-app-primaria text-app-sobre-primaria"
@@ -868,6 +844,12 @@ export default function TreinosPage() {
           </button>
         ))}
       </div>
+
+      {avisoDoTreino && (
+        <p role="status" className="mb-4 text-[13px] text-app-atencao">
+          {avisoDoTreino}
+        </p>
+      )}
 
       {loading ? (
         <div className="flex justify-center py-16 text-app-texto-2">
@@ -971,7 +953,7 @@ export default function TreinosPage() {
                           {s.routine_id &&
                             routines.some((r) => r.id === s.routine_id) && (
                               <button
-                                onClick={() => startPlanSession(s)}
+                                onClick={() => startPlanSession(s, dataDoDia)}
                                 className="btn-primary mt-2 w-full py-1.5 text-[13px]"
                               >
                                 <Play className="h-3.5 w-3.5" /> Iniciar treino
@@ -987,6 +969,11 @@ export default function TreinosPage() {
                                 onMarcar={(st) => markPlan(s, dataDoDia, st)}
                               />
                             </div>
+                          )}
+                          {erroDoCheckIn === s.id + dataDoDia && (
+                            <p role="alert" className="mt-2 text-[13px] text-app-perigo">
+                              {ERRO_DO_CHECKIN}
+                            </p>
                           )}
                         </li>
                       );
@@ -1699,7 +1686,11 @@ export default function TreinosPage() {
           lastByName={lastByName}
           best1rmByName={best1rmByName}
           saving={sessionSaving}
-          onClose={() => setSessionRoutine(null)}
+          erro={sessionErro}
+          onClose={() => {
+            setSessionRoutine(null);
+            setSessionErro(null);
+          }}
           onFinish={finishSession}
         />
       )}

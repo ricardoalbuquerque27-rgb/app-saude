@@ -39,6 +39,8 @@ const SOLIDO = "bg-app-primaria text-app-sobre-primaria hover:[filter:brightness
 const CONFIRMADO = "bg-app-primaria-fundo text-app-primaria";
 const SECUNDARIO = "border border-app-campo bg-app-cartao text-app-texto hover:bg-app-primaria-fundo";
 const AVISO = "border border-app-atencao bg-app-atencao-fundo text-app-atencao";
+/** A resposta que não gravou, igual nas três telas do check-in. */
+export const ERRO_DO_CHECKIN = "Não foi possível salvar. Tente de novo.";
 // 44 px em todas as telas: é a ação de um toque (o "Fui" da Início tinha 40).
 const BOTAO =
   "tappable inline-flex min-h-[44px] items-center justify-center whitespace-nowrap rounded-[10px] text-sm font-semibold disabled:opacity-60";
@@ -181,7 +183,7 @@ export default function PlanCheckIn({
     );
     setBusy(null);
     if (error) {
-      setErro("Não foi possível salvar. Tente de novo.");
+      setErro(ERRO_DO_CHECKIN);
       setErroEm(session.id);
       return;
     }

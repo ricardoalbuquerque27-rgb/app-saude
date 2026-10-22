@@ -1,9 +1,11 @@
 import { describe, it, expect } from "vitest";
+import { bancoEmMemoria } from "./bancoEmMemoria";
 import {
   computeAdherence,
   estadosDaSemana,
   indexCompletions,
   mondayOf,
+  setPlanCheck,
   weekDates,
   type Completion,
 } from "./planCheckIn";
@@ -188,5 +190,61 @@ describe("estadosDaSemana", () => {
   it("sem plano, a semana toda é livre", () => {
     const semana = estadosDaSemana([], [], HOJE);
     expect(semana.every((d) => d.estado === "livre")).toBe(true);
+  });
+});
+
+describe("setPlanCheck: o treino que sai junto com a resposta", () => {
+  const UID = "pac-a";
+  const DIA = "2026-10-12";
+  const sessao = { id: "p-seg", sport: "Musculação", title: "Treino A", day_of_week: 0 };
+  const feito = (workoutId: string): Completion => ({
+    id: "c-1", plan_id: "p-seg", date: DIA, status: "done", workout_id: workoutId,
+  });
+  const tabelas = (notas: string) => ({
+    workouts: [{ id: "w-1", user_id: UID, date: DIA, name: "Treino A", notes: notas }],
+    exercises: [{ id: "e-1", workout_id: "w-1", name: "Supino" }],
+    plan_completions: [{ ...feito("w-1"), user_id: UID }],
+  });
+
+  it('desfazer o "Feito" de um treino ao vivo apaga a resposta e não o treino', async () => {
+    // O "Feito" de uma sessão ao vivo aponta para o treino dela, com as
+    // séries. Desfazer apagava esse treino como se fosse o que o "Fui" cria.
+    const t: Record<string, any[]> = tabelas("Sessão ao vivo");
+    const r = await setPlanCheck(bancoEmMemoria(t), UID, sessao, DIA, null, feito("w-1"));
+    expect(r).toEqual({ error: null });
+    expect(t.plan_completions).toEqual([]);
+    expect(t.workouts.map((w) => w.id)).toEqual(["w-1"]);
+  });
+
+  it('trocar o "Feito" de um treino ao vivo por "não fui" mantém o treino', async () => {
+    const t: Record<string, any[]> = tabelas("Sessão ao vivo");
+    await setPlanCheck(bancoEmMemoria(t), UID, sessao, DIA, "skipped", feito("w-1"));
+    expect(t.plan_completions).toHaveLength(1);
+    expect(t.plan_completions[0]).toMatchObject({ status: "skipped", workout_id: null });
+    expect(t.workouts.map((w) => w.id)).toEqual(["w-1"]);
+  });
+
+  it('desfazer o "Fui" apaga o treino que ele criou', async () => {
+    const t: Record<string, any[]> = tabelas("Confirmado pelo plano semanal");
+    await setPlanCheck(bancoEmMemoria(t), UID, sessao, DIA, null, feito("w-1"));
+    expect(t.plan_completions).toEqual([]);
+    expect(t.workouts).toEqual([]);
+  });
+
+  it('o "Fui" que falha não deixa no Histórico o treino que ele criou', async () => {
+    // O treino é criado antes da resposta; com a resposta falhando, ele ficava
+    // no Histórico e o dia seguia sem resposta.
+    const t: Record<string, any[]> = { workouts: [], plan_completions: [] };
+    const banco = bancoEmMemoria(t, { falhar: (c) => c.tabela === "plan_completions" && c.op === "upsert" });
+    const r = await setPlanCheck(banco, UID, sessao, DIA, "done", null);
+    expect(r.error).toBeTruthy();
+    expect(t.workouts).toEqual([]);
+    expect(t.plan_completions).toEqual([]);
+  });
+
+  it("desfazer o treino que a Gaia concluiu também o apaga", async () => {
+    const t: Record<string, any[]> = tabelas("Concluído pelo plano semanal");
+    await setPlanCheck(bancoEmMemoria(t), UID, sessao, DIA, null, feito("w-1"));
+    expect(t.workouts).toEqual([]);
   });
 });
