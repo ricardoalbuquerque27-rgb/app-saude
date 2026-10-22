@@ -77,9 +77,11 @@ Os memos: `founder/board/offers.md`, `founder/board/monopoly.md`,
       quanto custou cada um (`/founder-marketing`, depois `/founder-cfo`).
 - [ ] **Uma página de entrada para o nutricionista** e **cobrança de verdade**,
       antes de qualquer campanha.
-- [ ] **O mapa dos concorrentes** (`/founder-competitors`) mostrando o que o
+- [x] **O mapa dos concorrentes** (`/founder-competitors`) mostrando o que o
       nutricionista usa hoje entre as consultas, quanto paga, e se alguém ao
-      alcance dele já vende essa triagem.
+      alcance dele já vende essa triagem. Feito em `founder/competitors.md`:
+      já vende. Nutriform, NutriOS, LiveClin e DietSystem fazem check-in e
+      alerta de R$ 29,90 a R$ 79,90 por mês, três deles pelo WhatsApp.
 - [ ] **Quanto custa um paciente grátis** (a Gaia tem custo por uso) e quantos
       pacientes cabem numa assinatura antes de ela dar prejuízo (`/founder-cfo`).
 - [ ] **Nada de "atende ao CFN"** antes de ler o texto oficial da Resolução CFN
