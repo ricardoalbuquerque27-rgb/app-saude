@@ -28,7 +28,9 @@ Isso não é óbvio lendo a árvore de arquivos.
   paciente" abaixo.
 - **Lógica testada:** `lib/date.ts` (datas e janelas, `dataNoBrasil`, e a
   `saudacao` pela hora de São Paulo),
-  `lib/planCheckIn.ts` (adesão, `estadosDaSemana`), `lib/foods.ts` (tabela
+  `lib/planCheckIn.ts` (adesão, `estadosDaSemana`, e o `setPlanCheck`, contra o
+  `bancoEmMemoria`), `lib/treinoAoVivo.ts` (`gravarTreinoAoVivo`, o "Finalizar"
+  da sessão ao vivo), `lib/foods.ts` (tabela
   TACO), `lib/edicao.ts` (`reduzirEdicao`, a regra de uma edição por vez,
   e `oQueSeguraATroca`), `lib/abas.ts` (a aba que o endereço pede),
   `lib/consultas.ts` (situação de cada consulta, hora de São Paulo, choque,
@@ -81,7 +83,8 @@ Isso não é óbvio lendo a árvore de arquivos.
   e as leituras em páginas do Corpo e dos exames em `lib/evolucaoDb.test.ts`
   e `lib/examesDb.test.ts` (o banco delas, `lib/bancoEmMemoria.ts`, tem
   `range`, `count: "exact"` e o `max-rows` do projeto, e devolve `error` quando
-  o teste pede).
+  o teste pede; grava também, com `insert`, `upsert`, `delete` e `in`, para os
+  testes do check-in e do treino ao vivo).
 
 Toda segurança é por **RLS no Postgres**, nunca por service role no app.
 Ao mexer em política, teste com `BEGIN ... ROLLBACK` e
@@ -456,8 +459,9 @@ cortava o "Registrar" da Início ("Regis") e cobria o "ver em Meu plano" da
 Dieta, e um toque ali abria a Gaia em vez da ação (decisão do dono do produto,
 17/10). Os 10 px saem da folga de cima dos ícones (o ícone do "Mais" começa a
 11 px da borda: 1 de borda e 10 de folga), então o "Mais" e o "Hábitos" mantêm
-44×44 sem balão por cima, e o topo do balão fica abaixo do pé do "Registrar"
-em 390×844. **A barra tem altura fixa**: `--barra-h` (61,5 px, em
+44×44 sem balão por cima, e o topo do balão ficava abaixo do pé do "Registrar"
+em 390×844 no dia em que foi medido (17/10); em outro dia, com mais coisa antes
+dele, o balão tapa o canto (ver "Em aberto"). **A barra tem altura fixa**: `--barra-h` (61,5 px, em
 `globals.css`) mais `env(safe-area-inset-bottom)`, e o balão e o painel aberto
 leem a mesma variável, porque o CSS não lê a altura de outro elemento e uma
 barra que cresce com o conteúdo desencaixaria o balão. Por isso o rótulo da
@@ -510,7 +514,25 @@ da Início mora numa prop própria, e o `compact` mantém a estrutura:
 redesenhá-lo lá punha um `<li>` fora de lista e repetia o nome e a nota. O
 lado clínico não o usa. Em Treinos, "Iniciar treino" (o primário da
 sessão, na largura toda) vem acima do check-in, e no dia sem resposta os dois
-são sólidos (ver "Em aberto").
+são sólidos (ver "Em aberto"). O check-in que não grava diz "Não foi possível
+salvar. Tente de novo." (`ERRO_DO_CHECKIN`) embaixo dos botões, nas três telas:
+em Treinos o retorno do `setPlanCheck` era ignorado, e a resposta sumia sem
+mensagem. E o "Fui" que falha apaga o treino que tinha acabado de criar.
+
+**O treino ao vivo** (`gravarTreinoAoVivo`, `lib/treinoAoVivo.ts`) fica com a
+data de hoje, que é quando foi feito, e o "Feito" vai no dia da sessão do plano
+de onde ele saiu, como o "Fui" tocado depois. Os dois iam em hoje: quem iniciava
+no sábado o treino de segunda gravava o "Feito" com o id da sessão de segunda e a
+data de sábado, e nenhum dia da semana o mostrava. Dia que ainda não chegou não
+recebe "Feito" (o treino adiantado fica só no Histórico); um "não fui" no dia
+vira "feito"; um "Fui" já respondido fica como está. Se o treino não grava, a
+sessão **fica aberta**, com as séries e "Não deu para salvar o treino. Tente de
+novo.": antes ela fechava e o treino sumia calado. Se as séries falham, o treino
+é apagado, para o novo "Finalizar" não o duplicar. Se só o check-in falha, o
+treino fica e o topo de Treinos avisa. **Desfazer o "Feito" não apaga o treino
+ao vivo**: o `setPlanCheck` só apaga os treinos que uma resposta cria
+(`NOTA_DO_FUI` e `NOTA_DA_GAIA`, pelas notas); antes, tocar no "Feito" de uma
+sessão ao vivo apagava o treino com todas as séries.
 
 ## Senha
 
@@ -532,7 +554,7 @@ desligada (ver "Em aberto").
 
 ```bash
 npm run dev      # desenvolvimento
-npm test         # 1004 testes unitários (vitest)
+npm test         # 1020 testes unitários (vitest)
 ferramentas/testar-sql.sh   # migrações e testes SQL num Postgres local
 npm run build    # produção
 ```
@@ -711,26 +733,28 @@ Modal fora do lugar: procure um `transform` num ancestral.
   (iniciar em cima, check-in embaixo) é porque terminar o treino ao vivo já
   marca "Feito", e o check-in é de quem treinou sem o cronômetro. Os dois
   sólidos juntos pedem decisão do dono do produto.
-- **Em Treinos, o check-in que falha não avisa.** `markPlan`
-  (`app/app/treinos/page.tsx`) ignora o retorno de `setPlanCheck`; o `load()`
-  logo depois devolve o botão ao que está no banco, então a resposta some sem
-  mensagem.
-- **"Iniciar treino" num dia que já passou grava em hoje.** A sessão ao vivo,
-  ao terminar, grava o treino e o "Feito" com `todayISO()`
-  (`app/app/treinos/page.tsx`, perto das linhas 501 e 546), não no dia da
-  sessão. O "Feito" vai com o id da sessão de segunda e a data de sábado, e
-  nenhum dia da semana o mostra (cada dia procura a data dele): quem inicia no
-  sábado o treino de segunda segue com a segunda sem resposta.
+- **As outras gravações de Treinos ainda ignoram o erro**
+  (`app/app/treinos/page.tsx`; o treino ao vivo e o check-in já conferem):
+  - o "Registrar treino" (`save`) fecha o formulário e limpa o que foi digitado
+    mesmo com o insert falhando, e sem usuário fica girando;
+  - editar uma rotina (`saveRoutine`) apaga os exercícios dela antes de gravar
+    os novos, e com o insert falhando a rotina fica vazia;
+  - excluir uma rotina ou uma sessão do plano (`removeRoutine`,
+    `removePlanEntry`) tira da tela mesmo com o delete falhando;
+  - excluir um treino e o "Adicionar" do plano (`savePlanEntry`) não avisam.
 - **O Tratamento ainda pinta a variação de peso** (perda verde, ganho em
   `app-perigo`), ao contrário da Início, do `StatCard` e de Medidas.
 - **"do nutri" em Treinos e "Prescrito por" na leitura do treino vêm só de
   `prescribed_by`.** Depois que o paciente revoga, a sessão segue com o selo,
   mas os botões já são os do treino próprio ("Fiz").
 - **O balão da Gaia ainda cobre o que rola por baixo dele**, 34 px acima da
-  barra na margem da direita (some ao descer e volta ao subir). Na primeira tela
-  de 390×844 não cobre mais nenhuma ação da Início nem da Dieta, mas o "Remover"
-  de Treinos e um campo do Perfil ficam sob ele (já ficavam), e a 320×800 ele
-  encosta no "Fiz" da Início.
+  barra na margem da direita (some ao descer e volta ao subir). O que fica sob
+  ele na primeira tela depende do que vem antes, e isso muda com o dia: no
+  sábado (17/10) o "Registrar" da Início ficava livre em 390×844; na quinta
+  (22/10), com o "Treino A — Superiores" no "Para hoje", o balão tapa o canto
+  direito dele, e o `conferir-inicio` acusa. O "Remover" de Treinos e um campo
+  do Perfil também ficam sob ele (já ficavam), e a 320×800 ele encosta no "Fiz"
+  da Início.
 - **A barra de baixo não cresce com o texto ampliado.** A altura é fixa em px
   (`--barra-h`, o que mantém a Gaia encaixada), e com o tamanho de texto da
   acessibilidade do Chrome no Android perto de 180% o rótulo de 11 px é cortado

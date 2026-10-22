@@ -8,6 +8,7 @@
 import { todayISO, addDaysISO } from "@/lib/date";
 import { adicionarAgua } from "@/lib/agua";
 import { numeroBR } from "@/lib/numeros";
+import { NOTA_DA_GAIA } from "@/lib/planCheckIn";
 import { classifyExam, EXAM_STATUS_LABEL, type Sex } from "@/lib/examRanges";
 
 // Idade em anos a partir da data de nascimento (AAAA-MM-DD).
@@ -1113,7 +1114,7 @@ export async function executeAction(
             date: hoje,
             name: s.title || s.sport,
             category: s.sport,
-            notes: "Concluído pelo plano semanal",
+            notes: NOTA_DA_GAIA,
           })
           .select()
           .single();

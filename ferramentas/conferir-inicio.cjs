@@ -423,6 +423,94 @@ async function clicar(loc) {
     await soFiz("Treinos", proprio);
   }));
 
+  // Os treinos de Maria no mock, lidos direto (sem passar pela tela): o que o
+  // "Finalizar" gravou, e o que o desfazer do check-in deixou.
+  const treinosNoMock = async () => {
+    const maria = await entrarComoMaria();
+    const r = await fetch(`${MOCK}/rest/v1/workouts?select=id,date,name,notes`, {
+      headers: { authorization: `Bearer ${maria.access_token}` },
+    });
+    return r.json();
+  };
+  const cartaoDoDia = (dia) => p.locator("div.card", { has: p.getByRole("heading", { name: dia, exact: true }) });
+  const abaSemana = async () => {
+    await p.goto(APP + "/app/treinos", { waitUntil: "networkidle", timeout: 120000 });
+    await p.getByRole("heading", { name: "Treinos", exact: true }).waitFor({ timeout: 60000 });
+    await cartaoDoDia("Segunda").first().waitFor({ timeout: 60000 });
+  };
+
+  await etapa("Treinos: o check-in que falha avisa", () => comFalha("plan_completions", async () => {
+    // `markPlan` ignorava o retorno de `setPlanCheck`: o `load()` devolvia o
+    // botão ao que estava no banco e a resposta sumia sem mensagem.
+    await abaSemana();
+    const sessao = () =>
+      p.locator("li", { has: p.getByText("do nutri", { exact: true }) })
+        .filter({ has: p.locator("button[aria-pressed]") }).first();
+    const fui = () => sessao().getByRole("button", { name: "Fui", exact: true });
+    const antes = (await treinosNoMock()).length;
+    await hidratado(fui());
+    await clicar(fui());
+    const aviso = sessao().getByText("Não foi possível salvar. Tente de novo.", { exact: true });
+    const viu = await aviso.waitFor({ timeout: 20000 }).then(() => true, () => false);
+    ok(viu, 'Treinos: o "Fui" que falha diz "Não foi possível salvar. Tente de novo." na sessão');
+    const r = await lerBotoes(sessao());
+    ok(r.botoes.length > 0 && !r.botoes.some((b) => b.apertado), "Treinos: e nenhum botão fica marcado", resumoDosBotoes(r));
+    ok((await treinosNoMock()).length === antes, 'Treinos: nem fica no Histórico o treino que o "Fui" criou');
+  }, { escrita: true }));
+
+  await etapa("Treinos: treino ao vivo de um dia que já passou", () => comEstado(async () => {
+    // A segunda da semana do mock tem o "Treino A", com rotina. Só vale como
+    // dia que já passou de terça em diante.
+    const hojeSemana = (new Date(hojeSP() + "T12:00:00").getDay() + 6) % 7;
+    if (hojeSemana === 0) {
+      console.log("  (pulado: hoje é segunda, e a segunda não é dia que já passou)");
+      return;
+    }
+    await abaSemana();
+    const segunda = () => cartaoDoDia("Segunda").first().locator("li", { hasText: "Treino A" }).first();
+    const iniciar = () => segunda().getByRole("button", { name: "Iniciar treino" });
+    await hidratado(iniciar());
+    await clicar(iniciar());
+    const finalizar = p.getByRole("button", { name: "Finalizar", exact: true });
+    await finalizar.waitFor({ timeout: 20000 });
+
+    // Primeiro com a gravação do treino falhando: a sessão fica aberta, com o
+    // aviso, para tentar de novo sem perder as séries.
+    await fetch(MOCK + "/__falhar", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ tabela: "workouts", escrita: true }),
+    });
+    await clicar(finalizar);
+    const erro = p.getByText("Não deu para salvar o treino. Tente de novo.", { exact: true });
+    const viuErro = await erro.waitFor({ timeout: 20000 }).then(() => true, () => false);
+    ok(viuErro, 'sessão ao vivo: o treino que falha diz "Não deu para salvar o treino. Tente de novo."');
+    ok(await finalizar.isVisible(), "sessão ao vivo: e a sessão fica aberta");
+    // O /__reset tira a falha; nada foi gravado, então não há o que perder.
+    await fetch(MOCK + "/__reset", { method: "POST" });
+
+    const antes = (await treinosNoMock()).length;
+    await clicar(finalizar);
+    await finalizar.waitFor({ state: "detached", timeout: 30000 });
+    const depois = await treinosNoMock();
+    const novo = depois.find((w) => w.notes === "Sessão ao vivo");
+    ok(depois.length === antes + 1 && !!novo && novo.date === hojeSP(),
+      `sessão ao vivo: o treino fica no Histórico com a data de hoje (${novo ? novo.date : "nenhum"})`);
+
+    await p.getByRole("button", { name: "Semana", exact: true }).click();
+    const feito = () => segunda().getByRole("button", { name: "Feito", exact: true });
+    const viuFeito = await feito().waitFor({ timeout: 20000 }).then(() => true, () => false);
+    ok(viuFeito, 'sessão ao vivo: a segunda fica "Feito" (era gravado em hoje, e nenhum dia o mostrava)');
+    await p.screenshot({ path: `${OUT}/treino-ao-vivo-segunda.png`, fullPage: true });
+
+    // Desfazer o "Feito" apaga a resposta, não o treino com as séries.
+    if (viuFeito) {
+      await clicar(feito());
+      await segunda().getByRole("button", { name: "Fui", exact: true }).waitFor({ timeout: 20000 });
+      const ficou = (await treinosNoMock()).some((w) => novo && w.id === novo.id);
+      ok(ficou, 'sessão ao vivo: desfazer o "Feito" mantém o treino no Histórico');
+    }
+  }));
+
   console.log("\nSeu dia: anéis");
   await etapa("anéis", async () => {
     await carregar();

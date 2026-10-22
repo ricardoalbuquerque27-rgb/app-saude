@@ -81,7 +81,14 @@ resposta, "Fui" sólido e "Não fui" secundário; feito, "Feito" com o check num
 fundo diferente do sem resposta; não fui, "Não fui" em aviso; tocar de novo
 desfaz; o treino próprio só com "Fiz", e o "não fui" gravado nele marcado em
 aviso e desfeito ao toque; os 44 px; e "Iniciar treino" acima do
-check-in em Treinos; um PNG de cada estado), o "Calorias · limite" e o "acima
+check-in em Treinos; um PNG de cada estado), em Treinos o "Fui" que falha (a
+escrita de `plan_completions` derrubada) com "Não foi possível salvar. Tente de
+novo." na sessão, nenhum botão marcado e nenhum treino deixado no Histórico, e
+o treino ao vivo da segunda iniciado num dia depois dela (pulado na própria
+segunda): com a escrita de `workouts` derrubada, a sessão segue aberta com "Não
+deu para salvar o treino. Tente de novo."; depois, o treino gravado com a data
+de hoje, a segunda "Feito" e, desfeito o "Feito", o treino ainda no Histórico
+(lido direto do mock), o "Calorias · limite" e o "acima
 do limite" (com uma refeição de 2.400 kcal que o roteiro grava no mock), o
 centro dos anéis em `tabular-nums`, o Score que abre nos quatro pilares, a
 sugestão de proteína, o "+250 ml" (sobe, "Desfazer", o foco de volta no

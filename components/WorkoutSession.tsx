@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { X, Check, Play, Pause, RotateCcw, Plus, Trophy, Loader2 } from "lucide-react";
 import { numeroBR } from "@/lib/numeros";
+import type { TreinoAoVivo } from "@/lib/treinoAoVivo";
 
 type RoutineEx = {
   name: string;
@@ -16,19 +17,14 @@ export type SessionRoutine = {
   name: string;
   exercises: RoutineEx[];
   planId?: string; // se veio de um dia do plano, marca como concluído ao finalizar
+  /** O dia da semana da sessão do plano (o check-in vai nele, não em hoje). */
+  planDate?: string;
 };
 
 type SetState = { reps: string; weight: string; done: boolean };
 type ExState = { name: string; rest: number; sets: SetState[] };
 
-export type FinishPayload = {
-  name: string;
-  durationMin: number | null;
-  exercises: {
-    name: string;
-    sets: { reps: number | null; weight: number | null }[];
-  }[];
-};
+export type FinishPayload = TreinoAoVivo;
 
 function epley(w: number, r: number) {
   return w * (1 + r / 30);
@@ -59,6 +55,7 @@ export default function WorkoutSession({
   lastByName,
   best1rmByName,
   saving,
+  erro = null,
   onClose,
   onFinish,
 }: {
@@ -66,6 +63,11 @@ export default function WorkoutSession({
   lastByName: Record<string, { reps: number | null; weight: number | null }>;
   best1rmByName: Record<string, number>;
   saving: boolean;
+  /**
+   * A gravação que falhou. A sessão fica aberta, com as séries, para tocar em
+   * "Finalizar" de novo: fechar perderia o treino inteiro.
+   */
+  erro?: string | null;
   onClose: () => void;
   onFinish: (p: FinishPayload) => void;
 }) {
@@ -202,6 +204,12 @@ export default function WorkoutSession({
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Finalizar"}
         </button>
       </div>
+
+      {erro && (
+        <p role="alert" className="border-b border-app-linha bg-app-perigo-fundo px-4 py-2.5 text-[13px] text-app-perigo">
+          {erro}
+        </p>
+      )}
 
       {/* Progresso */}
       <div className="h-1.5 w-full bg-app-linha">

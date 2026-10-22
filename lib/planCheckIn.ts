@@ -53,12 +53,21 @@ export function weekDates(iso: string = todayISO()): string[] {
   return Array.from({ length: 7 }, (_, i) => addDaysISO(mon, i));
 }
 
+// Os treinos que uma resposta cria: o do "Fui" (aqui) e o do
+// `concluir_treino_do_plano` da Gaia. Só eles saem quando a resposta é desfeita
+// ou vira "não fui". O "Feito" de uma sessão ao vivo aponta para o treino dela,
+// com as séries, e desfazer o apagava como se fosse um destes.
+export const NOTA_DO_FUI = "Confirmado pelo plano semanal";
+export const NOTA_DA_GAIA = "Concluído pelo plano semanal";
+const TREINOS_DA_RESPOSTA = [NOTA_DO_FUI, NOTA_DA_GAIA];
+
 /**
  * Grava (ou desfaz) o check-in de uma sessão do plano numa data.
  *
  * `status` nulo remove a marcação e volta ao estado "sem resposta".
  * Marcar como "done" também cria um treino no histórico, para o registro
- * contar nas estatísticas; desmarcar remove esse treino.
+ * contar nas estatísticas; desmarcar remove esse treino (só o que a resposta
+ * criou: o treino ao vivo fica).
  */
 export async function setPlanCheck(
   supabase: any,
@@ -84,7 +93,7 @@ export async function setPlanCheck(
   if (status === null) {
     if (!current) return { error: null };
     if (current.workout_id) {
-      await supabase.from("workouts").delete().eq("id", current.workout_id);
+      await supabase.from("workouts").delete().eq("id", current.workout_id).in("notes", TREINOS_DA_RESPOSTA);
     }
     const { error } = await supabase
       .from("plan_completions")
@@ -94,14 +103,15 @@ export async function setPlanCheck(
   }
 
   // O treino no histórico só existe para "fui". Ao trocar para "não fui",
-  // o treino criado antes precisa sair junto.
+  // o treino criado antes precisa sair junto (o ao vivo fica, só sem o vínculo).
   let workoutId: string | null = current?.workout_id ?? null;
 
   if (status === "skipped" && workoutId) {
-    await supabase.from("workouts").delete().eq("id", workoutId);
+    await supabase.from("workouts").delete().eq("id", workoutId).in("notes", TREINOS_DA_RESPOSTA);
     workoutId = null;
   }
 
+  let criado: string | null = null;
   if (status === "done" && !workoutId) {
     const { data: w } = await supabase
       .from("workouts")
@@ -110,11 +120,12 @@ export async function setPlanCheck(
         date,
         name: session.title || session.sport || "Treino",
         category: session.sport,
-        notes: "Confirmado pelo plano semanal",
+        notes: NOTA_DO_FUI,
       })
       .select("id")
       .single();
     workoutId = (w as any)?.id ?? null;
+    criado = workoutId;
   }
 
   const { error } = await supabase.from("plan_completions").upsert(
@@ -127,6 +138,9 @@ export async function setPlanCheck(
     },
     { onConflict: "plan_id,date" }
   );
+  // O treino foi criado antes da resposta: com ela falhando, ele ficava no
+  // Histórico e o dia seguia sem resposta.
+  if (error && criado) await supabase.from("workouts").delete().eq("id", criado);
 
   return { error: error?.message ?? null };
 }

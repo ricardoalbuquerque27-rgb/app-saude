@@ -861,6 +861,7 @@ if (CENARIO === "carteira") {
 // Os registros da consulta existem em qualquer cenário (vazios fora da carteira).
 T.consultation_records ||= [];
 T.consultation_addenda ||= [];
+T.exercises ||= [];
 
 // As tabelas que as funções mexem, do jeito que o cenário subiu: POST /__reset
 // volta a elas, e o roteiro de verificações pode rodar duas vezes seguidas.
@@ -872,9 +873,11 @@ T.consultation_addenda ||= [];
 // check-in ("Fui", "Feito" e "Não fui") na Início, na leitura do treino e em
 // Treinos, e a Início e a leitura do treino são do servidor: sem guardar, a
 // página recarregada voltava a "sem resposta".
+// `workouts` e `exercises` porque o "Finalizar" da sessão ao vivo e o "Fui"
+// (que cria o treino "Confirmado pelo plano semanal") gravam de verdade.
 const TABELAS_COM_ESTADO = [
   "appointments", "consultation_records", "consultation_addenda", "body_measurements", "profiles",
-  "daily_logs", "meals", "plan_completions",
+  "daily_logs", "meals", "plan_completions", "workouts", "exercises",
 ];
 const ESTADO_INICIAL = JSON.stringify(Object.fromEntries(TABELAS_COM_ESTADO.map((n) => [n, T[n] ?? []])));
 
@@ -1314,6 +1317,9 @@ const sessao = (id) => ({
  *  - plan_completions, POST (o upsert de `setPlanCheck`, com
  *    `on_conflict=plan_id,date`) e DELETE (desmarcar): o check-in do treino,
  *    uma linha por sessão e dia, só de quem pede.
+ *  - workouts e exercises, POST (o "Finalizar" da sessão ao vivo e o treino que
+ *    o "Fui" cria), e workouts, DELETE (o desfazer do check-in e o treino cujas
+ *    séries falharam), que leva as séries junto, como a cascata do banco.
  *  Nas escritas de insert, só linha de quem pede (a RLS `user_id = auth.uid()`),
  *  senão 403.
  */
@@ -1338,6 +1344,29 @@ function escrever(tabela, metodo, params, corpo, quem, prefer) {
       return linha;
     });
     return { status: 201, dados: representacao ? gravados : [], cabecalhos: {} };
+  }
+
+  if ((tabela === "workouts" || tabela === "exercises") && metodo === "POST") {
+    const novos = (Array.isArray(dados) ? dados : [dados]).filter((x) => x && typeof x === "object");
+    if (novos.some((n) => n.user_id !== quem))
+      return { status: 403, dados: { code: "42501", message: `new row violates row-level security policy for table "${tabela}"` }, cabecalhos: {} };
+    const lista = (T[tabela] ||= []);
+    const gravados = novos.map((n) => {
+      const linha = { id: `${tabela}-novo-${++seqEscrita}`, created_at: new Date().toISOString(), ...n };
+      lista.push(linha);
+      return linha;
+    });
+    return { status: 201, dados: representacao ? gravados : [], cabecalhos: {} };
+  }
+
+  if (tabela === "workouts" && metodo === "DELETE") {
+    // O banco apaga as séries em cascata com o treino.
+    const visiveis = aplicaFiltros(T.workouts || [], params).filter((l) => l.user_id === quem);
+    T.workouts = (T.workouts || []).filter((l) => !visiveis.includes(l));
+    const ids = new Set(visiveis.map((w) => w.id));
+    T.exercises = (T.exercises || []).filter((e) => !ids.has(e.workout_id));
+    if (representacao) return { status: 200, dados: visiveis, cabecalhos: contagem(visiveis.length) };
+    return { status: 204, dados: null, cabecalhos: contagem(visiveis.length) };
   }
 
   if ((tabela === "daily_logs" || tabela === "meals") && metodo === "POST") {
@@ -1492,6 +1521,15 @@ const srv = http.createServer((req, res) => {
       // do app e não é.
       if (req.method !== "GET" && req.method !== "HEAD") {
         const r = escrever(alvo, req.method, params, corpo, quemPede(req), req.headers["prefer"] || "");
+        // `insert(...).select().single()` pede objeto, como na leitura: sem
+        // isto o supabase-js recebia a lista, e o `id` do treino criado vinha
+        // indefinido. Só com a linha gravada: a escrita que o mock não simula
+        // devolve a lista vazia de sempre (com 406 aqui, o "Criar plano" do
+        // nutri passava a dar erro de console no tirar-prints-nutri).
+        if (Array.isArray(r.dados) && r.dados.length === 1 && r.status < 300 &&
+            (req.headers["accept"] || "").includes("vnd.pgrst.object")) {
+          return envia(r.status, r.dados[0], r.cabecalhos);
+        }
         return envia(r.status, r.dados, r.cabecalhos);
       }
 
