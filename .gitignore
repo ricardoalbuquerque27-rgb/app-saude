@@ -26,3 +26,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# python (as skills em .claude/skills rodam scripts)
+__pycache__/

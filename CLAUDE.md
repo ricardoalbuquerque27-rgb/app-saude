@@ -597,6 +597,13 @@ cenário e `tirar-prints.cjs`, `conferir-inicio.cjs`, `conferir-dieta.cjs`,
 param e se esperam pelo PID, nunca por `pkill -f` nem `until ! pgrep -f` (o laço
 casa consigo mesmo e não termina): veja o LEIAME.
 
+**Skills de negócio** (`.claude/skills/founder-*`, `/founder-board`, `/founder-cfo`
+e mais nove): o pacote Founder, de terceiros (MIT, origem e commit em
+`.claude/skills/LICENSE-founder-skill`), copiado sem mudança, para testar ideias
+de negócio. Não faz parte do app: grava numa pasta `founder/` na raiz, e os
+quatro scripts são Python da biblioteca padrão, sem rede. Para atualizar,
+copie de novo as pastas `skills/founder-*` do repositório de origem.
+
 ## Armadilhas que já custaram caro
 
 Cada uma destas quebrou em produção, ou só não quebrou porque a conferência
