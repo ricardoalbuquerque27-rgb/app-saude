@@ -30,7 +30,8 @@ Isso não é óbvio lendo a árvore de arquivos.
   `saudacao` pela hora de São Paulo),
   `lib/planCheckIn.ts` (adesão, `estadosDaSemana`, e o `setPlanCheck`, contra o
   `bancoEmMemoria`), `lib/treinoAoVivo.ts` (`gravarTreinoAoVivo`, o "Finalizar"
-  da sessão ao vivo), `lib/foods.ts` (tabela
+  da sessão ao vivo), `lib/treinos.ts` (`gravarTreino`, o treino com as séries,
+  e `salvarRotina`), `lib/foods.ts` (tabela
   TACO), `lib/edicao.ts` (`reduzirEdicao`, a regra de uma edição por vez,
   e `oQueSeguraATroca`), `lib/abas.ts` (a aba que o endereço pede),
   `lib/consultas.ts` (situação de cada consulta, hora de São Paulo, choque,
@@ -534,6 +535,18 @@ ao vivo**: o `setPlanCheck` só apaga os treinos que uma resposta cria
 (`NOTA_DO_FUI` e `NOTA_DA_GAIA`, pelas notas); antes, tocar no "Feito" de uma
 sessão ao vivo apagava o treino com todas as séries.
 
+**As outras gravações de Treinos** seguem a mesma regra: ou grava tudo, ou
+desfaz o que gravou e avisa, e o formulário fica aberto com o que foi digitado.
+O "Novo treino" e o treino ao vivo gravam por `gravarTreino` (`lib/treinos.ts`),
+que apaga o treino quando as séries falham; antes o "Novo treino" fechava o
+formulário e limpava o que foi digitado mesmo sem gravar. Editar uma rotina
+(`salvarRotina`) grava os exercícios novos **antes** de apagar os antigos e
+muda o nome por último: apagava primeiro, e um insert que falhasse deixava a
+rotina vazia. Excluir um treino, uma rotina ou uma sessão do plano só tira da
+tela depois de excluir, e o aviso vai embaixo do item tocado (`AvisoDoItem`),
+não no topo, que pode estar fora da tela. Quem prova é o `conferir-treinos.cjs`,
+com cada escrita derrubada.
+
 ## Senha
 
 Senha **nova** (criar conta e redefinir) tem pelo menos 8 caracteres, com uma
@@ -554,7 +567,7 @@ desligada (ver "Em aberto").
 
 ```bash
 npm run dev      # desenvolvimento
-npm test         # 1020 testes unitários (vitest)
+npm test         # 1033 testes unitários (vitest)
 ferramentas/testar-sql.sh   # migrações e testes SQL num Postgres local
 npm run build    # produção
 ```
@@ -564,10 +577,10 @@ Supabase falso e dirigem o Chromium — é a única forma de ver as telas
 logadas num ambiente sem acesso ao banco. Para a página do paciente do
 nutricionista, o mock com `CENARIO=carteira` e
 `ferramentas/tirar-prints-nutri.cjs`. Para o app do paciente, o mock sem
-cenário e `tirar-prints.cjs`, `conferir-inicio.cjs`, `conferir-dieta.cjs` e
-`conferir-consulta-paciente.cjs`. Esses processos se param e se esperam pelo
-PID, nunca por `pkill -f` nem `until ! pgrep -f` (o laço casa consigo mesmo e
-não termina): veja o LEIAME.
+cenário e `tirar-prints.cjs`, `conferir-inicio.cjs`, `conferir-dieta.cjs`,
+`conferir-consulta-paciente.cjs` e `conferir-treinos.cjs`. Esses processos se
+param e se esperam pelo PID, nunca por `pkill -f` nem `until ! pgrep -f` (o laço
+casa consigo mesmo e não termina): veja o LEIAME.
 
 ## Armadilhas que já custaram caro
 
@@ -733,15 +746,6 @@ Modal fora do lugar: procure um `transform` num ancestral.
   (iniciar em cima, check-in embaixo) é porque terminar o treino ao vivo já
   marca "Feito", e o check-in é de quem treinou sem o cronômetro. Os dois
   sólidos juntos pedem decisão do dono do produto.
-- **As outras gravações de Treinos ainda ignoram o erro**
-  (`app/app/treinos/page.tsx`; o treino ao vivo e o check-in já conferem):
-  - o "Registrar treino" (`save`) fecha o formulário e limpa o que foi digitado
-    mesmo com o insert falhando, e sem usuário fica girando;
-  - editar uma rotina (`saveRoutine`) apaga os exercícios dela antes de gravar
-    os novos, e com o insert falhando a rotina fica vazia;
-  - excluir uma rotina ou uma sessão do plano (`removeRoutine`,
-    `removePlanEntry`) tira da tela mesmo com o delete falhando;
-  - excluir um treino e o "Adicionar" do plano (`savePlanEntry`) não avisam.
 - **O Tratamento ainda pinta a variação de peso** (perda verde, ganho em
   `app-perigo`), ao contrário da Início, do `StatCard` e de Medidas.
 - **"do nutri" em Treinos e "Prescrito por" na leitura do treino vêm só de

@@ -66,11 +66,12 @@ novo.
 ## Cenários do mock
 
 `CENARIO` escolhe os dados que o mock devolve. Sem ele, valem os de sempre (a
-conta de teste da Maria), e é com esses que rodam os quatro roteiros do
-paciente: `tirar-prints.cjs`, `conferir-inicio.cjs`, `conferir-dieta.cjs` e
-`conferir-consulta-paciente.cjs`. Os três `conferir-*` acusam com código de
-saída 1, recusam rodar (código 2) se o mock subiu com outro cenário e começam
-voltando o mock ao início (`POST /__reset`); `OUT` diz onde vão os PNGs.
+conta de teste da Maria), e é com esses que rodam os cinco roteiros do
+paciente: `tirar-prints.cjs`, `conferir-inicio.cjs`, `conferir-dieta.cjs`,
+`conferir-consulta-paciente.cjs` e `conferir-treinos.cjs`. Os quatro
+`conferir-*` acusam com código de saída 1, recusam rodar (código 2) se o mock
+subiu com outro cenário e começam voltando o mock ao início (`POST /__reset`);
+`OUT` diz onde vão os PNGs.
 
 `conferir-inicio.cjs` confere a Início da Maria em 390 px e acusa com código de
 saída 1: a ordem das seções, a saudação pela hora de São Paulo, a contagem do
@@ -119,6 +120,17 @@ isso a expressão é `/Instrument[ _]Sans/`.
 treino prescrito nesses dias da semana (o "Para hoje" fica sem a linha "do seu
 nutricionista"): não é defeito do app. Rode noutro dia, ou acrescente ao mock
 uma sessão prescrita no dia em que for rodar.
+
+`conferir-treinos.cjs` confere Treinos da Maria em 390 px com cada escrita
+derrubada (`/__falhar` com `escrita`; `SO=regex` roda só as etapas cujo nome
+casa): o "Novo treino" diz "Não deu para salvar o treino. Tente de novo." e
+fica aberto com o nome digitado (e, sem a falha, fecha e o treino aparece no
+Histórico); editar uma rotina diz "Não deu para salvar a rotina. Tente de
+novo.", fica aberto, e os exercícios e o nome dela no mock ficam como estavam;
+excluir um treino ou uma rotina e remover uma sessão do plano avisam embaixo do
+item e o deixam na tela; e o "Adicionar" do plano avisa e fica aberto. Os
+excluir pedem `confirm`, que o roteiro aceita. O check-in e o treino ao vivo
+de Treinos são do `conferir-inicio.cjs`.
 
 `conferir-dieta.cjs` faz o mesmo com a Dieta da Maria (mock sem cenário, dev no
 ar; `SO=regex` roda só as etapas cujo nome casa): o rótulo do dia ("Hoje, qui. 15/10") que abre o seletor de data pelo
