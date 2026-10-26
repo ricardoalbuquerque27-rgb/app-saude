@@ -29,6 +29,7 @@ import { createClient } from "@/lib/supabase/client";
 import PageTransition from "@/components/PageTransition";
 import ChatWidget from "@/components/ChatWidget";
 import Onboarding from "@/components/Onboarding";
+import MarcaIcone from "@/components/MarcaIcone";
 
 // Navegação completa (usada na sidebar do desktop)
 const nav = [
@@ -200,9 +201,7 @@ export default function AppShell({
       {/* Sidebar — desktop */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-app-linha bg-app-cartao px-4 py-6 lg:flex">
         <div className="flex items-center gap-2.5 px-1">
-          <div className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-app-primaria text-app-sobre-primaria">
-            <Dumbbell className="h-5 w-5" />
-          </div>
+          <MarcaIcone tamanho={36} />
           <span className="text-lg font-bold tracking-tight text-app-texto">
             Pace Fit
           </span>
@@ -269,7 +268,7 @@ export default function AppShell({
           href="/app"
           className="flex items-center gap-2 font-bold text-app-primaria"
         >
-          <Dumbbell className="h-5 w-5" />
+          <MarcaIcone tamanho={28} />
           Pace Fit
         </Link>
         {/* 44 px de toque (eram 40), sem mexer um pixel no que se vê: o -my-0.5

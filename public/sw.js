@@ -1,8 +1,12 @@
-// Service worker do Pace Fit — habilita instalação (PWA) e um shell offline.
+// Service worker do app — habilita instalação (PWA) e um shell offline.
 // Estratégia enxuta: nunca mexe em /api nem em requisições externas (Supabase).
+// O nome do produto está escrito à mão aqui (o título padrão do push, lá
+// embaixo): este arquivo é estático e não lê lib/marca.ts. Trocou o NOME de
+// lib/marca.ts, troque aqui também.
 // v3: a v2 guardava a resposta do router.refresh() de /app (ver abaixo); trocar
 // o nome apaga esse cache no "activate".
-const CACHE = "pacefit-v3";
+// v4: o ícone trocou (o haltere saiu), e o /icon.svg em cache era o velho.
+const CACHE = "pacefit-v4";
 const OFFLINE_URLS = ["/app", "/manifest.webmanifest", "/icon.svg"];
 
 self.addEventListener("install", (event) => {

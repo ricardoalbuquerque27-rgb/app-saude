@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  Dumbbell,
   Loader2,
   Check,
   Eye,
@@ -14,6 +13,7 @@ import {
   Lock,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import MarcaIcone from "@/components/MarcaIcone";
 import {
   AJUDA_DA_SENHA,
   SENHA_MINIMO,
@@ -144,9 +144,7 @@ export default function LoginPage() {
           (lib/temaApp.ts, PARES_TEXTO_APP). */}
       <div className="hidden bg-app-primaria-fundo p-12 lg:flex lg:flex-col lg:justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-app-primaria text-app-sobre-primaria">
-            <Dumbbell className="h-5 w-5" />
-          </div>
+          <MarcaIcone tamanho={36} />
           <span className="text-lg font-semibold text-app-texto">Pace Fit</span>
         </div>
 
@@ -196,9 +194,7 @@ export default function LoginPage() {
             href="/"
             className="tappable mb-8 flex min-h-[44px] items-center justify-center gap-2.5 lg:hidden"
           >
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-app-primaria text-app-sobre-primaria">
-              <Dumbbell className="h-5 w-5" />
-            </div>
+            <MarcaIcone tamanho={36} />
             <span className="text-lg font-semibold text-app-texto">Pace Fit</span>
           </Link>
 

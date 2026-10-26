@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Dumbbell,
   ArrowRight,
   ArrowLeft,
   Loader2,
@@ -14,6 +13,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { ensurePushSubscription } from "@/lib/pushClient";
 import { todayISO } from "@/lib/date";
+import MarcaIcone from "@/components/MarcaIcone";
 
 const MEDS = [
   "Ozempic (semaglutida)",
@@ -134,9 +134,7 @@ export default function Onboarding({ initialName }: { initialName?: string }) {
         <div className="border-b border-app-linha px-6 pb-5 pt-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-app-primaria text-app-sobre-primaria">
-                <Dumbbell className="h-5 w-5" />
-              </div>
+              <MarcaIcone tamanho={32} />
               <span className="font-semibold text-app-texto">Pace Fit</span>
             </div>
             <button
