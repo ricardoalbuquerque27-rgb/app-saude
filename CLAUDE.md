@@ -45,7 +45,8 @@ Isso não é óbvio lendo a árvore de arquivos.
   botão do painel, `entradaDoRegistro`; o Observar, `observarDaConsulta` e
   `ultimoObservarPorPaciente`; o "antes" de cada medida, `anteriores`),
   `lib/aiActions.ts` (só `atualizar_peso` e `remover_ultimo` de peso, que não
-  podem pegar a medida da consulta),
+  podem pegar a medida da consulta, e o `definir_metas`, que não grava por cima
+  da prescrição nem quando a leitura dela falha),
   `lib/evolucao.ts` (a conta dos gráficos do Corpo: o período,
   `inicioDoPeriodo` e `limitadoEmUmAno`; a média semanal, `semanasDePeso`; os
   pontos da consulta e as séries de medida, `variacaoDaMedida`; o anel da meta,
@@ -626,7 +627,7 @@ vai fazer e que o app é de graça.
 
 ```bash
 npm run dev      # desenvolvimento
-npm test         # 1070 testes unitários (vitest)
+npm test         # 1073 testes unitários (vitest)
 ferramentas/testar-sql.sh   # migrações e testes SQL num Postgres local
 npm run build    # produção
 ```
