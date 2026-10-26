@@ -1,0 +1,13 @@
+{
+  "id": "P018",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "Eu já pago o Dietbox, monto o plano na consulta e o paciente já usa o app dele; estou no meio da assinatura e não vou pagar dois sistemas. R$ 79 por mês em cima do que eu já gasto pesa, e trocar tudo de lugar no meio do caminho dá mais trabalho do que o ganho.",
+  "objection": "Para quê pagar um segundo sistema se o Dietbox já tem o plano e o app do paciente? Migrar os pacientes e o histórico para outro lugar é dor de cabeça, e nada aqui me diz que a fila de quem parou de registrar vale R$ 79 por mês.",
+  "would_change_my_mind": "Um preço bem menor, perto de R$ 39, ou um jeito de importar meus pacientes e planos do Dietbox sem refazer nada, para eu poder testar sem abandonar o que já uso.",
+  "price_too_cheap": 19,
+  "price_cheap": 39,
+  "price_expensive": 59,
+  "price_too_expensive": 79
+}

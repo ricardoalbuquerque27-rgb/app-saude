@@ -1,0 +1,13 @@
+{
+  "id": "P012",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "trust",
+  "reason": "Já pago o Dietbox e estou no meio da assinatura, meus pacientes e meus planos estão lá. Empresa nova que eu nunca ouvi falar, com dado de paciente: se sumir com isso, o problema é meu perante o CRN e a LGPD, e não vale a economia de uns reais.",
+  "objection": "Empresa nova: e se sumir com os dados dos meus pacientes? Eu teria que passar todo mundo pra lá, pagar os dois por um tempo, e não vi nada dizendo como eu tiro os dados de volta se eu quiser sair.",
+  "would_change_my_mind": "Ver outro nutricionista que eu conheço usando há meses e satisfeito, e uma garantia clara de exportar todos os dados dos pacientes a qualquer hora, junto com um jeito de testar com poucos pacientes sem largar o Dietbox até o fim do que já paguei.",
+  "price_too_cheap": 25,
+  "price_cheap": 49,
+  "price_expensive": 119,
+  "price_too_expensive": 199
+}

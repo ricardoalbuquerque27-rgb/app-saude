@@ -1,0 +1,13 @@
+{
+  "id": "P011",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "Já pago um sistema e não quero pagar dois. Meu dia é plano em PDF e WhatsApp à noite, e trocar isso por um app novo, com paciente tendo que baixar e aprender, dá mais trabalho do que o benefício que eu enxergo hoje.",
+  "objection": "Eu teria que convencer cada paciente a sair do WhatsApp e usar outro app, e ainda manter o sistema que eu já pago. Pagar mensalidade pelos dois, sem saber se o paciente vai de fato registrar alguma coisa, não fecha pra mim. Ainda tenho dúvida de uma IA conversando com meu paciente sobre alimentação sem eu ver o que ela diz.",
+  "would_change_my_mind": "Ver que ele substitui o que eu já pago, com a importação dos meus pacientes e planos atuais, e que o paciente continua me respondendo pelo WhatsApp sem precisar abrir outro app.",
+  "price_too_cheap": 12,
+  "price_cheap": 29,
+  "price_expensive": 59,
+  "price_too_expensive": 99
+}

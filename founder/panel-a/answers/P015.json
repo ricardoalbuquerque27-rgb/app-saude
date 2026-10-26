@@ -1,0 +1,13 @@
+{
+  "id": "P015",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "Já pago um sistema que tem agenda e prontuário, e não vou pagar dois. Os 30 dias grátis sem cartão eu até testaria, mas quando o preço entrasse eu cancelava, porque R$ 79 por mês em cima do que eu já pago não fecha pra mim.",
+  "objection": "Já pago um sistema. Pra largar o meu eu teria que migrar agenda e histórico, e pra manter os dois eu teria que pagar dobrado e ainda convencer paciente a sair do WhatsApp e instalar app, coisa que faço à noite do jeito que já funciona.",
+  "would_change_my_mind": "Um plano grátis de verdade, ou um preço de lançamento bem baixo (uns R$ 29 a R$ 39) por tempo longo. Ou ver que ele substitui o sistema que eu já pago, e não que se soma a ele.",
+  "price_too_cheap": 15,
+  "price_cheap": 29,
+  "price_expensive": 49,
+  "price_too_expensive": 69
+}
