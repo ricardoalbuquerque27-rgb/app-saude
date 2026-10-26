@@ -1,0 +1,13 @@
+{
+  "id": "P007",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "need",
+  "reason": "Eu tenho poucos pacientes ativos e retorno a cada 30 ou 45 dias, então já sei quem sumiu sem precisar de uma fila. Posso até abrir o teste grátis, como faço com tudo que vejo no Instagram, mas pagar R$ 39 por mês em cima do sistema que eu já pago, com a renda que eu tenho agora, não fecha.",
+  "objection": "Meu paciente não vai registrar todo dia num app. Se ele não registra, a fila fica vazia e eu estou pagando por um painel sem dado.",
+  "would_change_my_mind": "Um plano grátis ou bem barato enquanto eu tenho poucos pacientes, e ver uns 3 dos meus pacientes registrando de verdade por duas semanas no teste, sem eu ficar cobrando.",
+  "price_too_cheap": 9,
+  "price_cheap": 15,
+  "price_expensive": 30,
+  "price_too_expensive": 59
+}

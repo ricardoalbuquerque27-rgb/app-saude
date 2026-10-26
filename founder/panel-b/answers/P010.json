@@ -1,0 +1,13 @@
+{
+  "id": "P010",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "need",
+  "reason": "Já pedi diário alimentar para paciente e ele largou em duas semanas, então não acredito que vá registrar refeição, água e treino num app todo dia. Tenho poucos pacientes ativos e já me viro com o que uso hoje; não vou pagar mais uma mensalidade por uma fila de alertas que depende de um registro que o paciente não faz.",
+  "objection": "Meu paciente não vai registrar todo dia num app. Se ele não registra, a fila não mostra nada e eu paguei R$ 39 por um painel vazio.",
+  "would_change_my_mind": "Ver, com nutricionista de consultório pequeno como eu, que os pacientes continuam registrando depois do primeiro mês. Ou um preço bem menor enquanto eu tenho poucos pacientes, para testar sem risco.",
+  "price_too_cheap": 9,
+  "price_cheap": 19,
+  "price_expensive": 35,
+  "price_too_expensive": 60
+}

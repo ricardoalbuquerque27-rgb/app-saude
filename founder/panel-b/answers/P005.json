@@ -1,0 +1,13 @@
+{
+  "id": "P005",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "trust",
+  "reason": "Eu só assino o que as colegas do grupo já usam e recomendam, e ninguém ali falou de Pace Fit. Já tenho meu sistema com plano e prontuário, e lançar meta de paciente em dois lugares é trabalho a mais na minha semana.",
+  "objection": "É mais uma ferramenta para eu alimentar além do sistema que já uso, com dado de paciente dentro, e não conheço nenhuma colega que use. E o treino é do personal, não meu, então uma parte do que está sendo vendido nem me serve.",
+  "would_change_my_mind": "Duas ou três colegas do meu grupo me dizerem que usam e que a fila de quem parou de registrar realmente poupa tempo nos retornos, e eu poder testar com meus próprios pacientes sem refazer nada do que já está no meu sistema.",
+  "price_too_cheap": 12,
+  "price_cheap": 25,
+  "price_expensive": 70,
+  "price_too_expensive": 130
+}
