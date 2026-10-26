@@ -1,0 +1,13 @@
+{
+  "id": "P012",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "trust",
+  "reason": "Já pago Dietbox, estou no meio da assinatura e meus pacientes já usam o app de lá. Para testar eu teria que pôr dado de 3 a 5 pacientes numa empresa que não conheço e pedir que instalem mais um app, e nada na oferta me diz como esse dado é protegido.",
+  "objection": "Empresa nova: e se sumir com os dados dos meus pacientes? Não vi uma palavra sobre LGPD, onde os dados ficam guardados nem se consigo tirar tudo de lá se eu quiser sair. Dado de paciente é responsabilidade minha, não do fundador.",
+  "would_change_my_mind": "Ver, por escrito, como os dados são protegidos (LGPD, onde ficam, como exporto tudo se eu cancelar) e ter o nome de uma ou duas nutricionistas de verdade que já usam, para eu poder perguntar a elas.",
+  "price_too_cheap": 19,
+  "price_cheap": 39,
+  "price_expensive": 90,
+  "price_too_expensive": 150
+}

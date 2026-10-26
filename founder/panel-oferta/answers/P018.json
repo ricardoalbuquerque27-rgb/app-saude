@@ -1,0 +1,13 @@
+{
+  "id": "P018",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "Já pago Dietbox, monto o plano lá durante a consulta e estou no meio da assinatura. Pagar um segundo sistema e pedir para 3 a 5 pacientes instalarem outro app, além de 1h de implantação, é trabalho que eu não tenho na agenda.",
+  "objection": "Eu ia ficar com dois sistemas: o plano no Dietbox e os pacientes registrando em outro app. O preço pesa para quem já paga uma assinatura, e eu não sei se o paciente vai abrir um segundo app só porque eu pedi.",
+  "would_change_my_mind": "Se a fila funcionasse em cima do que eu já uso, sem os pacientes terem que trocar de app, ou quando a minha assinatura atual vencesse e eu estivesse reavaliando.",
+  "price_too_cheap": 15,
+  "price_cheap": 30,
+  "price_expensive": 60,
+  "price_too_expensive": 120
+}

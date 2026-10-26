@@ -1,0 +1,13 @@
+{
+  "id": "P014",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "need",
+  "reason": "Tenho poucos pacientes ativos e boa parte treina na academia onde eu atendo, então eu já vejo quem sumiu pelo WhatsApp ou pessoalmente. Uma fila de quem saiu do plano me diria o que eu já sei, e pra isso ainda teria que convencer cada paciente a instalar app e registrar tudo.",
+  "objection": "Com 3 a 5 pacientes eu não preciso de uma fila para saber quem parou, e o paciente é que teria que registrar. Se ele não registrar, a fila não mostra nada, e eu ainda estaria pagando R$ 69,90 depois dos 30 dias por algo que o WhatsApp já resolve de graça.",
+  "would_change_my_mind": "Um plano grátis ou bem barato enquanto eu tiver poucos pacientes (até uns 15 ativos), ou ver de verdade que paciente meu da academia registra sem eu ficar cobrando.",
+  "price_too_cheap": 19,
+  "price_cheap": 39,
+  "price_expensive": 79,
+  "price_too_expensive": 129
+}

@@ -1,0 +1,13 @@
+{
+  "id": "P011",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "Já pago um sistema, não quero pagar dois. E o que me atende hoje é WhatsApp, PDF e planilha, que funciona: eu respondo paciente à noite, depois do jantar, e não quero abrir mais um lugar para olhar.",
+  "objection": "Para a fila valer alguma coisa, o paciente precisa instalar o app e registrar todo dia, e meu paciente de musculação e corrida já me manda tudo pelo WhatsApp. Se só três de cinco registrarem, eu fiquei com um painel meio vazio, mais uma chamada na agenda e um sistema a mais para manter além do que eu já uso.",
+  "would_change_my_mind": "Se o paciente não precisasse instalar nada nem mudar de hábito e eu visse a fila funcionando com o meu paciente real, sem trocar o meu jeito de atender, eu testaria. Ajudaria também ver que ela substitui a minha planilha, em vez de somar uma coisa a mais.",
+  "price_too_cheap": 19,
+  "price_cheap": 39,
+  "price_expensive": 89,
+  "price_too_expensive": 149
+}
