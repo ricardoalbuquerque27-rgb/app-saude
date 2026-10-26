@@ -21,6 +21,7 @@ import { createClient } from "@/lib/supabase/client";
 import { PageHeader, Modal, Field, EmptyState } from "@/components/ui";
 import type { PatientSummary } from "@/lib/nutri";
 import { comSinal, numeroFixo } from "@/lib/numeros";
+import { textoDoConvite } from "@/lib/marca";
 
 export type LinkRow = {
   id: string;
@@ -85,7 +86,7 @@ export default function PacientesClient({
   }
 
   async function copyInvite(code: string) {
-    const text = `Você foi convidado(a) para acompanhar sua saúde comigo. Crie sua conta e use o código ${code} — ou abra: ${inviteLink(code)}`;
+    const text = textoDoConvite(code, inviteLink(code));
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
