@@ -61,7 +61,9 @@ Isso não é óbvio lendo a árvore de arquivos.
   páginas em `lib/paginacao.ts` (`lerEmPaginas`),
   `lib/temaClinico.ts` e `lib/temaApp.ts` com `lib/contraste.ts` (as duas
   paletas e a razão de contraste), a regra de senha nova em `lib/senha.ts`
-  (`problemaDaSenha`, `ehErroDeSenhaFraca`), as contas da Início e da Dieta do
+  (`problemaDaSenha`, `ehErroDeSenhaFraca`), a marca em `lib/marca.ts`
+  (`linkDaVaga`, `textoDoConvite`, e a guarda do nome) e o desenho do ícone em
+  `lib/appIcon.ts`, as contas da Início e da Dieta do
   paciente (`lib/paraHoje.ts`, `montarParaHoje`; `lib/cardapio.ts`,
   `sugestaoDeProteina`, `partesDaSugestao` e `textoDaSugestao`; `lib/anel.ts`,
   `rotuloDoAnel` e `avisoDoAnel`; `lib/healthScore.ts`, `computeHealthScore`,
@@ -69,6 +71,8 @@ Isso não é óbvio lendo a árvore de arquivos.
   banco falso no próprio arquivo)
   e, em `lib/nutri.ts`, a conta do resumo, da fila de triagem e da linha do
   tempo do nutri (`montarResumos`, `filaDeTriagem`, `montarLinhaDoTempo`),
+  os textos da fila (`textoDesvios`, `textoParado`, `textoFaltas`,
+  `textoSemConfirmacao`, `textoExames`, `TEXTO_DOSE_ATRASADA`),
   as médias da semana e a comparação com a meta (`mediasDaSemana`,
   `compararComMeta`), os textos de meta e de desvio (`textoDaMeta`,
   `textoDoDesvio`, `textoDoDesvioDoPlano`), a divisão dos avisos entre meta
@@ -351,8 +355,8 @@ antiga faria a instrução velha passar por atual.
 Spec: `docs/superpowers/specs/2026-10-14-visual-do-app-do-paciente-design.md`.
 O dono do produto achou o app do paciente "genérico" e "carregado": cor sem
 função em 30 arquivos, caixa dentro de caixa, degradê e brilho, duas letras. A
-linguagem nova ("calmo e confiável") vale no app inteiro; só a Início e a
-Dieta foram redesenhadas. **O lado clínico não muda na tela** (página do
+linguagem nova ("calmo e confiável") vale no app inteiro; foram redesenhadas a
+Início, a Dieta e a página de entrada (ver "Marca e página de entrada"). **O lado clínico não muda na tela** (página do
 paciente e agenda): quem prova é `tirar-prints-nutri.cjs`, e é por isso que
 as cópias de `.card`, `.input` e companhia sob `:where(.tema-clinico)` seguem
 em `globals.css`.
@@ -376,9 +380,9 @@ gramas em texto.
 
 **Uma letra só.** Instrument Sans (400 a 700) por `next/font` no layout raiz,
 variável `--font-sans`; `font-sans`, `font-display` e `font-clinico` apontam
-para ela (`font-display` só existe para a landing compilar). Saíram Inter e
-Sora. A landing recebeu só a letra, e seus degradês ficam até ela ser
-reescrita (ver "Em aberto"). O `next/font` renomeia a família
+para ela (`font-display` ficou sem classe que o use quando a landing saiu, mas
+segue no seletor dos títulos em `globals.css`). Saíram Inter e Sora. A página
+de entrada foi reescrita na linguagem do app em 26/10. O `next/font` renomeia a família
 (`__Instrument_Sans_…`): quem confere o `font-family` usa
 `/Instrument[ _]Sans/`.
 
@@ -578,11 +582,49 @@ deixando entrar essas contas com a regra ligada não foi conferido contra o
 servidor de verdade. A proteção contra senhas vazadas é só do plano Pro e está
 desligada (ver "Em aberto").
 
+## Marca e página de entrada
+
+Spec: `docs/superpowers/specs/2026-10-26-marca-e-pagina-da-nutricionista-design.md`.
+O nome definitivo ainda não existe, e o atual vai mudar: ele mora em
+`lib/marca.ts` (`NOME`, com `SLOGAN`, `TITULO` e `DESCRICAO`), e a guarda de
+`lib/marca.test.ts` acusa o nome escrito em qualquer outro arquivo de `app/`,
+`components/` ou `lib/` (chegou a estar em 23). À mão ficam só o
+`public/sw.js` (o comentário e o título padrão do push; o arquivo é estático e
+não lê código) e os títulos de página que o `tirar-prints-nutri.cjs` confere:
+trocou o `NOME`, troque os dois. O manifesto é `app/manifest.ts`, servido em
+`/manifest.webmanifest`.
+
+**O ícone é a lista com um marcado** (era um haltere, que dizia academia e
+reforçava "treino é do personal"). A geometria é `FORMAS_DA_MARCA`, em
+`lib/appIcon.ts`, com as cores do `TEMA_APP`: dela saem os PNG e o
+`MarcaIcone`, o símbolo das telas (entrar, redefinir senha, menu, Onboarding).
+O `public/icon.svg` é cópia, conferida por teste. O haltere ficou só em
+Treinos.
+
+**A página `/` é da nutricionista**, estática e sem banco (a de consumidor e a
+`/recursos` saíram; `/recursos` responde 308 para `/`). Os textos da
+demonstração da fila saem das funções da fila (`textoDesvios` e companhia, em
+`lib/nutri.ts`), para a página nunca mostrar um alerta que a fila não
+escreve. Não tem preço, depoimento, número de usuários, "atende ao CFN" nem
+promessa de resultado. O botão "Quero uma vaga de implantação" abre o WhatsApp
+do fundador pelo `NEXT_PUBLIC_WHATSAPP_VAGAS`, configurado na Vercel:
+- aceita 10 ou 11 dígitos (DDD e número) ou 12 ou 13 começando com 55, escritos
+  de qualquer jeito (`linkDaVaga`);
+- qualquer outra coisa (o 0 de tronco, "011 9…", por exemplo) dá "As vagas de
+  implantação abrem em breve.", **sem erro em lugar nenhum**: depois de mudar a
+  variável, olhe o botão na página publicada;
+- é `NEXT_PUBLIC_`, então entra no código no build: trocar o número pede um
+  deploy novo;
+- o número fica visível no link, para quem abrir: não é segredo.
+
+O convite do paciente (`textoDoConvite`, em `PacientesClient`) diz o que ele
+vai fazer e que o app é de graça.
+
 ## Comandos
 
 ```bash
 npm run dev      # desenvolvimento
-npm test         # 1043 testes unitários (vitest)
+npm test         # 1070 testes unitários (vitest)
 ferramentas/testar-sql.sh   # migrações e testes SQL num Postgres local
 npm run build    # produção
 ```
@@ -593,9 +635,10 @@ logadas num ambiente sem acesso ao banco. Para a página do paciente do
 nutricionista, o mock com `CENARIO=carteira` e
 `ferramentas/tirar-prints-nutri.cjs`. Para o app do paciente, o mock sem
 cenário e `tirar-prints.cjs`, `conferir-inicio.cjs`, `conferir-dieta.cjs`,
-`conferir-consulta-paciente.cjs` e `conferir-treinos.cjs`. Esses processos se
-param e se esperam pelo PID, nunca por `pkill -f` nem `until ! pgrep -f` (o laço
-casa consigo mesmo e não termina): veja o LEIAME.
+`conferir-consulta-paciente.cjs` e `conferir-treinos.cjs`. Para a página de
+entrada e a tela de entrar, `conferir-entrada.cjs`, sem login nem cenário.
+Esses processos se param e se esperam pelo PID, nunca por `pkill -f` nem
+`until ! pgrep -f` (o laço casa consigo mesmo e não termina): veja o LEIAME.
 
 **Skills de negócio** (`.claude/skills/founder-*`, `/founder-board`, `/founder-cfo`
 e mais nove): o pacote Founder, de terceiros (MIT, origem e commit em
@@ -676,7 +719,7 @@ Modal fora do lugar: procure um `transform` num ancestral.
   aos dois temas** (no claro só `brand-700+` passa em contraste; no escuro
   só `brand-600` para trás). No app do paciente o par já está dentro das
   variáveis `app-*` (ver "Visual do app"), sem `dark:`; o par `brand-*` com
-  `dark:` sobra na landing (com o `MobileMenu` dela), na `/estilo` e em poucos
+  `dark:` sobra na `/estilo` e em poucos
   componentes: os editores clínicos (`MealPlanEditor`, `TemplateBar`,
   `clinico/EditorTreino` e `clinico/Conversa`) e o `FoodSearch` (que a Dieta do
   paciente também usa). A rota `/estilo`, só em desenvolvimento, mostra a escala
@@ -701,10 +744,6 @@ Modal fora do lugar: procure um `transform` num ancestral.
 - **Nenhum nutricionista real usou o produto.** É a maior incerteza, e
   nenhuma ferramenta resolve. A página do paciente foi aprovada pelo dono do
   produto, não por um nutricionista.
-- A landing fala com consumidor final, não com nutricionista, e só recebeu a
-  letra nova: segue com os degradês e animações do visual antigo (a spec do
-  visual deixou assim até ela ser reescrita), e por isso tem `brand-*`,
-  `uppercase` e cor decorativa que o app do paciente não tem mais.
 - Sem Web Push (falta VAPID) e sem cobrança.
 - Conta de teste (`Maria Souza (teste)`) e a rota `/estilo` precisam sair
   antes de usuários reais.
