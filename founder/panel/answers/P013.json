@@ -1,0 +1,13 @@
+{
+  "id": "P013",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "price",
+  "reason": "Eu abriria os 30 dias grátis porque não pede cartão, mas pagar R$ 79 por mês depois eu não pagaria: eu uso plano grátis ou promoção e cancelo quando o preço sobe. A fila de quem parou de registrar até me interessa para os meus pacientes online, mas isso eu resolvo hoje com WhatsApp e planilha de graça.",
+  "objection": "Prescrever treino é do personal, não meu. Pagar R$ 79 por um app que traz treino, agenda e prontuário, coisa que eu em boa parte já faço de outro jeito, e que só vale se os meus pacientes realmente usarem, porque se eles não registrarem a fila fica vazia.",
+  "would_change_my_mind": "Um plano grátis de verdade para poucos pacientes (uns 5 a 10 ativos), ou um preço bem mais baixo, perto de R$ 39, para eu levar só a parte de alimentação e a fila de atenção sem pagar pelo treino.",
+  "price_too_cheap": 15,
+  "price_cheap": 39,
+  "price_expensive": 79,
+  "price_too_expensive": 120
+}

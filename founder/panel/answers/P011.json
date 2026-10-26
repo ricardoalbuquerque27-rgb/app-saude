@@ -1,0 +1,13 @@
+{
+  "id": "P011",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "Eu já tenho meu esquema com WhatsApp e planilha, e o PDF do plano, e nunca paguei software de nutrição. Não vou pagar por um segundo sistema para fazer o que já resolvo à noite depois do jantar.",
+  "objection": "Meu paciente já me responde no WhatsApp. Se eu pedir para ele baixar ou abrir mais um app, metade não vai usar, e aí eu pago R$ 79 por mês e continuo no WhatsApp do mesmo jeito, só que com duas coisas para olhar.",
+  "would_change_my_mind": "Testar com três ou quatro pacientes meus nos 30 dias grátis e ver que eles de fato registram e respondem ali, de modo que eu consiga largar a planilha e o PDF. Aí sim eu pagaria.",
+  "price_too_cheap": 25,
+  "price_cheap": 49,
+  "price_expensive": 99,
+  "price_too_expensive": 150
+}

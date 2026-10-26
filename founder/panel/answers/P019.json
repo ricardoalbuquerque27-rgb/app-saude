@@ -1,0 +1,13 @@
+{
+  "id": "P019",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "Já pago Dietbox, monto o plano na consulta e meus pacientes já usam o app deles; estou no meio da assinatura e não vou pagar dois sistemas nem refazer a rotina de uma agenda cheia por causa de uma fila de atenção.",
+  "objection": "Trocar de sistema dá trabalho e eu perco o histórico: anos de pacientes, planos e consultas no Dietbox, e nada aqui diz que dá para trazer isso. Ainda teria de convencer cada paciente a instalar outro app.",
+  "would_change_my_mind": "Importar meus pacientes, planos e histórico do Dietbox sem eu digitar nada, e poder usar o Pace Fit só para o acompanhamento entre consultas por um preço baixo, sem cancelar o que já pago até o fim da assinatura.",
+  "price_too_cheap": 25,
+  "price_cheap": 45,
+  "price_expensive": 89,
+  "price_too_expensive": 130
+}
