@@ -21,6 +21,12 @@ import {
   separarDesvios,
   textoDoDesvioDoPlano,
   papelDasCalorias,
+  TEXTO_DOSE_ATRASADA,
+  textoDesvios,
+  textoParado,
+  textoFaltas,
+  textoSemConfirmacao,
+  textoExames,
   type DadosResumo,
   type DadosAtividade,
   type DailySeries,
@@ -1295,5 +1301,30 @@ describe("papelDasCalorias", () => {
   it("meta de peso com duas casas: 0,51 kg já está fora", () => {
     expect(papelDasCalorias(66.51, 66)).toBe("limite");
     expect(papelDasCalorias(65.49, 66)).toBe("meta");
+  });
+});
+
+describe("textos da fila", () => {
+  it("dose", () => expect(TEXTO_DOSE_ATRASADA).toBe("Dose atrasada"));
+  it("mudanças na prescrição", () => {
+    expect(textoDesvios(1)).toBe("1 mudança na sua prescrição");
+    expect(textoDesvios(2)).toBe("2 mudanças na sua prescrição");
+  });
+  it("parado", () => {
+    expect(textoParado(null)).toBe("Nunca registrou nada");
+    expect(textoParado(1)).toBe("1 dia sem registrar");
+    expect(textoParado(5)).toBe("5 dias sem registrar");
+  });
+  it("faltas", () => {
+    expect(textoFaltas(1)).toBe("Faltou a 1 treino (7d)");
+    expect(textoFaltas(2)).toBe("Faltou a 2 treinos (7d)");
+  });
+  it("sem confirmação", () => {
+    expect(textoSemConfirmacao(1)).toBe("1 treino sem confirmação (7d)");
+    expect(textoSemConfirmacao(2)).toBe("2 treinos sem confirmação (7d)");
+  });
+  it("exames", () => {
+    expect(textoExames(1)).toBe("1 exame fora da referência");
+    expect(textoExames(2)).toBe("2 exames fora da referência");
   });
 });

@@ -15,6 +15,34 @@ export type TipoAlerta = "dose" | "prescricao" | "parado" | "treino" | "exame" |
 
 export type Alerta = { tipo: TipoAlerta; nivel: number; texto: string };
 
+// Os textos da fila, numa função cada. A demonstração da página de entrada
+// usa as mesmas funções, para a página nunca mostrar um texto que a fila não
+// escreve. O singular existe também onde a fila não o pede (o parado só aparece
+// a partir de 3 dias, o sem confirmação a partir de 2), porque a função é
+// exportada e "1 dias" seria erro de quem a chamar.
+export const TEXTO_DOSE_ATRASADA = "Dose atrasada";
+
+export function textoDesvios(n: number): string {
+  return `${n} ${n > 1 ? "mudanças" : "mudança"} na sua prescrição`;
+}
+
+export function textoParado(dias: number | null): string {
+  if (dias == null) return "Nunca registrou nada";
+  return `${dias} ${dias === 1 ? "dia" : "dias"} sem registrar`;
+}
+
+export function textoFaltas(n: number): string {
+  return `Faltou a ${n} treino${n > 1 ? "s" : ""} (7d)`;
+}
+
+export function textoSemConfirmacao(n: number): string {
+  return `${n} ${n === 1 ? "treino" : "treinos"} sem confirmação (7d)`;
+}
+
+export function textoExames(n: number): string {
+  return `${n} exame${n > 1 ? "s" : ""} fora da referência`;
+}
+
 export type PatientSummary = {
   id: string;
   name: string;
@@ -380,13 +408,8 @@ export function montarResumos(
     // Do mais grave para o menos grave: a Início e a lista de pacientes só
     // mostram os dois primeiros. Exame fica por último porque o alerta dura
     // 180 dias e não some quando o exame é refeito.
-    if (doseOverdue) alertar("dose", 1, "Dose atrasada");
-    if (summary.desvios > 0)
-      alertar(
-        "prescricao",
-        2,
-        `${summary.desvios} ${summary.desvios > 1 ? "mudanças" : "mudança"} na sua prescrição`
-      );
+    if (doseOverdue) alertar("dose", 1, TEXTO_DOSE_ATRASADA);
+    if (summary.desvios > 0) alertar("prescricao", 2, textoDesvios(summary.desvios));
     // Pedido (nível 2) logo aqui; sem desfecho (nível 4) depois dos treinos,
     // para a lista seguir em ordem de nível.
     const deConsulta = alertasDeConsulta(
@@ -396,23 +419,12 @@ export function montarResumos(
     for (const a of deConsulta) if (a.nivel <= 2) alertar(a.tipo, a.nivel, a.texto);
 
     const idle = idleDays(summary, today);
-    if (idle == null) alertar("parado", 3, "Nunca registrou nada");
-    else if (idle >= 3) alertar("parado", 3, `${idle} dias sem registrar`);
-    if (summary.planFaltas7 > 0)
-      alertar(
-        "treino",
-        4,
-        `Faltou a ${summary.planFaltas7} treino${summary.planFaltas7 > 1 ? "s" : ""} (7d)`
-      );
+    if (idle == null || idle >= 3) alertar("parado", 3, textoParado(idle));
+    if (summary.planFaltas7 > 0) alertar("treino", 4, textoFaltas(summary.planFaltas7));
     if (summary.planSemResposta7 >= 2)
-      alertar("treino", 4, `${summary.planSemResposta7} treinos sem confirmação (7d)`);
+      alertar("treino", 4, textoSemConfirmacao(summary.planSemResposta7));
     for (const a of deConsulta) if (a.nivel > 2) alertar(a.tipo, a.nivel, a.texto);
-    if (summary.alteredExams > 0)
-      alertar(
-        "exame",
-        5,
-        `${summary.alteredExams} exame${summary.alteredExams > 1 ? "s" : ""} fora da referência`
-      );
+    if (summary.alteredExams > 0) alertar("exame", 5, textoExames(summary.alteredExams));
 
     return summary;
   });
