@@ -1,0 +1,71 @@
+{
+ "business": "Pace Fit com um canal hipotético (5 implantações por mês a partir do mês 3)",
+ "unit": "nutricionista pagante",
+ "price": 69.9,
+ "variable": [
+  {
+   "label": "Simples Nacional, Anexo V, 15,5% (sem pró-labore o Fator R fica abaixo de 28%; estimativa)",
+   "cost": 10.83
+  },
+  {
+   "label": "Asaas, cartão: 2,99% + R$ 0,49 por cobrança",
+   "cost": 2.58
+  },
+  {
+   "label": "IA (Groq e Gemini, plano pago): 15 pacientes a R$ 0,84 cada (estimativa)",
+   "cost": 12.65
+  }
+ ],
+ "fixed_monthly": [
+  {
+   "label": "Supabase Pro (US$ 25; o crédito de US$ 10 cobre o banco Micro)",
+   "cost": 126.0
+  },
+  {
+   "label": "Vercel Pro (US$ 20 por pessoa; o Hobby não permite uso comercial)",
+   "cost": 100.8
+  },
+  {
+   "label": "IOF de 3,5% nas faturas em dólar (a conferir)",
+   "cost": 7.94
+  },
+  {
+   "label": "Contador online, Simples Nacional (Contajá, a partir de)",
+   "cost": 137.0
+  },
+  {
+   "label": "Domínio .com.br (R$ 40 por ano; estimativa)",
+   "cost": 3.33
+  }
+ ],
+ "startup": [
+  {
+   "label": "Abertura da empresa (grátis no plano Contajá Total)",
+   "cost": 0
+  },
+  {
+   "label": "Política de privacidade e termos de uso com advogado (sem cotação; estimativa)",
+   "cost": 2000
+  },
+  {
+   "label": "Certificado digital e-CNPJ A1 (sem cotação; estimativa)",
+   "cost": 200
+  }
+ ],
+ "days_per_month": 1,
+ "plan_per_day": 19.69,
+ "ramp_per_day": [
+  0.0,
+  2.0,
+  1.9,
+  4.3,
+  6.59,
+  8.76,
+  10.82,
+  12.78,
+  14.64,
+  16.41,
+  18.09,
+  19.69
+ ]
+}
