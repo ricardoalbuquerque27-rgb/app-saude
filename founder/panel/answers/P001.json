@@ -1,0 +1,13 @@
+{
+  "id": "P001",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "trust",
+  "reason": "Eu só assino ferramenta que as colegas do grupo já usam e recomendam, e ninguém lá comentou desse app. Testar 30 dias de graça eu até testaria, mas pagar R$ 79 por mês num app que eu nunca vi uma colega usar, não.",
+  "objection": "Meu paciente não vai registrar todo dia num app. Eu já respondo paciente no WhatsApp à noite e funciona; se ele não abrir o app, a fila de atenção fica vazia e eu estou pagando por nada.",
+  "would_change_my_mind": "Duas ou três colegas do grupo de nutricionistas dizendo que usam e que os pacientes dela realmente registram, ou eu ver na prática um paciente meu registrando por duas semanas no teste grátis.",
+  "price_too_cheap": 19,
+  "price_cheap": 49,
+  "price_expensive": 99,
+  "price_too_expensive": 149
+}

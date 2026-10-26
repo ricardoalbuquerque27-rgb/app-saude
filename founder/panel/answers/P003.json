@@ -1,0 +1,13 @@
+{
+  "id": "P003",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "trust",
+  "reason": "Já pago Dietbox, monto o plano lá na consulta e meu paciente já usa o app dele. Os dados dos meus pacientes são prontuário, e eu não vou botar isso numa empresa que acabou de aparecer só porque tem uma fila bonita.",
+  "objection": "Empresa nova: e se sumir com os dados dos meus pacientes? Eu estaria pagando R$ 79 por cima do Dietbox, ainda teria que convencer o paciente a baixar outro app, e o prontuário com meu CRN ficaria preso num sistema que pode fechar em seis meses. Nada aqui diz que dá para exportar tudo.",
+  "would_change_my_mind": "Poder exportar todos os dados e prontuários a qualquer momento, ver colegas de CRN que eu conheço usando há mais de um ano, e uma promessa clara sobre onde ficam os dados do paciente (LGPD). Se ainda importasse meus pacientes do Dietbox sem eu digitar tudo de novo, eu testaria nos 30 dias grátis.",
+  "price_too_cheap": 19,
+  "price_cheap": 39,
+  "price_expensive": 79,
+  "price_too_expensive": 120
+}

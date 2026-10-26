@@ -1,0 +1,13 @@
+{
+  "id": "P004",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "need",
+  "reason": "Hoje eu resolvo com WhatsApp e planilha e mando o plano em PDF, e com poucos pacientes ativos isso dá conta. Metade do que o app promete é prescrever treino, e isso é do personal da academia, não meu.",
+  "objection": "Tenho poucos pacientes, então R$ 79 por mês pesa e eu nunca paguei software de nutrição. Ainda por cima, a parte de treino eu não uso. Não vejo o que eu ganho que o WhatsApp não faça de graça.",
+  "would_change_my_mind": "Um plano barato para quem está começando, com pouco paciente, e a parte de treino opcional ou ligada ao personal da academia, para ele prescrever e eu só acompanhar. Ver outra nutri iniciante usando e me poupando tempo à noite no WhatsApp também ajudaria.",
+  "price_too_cheap": 15,
+  "price_cheap": 29,
+  "price_expensive": 49,
+  "price_too_expensive": 79
+}
