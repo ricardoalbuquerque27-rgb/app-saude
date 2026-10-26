@@ -125,7 +125,55 @@ Notas de 1 a 10. Nas quatro linhas, mais alto é melhor para o comprador:
 
 ## O reteste
 
-(a preencher com o resultado do painel `founder/panel-oferta`)
+Mesmas 20 cartas da primeira rodada (semente 159337), em `founder/panel-oferta`.
+Só a objeção de preço do P018 perdeu o "R$ 79", como na rodada B. O pitch
+mudou junto com o preço (R$ 79 para R$ 69,90), por decisão do fundador. Por
+isso o que mudou não dá para atribuir só à oferta.
+
+**3 compram e 17 não**, contra 0 de 20 antes. Mas os três (P007, P016, P020)
+dizem com todas as letras que o "sim" é entrar nos 30 dias grátis, não pagar no
+dia 31:
+
+- P020: "se ele não registrar sem eu ficar cobrando no WhatsApp, cancelo antes do
+  dia 30";
+- P016 entra "porque é grátis, sem cartão, e sem migrar ninguém".
+
+**Intenção de pagar: continua zero.** O que a oferta ganhou foi a entrada no
+teste, que é onde a decisão acontece.
+
+| tema da objeção | antes (R$ 79) | depois (R$ 69,90) |
+| --- | ---: | ---: |
+| o paciente não vai registrar, ou não vai instalar mais um app | 14 | 15 |
+| já pago um sistema, dois sistemas, perco o histórico | 9 | 6 |
+| empresa nova: os dados, a LGPD, onde ficam | 6 | 5 |
+| treino é do personal (todos com a frase na carta) | 4 | 5 |
+| R$ do pitch igual ou acima do "caro demais" | 6 | 0 |
+| não tenho tempo para as chamadas da implantação | 0 | 3 |
+
+- **Caiu:** o preço deixou de travar para todos, e a migração caiu de 9 para 6,
+  com o "não precisa migrar ninguém".
+- **Subiu o valor percebido, mesmo com o preço mais baixo.** A mediana de
+  "começa a ficar caro" foi de R$ 79 para R$ 84,50, e a de "caro demais", de
+  R$ 120 para R$ 135. Parte pode ser âncora, porque o comprador simulado puxa a
+  resposta para o preço que leu.
+- **Não mexeu:** o paciente que não registra (15) e os dados (5). Nos dados, a
+  objeção agora aponta o buraco que ficou. P009: "nada na oferta me diz onde o
+  dado fica guardado nem se eu consigo tirar tudo de lá."
+- **Apareceu:** a implantação também custa tempo da nutricionista. P015: "não
+  tenho tempo pra implantação e chamada nos dias 1, 7 e 14."
+- **E um alerta sobre o tamanho do teste.** P014: "Com 3 a 5 pacientes eu não
+  preciso de uma fila para saber quem parou." A fila vale com muitos pacientes,
+  e o teste começa com poucos. É um comprador só, mas a lógica vale para todos.
+
+**Leitura:** a oferta tirou o preço e parte da migração do caminho e trouxe três
+compradores para o teste grátis. O que decide a compra continua fora dela:
+- o paciente registrar, que é produto (push, check-in semanal) e piloto real;
+- a confiança nos dados, que é a exportação e a política de privacidade, hoje
+  em análise.
+
+Antes do reteste, a equação de valor dava a "chance de dar certo" subindo de 2
+para 5. O painel não confirma essa subida: os 3 que entram ainda duvidam do
+registro.
 
 ## Em análise
 
