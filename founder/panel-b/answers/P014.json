@@ -1,0 +1,13 @@
+{
+  "id": "P014",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "Hoje eu tenho poucos pacientes ativos e dou conta pelo WhatsApp e pela planilha, então a tal fila de quem precisa de mim resolve um problema que eu ainda quase não tenho. Os R$ 39 não pesam, o que pesa é fazer paciente baixar mais um app e eu abrir mais uma tela.",
+  "objection": "Meu paciente já responde no WhatsApp, e eu não sei se ele vai de fato registrar num app à parte sem eu ficar cobrando. Aí a fila fica vazia ou mentirosa e eu volto pro WhatsApp. Também fico com um pé atrás de uma IA conversando com meu paciente em nome do meu plano.",
+  "would_change_my_mind": "Ver, no teste grátis, dois ou três pacientes meus registrando sozinhos e a fila me avisando de alguém que eu teria deixado passar. Se isso acontecer, eu pago os R$ 39 sem pensar.",
+  "price_too_cheap": 10,
+  "price_cheap": 20,
+  "price_expensive": 60,
+  "price_too_expensive": 90
+}

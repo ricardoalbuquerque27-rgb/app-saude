@@ -1,0 +1,13 @@
+{
+  "id": "P019",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "O preço não é o problema, R$ 39 eu nem sinto. Mas meus pacientes já usam o app do meu sistema, eu já lanço tudo lá, e ter que convidar todo mundo para um segundo app e digitar as metas em dois lugares é trabalho a mais que eu não tenho na agenda. Estou no meio da assinatura do meu sistema e não vou mexer na minha rotina agora.",
+  "objection": "Vou ter metas e paciente em dois lugares, e se o paciente não abrir o segundo app a fila não me diz nada. Já tenho trabalho demais para vigiar mais uma tela.",
+  "would_change_my_mind": "Ver funcionando com o Dietbox ou o WebDiet de verdade: importar meus pacientes e as metas de lá sem eu redigitar, e o paciente usando um app só.",
+  "price_too_cheap": 15,
+  "price_cheap": 29,
+  "price_expensive": 69,
+  "price_too_expensive": 129
+}

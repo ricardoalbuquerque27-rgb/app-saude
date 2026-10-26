@@ -1,0 +1,13 @@
+{
+  "id": "P020",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "Eu abriria o teste de 30 dias, porque faço isso com tudo, mas pagar depois é outra história. Meu acompanhamento já roda no WhatsApp à noite, e para o Pace Fit valer R$ 39 eu precisaria convencer os pacientes a baixar e registrar num app a mais.",
+  "objection": "Vou lançar meta em dois lugares e ainda depender do paciente abrir outro app, quando ele já me responde no WhatsApp. Se só uns poucos aderirem, a fila de quem parou de registrar fica vazia e eu estou pagando por um painel sem dado.",
+  "would_change_my_mind": "Ver, ainda no teste, uns 5 pacientes meus registrando de verdade e a fila apontando alguém que eu teria deixado passar. Ajudaria também importar as metas do sistema que eu já uso, sem digitar tudo de novo.",
+  "price_too_cheap": 12,
+  "price_cheap": 29,
+  "price_expensive": 69,
+  "price_too_expensive": 119
+}

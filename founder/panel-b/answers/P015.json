@@ -1,0 +1,13 @@
+{
+  "id": "P015",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "Já pago um sistema e já falo com paciente no WhatsApp à noite, então não quero pagar dois nem ter que lançar meta em dois lugares. Os 30 dias grátis eu até testava, mas eu uso a promoção e cancelo quando o preço sobe, e aqui eu cancelaria antes de cobrar.",
+  "objection": "Já pago um sistema, não quero pagar dois. E ainda ia ter que convencer o paciente a instalar mais um app e repetir no Pace Fit o que já está no meu sistema.",
+  "would_change_my_mind": "Um plano grátis de verdade, que não acabe depois dos 30 dias, pelo menos pra uns poucos pacientes.",
+  "price_too_cheap": 9,
+  "price_cheap": 19,
+  "price_expensive": 39,
+  "price_too_expensive": 59
+}

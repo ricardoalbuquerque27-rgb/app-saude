@@ -1,0 +1,13 @@
+{
+  "id": "P017",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "Minha agenda está cheia e o WhatsApp com a planilha já funciona, nunca paguei software de nutrição e não tenho vontade de mudar a rotina de quem já me responde à noite. Colocar as metas de cada paciente em mais um lugar é trabalho a mais, e eu nem uso um sistema para ser complemento dele.",
+  "objection": "Empresa nova: e se sumir com os dados dos meus pacientes? E se meus pacientes nem abrirem o app e continuarem me mandando tudo no WhatsApp, eu fico com dois canais em vez de um.",
+  "would_change_my_mind": "Ver, num teste com poucos pacientes meus, que eles registram lá sozinhos sem eu ficar cobrando, e poder exportar tudo quando eu quiser.",
+  "price_too_cheap": 9,
+  "price_cheap": 19,
+  "price_expensive": 59,
+  "price_too_expensive": 99
+}
