@@ -82,8 +82,11 @@ Os memos: `founder/board/offers.md`, `founder/board/monopoly.md`,
       alcance dele já vende essa triagem. Feito em `founder/competitors.md`:
       já vende. Nutriform, NutriOS, LiveClin e DietSystem fazem check-in e
       alerta de R$ 29,90 a R$ 79,90 por mês, três deles pelo WhatsApp.
-- [ ] **Quanto custa um paciente grátis** (a Gaia tem custo por uso) e quantos
+- [x] **Quanto custa um paciente grátis** (a Gaia tem custo por uso) e quantos
       pacientes cabem numa assinatura antes de ela dar prejuízo (`/founder-cfo`).
+      Feito em `founder/cfo.md`, como estimativa: R$ 0,84 a R$ 1,22 por paciente
+      por mês no plano pago, e uns 46 a 67 pacientes por assinatura antes de ela
+      dar prejuízo sozinha.
 - [ ] **Nada de "atende ao CFN"** antes de ler o texto oficial da Resolução CFN
       594/2017.
 
