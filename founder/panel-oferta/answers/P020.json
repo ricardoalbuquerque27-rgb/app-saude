@@ -1,0 +1,13 @@
+{
+  "id": "P020",
+  "buys": true,
+  "purchases_first_month": 1,
+  "reason_code": "need",
+  "reason": "Não custa nada testar: 30 dias sem cartão e sem migrar ninguém, que era a minha maior trava. E saber quem do online sumiu entre uma consulta e outra é coisa que hoje eu descubro por acaso, no WhatsApp. Eu assino o teste; não prometo que pago no dia 31.",
+  "objection": "Meu paciente já fala comigo no WhatsApp. Vou ter que fazer ele instalar mais um app e registrar tudo lá, e se ele não registrar a fila não mostra nada. Aí vira mais um sistema do lado do que eu já uso, e eu fico com dois.",
+  "would_change_my_mind": "Se os pacientes não registrarem sem eu ficar cobrando no WhatsApp, eu cancelo antes do dia 30.",
+  "price_too_cheap": 19,
+  "price_cheap": 39,
+  "price_expensive": 90,
+  "price_too_expensive": 150
+}
