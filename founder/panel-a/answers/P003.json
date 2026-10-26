@@ -1,0 +1,13 @@
+{
+  "id": "P003",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "trust",
+  "reason": "Já pago o Dietbox, monto o plano na consulta e meus pacientes já estão lá, no meio da assinatura. Passar o histórico deles para uma empresa que eu nunca ouvi falar, por mais R$ 79, não vale o risco.",
+  "objection": "Empresa nova: e se sumir com os dados dos meus pacientes? Prontuário com meu CRN não é coisa que eu quero refazer em outro lugar. E eu pagaria os dois ao mesmo tempo, porque o Dietbox eu já paguei.",
+  "would_change_my_mind": "Poder exportar tudo (pacientes, planos e prontuários) para um arquivo meu quando eu quiser, e ver uma colega que eu conheço usando há alguns meses sem problema.",
+  "price_too_cheap": 20,
+  "price_cheap": 45,
+  "price_expensive": 89,
+  "price_too_expensive": 130
+}

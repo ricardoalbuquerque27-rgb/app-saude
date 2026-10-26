@@ -1,0 +1,13 @@
+{
+  "id": "P005",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "trust",
+  "reason": "Eu só assino o que as colegas do grupo já usam e recomendam, e aqui não vejo ninguém que eu conheça usando. E a parte de prescrever treino não é comigo, isso é do personal; então metade do que me mostram eu não ia usar.",
+  "objection": "Não sei se alguma colega minha usa isso. Sem alguém do grupo me dizendo que funciona no consultório de verdade, eu não ponho meus pacientes e meus registros de consulta num sistema novo.",
+  "would_change_my_mind": "Duas ou três colegas do meu grupo de nutricionistas me dizerem que usam e recomendam, e eu poder ver que o treino é opcional e não atrapalha o meu fluxo de cardápio e retorno.",
+  "price_too_cheap": 30,
+  "price_cheap": 55,
+  "price_expensive": 100,
+  "price_too_expensive": 160
+}

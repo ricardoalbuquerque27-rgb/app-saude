@@ -1,0 +1,13 @@
+{
+  "id": "P001",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "trust",
+  "reason": "Eu só assino o que as colegas do grupo já usam e recomendam, e ninguém lá falou desse app. Não vou ser o primeiro a pôr paciente meu num sistema que eu não vi funcionando na mão de outra nutri.",
+  "objection": "Meu paciente não vai registrar todo dia num app. Sem registro, a fila que me mostra quem parou de registrar vira uma lista de gente que eu já sei que não registra, e eu continuo respondendo no WhatsApp à noite do mesmo jeito.",
+  "would_change_my_mind": "Duas ou três colegas do meu grupo de nutricionistas dizerem que usam há alguns meses e que os pacientes delas realmente registram.",
+  "price_too_cheap": 25,
+  "price_cheap": 45,
+  "price_expensive": 90,
+  "price_too_expensive": 130
+}
