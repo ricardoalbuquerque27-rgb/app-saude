@@ -1,0 +1,13 @@
+{
+  "id": "P004",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "need",
+  "reason": "Tenho poucos pacientes ativos e sei de cabeça quem sumiu, porque falo com eles no WhatsApp e vejo na academia. Nunca paguei software de nutrição e não vejo o que isso resolve que eu já não resolvo de graça.",
+  "objection": "Metade do que a fila promete é treino, e prescrever treino é do personal, não meu. Sobra o registro de refeição, que depende de o paciente instalar mais um app, e eu já brigo para ele me mandar foto no WhatsApp.",
+  "would_change_my_mind": "Ter bem mais pacientes ativos do que consigo acompanhar na planilha e no WhatsApp, a ponto de perder gente sem perceber.",
+  "price_too_cheap": 10,
+  "price_cheap": 25,
+  "price_expensive": 50,
+  "price_too_expensive": 80
+}

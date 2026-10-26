@@ -1,0 +1,13 @@
+{
+  "id": "P010",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "Já pedi diário alimentar e vi o paciente largar em duas semanas; app é o mesmo problema com outra cara. E tenho poucos pacientes ativos, então eu mesma consigo saber quem sumiu sem precisar de uma fila.",
+  "objection": "Meu paciente não vai registrar todo dia num app. Se ele não registrar, a fila não tem o que mostrar, e eu ainda fico com a cara de quem pediu mais uma tarefa pra ele.",
+  "would_change_my_mind": "Ver uma nutricionista parecida comigo, com poucos pacientes, dizendo que os pacientes dela continuaram registrando depois do primeiro mês, ou um jeito de o paciente registrar que dê menos trabalho do que o diário que eu já tentei.",
+  "price_too_cheap": 15,
+  "price_cheap": 29,
+  "price_expensive": 59,
+  "price_too_expensive": 99
+}

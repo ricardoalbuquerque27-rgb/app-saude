@@ -1,0 +1,13 @@
+{
+  "id": "P005",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "trust",
+  "reason": "Eu só assino o que as colegas do grupo já usam e recomendam, e aqui não vejo ninguém que eu conheça usando. Os 30 dias são grátis, mas o custo para mim é o meu tempo e pôr paciente meu num app que eu não sei se as colegas aprovam.",
+  "objection": "Ninguém do meu grupo de nutricionistas usa isso e não tenho como saber se é sério. Eu teria que convidar paciente meu para testar, e se der problema quem responde sou eu. Metade dos alertas fala de treino, e prescrever treino é do personal, não meu.",
+  "would_change_my_mind": "Duas ou três colegas do meu grupo, que atendem como eu, me dizerem que usam há meses e recomendam.",
+  "price_too_cheap": 25,
+  "price_cheap": 50,
+  "price_expensive": 110,
+  "price_too_expensive": 180
+}

@@ -1,0 +1,13 @@
+{
+  "id": "P007",
+  "buys": true,
+  "purchases_first_month": 1,
+  "reason_code": "habit",
+  "reason": "Eu assino teste grátis de tudo que aparece e 30 dias sem cartão não me custa nada, só a chamada de 30 minutos e convidar uns pacientes. Não é que eu esteja convencido: eu entro pelo grátis e só pago no mês 2 se o negócio provar que funciona.",
+  "objection": "Meu paciente não vai registrar todo dia num app. Eu tenho poucos pacientes e vejo cada um a cada 30 ou 45 dias, então se eles não registrarem a fila fica vazia ou mostra todo mundo parado, e aí eu troco de sistema.",
+  "would_change_my_mind": "",
+  "price_too_cheap": 15,
+  "price_cheap": 35,
+  "price_expensive": 80,
+  "price_too_expensive": 130
+}
