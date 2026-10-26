@@ -3,6 +3,7 @@ import { Instrument_Sans } from "next/font/google";
 import "./globals.css";
 import PwaRegister from "@/components/PwaRegister";
 import { cssDoTemaApp } from "@/lib/temaApp";
+import { NOME, TITULO, DESCRICAO } from "@/lib/marca";
 
 // Uma letra só no app inteiro (antes eram Inter no corpo e Sora nos títulos,
 // e a página do nutricionista tinha uma terceira instância própria). Instrument
@@ -14,14 +15,13 @@ const letra = Instrument_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Pace Fit — Treinos, Dieta e Saúde",
-  description:
-    "Acompanhe seus treinos, dieta, peso, hábitos e exames em um só lugar.",
+  title: TITULO,
+  description: DESCRICAO,
   manifest: "/manifest.webmanifest",
-  applicationName: "Pace Fit",
+  applicationName: NOME,
   appleWebApp: {
     capable: true,
-    title: "Pace Fit",
+    title: NOME,
     statusBarStyle: "black-translucent",
   },
 };

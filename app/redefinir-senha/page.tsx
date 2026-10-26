@@ -11,6 +11,7 @@ import {
   ehErroDeSenhaFraca,
   problemaDaSenha,
 } from "@/lib/senha";
+import { NOME } from "@/lib/marca";
 
 export default function RedefinirSenhaPage() {
   const [ready, setReady] = useState(false);
@@ -90,7 +91,7 @@ export default function RedefinirSenhaPage() {
           className="tappable mb-8 flex min-h-[44px] items-center justify-center gap-2.5"
         >
           <MarcaIcone tamanho={36} />
-          <span className="text-lg font-semibold text-app-texto">Pace Fit</span>
+          <span className="text-lg font-semibold text-app-texto">{NOME}</span>
         </Link>
 
         <div className="card">

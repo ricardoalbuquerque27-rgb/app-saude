@@ -26,6 +26,7 @@ import { ConversaENotas, type Foco } from "./secoes/ConversaENotas";
 import { ErroSecao } from "@/components/clinico/ErroSecao";
 import { LinkPacientes, SemAcesso } from "./secoes/SemAcesso";
 import { FOCO } from "@/components/clinico/estilos";
+import { NOME } from "@/lib/marca";
 
 export const dynamic = "force-dynamic";
 
@@ -39,7 +40,7 @@ export function generateMetadata({
 }) {
   const aba = abaDaUrl(searchParams?.aba);
   const rotulo = ABAS.find((a) => a.id === aba)?.rotulo ?? "Resumo";
-  return { title: `${rotulo} · Paciente · Pace Fit` };
+  return { title: `${rotulo} · Paciente · ${NOME}` };
 }
 
 // O detalhe do paciente, em abas por assunto: Resumo (fila e números),

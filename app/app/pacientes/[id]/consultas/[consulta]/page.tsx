@@ -24,11 +24,12 @@ import { ContextoDaConsulta } from "@/components/registro/ContextoDaConsulta";
 import { EditorRegistro } from "@/components/registro/EditorRegistro";
 import { RegistroConcluido } from "@/components/registro/RegistroConcluido";
 import { LinkPacientes, SemAcesso } from "../../secoes/SemAcesso";
+import { NOME } from "@/lib/marca";
 
 export const dynamic = "force-dynamic";
 
 export function generateMetadata() {
-  return { title: "Registro · Paciente · Pace Fit" };
+  return { title: `Registro · Paciente · ${NOME}` };
 }
 
 /** "1.800 kcal · 110 g de proteína · 2,5 L de água · peso alvo 62 kg" */

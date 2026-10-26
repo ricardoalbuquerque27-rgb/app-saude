@@ -22,9 +22,10 @@ import { textoDesdeUltima, tituloDesde } from "@/lib/desdeConsulta";
 import { aceitaObservar, comDireitoAoRegistro } from "@/lib/registro";
 import { getObservarDosPacientes, getRegistrosDasConsultas } from "@/lib/registroDb";
 import { Agenda } from "@/components/consultas/agenda/Agenda";
+import { NOME } from "@/lib/marca";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Agenda · Pace Fit" };
+export const metadata = { title: `Agenda · ${NOME}` };
 
 // A agenda do nutricionista (spec: docs/superpowers/specs/2026-10-13-consultas-e-agenda-design.md).
 // O servidor busca só o período que a vista mostra, as pendências de

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { withTimeout, isAbortError, parseModelJson } from "@/lib/aiHttp";
 import { todayISO, limitesDaJanela } from "@/lib/date";
+import { NOME } from "@/lib/marca";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -9,7 +10,7 @@ export const dynamic = "force-dynamic";
 const MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
 
 const SYSTEM =
-  "Você é uma inteligência de saúde do app Pace Fit. Sua especialidade é CONECTAR os dados de diferentes áreas " +
+  `Você é uma inteligência de saúde do app ${NOME}. Sua especialidade é CONECTAR os dados de diferentes áreas ` +
   "(exames, dieta, treino, hábitos, tratamento e peso) para gerar insights que isoladamente não apareceriam. " +
   "Ex.: ligar um exame alterado a um padrão da dieta, ou o sono ao desempenho nos treinos.\n\n" +
   "Regras:\n" +

@@ -30,6 +30,7 @@ import PageTransition from "@/components/PageTransition";
 import ChatWidget from "@/components/ChatWidget";
 import Onboarding from "@/components/Onboarding";
 import MarcaIcone from "@/components/MarcaIcone";
+import { NOME } from "@/lib/marca";
 
 // Navegação completa (usada na sidebar do desktop)
 const nav = [
@@ -203,7 +204,7 @@ export default function AppShell({
         <div className="flex items-center gap-2.5 px-1">
           <MarcaIcone tamanho={36} />
           <span className="text-lg font-bold tracking-tight text-app-texto">
-            Pace Fit
+            {NOME}
           </span>
         </div>
 
@@ -269,7 +270,7 @@ export default function AppShell({
           className="flex items-center gap-2 font-bold text-app-primaria"
         >
           <MarcaIcone tamanho={28} />
-          Pace Fit
+          {NOME}
         </Link>
         {/* 44 px de toque (eram 40), sem mexer um pixel no que se vê: o -my-0.5
             devolve os 4 px à barra (que é fixa e conta na rolagem das âncoras),

@@ -167,6 +167,38 @@ const semRolagemLateral = (page) =>
     ok(destino && new URL(destino, APP).pathname === "/", `e manda para / (${destino})`);
   });
 
+  await etapa("/manifest.webmanifest", async () => {
+    const r = await fetch(APP + "/manifest.webmanifest");
+    const m = await r.json();
+    ok(String(m.name).includes(NOME), `o name traz o nome (${m.name})`);
+    ok(m.short_name === NOME, `o short_name é o nome (${m.short_name})`);
+    ok(!(m.categories || []).includes("fitness"), `sem "fitness" nas categorias (${JSON.stringify(m.categories)})`);
+  });
+
+  await etapa("/icon-192.png", async () => {
+    const r = await fetch(APP + "/icon-192.png");
+    ok(r.status === 200, `responde 200 (${r.status})`);
+    ok((r.headers.get("content-type") || "").startsWith("image/png"), `é PNG (${r.headers.get("content-type")})`);
+  });
+
+  for (const [largura, altura] of [[1280, 800], [390, 844]]) {
+    await etapa(`/login em ${largura} px`, async () => {
+      const ctx = await b.newContext({ viewport: { width: largura, height: altura } });
+      const p = await ctx.newPage();
+      await p.goto(APP + "/login", { waitUntil: "networkidle", timeout: 120000 });
+      ok((await p.locator("svg.lucide-dumbbell").count()) === 0, "sem o haltere no lugar da marca");
+      // Há dois na página (o do painel lateral, só no computador, e o de cima
+      // do formulário, só no celular): basta um visível.
+      ok((await p.locator("svg[data-marca]:visible").count()) >= 1, "o símbolo novo aparece");
+      if (largura === 1280) {
+        const h2 = (await p.locator("h2").first().innerText()).trim();
+        ok(h2 === "O acompanhamento entre uma consulta e outra.", `o painel fala com os dois lados (${h2})`);
+        await p.screenshot({ path: path.join(OUT, "login-1280.png") });
+      }
+      await ctx.close();
+    });
+  }
+
   await b.close();
   const falhas = resultados.filter((r) => !r).length;
   console.log(`\nPrints em ${OUT}.`);

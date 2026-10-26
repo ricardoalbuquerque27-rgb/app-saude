@@ -1,4 +1,4 @@
-// Tipos do banco de dados Pace Fit.
+// Tipos do banco de dados.
 // Gerados a partir do schema do Supabase (mantidos em sincronia com a migration).
 
 export type Json =

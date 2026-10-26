@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { withTimeout, isAbortError, parseModelJson } from "@/lib/aiHttp";
 import { todayISO, limitesDaJanela } from "@/lib/date";
+import { NOME } from "@/lib/marca";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,7 +11,7 @@ export const dynamic = "force-dynamic";
 const MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
 
 const SYSTEM =
-  "Você é um coach de saúde, nutrição e treino analisando os dados dos últimos ~30 dias de um usuário do app Pace Fit. " +
+  `Você é um coach de saúde, nutrição e treino analisando os dados dos últimos ~30 dias de um usuário do app ${NOME}. ` +
   "Gere uma análise HONESTA, prática e motivadora, em português do Brasil. " +
   "Baseie-se APENAS nos dados fornecidos. Se houver poucos dados, diga isso e recomende o que a pessoa deveria começar a registrar. " +
   "Não invente números. Para alterações em exames, recomende procurar um médico/nutricionista — você não faz diagnóstico.\n\n" +

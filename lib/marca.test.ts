@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import { describe, it, expect } from "vitest";
 import { NOME, SLOGAN, TITULO, DESCRICAO, linkDaVaga, textoDoConvite } from "./marca";
 
@@ -43,5 +45,25 @@ describe("textoDoConvite", () => {
       `Oi! Vou acompanhar você entre as consultas pelo ${NOME}, um app de graça. Abra o link, crie sua conta e registre o que comer, a água e o peso; eu acompanho daqui. Se pedir um código, é este: AB12CD. ${link}`
     );
     expect(texto).not.toContain("convidado(a)");
+  });
+});
+
+function arquivos(dir: string): string[] {
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+    const p = path.join(dir, e.name);
+    return e.isDirectory() ? arquivos(p) : [p];
+  });
+}
+
+describe("o nome num lugar só", () => {
+  // O nome chegou a estar escrito à mão em 23 arquivos, e o definitivo ainda
+  // não existe: escrito fora daqui, ele ficaria velho na próxima troca.
+  it("o nome só está escrito em lib/marca.ts", () => {
+    const achados = ["app", "components", "lib"]
+      .flatMap(arquivos)
+      .filter((f) => /\.(ts|tsx|webmanifest)$/.test(f))
+      .filter((f) => !f.endsWith(".test.ts") && f !== path.join("lib", "marca.ts"))
+      .filter((f) => fs.readFileSync(f, "utf8").includes(NOME));
+    expect(achados).toEqual([]);
   });
 });

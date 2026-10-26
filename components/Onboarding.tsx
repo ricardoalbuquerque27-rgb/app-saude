@@ -14,6 +14,7 @@ import { createClient } from "@/lib/supabase/client";
 import { ensurePushSubscription } from "@/lib/pushClient";
 import { todayISO } from "@/lib/date";
 import MarcaIcone from "@/components/MarcaIcone";
+import { NOME } from "@/lib/marca";
 
 const MEDS = [
   "Ozempic (semaglutida)",
@@ -135,7 +136,7 @@ export default function Onboarding({ initialName }: { initialName?: string }) {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <MarcaIcone tamanho={32} />
-              <span className="font-semibold text-app-texto">Pace Fit</span>
+              <span className="font-semibold text-app-texto">{NOME}</span>
             </div>
             <button
               onClick={skip}
