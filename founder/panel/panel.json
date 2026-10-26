@@ -1,0 +1,91 @@
+{
+ "n": 20,
+ "seed": 159337,
+ "customer": {
+  "business": "Pace Fit (app para o nutricionista acompanhar os pacientes entre as consultas)",
+  "target": "nutricionistas que atendem sozinhos no Brasil, presencial ou online, de consultório ou de nutrição esportiva; pensam e escrevem em português, e toda renda e todo preço aqui são em reais (R$)",
+  "where": "Brasil, online",
+  "age": [
+   23,
+   45
+  ],
+  "_fontes": "Renda: palpite ancorado na média do CFN (R$ 4.831,62 por mês, tabelas de 2017, https://cfn.org.br/wp-content/uploads/repositorirob/pdf/Pesquisa.pdf) e nas faixas de R$ 3.000 a R$ 10.000 por mês de blogs sem metodologia. Fatias de segmento e de comportamento: palpite. Objeções: das reclamações em founder/competitors.md e dos riscos em founder/board.md. Nenhum dado vem de nutricionista real.",
+  "segments": [
+   {
+    "name": "Consultório, começando (até 3 anos de formada, poucos pacientes ativos)",
+    "share": 0.3,
+    "income": [
+     30000,
+     60000
+    ]
+   },
+   {
+    "name": "Consultório, consolidada (agenda cheia, retornos todo mês)",
+    "share": 0.3,
+    "income": [
+     60000,
+     150000
+    ]
+   },
+   {
+    "name": "Nutrição esportiva (pacientes de musculação e corrida, parte online)",
+    "share": 0.4,
+    "income": [
+     45000,
+     130000
+    ]
+   }
+  ],
+  "behaviours": [
+   {
+    "name": "Já paga Dietbox ou WebDiet",
+    "share": 0.3,
+    "how": "Monta o plano alimentar no sistema durante a consulta e o paciente usa o app dele; está no meio da assinatura."
+   },
+   {
+    "name": "Acompanha pelo WhatsApp e planilha",
+    "share": 0.2,
+    "how": "Nunca pagou software de nutrição; manda o plano em PDF e responde dúvida no WhatsApp à noite."
+   },
+   {
+    "name": "Não acredita em app para o paciente",
+    "share": 0.15,
+    "how": "Já pediu diário alimentar e viu o paciente largar em duas semanas."
+   },
+   {
+    "name": "Caça preço",
+    "share": 0.15,
+    "how": "Usa o plano grátis ou a promoção dos primeiros meses e cancela quando o preço sobe."
+   },
+   {
+    "name": "Testa ferramenta nova",
+    "share": 0.1,
+    "how": "Assina o teste grátis de tudo que aparece no Instagram e troca de sistema sem dó."
+   },
+   {
+    "name": "Pergunta às colegas antes",
+    "share": 0.1,
+    "how": "Só assina o que as colegas do grupo de nutricionistas já usam e recomendam."
+   }
+  ],
+  "objections": [
+   "Meu paciente não vai registrar todo dia num app",
+   "Já pago um sistema, não quero pagar dois",
+   "Sem lembrete no WhatsApp, o paciente esquece",
+   "Empresa nova: e se sumir com os dados dos meus pacientes?",
+   "Trocar de sistema dá trabalho, e eu perco o histórico",
+   "R$ 79 por mês pesa com os poucos pacientes que eu tenho",
+   "Prescrever treino é do personal, não meu"
+  ],
+  "habits": [
+   "você atende três dias no consultório e dois online",
+   "você faz o retorno a cada 30 ou 45 dias",
+   "você responde paciente no WhatsApp à noite, depois do jantar",
+   "você divide a sala com outros profissionais de saúde",
+   "você atende dentro de uma academia, e boa parte dos pacientes treina lá",
+   "você posta no Instagram para trazer paciente novo",
+   "você vende o acompanhamento em pacotes de três meses"
+  ]
+ },
+ "pitch": "Pace Fit, um app para o nutricionista acompanhar os pacientes entre as consultas.\nNa tela inicial, uma fila mostra quais pacientes precisam de atenção: quem parou de registrar, quem tem exame alterado, quem pediu ou remarcou consulta, quem mudou a meta ou o treino que você prescreveu.\nVocê prescreve ali mesmo metas, cardápio e treino, e tem agenda, conversa com o paciente e o registro de cada consulta, concluído com o seu CRN.\nO paciente entra por um convite seu e usa de graça um app no navegador ou instalado no celular, onde registra refeições, água, peso e treino, também conversando com uma assistente de IA.\nR$ 79 por mês. 30 dias grátis, sem cartão. Online, em português."
+}
