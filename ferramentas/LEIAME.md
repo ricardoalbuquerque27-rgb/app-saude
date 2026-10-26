@@ -157,6 +157,12 @@ node ferramentas/conferir-entrada.cjs   # "As vagas de implantação abrem em br
 A variável é `NEXT_PUBLIC_` e entra na compilação: depois de mudá-la, pare o
 dev, `rm -rf .next` e suba de novo, senão o dev segue com o valor antigo.
 
+O dev renderiza a cada pedido e não mostra o que o build pré-renderiza: o
+`/recursos` estático respondia 308 sem o `Location` só em produção. Para ver o
+de produção, pare o dev, rode `npm run build` e `setsid npm start & START_PID=$!`
+(pare com `kill -- -$START_PID`) e o mesmo script, que lê `APP` (padrão
+`http://localhost:3000`).
+
 `conferir-dieta.cjs` faz o mesmo com a Dieta da Maria (mock sem cenário, dev no
 ar; `SO=regex` roda só as etapas cujo nome casa): o rótulo do dia ("Hoje, qui. 15/10") que abre o seletor de data pelo
 `showPicker()` e o `input type="date"` escondido (`max` em hoje, data futura e

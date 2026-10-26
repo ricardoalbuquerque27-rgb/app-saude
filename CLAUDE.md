@@ -602,7 +602,9 @@ O `public/icon.svg` é cópia, conferida por teste. O haltere ficou só em
 Treinos.
 
 **A página `/` é da nutricionista**, estática e sem banco (a de consumidor e a
-`/recursos` saíram; `/recursos` responde 308 para `/`). Os textos da
+`/recursos` saíram; `/recursos` responde 308 para `/`, e é dinâmica de
+propósito: estática, o build guardava o 308 sem o `Location`, e o dev não mostra
+isso). Os textos da
 demonstração da fila saem das funções da fila (`textoDesvios` e companhia, em
 `lib/nutri.ts`), para a página nunca mostrar um alerta que a fila não
 escreve. Não tem preço, depoimento, número de usuários, "atende ao CFN" nem
