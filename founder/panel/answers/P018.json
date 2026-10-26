@@ -1,0 +1,13 @@
+{
+  "id": "P018",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "Já pago o Dietbox e estou no meio da assinatura, e monto o plano na consulta no sistema que eu conheço. Pagar mais R$ 79 por um segundo app, só pelo acompanhamento entre as consultas, não fecha na minha conta.",
+  "objection": "Pagar duas ferramentas ao mesmo tempo. Eu teria que passar os pacientes e os planos para outro sistema, convidar um por um, e ainda manter o Dietbox até acabar o que já paguei. R$ 79 por mês pesa com os poucos pacientes que eu tenho, e eu não sei se o paciente vai de fato registrar alguma coisa.",
+  "would_change_my_mind": "Se ele substituísse o Dietbox por um valor menor ou igual ao que eu pago hoje, e eu pudesse trazer meus pacientes e planos sem refazer tudo na mão.",
+  "price_too_cheap": 15,
+  "price_cheap": 29,
+  "price_expensive": 59,
+  "price_too_expensive": 79
+}

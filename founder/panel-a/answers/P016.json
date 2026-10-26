@@ -1,0 +1,13 @@
+{
+  "id": "P016",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "need",
+  "reason": "Eu atendo gente de musculação e corrida, mas treino é do personal, então a parte de prescrever treino não me serve. Cardápio, meta e agenda eu já resolvo do meu jeito, e eu até testaria os 30 dias grátis, mas pagar R$ 79 todo mês eu não pago.",
+  "objection": "Pago R$ 79 por mês por um monte de coisa que eu já resolvo de graça ou mais barato, e uma parte dela, o treino, nem é meu papel. Eu vendo pacote de três meses, então não preciso de uma assinatura mensal que fica pesando quando o paciente some.",
+  "would_change_my_mind": "Um plano gratuito de verdade, ou uns R$ 39 por mês, sem a parte de treino, só com a fila de quem parou de registrar e o cardápio.",
+  "price_too_cheap": 15,
+  "price_cheap": 35,
+  "price_expensive": 65,
+  "price_too_expensive": 100
+}

@@ -137,6 +137,32 @@ sem as respostas a semana fica sem os botões do check-in e sem o "Confirmados",
 e "Tentar de novo" carrega. O check-in e o treino ao vivo de Treinos são do
 `conferir-inicio.cjs`.
 
+`conferir-entrada.cjs` confere a página de entrada (`/`, a da nutricionista) e a
+tela de entrar, sem login e com qualquer cenário (a página não lê o banco). Em
+390 e 1280 px, no claro e com o `.dark` que o app deixa no `<html>` ao sair: o
+`h1` é o slogan, a demonstração da fila tem as quatro linhas na ordem, sem
+rolagem lateral (também em 320 px) e só com cores `app-*`, sem caixa alta,
+degradê nem `<img>`. E mais: o `/recursos` responde 308 para `/`, o manifesto
+traz o nome e não "fitness", o `/icon-192.png` é PNG e o `/login` tem o
+símbolo novo, sem o haltere. O nome e o slogan saem de `lib/marca.ts`. O botão
+da vaga roda de dois jeitos:
+
+```bash
+# com o número: no .env.local, NEXT_PUBLIC_WHATSAPP_VAGAS=(11) 91234-5678
+VAGAS=5511912345678 node ferramentas/conferir-entrada.cjs   # os dois botões vão ao wa.me
+# sem o número no .env.local:
+node ferramentas/conferir-entrada.cjs   # "As vagas de implantação abrem em breve." duas vezes
+```
+
+A variável é `NEXT_PUBLIC_` e entra na compilação: depois de mudá-la, pare o
+dev, `rm -rf .next` e suba de novo, senão o dev segue com o valor antigo.
+
+O dev renderiza a cada pedido e não mostra o que o build pré-renderiza: o
+`/recursos` estático respondia 308 sem o `Location` só em produção. Para ver o
+de produção, pare o dev, rode `npm run build` e `setsid npm start & START_PID=$!`
+(pare com `kill -- -$START_PID`) e o mesmo script, que lê `APP` (padrão
+`http://localhost:3000`).
+
 `conferir-dieta.cjs` faz o mesmo com a Dieta da Maria (mock sem cenário, dev no
 ar; `SO=regex` roda só as etapas cujo nome casa): o rótulo do dia ("Hoje, qui. 15/10") que abre o seletor de data pelo
 `showPicker()` e o `input type="date"` escondido (`max` em hoje, data futura e

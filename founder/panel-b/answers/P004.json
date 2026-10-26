@@ -1,0 +1,13 @@
+{
+  "id": "P004",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "need",
+  "reason": "Tenho poucos pacientes ativos e consigo acompanhar tudo no WhatsApp e na planilha; não sinto falta de uma fila que me diga quem sumiu, porque eu já sei quem é. Nunca paguei software de nutrição e não vou começar por um complemento que ainda me obriga a lançar tudo de novo.",
+  "objection": "Treino é do personal, não meu, então metade do que está sendo vendido não é para mim. E ainda ia ter que convencer cada paciente a baixar e usar mais um app, além de digitar as metas aqui e manter o plano no outro sistema.",
+  "would_change_my_mind": "Ver, com meus pacientes de verdade, que o paciente registra sozinho e que eu ganho tempo à noite no WhatsApp, e uma versão só de nutrição, sem o treino, por menos de R$ 20 enquanto eu tenho poucos pacientes.",
+  "price_too_cheap": 9,
+  "price_cheap": 19,
+  "price_expensive": 35,
+  "price_too_expensive": 59
+}

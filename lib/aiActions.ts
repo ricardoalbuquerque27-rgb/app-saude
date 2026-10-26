@@ -1019,13 +1019,22 @@ export async function executeAction(
       case "definir_metas": {
         // A prescrição do profissional não é sobrescrita pela IA. A regra está
         // também no system prompt, mas aqui é onde ela realmente se sustenta:
-        // instrução de prompt é orientação, isto é garantia.
-        const { data: presc } = await supabase
+        // instrução de prompt é orientação, isto é garantia. A leitura que falha
+        // não é "não tem prescrição": o supabase-js devolve `data: null` com o
+        // erro, sem lançar, e a guarda deixava gravar por cima das metas do
+        // nutricionista justo quando não conseguia conferi-las.
+        const { data: presc, error: erroPresc } = await supabase
           .from("prescriptions")
           .select("id")
           .eq("patient_id", uid)
           .limit(1)
           .maybeSingle();
+        if (erroPresc) {
+          return {
+            ok: false,
+            resumo: "Não consegui conferir as metas do seu nutricionista. Tente de novo.",
+          };
+        }
         if (presc) {
           return {
             ok: false,

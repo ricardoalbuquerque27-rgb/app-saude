@@ -14,6 +14,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { VAPID_PUBLIC_KEY } from "@/lib/vapidPublicKey";
 import { meuPerfil } from "@/lib/perfil";
+import { NOME } from "@/lib/marca";
 
 type InstallEvent = Event & {
   prompt: () => Promise<void>;
@@ -247,7 +248,7 @@ export default function PwaSettings() {
               </p>
             ) : (
               <p className="mt-1 text-sm text-app-texto-2">
-                Adicione o Pace Fit à tela inicial e use como um app de verdade,
+                Adicione o {NOME} à tela inicial e use como um app de verdade,
                 em tela cheia.
               </p>
             )}

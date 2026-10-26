@@ -1,0 +1,13 @@
+{
+  "id": "P003",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "trust",
+  "reason": "Já pago Dietbox e monto o plano lá durante a consulta, e meu paciente já usa o app daquele sistema. Pôr os dados dos meus pacientes, com exame e tudo, numa empresa que eu nunca ouvi falar, e ainda pedir para eles instalarem um segundo app, é muito risco por uma fila de alertas.",
+  "objection": "Empresa nova: e se sumir com os dados dos meus pacientes? Eu respondo pelo sigilo deles, não o fundador. Além disso seria uma segunda mensalidade em cima do Dietbox, que ainda estou pagando, e mais um app para o paciente lembrar de abrir.",
+  "would_change_my_mind": "Ver por escrito onde ficam os dados dos pacientes e como eu exporto tudo se eu quiser sair, e um colega nutricionista que eu conheça usando há alguns meses e me dizendo que o fundador não sumiu.",
+  "price_too_cheap": 12,
+  "price_cheap": 29,
+  "price_expensive": 59,
+  "price_too_expensive": 99
+}

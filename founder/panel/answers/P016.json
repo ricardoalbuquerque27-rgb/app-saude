@@ -1,0 +1,13 @@
+{
+  "id": "P016",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "price",
+  "reason": "Eu uso o mês grátis e cancelo antes de cobrar, é assim que eu faço com qualquer ferramenta. R$ 79 por mês para acompanhar paciente que já fecha pacote de três meses comigo pelo WhatsApp e planilha eu não pago de cara.",
+  "objection": "Prescrever treino é do personal, não meu, então uma parte do que o app vende eu nem uso. E o paciente precisa baixar mais um app e registrar tudo, e eu já sei que a maioria para de registrar na segunda semana. Pagar R$ 79 por isso fica caro.",
+  "would_change_my_mind": "Um plano grátis de verdade para poucos pacientes, ou uns R$ 39 nos primeiros meses, e ver que o paciente de musculação e corrida registra mesmo e que eu ganho tempo na semana.",
+  "price_too_cheap": 12,
+  "price_cheap": 29,
+  "price_expensive": 59,
+  "price_too_expensive": 99
+}

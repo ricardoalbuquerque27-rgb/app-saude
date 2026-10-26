@@ -1,0 +1,13 @@
+{
+  "id": "P014",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "Hoje eu mando o plano em PDF e respondo no WhatsApp, e com os poucos pacientes que tenho isso funciona. Nunca paguei software e R$ 79 por mês pesa quando a clínica ainda está começando.",
+  "objection": "Trocar de sistema dá trabalho e eu perco o histórico. Ainda teria que convencer cada paciente a instalar mais um app, e eles já me respondem no WhatsApp.",
+  "would_change_my_mind": "Um plano mais barato para quem tem poucos pacientes (uns R$ 39 até eu ter mais gente), ou importar minha planilha e o histórico dos pacientes sem eu digitar tudo de novo.",
+  "price_too_cheap": 19,
+  "price_cheap": 35,
+  "price_expensive": 60,
+  "price_too_expensive": 90
+}

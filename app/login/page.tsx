@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  Dumbbell,
   Loader2,
   Check,
   Eye,
@@ -14,17 +13,22 @@ import {
   Lock,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import MarcaIcone from "@/components/MarcaIcone";
 import {
   AJUDA_DA_SENHA,
   SENHA_MINIMO,
   ehErroDeSenhaFraca,
   problemaDaSenha,
 } from "@/lib/senha";
+import { NOME } from "@/lib/marca";
 
+// O painel fala com os dois lados de quem entra: a nutricionista, que paga, e o
+// paciente que ela convidou. Os destaques antigos (Modo Caneta, IA, foto do
+// prato) falavam com o consumidor.
 const HIGHLIGHTS = [
-  "Modo Caneta: acompanhe seu tratamento (GLP-1)",
-  "IA que conecta seus exames, dieta e treino",
-  "Estime calorias pela foto do prato",
+  "A fila de quem precisa de atenção, para a nutricionista",
+  "O plano, as metas e os registros do dia, para o paciente",
+  "Cada paciente só aparece para a nutricionista que o acompanha",
 ];
 
 export default function LoginPage() {
@@ -144,21 +148,17 @@ export default function LoginPage() {
           (lib/temaApp.ts, PARES_TEXTO_APP). */}
       <div className="hidden bg-app-primaria-fundo p-12 lg:flex lg:flex-col lg:justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-app-primaria text-app-sobre-primaria">
-            <Dumbbell className="h-5 w-5" />
-          </div>
-          <span className="text-lg font-semibold text-app-texto">Pace Fit</span>
+          <MarcaIcone tamanho={36} />
+          <span className="text-lg font-semibold text-app-texto">{NOME}</span>
         </div>
 
         <div>
           <h2 className="text-4xl font-semibold leading-[1.1] text-app-texto xl:text-5xl">
-            Supere seus limites.
-            <br />
-            Acompanhe cada <span className="text-app-primaria">evolução</span>.
+            O acompanhamento entre uma consulta e outra.
           </h2>
           <p className="mt-4 max-w-sm text-base text-app-texto-2">
-            Treinos, dieta, hábitos e exames — com inteligência que trabalha por
-            você.
+            Para a nutricionista, a fila de quem precisa de atenção. Para o paciente, o
+            plano e os registros do dia.
           </p>
 
           <ul className="mt-8 space-y-3">
@@ -184,7 +184,7 @@ export default function LoginPage() {
             </span>
           </div>
           <p className="mt-3 text-[13px] text-app-texto-2">
-            © {new Date().getFullYear()} Pace Fit
+            © {new Date().getFullYear()} {NOME}
           </p>
         </div>
       </div>
@@ -196,10 +196,8 @@ export default function LoginPage() {
             href="/"
             className="tappable mb-8 flex min-h-[44px] items-center justify-center gap-2.5 lg:hidden"
           >
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-app-primaria text-app-sobre-primaria">
-              <Dumbbell className="h-5 w-5" />
-            </div>
-            <span className="text-lg font-semibold text-app-texto">Pace Fit</span>
+            <MarcaIcone tamanho={36} />
+            <span className="text-lg font-semibold text-app-texto">{NOME}</span>
           </Link>
 
           <h1 className="text-2xl font-semibold text-app-texto">

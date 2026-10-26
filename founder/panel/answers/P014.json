@@ -1,0 +1,13 @@
+{
+  "id": "P014",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "need",
+  "reason": "Tenho poucos pacientes ativos e o WhatsApp com a planilha já dá conta. Não vou pagar R$ 79 por mês fixo por uma fila de atenção que, com esse tanto de paciente, eu mesma enxergo olhando a conversa.",
+  "objection": "Trocar de sistema dá trabalho, e eu perco o histórico. Ainda teria que convencer cada paciente a instalar e registrar tudo num app novo, e R$ 79 todo mês pesa quando a renda ainda está começando e o número de pacientes é pequeno.",
+  "would_change_my_mind": "Um plano que custasse pouco enquanto eu tenho poucos pacientes, tipo cobrar por paciente ativo, e que importasse minha planilha e os PDFs dos planos para eu não perder o histórico.",
+  "price_too_cheap": 9,
+  "price_cheap": 25,
+  "price_expensive": 49,
+  "price_too_expensive": 70
+}

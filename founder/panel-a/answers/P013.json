@@ -1,0 +1,13 @@
+{
+  "id": "P013",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "price",
+  "reason": "Eu entro em teste grátis sem cartão, mas pago mesmo só quando o preço me convence, e R$ 79 por mês para um sistema que mistura coisas que não são minhas, como prescrever treino, não convence. Eu uso o plano grátis ou a promoção dos primeiros meses e cancelo quando o preço sobe, então os 30 dias grátis acabariam sem eu pagar nada.",
+  "objection": "Prescrever treino é do personal, não meu, e eu estaria pagando R$ 79 por mês por uma parte que não vou usar. Os meus pacientes de musculação e corrida já têm personal ou treinador. Das outras partes, fila de triagem, agenda e registro de consulta, não sei se justificam sozinhas esse valor.",
+  "would_change_my_mind": "Um plano grátis que fique de verdade, para alguns pacientes, ou um preço fixo perto de R$ 40 por mês, sem a parte de treino me empurrando para pagar a mais.",
+  "price_too_cheap": 19,
+  "price_cheap": 39,
+  "price_expensive": 79,
+  "price_too_expensive": 119
+}

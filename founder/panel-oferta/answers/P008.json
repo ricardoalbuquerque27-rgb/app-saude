@@ -1,0 +1,13 @@
+{
+  "id": "P008",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "Já pago Dietbox, meu plano alimentar e meus pacientes estão lá e estou no meio da assinatura. A fila de quem sumiu entre as consultas me interessa, mas eu teria que pedir pros meus pacientes instalarem outro app e prescrever em dois lugares, e na minha semana não sobra tempo pra isso.",
+  "objection": "Já pago um sistema, não quero pagar dois. E mais do que o preço, é pedir pro paciente largar o app do Dietbox ou usar dois, e eu ter que lançar meta e cardápio de novo num sistema que eu não conheço.",
+  "would_change_my_mind": "Se a fila funcionasse em cima do que meus pacientes já registram no app que eles usam hoje, sem eu duplicar prescrição nem pedir instalação de outro app.",
+  "price_too_cheap": 19,
+  "price_cheap": 39,
+  "price_expensive": 90,
+  "price_too_expensive": 140
+}

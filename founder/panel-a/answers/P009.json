@@ -1,0 +1,13 @@
+{
+  "id": "P009",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "Já pago o Dietbox, estou no meio da assinatura e monto o plano na consulta sem problema; o paciente já usa o app dele. Pagar R$ 79 por um segundo sistema pra ver uma fila de alertas não compensa o trabalho de mexer na minha rotina.",
+  "objection": "Empresa nova: se sumir ou mudar de rumo, o que acontece com os dados dos meus pacientes? Não vejo nada aí sobre LGPD, backup ou como eu levo meus pacientes embora se eu quiser sair.",
+  "would_change_my_mind": "Ver nutricionistas de verdade que já usam há meses, e uma garantia clara por escrito sobre os dados (onde ficam, como exporto tudo, o que acontece se vocês fecharem), mais um jeito de importar os pacientes e planos do Dietbox sem refazer tudo.",
+  "price_too_cheap": 29,
+  "price_cheap": 49,
+  "price_expensive": 99,
+  "price_too_expensive": 149
+}

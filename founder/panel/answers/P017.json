@@ -1,0 +1,13 @@
+{
+  "id": "P017",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "trust",
+  "reason": "Meus dados de paciente e meus retornos estão no WhatsApp e na planilha, que funcionam e não custam nada. Não vou trocar isso e pedir para uns 100 pacientes instalarem um app de uma empresa que eu nunca ouvi falar.",
+  "objection": "Empresa nova: e se sumir ou fechar e eu perder os dados e o histórico dos meus pacientes? Não sei onde ficam guardados, se dá para exportar tudo, nem como fica a LGPD com o prontuário deles lá.",
+  "would_change_my_mind": "Saber que dá para exportar todos os dados dos pacientes e do prontuário quando eu quiser, e ver uma colega nutricionista que eu conheço usando há alguns meses sem problema.",
+  "price_too_cheap": 15,
+  "price_cheap": 35,
+  "price_expensive": 80,
+  "price_too_expensive": 130
+}

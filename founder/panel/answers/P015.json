@@ -1,0 +1,13 @@
+{
+  "id": "P015",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "Já pago um sistema pra agenda e prontuário e minha rotina já roda nele. Pagar R$ 79 em outro, só pra ter fila e app pro paciente, não fecha na minha conta. Os 30 dias grátis eu até testaria, mas é o que eu faria com qualquer coisa: uso o grátis e cancelo antes de cobrar.",
+  "objection": "Isso se sobrepõe ao que eu já pago (agenda, registro de consulta, conversa). Se eu tiver que manter os dois, são dois valores por mês e dois lugares pra lançar a mesma coisa. E meu paciente já me chama no WhatsApp, não sei se ele vai abrir outro app.",
+  "would_change_my_mind": "Um preço de entrada bem mais baixo que dure além do primeiro mês, ou poder trazer meus pacientes e minha agenda do sistema atual sem redigitar nada, de modo que o Pace Fit substitua o que já pago em vez de somar.",
+  "price_too_cheap": 15,
+  "price_cheap": 29,
+  "price_expensive": 69,
+  "price_too_expensive": 119
+}

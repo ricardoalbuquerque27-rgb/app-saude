@@ -1,0 +1,13 @@
+{
+  "id": "P010",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "Já pedi diário alimentar e o paciente largou em duas semanas, então não acredito que ele vá registrar refeição, água e peso num app todo dia. Sem registro, essa fila de quem precisa do meu cuidado fica vazia, e eu estaria pagando por uma tela que não enche.",
+  "objection": "Meu paciente não vai registrar todo dia num app. A fila toda depende de ele registrar, e eu tenho poucos pacientes ativos, então R$ 79 por mês para algo que provavelmente vai ficar parado não fecha.",
+  "would_change_my_mind": "Ver, em colega ou em paciente meu de verdade, que o paciente continua registrando depois de um mês e que a fila me avisa de algo útil sem eu ter de cobrar o paciente.",
+  "price_too_cheap": 12,
+  "price_cheap": 29,
+  "price_expensive": 49,
+  "price_too_expensive": 79
+}

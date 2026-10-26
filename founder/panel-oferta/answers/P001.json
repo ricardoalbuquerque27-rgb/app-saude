@@ -1,0 +1,13 @@
+{
+  "id": "P001",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "trust",
+  "reason": "Eu só assino o que as colegas do grupo já usam e recomendam, e ninguém lá fala de Pace Fit. Mesmo com 30 dias grátis, não vou pôr 3 a 5 pacientes meus num app que nenhuma colega testou.",
+  "objection": "Meu paciente não vai registrar todo dia num app. Se ele para de registrar, a fila só me mostra o que eu já sei: que ele sumiu. E ainda vou gastar noite de WhatsApp pedindo pra instalar.",
+  "would_change_my_mind": "Duas ou três colegas do grupo de nutricionistas dizendo que usam há meses, com paciente de verdade registrando, e uma delas me mostrando a fila funcionando.",
+  "price_too_cheap": 19,
+  "price_cheap": 39,
+  "price_expensive": 99,
+  "price_too_expensive": 169
+}

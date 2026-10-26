@@ -121,3 +121,63 @@ describe("remover_ultimo (peso)", () => {
     expect(r).toEqual({ ok: true, resumo: "Não há registro de peso para apagar." });
   });
 });
+
+// O definir_metas não pode gravar por cima das metas que o nutricionista
+// prescreveu. A guarda lê `prescriptions`, e o supabase-js devolve
+// `{ data: null, error }` sem lançar quando a leitura falha: tomada por "não
+// tem prescrição", a falha deixava o assistente gravar as metas dele por cima
+// das do nutricionista. Este banco falso só tem as duas tabelas da ação.
+function bancoDasMetas({ prescricao, leituraFalha }: { prescricao: Linha | null; leituraFalha?: boolean }) {
+  const gravados: Linha[] = [];
+  const from = (tabela: string) => {
+    if (tabela === "prescriptions") {
+      const q: any = {
+        select: () => q,
+        eq: () => q,
+        limit: () => q,
+        maybeSingle: async () =>
+          leituraFalha
+            ? { data: null, error: { message: "falha de rede" } }
+            : { data: prescricao, error: null },
+      };
+      return q;
+    }
+    if (tabela === "profiles") {
+      return { upsert: async (patch: Linha) => (gravados.push(patch), { error: null }) };
+    }
+    throw new Error(`tabela fora do teste: ${tabela}`);
+  };
+  return { banco: { from }, gravados };
+}
+
+describe("definir_metas", () => {
+  const metas = '{"calorias_dia":1800,"proteina_dia_g":120}';
+
+  it("com a leitura da prescrição falhando: não grava e diz que não conferiu", async () => {
+    const { banco, gravados } = bancoDasMetas({ prescricao: null, leituraFalha: true });
+    const r = await executeAction("definir_metas", metas, banco, PACIENTE);
+
+    expect(gravados).toEqual([]);
+    expect(r).toEqual({
+      ok: false,
+      resumo: "Não consegui conferir as metas do seu nutricionista. Tente de novo.",
+    });
+  });
+
+  it("com prescrição: não grava", async () => {
+    const { banco, gravados } = bancoDasMetas({ prescricao: { id: "presc-1" } });
+    const r = await executeAction("definir_metas", metas, banco, PACIENTE);
+
+    expect(gravados).toEqual([]);
+    expect(r.ok).toBe(false);
+  });
+
+  it("sem prescrição (a leitura deu certo e não achou): grava as metas", async () => {
+    const { banco, gravados } = bancoDasMetas({ prescricao: null });
+    const r = await executeAction("definir_metas", metas, banco, PACIENTE);
+
+    expect(gravados).toHaveLength(1);
+    expect(gravados[0]).toMatchObject({ id: PACIENTE, daily_calorie_goal: 1800, protein_goal_g: 120 });
+    expect(r.ok).toBe(true);
+  });
+});

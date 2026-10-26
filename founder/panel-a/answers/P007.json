@@ -1,0 +1,13 @@
+{
+  "id": "P007",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "Eu abriria o teste grátis, porque abro de tudo que vejo no Instagram, mas não pagaria depois. Atendo poucos pacientes e vejo cada um a cada 30 ou 45 dias, então a fila de quem parou de registrar só funciona se o paciente registrar, e eu já sei que ele não vai fazer isso todo dia.",
+  "objection": "Meu paciente não vai registrar todo dia num app. Se ele não registra, a fila fica vazia ou só me mostra que ele sumiu, e eu pagaria R$ 79 por mês para descobrir o que já sei. Com poucos pacientes eu ainda me viro com WhatsApp e planilha.",
+  "would_change_my_mind": "Ver, no teste, uns 3 ou 4 dos meus pacientes de verdade registrando por 2 semanas sem eu ficar cobrando. Ou um preço bem menor enquanto eu tenho poucos pacientes.",
+  "price_too_cheap": 15,
+  "price_cheap": 29,
+  "price_expensive": 49,
+  "price_too_expensive": 79
+}

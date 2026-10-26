@@ -1,0 +1,13 @@
+{
+  "id": "P009",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "trust",
+  "reason": "Já pago o Dietbox e estou no meio da assinatura, o plano e o prontuário ficam lá, então isso seria um segundo sistema para lançar meta duas vezes. E é empresa que eu nunca ouvi falar: não ponho dado de paciente meu nas mãos de quem eu não conheço.",
+  "objection": "Empresa nova: e se sumir com os dados dos meus pacientes? Não está escrito onde ficam os dados, quem tem acesso, nem como eu tiro tudo se eu sair. E ainda tem a IA conversando com o meu paciente sem eu saber o que ela diz a ele.",
+  "would_change_my_mind": "Ver, antes de pôr paciente real, onde os dados ficam guardados, como eu exporto tudo e apago tudo se eu sair, e o que a IA pode e não pode dizer ao paciente; ou um colega nutricionista que eu conheça já usando há alguns meses e me dizendo que vale a pena.",
+  "price_too_cheap": 12,
+  "price_cheap": 25,
+  "price_expensive": 59,
+  "price_too_expensive": 90
+}

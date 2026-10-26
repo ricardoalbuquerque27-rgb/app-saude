@@ -1,0 +1,13 @@
+{
+  "id": "P007",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "need",
+  "reason": "Eu abriria o teste grátis, porque abro de tudo que vejo no Instagram, mas pagar R$ 79 por mês com poucos pacientes ativos e retorno só a cada 30 ou 45 dias eu não consigo justificar. Uma fila de quem precisa de atenção não me serve de muita coisa quando tenho meia dúzia de pacientes que eu já conheço de cabeça.",
+  "objection": "Meu paciente não vai registrar todo dia num app. Se ele não registra, a fila fica vazia, eu pago R$ 79 por um painel sem dado e ainda tenho que convencer cada paciente a instalar mais uma coisa.",
+  "would_change_my_mind": "Um plano grátis ou bem barato (uns R$ 29) enquanto eu tenho poucos pacientes, que só passa a cobrar o valor cheio quando a carteira crescer, ou ver que os pacientes de outros nutricionistas continuam registrando depois do primeiro mês.",
+  "price_too_cheap": 9,
+  "price_cheap": 29,
+  "price_expensive": 49,
+  "price_too_expensive": 79
+}

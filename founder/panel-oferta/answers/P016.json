@@ -1,0 +1,13 @@
+{
+  "id": "P016",
+  "buys": true,
+  "purchases_first_month": 1,
+  "reason_code": "price",
+  "reason": "Só entro porque são 30 dias grátis, sem cartão, e eu não preciso migrar ninguém: o risco é uma hora do meu tempo e convidar uns três pacientes online. Se eu vou pagar R$ 69,90 depois do mês grátis é outra conversa, eu cancelo se a fila não me mostrar nada que eu já não soubesse.",
+  "objection": "Paciente de musculação e de corrida já tem o app do personal, o Strava, o relógio. Pedir para ele baixar mais um e registrar comida é o que costuma não pegar, e aí minha fila fica vazia e eu gastei a chamada à toa. E treino eu não prescrevo, isso é do personal, então o alerta de quem faltou ao treino não vai valer para mim.",
+  "would_change_my_mind": "Se pedisse cartão para começar, ou se a fila só fizesse sentido com treino prescrito por mim, eu não entrava.",
+  "price_too_cheap": 19,
+  "price_cheap": 39,
+  "price_expensive": 79,
+  "price_too_expensive": 129
+}

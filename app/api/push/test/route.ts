@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { sendPush } from "@/lib/webpush";
+import { NOME } from "@/lib/marca";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,7 +36,7 @@ export async function POST() {
 
   const payload = {
     title: "Notificação de teste ✅",
-    body: "Seus lembretes do Pace Fit estão funcionando!",
+    body: `Seus lembretes do ${NOME} estão funcionando!`,
     url: "/app",
     tag: "pacefit-test",
   };

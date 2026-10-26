@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Dumbbell, Loader2, Check, Eye, EyeOff } from "lucide-react";
+import { Loader2, Check, Eye, EyeOff } from "lucide-react";
+import MarcaIcone from "@/components/MarcaIcone";
 import { createClient } from "@/lib/supabase/client";
 import {
   AJUDA_DA_SENHA,
@@ -10,6 +11,7 @@ import {
   ehErroDeSenhaFraca,
   problemaDaSenha,
 } from "@/lib/senha";
+import { NOME } from "@/lib/marca";
 
 export default function RedefinirSenhaPage() {
   const [ready, setReady] = useState(false);
@@ -88,10 +90,8 @@ export default function RedefinirSenhaPage() {
           href="/"
           className="tappable mb-8 flex min-h-[44px] items-center justify-center gap-2.5"
         >
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-app-primaria text-app-sobre-primaria">
-            <Dumbbell className="h-5 w-5" />
-          </div>
-          <span className="text-lg font-semibold text-app-texto">Pace Fit</span>
+          <MarcaIcone tamanho={36} />
+          <span className="text-lg font-semibold text-app-texto">{NOME}</span>
         </Link>
 
         <div className="card">

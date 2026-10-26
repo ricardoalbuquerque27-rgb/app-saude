@@ -1,0 +1,13 @@
+{
+  "id": "P015",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "Já pago um sistema e minha agenda está cheia. Ter que convidar paciente para instalar outro app e ainda pagar R$ 69,90 por cima do que já pago não fecha pra mim. A fila é boa de ideia, mas não vou pagar dois.",
+  "objection": "Pagar dois sistemas e botar meus pacientes pra usar mais um app. Eu responda paciente no WhatsApp à noite, não tenho tempo pra implantação e chamada nos dias 1, 7 e 14. Se eu testar, uso os 30 dias grátis e cancelo quando começar a cobrar.",
+  "would_change_my_mind": "Um plano grátis de verdade pra uns 5 pacientes, ou o Pace Fit substituir o sistema que eu já pago (agenda, prontuário e fila num preço só) pra eu poder cancelar o outro.",
+  "price_too_cheap": 15,
+  "price_cheap": 35,
+  "price_expensive": 60,
+  "price_too_expensive": 99
+}

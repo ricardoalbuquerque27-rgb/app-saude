@@ -1,0 +1,13 @@
+{
+  "id": "P002",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "need",
+  "reason": "Tenho poucos pacientes ativos e já vi paciente largar o diário alimentar em duas semanas, então não acredito que ele vá registrar num app. Sem registro, a fila vira uma lista de gente que parou, e isso eu já sei sem pagar R$ 39 e sem lançar tudo duas vezes.",
+  "objection": "O paciente não vai usar. Eu ia ter o trabalho de lançar meta em mais um sistema e a fila ia mostrar quase todo mundo como 'parou de registrar'. E é empresa nova: se sumir, leva os dados dos meus pacientes junto.",
+  "would_change_my_mind": "Ver dados reais de nutricionista parecida comigo mostrando que a maioria dos pacientes ainda registra depois de 30 dias, e um jeito de exportar tudo para o meu computador quando eu quiser.",
+  "price_too_cheap": 9,
+  "price_cheap": 19,
+  "price_expensive": 45,
+  "price_too_expensive": 80
+}

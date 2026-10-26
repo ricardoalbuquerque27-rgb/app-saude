@@ -17,6 +17,7 @@ import { ensurePushSubscription } from "@/lib/pushClient";
 import { todayISO, addDaysISO } from "@/lib/date";
 import { comSinal, numeroFixo } from "@/lib/numeros";
 import { useLiveRefresh } from "@/lib/useLiveRefresh";
+import { NOME } from "@/lib/marca";
 
 const MEDS = [
   "Ozempic (semaglutida)",
@@ -309,7 +310,7 @@ function SetupTreatment({ onCreated }: { onCreated: () => void }) {
 
       <p className="flex items-start gap-1.5 text-xs text-app-texto-2">
         <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-        O Pace Fit ajuda a organizar seu tratamento, mas não substitui seu médico.
+        O {NOME} ajuda a organizar seu tratamento, mas não substitui seu médico.
         Doses e mudanças devem ser sempre orientadas por um profissional.
       </p>
     </div>
@@ -418,8 +419,8 @@ function ActiveTreatment({
 
       <p className="flex items-start gap-1.5 text-xs text-app-texto-2">
         <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-        Em caso de efeitos fortes ou persistentes, procure seu médico. O Pace Fit
-        não substitui acompanhamento profissional.
+        Em caso de efeitos fortes ou persistentes, procure seu médico. O {NOME} não
+        substitui acompanhamento profissional.
       </p>
     </div>
   );

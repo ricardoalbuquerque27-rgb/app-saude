@@ -1,0 +1,13 @@
+{
+  "id": "P002",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "Já pedi diário alimentar e o paciente largou em duas semanas, então não acredito que o meu vai ficar registrando refeição e peso num app. Com poucos pacientes ativos eu sei de cor quem sumiu, não preciso de uma fila para me dizer isso, e R$ 79 todo mês pesa quando a agenda ainda está vazia.",
+  "objection": "Empresa nova: se ela sumir, o que acontece com os dados e com o prontuário dos meus pacientes? E se o paciente largar o app em duas semanas, a fila só vai me mostrar um monte de gente 'que parou de registrar'.",
+  "would_change_my_mind": "Ver nutricionistas de consultório pequeno como eu com pacientes que ainda registram depois de dois meses de uso, e saber de forma clara onde ficam os dados e que eu consigo exportar tudo se a empresa fechar.",
+  "price_too_cheap": 15,
+  "price_cheap": 29,
+  "price_expensive": 59,
+  "price_too_expensive": 89
+}

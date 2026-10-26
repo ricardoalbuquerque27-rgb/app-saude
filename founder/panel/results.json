@@ -1,0 +1,151 @@
+{
+ "business": "Pace Fit (app para o nutricionista acompanhar os pacientes entre as consultas)",
+ "seed": 159337,
+ "dealt": 20,
+ "answered": 20,
+ "skipped": [],
+ "buys": 0,
+ "passes": 20,
+ "buy_rate": 0.0,
+ "by_segment": [
+  [
+   "Nutrição esportiva (pacientes de musculação e corrida, parte online)",
+   8,
+   0.0
+  ],
+  [
+   "Consultório, começando (até 3 anos de formada, poucos pacientes ativos)",
+   6,
+   0.0
+  ],
+  [
+   "Consultório, consolidada (agenda cheia, retornos todo mês)",
+   6,
+   0.0
+  ]
+ ],
+ "by_behaviour": [
+  [
+   "Pergunta às colegas antes",
+   2,
+   0.0
+  ],
+  [
+   "Não acredita em app para o paciente",
+   3,
+   0.0
+  ],
+  [
+   "Já paga Dietbox ou WebDiet",
+   6,
+   0.0
+  ],
+  [
+   "Acompanha pelo WhatsApp e planilha",
+   4,
+   0.0
+  ],
+  [
+   "Testa ferramenta nova",
+   2,
+   0.0
+  ],
+  [
+   "Caça preço",
+   3,
+   0.0
+  ]
+ ],
+ "by_income": [
+  [
+   "$66,000 to $102,000",
+   7,
+   0.0
+  ],
+  [
+   "under $66,000",
+   6,
+   0.0
+  ],
+  [
+   "$102,000 and up",
+   7,
+   0.0
+  ]
+ ],
+ "why_not": [
+  [
+   "habit",
+   9,
+   [
+    "Já pedi diário alimentar e o paciente largou em duas semanas, então não acredito que um app com registro de refeição, água e treino vá ser diferente. Tenho poucos pacientes ativos e R$ 79 por mês pesa para quem está começando.",
+    "Já pago o Dietbox, monto o plano na consulta e meus pacientes já usam o app dele. Não vou pagar R$ 79 em cima de um sistema que já tenho no meio da assinatura, e muito menos pedir pra paciente baixar outro app."
+   ],
+   [
+    "P006",
+    "P008"
+   ]
+  ],
+  [
+   "trust",
+   6,
+   [
+    "Eu só assino ferramenta que as colegas do grupo já usam e recomendam, e ninguém lá comentou desse app. Testar 30 dias de graça eu até testaria, mas pagar R$ 79 por mês num app que eu nunca vi uma colega usar, não.",
+    "Empresa nova com dado de paciente meu dentro: se sumir, eu que respondo pro paciente, não eles. E eu já vi o paciente largar o diário em duas semanas, então não acredito que ele vá usar o app pra valer."
+   ],
+   [
+    "P001",
+    "P002"
+   ]
+  ],
+  [
+   "need",
+   3,
+   [
+    "Hoje eu resolvo com WhatsApp e planilha e mando o plano em PDF, e com poucos pacientes ativos isso dá conta. Metade do que o app promete é prescrever treino, e isso é do personal da academia, não meu.",
+    "Eu abriria o teste grátis, porque abro de tudo que vejo no Instagram, mas pagar R$ 79 por mês com poucos pacientes ativos e retorno só a cada 30 ou 45 dias eu não consigo justificar. Uma fila de quem precisa de atenção não me serve de muita coisa quando tenho meia dúzia de pacientes que eu já conheço de cabeça."
+   ],
+   [
+    "P004",
+    "P007"
+   ]
+  ],
+  [
+   "price",
+   2,
+   [
+    "Eu abriria os 30 dias grátis porque não pede cartão, mas pagar R$ 79 por mês depois eu não pagaria: eu uso plano grátis ou promoção e cancelo quando o preço sobe. A fila de quem parou de registrar até me interessa para os meus pacientes online, mas isso eu resolvo hoje com WhatsApp e planilha de graça.",
+    "Eu uso o mês grátis e cancelo antes de cobrar, é assim que eu faço com qualquer ferramenta. R$ 79 por mês para acompanhar paciente que já fecha pacote de três meses comigo pelo WhatsApp e planilha eu não pago de cara."
+   ],
+   [
+    "P013",
+    "P016"
+   ]
+  ]
+ ],
+ "why_yes": [],
+ "flip": [
+  "Duas ou três colegas do grupo de nutricionistas dizendo que usam e que os pacientes dela realmente registram, ou eu ver na prática um paciente meu registrando por duas semanas no teste grátis.",
+  "Ver nutricionista de verdade usando há meses, com a taxa de pacientes que continuam registrando depois de 30 dias, e uma garantia clara de exportar tudo (prontuário e registros) quando eu quiser, com onde os dados ficam guardados e o que acontece se a empresa fechar.",
+  "Poder exportar todos os dados e prontuários a qualquer momento, ver colegas de CRN que eu conheço usando há mais de um ano, e uma promessa clara sobre onde ficam os dados do paciente (LGPD). Se ainda importasse meus pacientes do Dietbox sem eu digitar tudo de novo, eu testaria nos 30 dias grátis.",
+  "Um plano barato para quem está começando, com pouco paciente, e a parte de treino opcional ou ligada ao personal da academia, para ele prescrever e eu só acompanhar. Ver outra nutri iniciante usando e me poupando tempo à noite no WhatsApp também ajudaria.",
+  "Várias colegas do meu grupo de nutricionistas dizendo que já usam e recomendam, de preferência alguém que atende como eu, parte presencial e parte online.",
+  "Ver um colega com poucos pacientes, igual a mim, mostrando que os pacientes dele continuam registrando depois de um mês, e um plano mais barato só com cardápio, agenda e conversa, sem treino.",
+  "Um plano grátis ou bem barato (uns R$ 29) enquanto eu tenho poucos pacientes, que só passa a cobrar o valor cheio quando a carteira crescer, ou ver que os pacientes de outros nutricionistas continuam registrando depois do primeiro mês.",
+  "Ver que dá pra trocar o Dietbox de vez: importar meus pacientes e planos sem refazer tudo e cobrir o que eu uso hoje, pagando um sistema só. Ou então um tempo de teste com paciente real, sem custo, que me mostre que a fila de atenção me poupa tempo à noite no WhatsApp.",
+  "Saber quem está por trás, ver outros nutricionistas conhecidos usando há um tempo, e poder exportar todos os dados dos meus pacientes a qualquer momento. Aí eu testaria com dois ou três pacientes só, depois que a minha assinatura atual vencer.",
+  "Ver, com dados de nutricionista parecida comigo, que a maioria dos pacientes continua registrando depois de um mês, e um plano baixo ou grátis enquanto eu tiver poucos pacientes.",
+  "Testar com três ou quatro pacientes meus nos 30 dias grátis e ver que eles de fato registram e respondem ali, de modo que eu consiga largar a planilha e o PDF. Aí sim eu pagaria.",
+  "Poder importar meus pacientes e planos do Dietbox e exportar tudo quando eu quiser (um contrato claro dizendo que os dados são meus e onde ficam), mais uma colega que eu conheço usando há alguns meses. Aí eu testo os 30 dias quando a minha assinatura atual vencer.",
+  "Um plano grátis de verdade para poucos pacientes (uns 5 a 10 ativos), ou um preço bem mais baixo, perto de R$ 39, para eu levar só a parte de alimentação e a fila de atenção sem pagar pelo treino.",
+  "Um plano que custasse pouco enquanto eu tenho poucos pacientes, tipo cobrar por paciente ativo, e que importasse minha planilha e os PDFs dos planos para eu não perder o histórico.",
+  "Um preço de entrada bem mais baixo que dure além do primeiro mês, ou poder trazer meus pacientes e minha agenda do sistema atual sem redigitar nada, de modo que o Pace Fit substitua o que já pago em vez de somar.",
+  "Um plano grátis de verdade para poucos pacientes, ou uns R$ 39 nos primeiros meses, e ver que o paciente de musculação e corrida registra mesmo e que eu ganho tempo na semana.",
+  "Saber que dá para exportar todos os dados dos pacientes e do prontuário quando eu quiser, e ver uma colega nutricionista que eu conheço usando há alguns meses sem problema.",
+  "Se ele substituísse o Dietbox por um valor menor ou igual ao que eu pago hoje, e eu pudesse trazer meus pacientes e planos sem refazer tudo na mão.",
+  "Importar meus pacientes, planos e histórico do Dietbox sem eu digitar nada, e poder usar o Pace Fit só para o acompanhamento entre consultas por um preço baixo, sem cancelar o que já pago até o fim da assinatura.",
+  "Importar os pacientes e o histórico do meu sistema atual sem eu redigitar nada, e ver no teste que pelo menos uns 5 pacientes meus entraram e registraram sem eu ficar cobrando."
+ ],
+ "purchases_first_month_per_buyer": null,
+ "price_answers": 20
+}

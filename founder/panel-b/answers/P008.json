@@ -1,0 +1,13 @@
+{
+  "id": "P008",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "Já pago o Dietbox, monto o plano na consulta e meu paciente já usa o app dele. Não vou pôr o paciente para instalar outro app nem lançar meta em dois lugares só por uma fila de alertas, e eu já respondo paciente no WhatsApp à noite.",
+  "objection": "Já pago um sistema, não quero pagar dois. Ia ter que lançar tudo duas vezes, e meu paciente ia ter dois apps, o do Dietbox e esse.",
+  "would_change_my_mind": "Se ele conversasse com o meu sistema e puxasse as metas e o plano de lá sozinho, sem eu digitar de novo, e o paciente continuasse com um app só.",
+  "price_too_cheap": 9,
+  "price_cheap": 19,
+  "price_expensive": 59,
+  "price_too_expensive": 99
+}

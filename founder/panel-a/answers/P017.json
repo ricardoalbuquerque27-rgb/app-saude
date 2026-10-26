@@ -1,0 +1,13 @@
+{
+  "id": "P017",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "trust",
+  "reason": "Minha agenda está cheia e eu já me viro com WhatsApp, planilha e PDF; trocar isso por uma empresa que eu não conheço, com os dados dos meus pacientes lá dentro, não compensa o trabalho. Os R$ 79 não são o problema, o problema é confiar e ter que convencer cada paciente a instalar mais um app.",
+  "objection": "Empresa nova: e se sumir com os dados dos meus pacientes? Aqui não diz onde ficam os dados, se eu consigo exportar tudo, nem como fica a questão da LGPD e do sigilo do prontuário.",
+  "would_change_my_mind": "Ver escrito, com clareza, onde os dados ficam guardados, como eu exporto tudo (pacientes e prontuários) a qualquer momento, e ter indicação de uma colega de confiança que já usa há meses.",
+  "price_too_cheap": 29,
+  "price_cheap": 55,
+  "price_expensive": 120,
+  "price_too_expensive": 200
+}

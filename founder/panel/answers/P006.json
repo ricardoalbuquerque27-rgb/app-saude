@@ -1,0 +1,13 @@
+{
+  "id": "P006",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "Já pedi diário alimentar e o paciente largou em duas semanas, então não acredito que um app com registro de refeição, água e treino vá ser diferente. Tenho poucos pacientes ativos e R$ 79 por mês pesa para quem está começando.",
+  "objection": "Se o paciente não registra, a fila de quem parou de registrar só vai me mostrar todo mundo parado, e eu ainda pago por isso. E prescrever treino é do personal, não meu: metade do que você descreve eu não uso.",
+  "would_change_my_mind": "Ver um colega com poucos pacientes, igual a mim, mostrando que os pacientes dele continuam registrando depois de um mês, e um plano mais barato só com cardápio, agenda e conversa, sem treino.",
+  "price_too_cheap": 15,
+  "price_cheap": 29,
+  "price_expensive": 59,
+  "price_too_expensive": 99
+}

@@ -1,5 +1,6 @@
 import { Watch, Activity, HeartPulse, Footprints, Moon, Bike, Smartphone } from "lucide-react";
 import { PageHeader } from "@/components/ui";
+import { NOME } from "@/lib/marca";
 
 const DEVICES = [
   {
@@ -85,7 +86,7 @@ export default function IntegracoesPage() {
       </div>
 
       <p className="mt-6 text-center text-xs text-app-texto-2">
-        As conexões usam login seguro (OAuth) — o Pace Fit nunca vê sua senha do dispositivo.
+        As conexões usam login seguro (OAuth) — o {NOME} nunca vê sua senha do dispositivo.
       </p>
     </div>
   );

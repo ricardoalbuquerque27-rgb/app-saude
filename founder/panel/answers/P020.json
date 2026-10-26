@@ -1,0 +1,13 @@
+{
+  "id": "P020",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "Eu abriria o teste de 30 dias, porque abro o de tudo, mas pagar R$ 79 é outra conversa. Meus pacientes já falam comigo no WhatsApp à noite e eu já tenho um sistema com o histórico deles, então só troco se ficar claro que os pacientes vão mesmo registrar no app.",
+  "objection": "Trocar de sistema dá trabalho e eu perco o histórico. Não vi nada falando em trazer os dados que eu já tenho, e ainda preciso convencer cada paciente a sair do WhatsApp e instalar outro app.",
+  "would_change_my_mind": "Importar os pacientes e o histórico do meu sistema atual sem eu redigitar nada, e ver no teste que pelo menos uns 5 pacientes meus entraram e registraram sem eu ficar cobrando.",
+  "price_too_cheap": 25,
+  "price_cheap": 49,
+  "price_expensive": 99,
+  "price_too_expensive": 149
+}

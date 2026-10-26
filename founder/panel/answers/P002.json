@@ -1,0 +1,13 @@
+{
+  "id": "P002",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "trust",
+  "reason": "Empresa nova com dado de paciente meu dentro: se sumir, eu que respondo pro paciente, não eles. E eu já vi o paciente largar o diário em duas semanas, então não acredito que ele vá usar o app pra valer.",
+  "objection": "Não acredito que o paciente vai registrar de verdade, e ainda tenho que confiar o prontuário e os dados deles a uma empresa que acabou de nascer. R$ 79 por mês pesa com poucos pacientes ativos.",
+  "would_change_my_mind": "Ver nutricionista de verdade usando há meses, com a taxa de pacientes que continuam registrando depois de 30 dias, e uma garantia clara de exportar tudo (prontuário e registros) quando eu quiser, com onde os dados ficam guardados e o que acontece se a empresa fechar.",
+  "price_too_cheap": 15,
+  "price_cheap": 29,
+  "price_expensive": 49,
+  "price_too_expensive": 69
+}

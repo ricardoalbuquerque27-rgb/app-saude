@@ -1,0 +1,13 @@
+{
+  "id": "P006",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "need",
+  "reason": "Tenho poucos pacientes ativos e já sei quem sumiu, porque eu converso com eles. Não acredito em app para o paciente: o diário alimentar eles largam em duas semanas, então a fila ia me mostrar uma lista de gente que parou de registrar. Treino eu nem prescrevo, é do personal.",
+  "objection": "O paciente não vai usar o app depois da segunda semana, e sem registro a fila não tem o que me mostrar. Aí eu pago R$ 39 por mês por uma tela vazia.",
+  "would_change_my_mind": "Ver, em pacientes de verdade e não em demonstração, que a maioria ainda registra depois de 30 dias. Ou ter uma versão grátis enquanto eu tiver poucos pacientes, para eu só pagar quando a agenda encher.",
+  "price_too_cheap": 5,
+  "price_cheap": 15,
+  "price_expensive": 39,
+  "price_too_expensive": 69
+}

@@ -1,440 +1,155 @@
 import Link from "next/link";
-import {
-  Dumbbell,
-  Salad,
-  LineChart,
-  Droplets,
-  FileText,
-  ArrowRight,
-  Bot,
-  Leaf,
-  Camera,
-  Syringe,
-  HeartPulse,
-  ShieldCheck,
-  Check,
-  Stethoscope,
-} from "lucide-react";
-import Reveal from "@/components/Reveal";
-import { Logo, Pill } from "@/components/landing";
-import MobileMenu from "@/components/MobileMenu";
+import type { Metadata } from "next";
+import type { ReactNode } from "react";
+import MarcaIcone from "@/components/MarcaIcone";
+import { NOME, SLOGAN, TITULO, linkDaVaga } from "@/lib/marca";
+import { textoDesvios, textoExames, textoFaltas, textoParado } from "@/lib/nutri";
 
-/* Landing no modelo Whoop: seções preto/branco alternadas, tipografia grande e
-   "leve", botões em pílula, cards com mídia e título sobreposto. */
+// A página de entrada fala com quem paga, a nutricionista. A antiga falava com
+// o consumidor ("Começar grátis", treinos, fotos externas, fundo preto e
+// degradês), e o board apontou isso (founder/board.md). Ela é estática e não lê
+// o banco. Os textos da demonstração saem das mesmas funções da fila, para a
+// página nunca mostrar um alerta que a fila não escreve. O número do WhatsApp é
+// uma variável NEXT_PUBLIC_, que entra no código no build: trocar o número pede
+// um deploy novo, e sem ele a página diz que as vagas abrem em breve, em vez de
+// um link quebrado.
 
-// Círculo verde "assinatura" (tipo WHOOP AGE), com pulso e partículas
-function GlowRing({ value, label }: { value: string; label: string }) {
-  const dots = [
-    "left-6 top-8 h-1.5 w-1.5",
-    "right-8 top-16 h-1 w-1",
-    "bottom-10 left-14 h-1.5 w-1.5",
-    "bottom-16 right-10 h-1 w-1",
-    "left-10 top-1/2 h-1 w-1",
-  ];
-  const delays = ["0s", "1.2s", "2s", "0.6s", "1.6s"];
+export const metadata: Metadata = { title: TITULO, description: SLOGAN };
+
+const DEMONSTRACAO = [
+  { nome: "Ana R.", texto: textoDesvios(1) },
+  { nome: "Bruno M.", texto: textoParado(5) },
+  { nome: "Carla S.", texto: textoFaltas(2) },
+  { nome: "Diego T.", texto: textoExames(1) },
+];
+
+const PASSOS = [
+  {
+    dia: "Dia 1:",
+    texto:
+      "uma chamada de 30 minutos. Criamos a sua conta e convidamos de 3 a 5 pacientes seus, com a mensagem pronta para o WhatsApp.",
+  },
+  { dia: "Dia 7:", texto: "15 minutos para abrir a fila juntos." },
+  { dia: "Dia 14:", texto: "mais 15 minutos, e a fila já mostra quem precisa de você." },
+];
+
+function BotaoDaVaga({ link }: { link: string | null }) {
+  if (!link) return <p className="text-app-texto-2">As vagas de implantação abrem em breve.</p>;
   return (
-    <div className="relative flex h-56 w-56 items-center justify-center sm:h-64 sm:w-64">
-      <div
-        className="animate-pulse-glow absolute inset-0 rounded-full"
-        style={{
-          background:
-            "radial-gradient(circle at 50% 45%, rgba(24,184,94,0.55), rgba(24,184,94,0.08) 55%, transparent 72%)",
-        }}
-      />
-      <div className="animate-spin-slow absolute inset-4 rounded-full border border-dashed border-brand-400/25" />
-      <div className="absolute inset-10 rounded-full border border-brand-400/20" />
-      {dots.map((d, i) => (
-        <span
-          key={i}
-          className={`animate-float absolute rounded-full bg-brand-300/80 ${d}`}
-          style={{ animationDelay: delays[i] }}
-        />
-      ))}
-      <div className="relative text-center">
-        <p className="font-display text-5xl font-bold text-white">{value}</p>
-        <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-brand-300">
-          {label}
-        </p>
-      </div>
-    </div>
+    <a className="btn-primary w-full px-5 text-base sm:w-auto" href={link} target="_blank" rel="noopener">
+      Quero uma vaga de implantação
+    </a>
   );
 }
 
-const mediaCards = [
-  { title: "Registre seus treinos", icon: Dumbbell, from: "from-brand-700", to: "to-slate-900", img: "https://images.unsplash.com/photo-1759674861540-afed9f86f94a?w=900&auto=format&fit=crop&q=60" },
-  { title: "Calorias pela foto", icon: Camera, from: "from-amber-700", to: "to-slate-900", img: "https://images.unsplash.com/photo-1606756790138-261d2b21cd75?w=900&auto=format&fit=crop&q=60" },
-  { title: "Acompanhe seu peso", icon: LineChart, from: "from-violet-700", to: "to-slate-900", img: "https://plus.unsplash.com/premium_photo-1722686591833-d96146b9ea8b?w=900&auto=format&fit=crop&q=60" },
-  { title: "Hábitos do dia a dia", icon: Droplets, from: "from-blue-700", to: "to-slate-900", img: "https://plus.unsplash.com/premium_photo-1689298475215-ee343186074d?w=900&auto=format&fit=crop&q=60" },
-  { title: "Entenda seus exames", icon: FileText, from: "from-slate-600", to: "to-slate-900", img: "https://plus.unsplash.com/premium_photo-1723132607567-32ef8b312c03?w=900&auto=format&fit=crop&q=60" },
-];
-
-const pillars = [
-  {
-    name: "Treino",
-    points: ["Plano semanal", "Registro por série", "Progressão de carga", "Check-in do treino"],
-  },
-  {
-    name: "Nutrição",
-    points: ["Calorias e macros", "Análise por foto (IA)", "Meta de proteína", "Gaia (IA) 24h"],
-  },
-  {
-    name: "Saúde",
-    points: ["Peso e medidas", "Leitura de exames", "Modo Caneta (GLP-1)", "Inteligência de Saúde"],
-  },
-];
-
-export default function Home() {
+function Secao({ titulo, children }: { titulo: string; children: ReactNode }) {
   return (
-    <main className="bg-black">
-      {/* Barra de promoção */}
-      <div className="bg-brand-700 px-4 py-2.5 text-center text-sm font-medium text-white">
-        Comece grátis hoje — sem cartão, no celular ou no computador.{" "}
-        <Link href="/login" className="font-bold underline underline-offset-2">
-          Criar conta
-        </Link>
-      </div>
+    <section className="mt-12">
+      <h2 className="text-xl font-semibold text-app-texto">{titulo}</h2>
+      <div className="mt-3 leading-relaxed text-app-texto">{children}</div>
+    </section>
+  );
+}
 
-      {/* Header */}
-      <header className="sticky top-0 z-30 bg-black">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4">
-          <Logo />
-          <nav className="hidden items-center gap-9 text-xs font-semibold uppercase tracking-[0.15em] text-slate-300 lg:flex">
-            <Link href="/recursos" className="hover:text-white">Recursos</Link>
-            <a href="#diferenciais" className="hover:text-white">Diferenciais</a>
-            <a href="#seguranca" className="hover:text-white">Segurança</a>
-          </nav>
-          <div className="flex items-center gap-3">
-            <Link
-              href="/login"
-              className="hidden text-xs font-semibold uppercase tracking-[0.15em] text-slate-300 hover:text-white sm:inline"
-            >
-              Entrar
-            </Link>
-            <Pill href="/login" variant="green" className="hidden sm:inline-flex">
-              Criar conta
-            </Pill>
-            <MobileMenu
-              links={[
-                { label: "Recursos", href: "/recursos" },
-                { label: "Diferenciais", href: "#diferenciais" },
-                { label: "Segurança", href: "#seguranca" },
-              ]}
-            />
-          </div>
+export default function Entrada() {
+  const link = linkDaVaga(process.env.NEXT_PUBLIC_WHATSAPP_VAGAS);
+
+  return (
+    <div className="mx-auto max-w-2xl px-4">
+      <header className="flex items-center justify-between gap-4 py-4">
+        <div className="flex items-center gap-2.5">
+          <MarcaIcone tamanho={36} />
+          <span className="text-lg font-semibold text-app-texto">{NOME}</span>
         </div>
+        <Link href="/login" className="btn-ghost">
+          Entrar
+        </Link>
       </header>
 
-      {/* HERO — mídia full-bleed com título sobreposto */}
-      <section className="relative">
-        <div className="relative mx-3 overflow-hidden rounded-3xl">
-          <div className="absolute inset-0 bg-gradient-to-br from-slate-800 via-slate-900 to-black" />
-          <div
-            className="absolute inset-0 bg-cover bg-center"
-            style={{
-              backgroundImage:
-                "url('https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=1920&auto=format&fit=crop&q=60')",
-            }}
-          />
-          <div className="absolute inset-0 bg-slate-950/65" />
-          <div
-            className="pointer-events-none absolute inset-0"
-            style={{
-              backgroundImage:
-                "radial-gradient(600px 500px at 78% 30%, rgba(24,184,94,0.30), transparent 60%)",
-            }}
-          />
-          <div className="relative mx-auto grid max-w-7xl items-center gap-10 px-6 py-20 sm:px-10 lg:grid-cols-2 lg:py-28">
-            <Reveal>
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-brand-400">
-                Saúde · Treino · Dieta com IA
-              </p>
-              <h1 className="mt-6 font-display text-5xl font-semibold leading-[0.98] tracking-tight text-white sm:text-6xl xl:text-7xl">
-                o app de saúde feito para durar
-              </h1>
-              <p className="mt-6 max-w-md text-lg leading-relaxed text-slate-300">
-                Treinos, dieta, peso, hábitos, exames e tratamento num só lugar —
-                com uma inteligência que trabalha por você todos os dias.
-              </p>
-              <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-                <Pill href="/login" variant="green">Começar grátis</Pill>
-                <Pill href="#diferenciais" variant="white">Ver diferenciais</Pill>
-              </div>
-            </Reveal>
-            <div className="flex justify-center lg:justify-end">
-              <div className="animate-float">
-                <GlowRing value="92" label="Score de Saúde" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Faixa em movimento (marquee) */}
-      <div className="overflow-hidden border-y border-white/10 bg-black py-5" aria-hidden="true">
-        <div className="flex w-max animate-marquee">
-          {[0, 1].map((dup) => (
-            <div key={dup} className="flex items-center">
-              {["Treino", "Dieta", "Sono", "Água", "Exames", "IA", "Modo Caneta", "Nutricionista"].map(
-                (w) => (
-                  <span
-                    key={w}
-                    className="flex items-center text-xl font-semibold uppercase tracking-[0.15em] text-white/70 sm:text-2xl"
-                  >
-                    <span className="px-6">{w}</span>
-                    <span className="text-brand-500">•</span>
-                  </span>
-                )
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* SEÇÃO BRANCA — título gigante + cards de mídia (carrossel) */}
-      <section id="recursos" className="bg-white">
-        <div className="mx-auto max-w-7xl px-6 py-24 sm:px-10">
-          <Reveal>
-            <h2 className="max-w-3xl font-display text-4xl font-semibold leading-[1.02] tracking-tight text-slate-900 sm:text-6xl">
-              Tudo o que importa, num só app
-            </h2>
-            <p className="mt-6 max-w-xl text-lg text-slate-500">
-              Uma visão completa da sua saúde — para você tomar decisões melhores
-              todos os dias.
-            </p>
-            <div className="mt-8">
-              <Pill href="/recursos" variant="black">
-                Ver todos os recursos e tecnologias <ArrowRight className="h-4 w-4" />
-              </Pill>
-            </div>
-          </Reveal>
-
-          <div className="mt-12 flex snap-x gap-5 overflow-x-auto pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {mediaCards.map((c) => (
-              <div
-                key={c.title}
-                className={`relative flex aspect-[3/4] w-[78%] shrink-0 snap-start flex-col justify-between overflow-hidden rounded-3xl bg-gradient-to-br ${c.from} ${c.to} p-6 transition duration-300 hover:-translate-y-1.5 sm:w-[340px]`}
-              >
-                {c.img && (
-                  <>
-                    <div
-                      className="absolute inset-0 bg-cover bg-center"
-                      style={{ backgroundImage: `url('${c.img}')` }}
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
-                  </>
-                )}
-                <div className="relative flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15 text-white backdrop-blur">
-                  <c.icon className="h-5 w-5" />
-                </div>
-                <h3 className="relative font-display text-2xl font-semibold leading-tight text-white">
-                  {c.title}
-                </h3>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* SEÇÃO PRETA — diferenciais em cards de mídia grandes */}
-      <section id="diferenciais" className="bg-black">
-        <div className="mx-auto max-w-7xl px-6 py-24 sm:px-10">
-          <Reveal>
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-brand-400">
-              O que nos torna diferentes
-            </p>
-            <h2 className="mt-5 max-w-2xl font-display text-4xl font-semibold leading-[1.02] tracking-tight text-white sm:text-6xl">
-              Mais que um app de treino
-            </h2>
-          </Reveal>
-
-          <div className="mt-12 grid gap-5 lg:grid-cols-2">
-            {[
-              {
-                icon: Syringe,
-                title: "Modo Caneta",
-                sub: "GLP-1",
-                desc: "Para quem usa Ozempic, Mounjaro, Wegovy e similares: lembrete da aplicação, diário de efeitos e foco em proteína para preservar músculo.",
-                img: "https://images.unsplash.com/photo-1682330709591-aa4b18ac1030?w=900&auto=format&fit=crop&q=60",
-              },
-              {
-                icon: HeartPulse,
-                title: "Inteligência de Saúde",
-                sub: "IA conectada",
-                desc: "Cruza seus exames, dieta, treino e hábitos e revela conexões que passariam despercebidas — com prioridades claras do que fazer agora.",
-                img: "https://images.unsplash.com/photo-1697577418970-95d99b5a55cf?w=900&auto=format&fit=crop&q=60",
-              },
-            ].map((d) => (
-              <div
-                key={d.title}
-                className="relative flex min-h-[24rem] flex-col justify-between overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-slate-800 to-black p-8 transition duration-300 hover:-translate-y-1.5 hover:border-brand-500/40"
-              >
-                {d.img && (
-                  <>
-                    <div
-                      className="absolute inset-0 bg-cover bg-center"
-                      style={{ backgroundImage: `url('${d.img}')` }}
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/60 to-black/40" />
-                  </>
-                )}
-                <div
-                  className="pointer-events-none absolute -right-10 -top-12 h-52 w-52 rounded-full"
-                  style={{
-                    background:
-                      "radial-gradient(circle, rgba(24,184,94,0.30), transparent 60%)",
-                  }}
-                />
-                <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600 text-white">
-                  <d.icon className="h-7 w-7" />
-                </div>
-                <div className="relative">
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-400">
-                    {d.sub}
-                  </p>
-                  <h3 className="mt-2 font-display text-3xl font-semibold tracking-tight text-white">
-                    {d.title}
-                  </h3>
-                  <p className="mt-3 max-w-md text-base leading-relaxed text-slate-400">
-                    {d.desc}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* SEÇÃO BRANCA — 3 pilares (estilo cards de plano) */}
-      <section className="bg-white">
-        <div className="mx-auto max-w-7xl px-6 py-24 sm:px-10">
-          <h2 className="text-center font-display text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl">
-            Três pilares, um só lugar
-          </h2>
-          <div className="mt-14 grid gap-6 md:grid-cols-3">
-            {pillars.map((p) => (
-              <div
-                key={p.name}
-                className="flex flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white"
-              >
-                <div className="flex h-40 items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200">
-                  <span className="font-display text-2xl font-semibold uppercase tracking-[0.35em] text-slate-800">
-                    {p.name}
-                  </span>
-                </div>
-                <div className="flex flex-1 flex-col p-7">
-                  <ul className="flex-1 space-y-3">
-                    {p.points.map((pt) => (
-                      <li key={pt} className="flex items-center gap-3 text-sm text-slate-700">
-                        <Check className="h-4 w-4 shrink-0 text-brand-600" />
-                        {pt}
-                      </li>
-                    ))}
-                  </ul>
-                  <Pill href="/login" variant="black" className="mt-7 w-full">
-                    Começar
-                  </Pill>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* SEÇÃO PRETA — recursos de IA */}
-      <section className="bg-black">
-        <div className="mx-auto max-w-7xl px-6 py-24 sm:px-10">
-          <h2 className="max-w-2xl font-display text-4xl font-semibold leading-[1.02] tracking-tight text-white sm:text-5xl">
-            Inteligência que trabalha por você
-          </h2>
-          <div className="mt-12 grid gap-px overflow-hidden rounded-3xl border border-white/10 bg-white/10 sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              { icon: Camera, t: "Foto do prato", d: "Calorias e macros pela imagem." },
-              { icon: Leaf, t: "Gaia, sua IA 24h", d: "Companheira de saúde em qualquer tela." },
-              { icon: FileText, t: "Leitura de exames", d: "Entenda o PDF sem juridiquês." },
-              { icon: Stethoscope, t: "Nutricionista junto", d: "Seu profissional acompanha tudo." },
-            ].map((f) => (
-              <div key={f.t} className="bg-black p-7">
-                <f.icon className="h-6 w-6 text-brand-400" />
-                <h3 className="mt-4 text-lg font-semibold text-white">{f.t}</h3>
-                <p className="mt-1 text-sm text-slate-400">{f.d}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* SEÇÃO BRANCA — segurança */}
-      <section id="seguranca" className="bg-white">
-        <div className="mx-auto max-w-7xl px-6 py-24 sm:px-10">
-          <div className="grid items-center gap-12 lg:grid-cols-2">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-brand-600">
-                Privacidade em primeiro lugar
-              </p>
-              <h2 className="mt-5 font-display text-4xl font-semibold leading-[1.02] tracking-tight text-slate-900 sm:text-5xl">
-                Seus dados de saúde são só seus
-              </h2>
-              <p className="mt-5 max-w-lg text-lg text-slate-500">
-                Cada conta acessa apenas os próprios registros, a conexão é
-                criptografada e você continua no controle.
-              </p>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              {[
-                { icon: ShieldCheck, t: "Isolamento por conta", d: "Só você vê seus dados." },
-                { icon: HeartPulse, t: "Sem diagnóstico", d: "Não substitui seu médico." },
-                { icon: Check, t: "Criptografia", d: "Tráfego protegido (HTTPS)." },
-                { icon: Bot, t: "IA responsável", d: "Indica procurar profissional." },
-              ].map((i) => (
-                <div key={i.t} className="rounded-3xl bg-slate-50 p-6">
-                  <i.icon className="h-5 w-5 text-brand-600" />
-                  <p className="mt-3 font-semibold text-slate-900">{i.t}</p>
-                  <p className="text-sm text-slate-500">{i.d}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA FINAL — preto com título gigante */}
-      <section className="relative overflow-hidden bg-black">
-        <div
-          className="pointer-events-none absolute inset-0"
-          style={{
-            backgroundImage:
-              "radial-gradient(700px 340px at 50% 0%, rgba(24,184,94,0.25), transparent 60%)",
-          }}
-        />
-        <div className="relative mx-auto max-w-3xl px-6 py-28 text-center">
-          <h2 className="font-display text-5xl font-semibold leading-[1.0] tracking-tight text-white sm:text-7xl">
-            comece sua evolução hoje
-          </h2>
-          <p className="mx-auto mt-6 max-w-md text-lg text-slate-400">
-            Crie sua conta em segundos. Grátis, sem cartão.
+      <main>
+        <section className="pt-10 sm:pt-16">
+          <h1 className="text-[2rem] font-semibold leading-tight text-app-texto sm:text-5xl">
+            {SLOGAN}
+          </h1>
+          <p className="mt-4 text-lg leading-relaxed text-app-texto-2">
+            Em 14 dias, uma fila mostra quais dos seus pacientes estão saindo do plano entre as
+            consultas. A implantação é feita comigo, sem migrar ninguém.
           </p>
-          <div className="mt-10 flex justify-center">
-            <Pill href="/login" variant="green" className="px-9 py-4 text-sm">
-              Criar conta grátis <ArrowRight className="h-4 w-4" />
-            </Pill>
+          <div className="mt-6">
+            <BotaoDaVaga link={link} />
           </div>
-        </div>
-      </section>
+          <p className="mt-3 text-sm text-app-texto-2">30 dias grátis, sem cartão.</p>
+        </section>
 
-      {/* Rodapé */}
-      <footer className="bg-black">
-        <div className="mx-auto max-w-7xl border-t border-white/10 px-6 py-12 sm:px-10">
-          <div className="flex flex-col items-center gap-4 text-center">
-            <Logo />
-            <p className="max-w-md text-xs leading-relaxed text-slate-500">
-              O Pace Fit é uma ferramenta de acompanhamento e educação em saúde e
-              não substitui a avaliação de um profissional. Em caso de dúvidas
-              médicas, procure seu médico ou nutricionista.
-            </p>
-            <p className="text-xs text-slate-600">© {new Date().getFullYear()} Pace Fit</p>
+        <section className="card mt-10">
+          <p className="text-sm text-app-texto-2">Demonstração, com pacientes fictícios</p>
+          <ul className="mt-2 divide-y divide-app-linha">
+            {DEMONSTRACAO.map((linha) => (
+              <li
+                key={linha.nome}
+                className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 py-3"
+              >
+                <span className="font-medium text-app-texto">{linha.nome}</span>
+                <span className="text-app-texto-2">{linha.texto}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <Secao titulo="Como funciona">
+          <ol className="space-y-3">
+            {PASSOS.map((passo) => (
+              <li key={passo.dia}>
+                <span className="font-semibold">{passo.dia}</span> {passo.texto}
+              </li>
+            ))}
+          </ol>
+        </Secao>
+
+        <Secao titulo="A garantia">
+          <p>
+            Se no dia 14 menos de 3 desses pacientes estiverem registrando, você ganha mais 30
+            dias grátis e a implantação é refeita.
+          </p>
+        </Secao>
+
+        <Secao titulo="O que você tem">
+          <p>
+            Não precisa migrar ninguém para testar: os outros pacientes seguem onde estão. Você
+            prescreve metas, cardápio e, se quiser, treino, e tem agenda, conversa e o registro
+            de cada consulta, concluído com o seu CRN.
+          </p>
+        </Secao>
+
+        {/* A última frase é verdade pela RLS, e é o máximo que se diz até
+            existir a política de privacidade (founder/offer.md). */}
+        <Secao titulo="O paciente">
+          <p>
+            Seu paciente usa um app de graça, no celular ou no navegador. Ele registra comida,
+            água, peso e treino, e pode fazer isso conversando com uma assistente. Ela não muda a
+            meta que você deu. Cada paciente só aparece, no app, para você e para ele mesmo.
+          </p>
+        </Secao>
+
+        <Secao titulo="As vagas">
+          <p>São 10 vagas de implantação por mês, porque cada uma é feita pelo fundador.</p>
+          <div className="mt-5">
+            <BotaoDaVaga link={link} />
           </div>
-        </div>
+        </Secao>
+      </main>
+
+      <footer className="mt-16 border-t border-app-linha py-6 text-sm text-app-texto-2">
+        <Link
+          href="/login"
+          className="inline-flex min-h-[44px] items-center text-app-texto underline-offset-4 hover:underline"
+        >
+          Recebi um convite do meu nutricionista: entrar
+        </Link>
+        <p className="mt-1">
+          © {new Date().getFullYear()} {NOME}
+        </p>
       </footer>
-    </main>
+    </div>
   );
 }

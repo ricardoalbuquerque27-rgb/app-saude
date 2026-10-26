@@ -1,0 +1,13 @@
+{
+  "id": "P009",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "trust",
+  "reason": "Já pago o Dietbox e estou no meio da assinatura, então teria que pagar dois sistemas ao mesmo tempo. E é empresa nova, sem nome na praça: não coloco dado de paciente num lugar que pode sumir.",
+  "objection": "Empresa nova: e se sumir com os dados dos meus pacientes? Eu monto o plano no sistema que já uso e o paciente já está acostumado com o app dele. Não vejo por que arriscar o histórico deles e ainda pagar R$ 79 por cima do que já pago.",
+  "would_change_my_mind": "Saber quem está por trás, ver outros nutricionistas conhecidos usando há um tempo, e poder exportar todos os dados dos meus pacientes a qualquer momento. Aí eu testaria com dois ou três pacientes só, depois que a minha assinatura atual vencer.",
+  "price_too_cheap": 29,
+  "price_cheap": 49,
+  "price_expensive": 89,
+  "price_too_expensive": 129
+}
