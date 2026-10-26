@@ -1,5 +1,6 @@
-Pace Fit, um app para o nutricionista acompanhar os pacientes entre as consultas.
-Na tela inicial, uma fila mostra quais pacientes precisam de atenção: quem parou de registrar, quem tem exame alterado, quem pediu ou remarcou consulta, quem mudou a meta ou o treino que você prescreveu.
-Você prescreve ali mesmo metas, cardápio e treino, e tem agenda, conversa com o paciente e o registro de cada consulta, concluído com o seu CRN.
-O paciente entra por um convite seu e usa de graça um app no navegador ou instalado no celular, onde registra refeições, água, peso e treino, também conversando com uma assistente de IA.
-R$ 79 por mês. 30 dias grátis, sem cartão. Online, em português.
+Pace Fit: em 14 dias, uma fila que mostra quais dos seus pacientes estão saindo do plano entre as consultas: quem parou de registrar, quem faltou ao treino, quem tem exame fora da referência, quem mudou a meta que você deu, quem pediu ou remarcou consulta.
+A implantação é feita pelo fundador, com você. No dia 1, uma chamada de 30 minutos para criar a conta e convidar de 3 a 5 pacientes seus, com a mensagem pronta para mandar no WhatsApp e um guia curto para o paciente instalar o app. Nos dias 7 e 14, mais 15 minutos para abrir a fila juntos.
+Garantia: se no dia 14 menos de 3 desses pacientes estiverem registrando, você ganha mais 30 dias grátis e a implantação é refeita.
+Não precisa migrar ninguém para testar: os outros pacientes seguem onde estão. Você prescreve metas, cardápio e, se quiser, treino, e tem agenda, conversa e o registro de cada consulta, concluído com o seu CRN.
+O paciente usa de graça um app no navegador ou instalado no celular e registra refeições, água, peso e treino, também conversando com uma assistente de IA, que não consegue mudar as metas nem o treino que você prescreveu.
+R$ 69,90 por mês, 30 dias grátis, sem cartão. Online, em português. São 10 vagas de implantação por mês, porque cada uma é feita pelo fundador.

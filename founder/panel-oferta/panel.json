@@ -1,0 +1,91 @@
+{
+ "n": 20,
+ "seed": 159337,
+ "customer": {
+  "business": "Pace Fit (app para o nutricionista acompanhar os pacientes entre as consultas)",
+  "target": "nutricionistas que atendem sozinhos no Brasil, presencial ou online, de consultório ou de nutrição esportiva; pensam e escrevem em português, e toda renda e todo preço aqui são em reais (R$)",
+  "where": "Brasil, online",
+  "age": [
+   23,
+   45
+  ],
+  "_fontes": "Renda: palpite ancorado na média do CFN (R$ 4.831,62 por mês, tabelas de 2017, https://cfn.org.br/wp-content/uploads/repositorirob/pdf/Pesquisa.pdf) e nas faixas de R$ 3.000 a R$ 10.000 por mês de blogs sem metodologia. Fatias de segmento e de comportamento: palpite. Objeções: das reclamações em founder/competitors.md e dos riscos em founder/board.md. Nenhum dado vem de nutricionista real. Cópia para o pitch B: só a objeção do preço perdeu o valor de R$ 79, na mesma posição, para as cartas saírem iguais.",
+  "segments": [
+   {
+    "name": "Consultório, começando (até 3 anos de formada, poucos pacientes ativos)",
+    "share": 0.3,
+    "income": [
+     30000,
+     60000
+    ]
+   },
+   {
+    "name": "Consultório, consolidada (agenda cheia, retornos todo mês)",
+    "share": 0.3,
+    "income": [
+     60000,
+     150000
+    ]
+   },
+   {
+    "name": "Nutrição esportiva (pacientes de musculação e corrida, parte online)",
+    "share": 0.4,
+    "income": [
+     45000,
+     130000
+    ]
+   }
+  ],
+  "behaviours": [
+   {
+    "name": "Já paga Dietbox ou WebDiet",
+    "share": 0.3,
+    "how": "Monta o plano alimentar no sistema durante a consulta e o paciente usa o app dele; está no meio da assinatura."
+   },
+   {
+    "name": "Acompanha pelo WhatsApp e planilha",
+    "share": 0.2,
+    "how": "Nunca pagou software de nutrição; manda o plano em PDF e responde dúvida no WhatsApp à noite."
+   },
+   {
+    "name": "Não acredita em app para o paciente",
+    "share": 0.15,
+    "how": "Já pediu diário alimentar e viu o paciente largar em duas semanas."
+   },
+   {
+    "name": "Caça preço",
+    "share": 0.15,
+    "how": "Usa o plano grátis ou a promoção dos primeiros meses e cancela quando o preço sobe."
+   },
+   {
+    "name": "Testa ferramenta nova",
+    "share": 0.1,
+    "how": "Assina o teste grátis de tudo que aparece no Instagram e troca de sistema sem dó."
+   },
+   {
+    "name": "Pergunta às colegas antes",
+    "share": 0.1,
+    "how": "Só assina o que as colegas do grupo de nutricionistas já usam e recomendam."
+   }
+  ],
+  "objections": [
+   "Meu paciente não vai registrar todo dia num app",
+   "Já pago um sistema, não quero pagar dois",
+   "Sem lembrete no WhatsApp, o paciente esquece",
+   "Empresa nova: e se sumir com os dados dos meus pacientes?",
+   "Trocar de sistema dá trabalho, e eu perco o histórico",
+   "O preço pesa com os poucos pacientes que eu tenho",
+   "Prescrever treino é do personal, não meu"
+  ],
+  "habits": [
+   "você atende três dias no consultório e dois online",
+   "você faz o retorno a cada 30 ou 45 dias",
+   "você responde paciente no WhatsApp à noite, depois do jantar",
+   "você divide a sala com outros profissionais de saúde",
+   "você atende dentro de uma academia, e boa parte dos pacientes treina lá",
+   "você posta no Instagram para trazer paciente novo",
+   "você vende o acompanhamento em pacotes de três meses"
+  ]
+ },
+ "pitch": "Pace Fit: em 14 dias, uma fila que mostra quais dos seus pacientes estão saindo do plano entre as consultas: quem parou de registrar, quem faltou ao treino, quem tem exame fora da referência, quem mudou a meta que você deu, quem pediu ou remarcou consulta.\nA implantação é feita pelo fundador, com você. No dia 1, uma chamada de 30 minutos para criar a conta e convidar de 3 a 5 pacientes seus, com a mensagem pronta para mandar no WhatsApp e um guia curto para o paciente instalar o app. Nos dias 7 e 14, mais 15 minutos para abrir a fila juntos.\nGarantia: se no dia 14 menos de 3 desses pacientes estiverem registrando, você ganha mais 30 dias grátis e a implantação é refeita.\nNão precisa migrar ninguém para testar: os outros pacientes seguem onde estão. Você prescreve metas, cardápio e, se quiser, treino, e tem agenda, conversa e o registro de cada consulta, concluído com o seu CRN.\nO paciente usa de graça um app no navegador ou instalado no celular e registra refeições, água, peso e treino, também conversando com uma assistente de IA, que não consegue mudar as metas nem o treino que você prescreveu.\nR$ 69,90 por mês, 30 dias grátis, sem cartão. Online, em português. São 10 vagas de implantação por mês, porque cada uma é feita pelo fundador."
+}
