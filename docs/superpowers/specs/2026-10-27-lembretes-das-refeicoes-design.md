@@ -50,13 +50,24 @@ Exemplo de como chega: `2026-10-27-lembretes-das-refeicoes/exemplo-notificacoes.
   - o horário passou há mais de 1 hora (uma rodada perdida do agendador não
     manda o café às 15h).
 - **O texto:**
-  - título: a refeição ("Almoço");
-  - corpo: a descrição da primeira opção do cardápio, cortada em 110
-    caracteres numa palavra inteira, com "…"; com mais opções, " · ou mais 1
-    opção" ou " · ou mais N opções";
+  - título: a refeição e a pergunta ("Almoço: você comeu?"), nos dois
+    celulares. O mais longo é "Lanche da manhã: você comeu?" (28
+    caracteres); se um celular cortar o título, o que some é o fim da
+    pergunta, nunca o nome da refeição;
+  - corpo com botões: a descrição da primeira opção do cardápio, cortada em
+    110 caracteres numa palavra inteira, com "…"; com mais opções, " · ou mais
+    1 opção" ou " · ou mais N opções";
+  - corpo sem botões: "Toque para marcar. " e depois o mesmo cardápio. O pedido
+    vem antes do cardápio porque a tela bloqueada do iPhone corta o texto em
+    poucas linhas, e o que some é o fim;
   - o nome do app aparece em cima, pelo próprio celular.
 - **Os botões:** "Comi" e "Não comi". O Android mostra os dois; o iPhone não
   mostra botão em notificação de app web.
+- **Quem escolhe o corpo é o celular, na hora de mostrar:** o servidor manda
+  os dois (`body` e `bodySemBotoes`), e o service worker usa o sem botões
+  quando o navegador não mostra botão (`Notification.maxActions` ausente ou
+  menor que 2). Vale para o iPhone e para qualquer navegador sem botões, sem o
+  servidor adivinhar o celular.
 - **O toque no texto** abre a Dieta no dia e na refeição
   (`/app/dieta?data=AAAA-MM-DD#refeicao-<nome>`, com o nome em minúsculas,
   sem acento e com hífen: `refeicao-cafe-da-manha`), para ver o cardápio e
@@ -230,8 +241,21 @@ política: só a função de envio escreve e lê.
     `POST /api/refeicoes/marcar` (com o cookie da sessão), sem abrir o app; se
     a resposta não é 2xx ou a chamada falha, mostra a notificação "Não deu para
     marcar…";
-  - o toque no texto abre a URL, como hoje;
+  - o toque no texto leva à refeição em qualquer caso:
+    - **com o app já aberto** (em segundo plano, em outra tela): o service
+      worker põe a janela na frente e manda um recado (`postMessage` com a
+      URL), e o app navega até ela (um ouvinte no `AppShell`, com o
+      `router.push`). O `client.navigate` de hoje pode não existir no navegador
+      do iPhone, e o app voltaria para a frente na tela em que estava;
+    - **com o app fechado:** abre direto na URL (`openWindow`), como hoje;
   - o `CACHE` passa a `pacefit-v5`, para o celular trocar o service worker.
+- **O login volta para onde a pessoa ia.** Com a sessão vencida, o
+  middleware leva ao `/login` com `?volta=<caminho>`, e o login, depois de
+  entrar, vai a esse caminho em vez de `/app`. Só vale caminho de dentro do
+  app (começa com `/app`, sem `//` nem esquema), para o parâmetro não virar
+  porta para outro site. Hoje o login leva sempre a `/app`, e o toque numa
+  notificação com a sessão vencida terminava na Início. A regra mora numa
+  função testada (`destinoDoLogin`).
 - **A rota `POST /api/refeicoes/marcar`**: `{ data, refeicao, resposta, itemId? }`,
   com `resposta` em `comi`, `nao_comi` ou `desfazer`. Sem sessão, 401; data ou
   refeição inválida, 400. Ela chama `marcarRefeicao` (`lib/refeicoesDoPlano.ts`),
@@ -255,8 +279,10 @@ Fica no CLAUDE.md, com cada comando pronto:
 4. **Conferir o `pacefit-reminders`** no SQL Editor: que ele chama
    `https://app-saude-silk.vercel.app/api/cron/reminders` com
    `Authorization: Bearer <CRON_SECRET>`.
-5. **Testar num celular:** ligar no Perfil, usar o "Enviar teste" do
-   `PwaSettings`, e esperar uma refeição.
+5. **Testar num Android e num iPhone:** ligar no Perfil, usar o "Enviar
+   teste" do `PwaSettings`, e esperar uma refeição. Em cada um, tocar na
+   notificação com o app fechado e com o app aberto em outra tela, e conferir
+   que abre na refeição; no iPhone, conferir o "Toque para marcar." no texto.
 
 **Ao ligar, também passam a chegar** o lembrete diário que já existe ("Bora,
 fulano 💪 …") e o da caneta, para quem os tiver ligado.
@@ -264,8 +290,11 @@ fulano 💪 …") e o da caneta, para quem os tiver ligado.
 ## Testes
 
 **Unitários, escritos antes (vitest):**
-- `notificacaoDaRefeicao`: título, corte em 110 caracteres numa palavra, "ou
-  mais 1 opção" e "ou mais N opções", a `tag`, a URL e os dois botões.
+- `notificacaoDaRefeicao`: o título com a pergunta, o corte em 110
+  caracteres numa palavra, "ou mais 1 opção" e "ou mais N opções", o corpo sem
+  botões começando por "Toque para marcar. ", a `tag`, a URL e os dois botões.
+- `destinoDoLogin`: caminho do app vale; vazio, externo (`https://…`,
+  `//outro`), fora de `/app` e com `\` vão para `/app`.
 - Os horários: `HORARIOS_SUGERIDOS` igual aos da migração (lendo o arquivo);
   `horarioValido`; `horariosDoPaciente` (o salvo vence o sugerido, o inválido
   não, e só as refeições do cardápio).
@@ -293,10 +322,13 @@ fulano 💪 …") e o da caneta, para quem os tiver ligado.
 - o bloco "Refeições da semana" na aba Alimentação, e o `tirar-prints-nutri`
   passando como antes nas outras abas.
 
-**O que não dá para testar aqui:** os botões dentro da notificação do
-sistema. O navegador de teste não mostra notificação, então isso fica para o
-passo 5 de "Para ligar". O trecho do service worker é mínimo: ele só chama a
-rota, que é testada.
+**O que não dá para testar aqui:** a notificação do sistema, com os botões, o
+corpo escolhido pelo celular e o toque com o app aberto ou fechado. O navegador
+de teste não mostra notificação, então isso fica para o passo 5 de "Para
+ligar". O que o service worker faz é mínimo e sem regra própria: escolhe entre
+os dois corpos que já vêm prontos e testados, chama a rota testada e manda a
+URL ao app. O ouvinte do recado no `AppShell` se confere com o mock, mandando
+o recado à página pelo Playwright.
 
 **Por fim:** `npm test`, o typecheck e o `npm run build`, com o dev parado.
 
@@ -318,6 +350,6 @@ rota, que é testada.
 - **15 minutos de atraso.** O agendamento roda de 15 em 15. Encurtar para 5 é
   trocar o `*/15` do `pacefit-reminders`, com três vezes mais chamadas.
 - **A sessão vencida no celular** faz o botão falhar. A notificação "Não deu
-  para marcar" leva ao app, que pede login.
+  para marcar" leva ao app, que pede login e volta para a refeição.
 - **"Comi" por reflexo.** Um toque é barato também para responder sem pensar.
   A semana na aba Alimentação mostra o padrão, não a verdade de cada refeição.
