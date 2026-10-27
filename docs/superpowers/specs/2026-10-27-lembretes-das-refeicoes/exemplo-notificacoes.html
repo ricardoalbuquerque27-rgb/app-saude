@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Lembretes das refeições: exemplo</title>
+<style>
+  :root { --pagina:#f6f7f6; --texto:#111827; --texto2:#4b5563; --linha:#e5e7eb; --primaria:#0e5d34; --primaria-fundo:#e7f3ec; --atencao:#9a3412; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--pagina); color: var(--texto); font-family: "Instrument Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; padding: 40px 48px; width: 1500px; }
+  h1 { font-size: 30px; font-weight: 600; }
+  .sub { color: var(--texto2); margin-top: 6px; font-size: 16px; }
+  .linha { display: flex; gap: 36px; margin-top: 32px; align-items: flex-start; }
+  .col { width: 452px; }
+  .rotulo { font-weight: 600; font-size: 17px; margin-bottom: 12px; }
+  .rotulo small { display: block; font-weight: 400; color: var(--texto2); font-size: 14px; margin-top: 2px; }
+  .celular { width: 452px; height: 700px; border-radius: 44px; padding: 14px; background: #1f2937; box-shadow: 0 0 0 2px #374151 inset; }
+  .tela { width: 100%; height: 100%; border-radius: 32px; overflow: hidden; position: relative; }
+  .legenda { color: var(--texto2); font-size: 14.5px; line-height: 1.45; margin-top: 14px; }
+  .legenda b { color: var(--texto); }
+  /* Android */
+  .android { background: #dfe4e1; font-family: Roboto, "Segoe UI", system-ui, sans-serif; }
+  .barra { display: flex; justify-content: space-between; padding: 14px 24px 6px; font-size: 14px; color: #1f2937; }
+  .relogio-a { padding: 6px 24px 14px; font-size: 40px; color: #111827; font-weight: 400; }
+  .data-a { padding: 0 24px 16px; color: #374151; font-size: 15px; margin-top: -8px; }
+  .notif-a { background: #fbfdfb; margin: 8px 12px; border-radius: 22px; padding: 14px 16px 10px; }
+  .topo-a { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #4b5563; }
+  .icone { width: 22px; height: 22px; border-radius: 6px; flex-shrink: 0; }
+  .titulo-a { font-weight: 600; font-size: 16px; margin-top: 8px; color: #111827; }
+  .corpo-a { font-size: 15px; color: #374151; margin-top: 2px; line-height: 1.38; }
+  .acoes-a { display: flex; gap: 8px; margin-top: 12px; }
+  .acoes-a span { background: #e7f3ec; color: var(--primaria); font-weight: 600; font-size: 14.5px; padding: 9px 18px; border-radius: 999px; }
+  .erro-a .corpo-a { color: #374151; }
+  /* iPhone */
+  .iphone { background: #1b2a24; color: #fff; font-family: -apple-system, "SF Pro Text", system-ui, sans-serif; }
+  .ilha { width: 120px; height: 34px; background: #000; border-radius: 20px; margin: 12px auto 0; }
+  .data-i { text-align: center; font-size: 18px; margin-top: 26px; opacity: .9; }
+  .relogio-i { text-align: center; font-size: 84px; font-weight: 600; letter-spacing: -2px; line-height: 1; margin-top: 4px; }
+  .notif-i { position: absolute; left: 14px; right: 14px; bottom: 150px; background: rgba(245,245,245,.88); color: #111; border-radius: 22px; padding: 12px 14px; display: flex; gap: 10px; }
+  .notif-i .icone { width: 38px; height: 38px; border-radius: 9px; }
+  .cab-i { display: flex; justify-content: space-between; font-size: 13.5px; }
+  .cab-i b { font-weight: 600; }
+  .cab-i span { color: #6b7280; }
+  .corpo-i { font-size: 14.5px; line-height: 1.33; margin-top: 2px; }
+  .corpo-i b { font-weight: 600; }
+  .rodape-i { position: absolute; bottom: 26px; left: 0; right: 0; text-align: center; font-size: 13px; opacity: .7; }
+  /* app */
+  .app { background: var(--pagina); }
+  .app-topo { display: flex; align-items: center; gap: 10px; padding: 18px 20px 12px; background: #fff; border-bottom: 1px solid var(--linha); }
+  .app-topo .icone { width: 30px; height: 30px; border-radius: 8px; }
+  .app-topo b { font-size: 17px; color: var(--primaria); }
+  .app-tit { padding: 16px 20px 4px; font-size: 24px; font-weight: 600; }
+  .app-sub { padding: 0 20px 12px; color: var(--texto2); font-size: 14px; }
+  .card { background: #fff; border: 1px solid var(--linha); border-radius: 14px; margin: 0 16px 12px; }
+  .card-cab { display: flex; justify-content: space-between; align-items: baseline; padding: 14px 16px 6px; }
+  .card-cab b { font-size: 16px; }
+  .selo { font-size: 13px; color: var(--primaria); background: var(--primaria-fundo); padding: 3px 9px; border-radius: 999px; font-weight: 600; }
+  .pergunta { padding: 2px 16px 8px; font-size: 14px; color: var(--texto2); }
+  .opcao { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--linha); }
+  .opcao p { font-size: 14.5px; line-height: 1.35; }
+  .opcao p small { color: var(--texto2); display: block; font-size: 13px; margin-top: 2px; }
+  .btn { min-height: 44px; padding: 0 14px; border-radius: 10px; display: inline-flex; align-items: center; font-weight: 600; font-size: 14px; white-space: nowrap; }
+  .btn-sol { background: var(--primaria); color: #fff; }
+  .btn-sec { border: 1px solid #858d99; color: var(--texto); background: #fff; }
+  .acoes-app { display: flex; gap: 8px; padding: 12px 16px 14px; border-top: 1px solid var(--linha); }
+  .nota { padding: 0 16px 12px; font-size: 12.5px; color: var(--texto2); }
+  .card-min { padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; }
+  .card-min span { color: var(--texto2); font-size: 14px; }
+</style>
+</head>
+<body>
+  <h1>Como chegariam os lembretes das refeições</h1>
+  <p class="sub">Exemplo ilustrativo, com o cardápio fictício da paciente de teste. A aparência real muda um pouco de um celular para outro.</p>
+
+  <div class="linha">
+    <div class="col">
+      <p class="rotulo">Android<small>Com os botões "Comi" e "Não comi"</small></p>
+      <div class="celular"><div class="tela android">
+        <div class="barra"><span>12:31</span><span>📶 🔋 82%</span></div>
+        <div class="relogio-a">12:31</div>
+        <div class="data-a">terça-feira, 27 de outubro</div>
+        <div class="notif-a">
+          <div class="topo-a"><svg class="icone" viewBox="0 0 512 512"><rect width="512" height="512" rx="112" fill="#0e5d34"/><g fill="#fff"><rect x="132" y="142" width="248" height="44" rx="22" opacity="0.55"/><rect x="208" y="234" width="172" height="44" rx="22"/><rect x="132" y="326" width="248" height="44" rx="22" opacity="0.55"/><circle cx="154" cy="256" r="30"/></g></svg>Pace Fit · agora</div>
+          <p class="titulo-a">Almoço</p>
+          <p class="corpo-a">Arroz integral, feijão, frango grelhado e salada de folhas · ou mais 1 opção</p>
+          <div class="acoes-a"><span>Comi</span><span>Não comi</span></div>
+        </div>
+        <div class="notif-a erro-a">
+          <div class="topo-a"><svg class="icone" viewBox="0 0 512 512"><rect width="512" height="512" rx="112" fill="#0e5d34"/><g fill="#fff"><rect x="132" y="142" width="248" height="44" rx="22" opacity="0.55"/><rect x="208" y="234" width="172" height="44" rx="22"/><rect x="132" y="326" width="248" height="44" rx="22" opacity="0.55"/><circle cx="154" cy="256" r="30"/></g></svg>Pace Fit · agora</div>
+          <p class="corpo-a">Não deu para marcar sua resposta (Lanche da manhã). Toque para abrir o app.</p>
+        </div>
+      </div></div>
+      <p class="legenda"><b>"Comi" e "Não comi"</b> gravam na hora, sem abrir o app. <b>O toque no texto</b> abre a refeição no app. Se a marcação falhar (sem internet, por exemplo), chega o aviso de baixo.</p>
+    </div>
+
+    <div class="col">
+      <p class="rotulo">iPhone<small>Com o app na Tela de Início (iOS 16.4 ou mais novo)</small></p>
+      <div class="celular"><div class="tela iphone">
+        <div class="ilha"></div>
+        <p class="data-i">terça-feira, 27 de outubro</p>
+        <p class="relogio-i">12:31</p>
+        <div class="notif-i">
+          <svg class="icone" viewBox="0 0 512 512"><rect width="512" height="512" rx="112" fill="#0e5d34"/><g fill="#fff"><rect x="132" y="142" width="248" height="44" rx="22" opacity="0.55"/><rect x="208" y="234" width="172" height="44" rx="22"/><rect x="132" y="326" width="248" height="44" rx="22" opacity="0.55"/><circle cx="154" cy="256" r="30"/></g></svg>
+          <div style="flex:1">
+            <div class="cab-i"><b>Pace Fit</b><span>agora</span></div>
+            <p class="corpo-i"><b>Almoço</b><br>Arroz integral, feijão, frango grelhado e salada de folhas · ou mais 1 opção</p>
+          </div>
+        </div>
+        <p class="rodape-i">Deslize para abrir</p>
+      </div></div>
+      <p class="legenda"><b>Sem botões:</b> o iPhone não mostra botão em notificação de app web. O toque abre a refeição no app, já com "Comi" e "Não comi" na tela.</p>
+    </div>
+
+    <div class="col">
+      <p class="rotulo">No app, depois do "Comi"<small>Dieta · quando a refeição tem mais de uma opção</small></p>
+      <div class="celular"><div class="tela app">
+        <div class="app-topo"><svg class="icone" viewBox="0 0 512 512"><rect width="512" height="512" rx="112" fill="#0e5d34"/><g fill="#fff"><rect x="132" y="142" width="248" height="44" rx="22" opacity="0.55"/><rect x="208" y="234" width="172" height="44" rx="22"/><rect x="132" y="326" width="248" height="44" rx="22" opacity="0.55"/><circle cx="154" cy="256" r="30"/></g></svg><b>Pace Fit</b></div>
+        <p class="app-tit">Dieta</p>
+        <p class="app-sub">Cardápio da sua nutricionista · hoje</p>
+        <div class="card">
+          <div class="card-cab"><b>Almoço</b><span class="selo">comi</span></div>
+          <p class="pergunta">Qual opção?</p>
+          <div class="opcao"><p>Arroz integral, feijão, frango grelhado e salada de folhas<small>520 kcal · 38 g de proteína</small></p><span class="btn btn-sol">Foi esta</span></div>
+          <div class="opcao"><p>Purê de batata, carne moída refogada e legumes<small>540 kcal · 34 g de proteína</small></p><span class="btn btn-sol">Foi esta</span></div>
+          <div class="acoes-app"><span class="btn btn-sec">Desfazer</span></div>
+        </div>
+        <div class="card"><div class="card-min"><b>Lanche da tarde</b></div>
+          <div class="opcao"><p>1 iogurte natural e 1 fruta<small>180 kcal · 9 g de proteína</small></p></div>
+          <div class="acoes-app"><span class="btn btn-sol">Comi</span><span class="btn btn-sec">Não comi</span></div>
+        </div>
+      </div></div>
+      <p class="legenda"><b>Com mais de uma opção,</b> o "Comi" da notificação grava só que comeu, e o app pergunta qual foi. <b>Com uma opção só,</b> a refeição já entra com as calorias.</p>
+    </div>
+  </div>
+</body>
+</html>
