@@ -1,0 +1,161 @@
+{
+ "business": "Pace Fit (app para o nutricionista acompanhar os pacientes entre as consultas)",
+ "seed": 159337,
+ "dealt": 20,
+ "answered": 20,
+ "skipped": [],
+ "buys": 1,
+ "passes": 19,
+ "buy_rate": 0.05,
+ "by_segment": [
+  [
+   "Nutrição esportiva (pacientes de musculação e corrida, parte online)",
+   8,
+   0.125
+  ],
+  [
+   "Consultório, começando (até 3 anos de formada, poucos pacientes ativos)",
+   6,
+   0.0
+  ],
+  [
+   "Consultório, consolidada (agenda cheia, retornos todo mês)",
+   6,
+   0.0
+  ]
+ ],
+ "by_behaviour": [
+  [
+   "Testa ferramenta nova",
+   2,
+   0.5
+  ],
+  [
+   "Pergunta às colegas antes",
+   2,
+   0.0
+  ],
+  [
+   "Não acredita em app para o paciente",
+   3,
+   0.0
+  ],
+  [
+   "Já paga Dietbox ou WebDiet",
+   6,
+   0.0
+  ],
+  [
+   "Acompanha pelo WhatsApp e planilha",
+   4,
+   0.0
+  ],
+  [
+   "Caça preço",
+   3,
+   0.0
+  ]
+ ],
+ "by_income": [
+  [
+   "$66,000 to $102,000",
+   7,
+   0.14285714285714285
+  ],
+  [
+   "under $66,000",
+   6,
+   0.0
+  ],
+  [
+   "$102,000 and up",
+   7,
+   0.0
+  ]
+ ],
+ "why_not": [
+  [
+   "trust",
+   6,
+   [
+    "Ninguém do meu grupo de nutricionistas usa nem comentou disso, e eu não assino ferramenta que nenhuma colega testou antes. Além disso, meu paciente de musculação e corrida já registra treino em outro app e mal responde o WhatsApp; duvido que vá lançar refeição e água todo dia em mais um.",
+    "Eu teria de pôr os dados dos meus pacientes, e o meu nome junto, no app de uma empresa nova que eu não conheço, e a oferta não diz uma palavra sobre onde esses dados ficam ou o que acontece com eles se a empresa fechar. E com poucos pacientes e retorno a cada 30 ou 45 dias, eu já sei de cabeça quem está largando; não preciso pagar R$ 69,90 por uma fila disso."
+   ],
+   [
+    "P001",
+    "P002"
+   ]
+  ],
+  [
+   "price",
+   5,
+   [
+    "Eu entraria no teste grátis na hora, porque não pede cartão, mas pagar R$ 69,90 por mês para acompanhar meia dúzia de pacientes não cabe no que eu faturo hoje. Com tão pouca gente, eu ainda sei de cabeça quem sumiu, e cobro pelo WhatsApp entre um retorno e outro.",
+    "Como é grátis e sem cartão, eu até abro os 30 dias, mas pagar R$ 69,90 por mês além do que já gasto com software para ver uma fila de quem sumiu eu não pago: no dia 30 eu cancelo, como faço com tudo."
+   ],
+   [
+    "P007",
+    "P013"
+   ]
+  ],
+  [
+   "habit",
+   5,
+   [
+    "Já pago o Dietbox, monto o plano lá dentro da consulta e meus pacientes já usam o app dele; teria que prescrever de novo num segundo sistema e pedir para o paciente instalar outro app, e com agenda cheia e retorno todo mês eu não tenho tempo nem motivo para isso.",
+    "Já pago o Dietbox, estou no meio da assinatura e monto o plano lá mesmo, durante a consulta. Pagar mais R$ 69,90 para montar meta e cardápio uma segunda vez para 3 a 5 pacientes, numa semana com três dias de consultório e dois online, não fecha."
+   ],
+   [
+    "P008",
+    "P009"
+   ]
+  ],
+  [
+   "need",
+   3,
+   [
+    "Tenho poucos pacientes e vejo quase todos na academia ou no WhatsApp, então já sei quem sumiu sem precisar de fila. Pagar R$ 69,90 todo mês para organizar uma carteira que ainda cabe numa planilha não fecha com o que eu ganho hoje.",
+    "Tenho poucos pacientes ativos e já acompanho todos pelo WhatsApp; uma fila para avisar quem saiu do plano não me diz nada que eu não saiba. E paciente meu larga diário alimentar em duas semanas, então essa fila ia ficar cheia de \"parou de registrar\" e só."
+   ],
+   [
+    "P004",
+    "P006"
+   ]
+  ]
+ ],
+ "why_yes": [
+  [
+   "need",
+   1,
+   [
+    "Sem cartão e sem migrar ninguém, eu entro no teste no mesmo dia, como entro em tudo. O que me prende é a fila de quem faltou ao treino e parou de registrar, porque hoje eu só descubro isso no WhatsApp à noite ou na consulta seguinte. Pago os R$ 69,90 se no dia 30 meus pacientes de musculação estiverem mesmo registrando."
+   ],
+   [
+    "P020"
+   ]
+  ]
+ ],
+ "flip": [
+  "Duas ou três colegas do grupo dizendo que usam há alguns meses e que os pacientes delas de fato continuam registrando depois do primeiro mês.",
+  "Poder exportar tudo dos meus pacientes (registros das consultas, medidas, exames) quando eu quiser, e ver por escrito, com LGPD, onde os dados ficam e o que acontece com eles se a empresa fechar.",
+  "Ver por escrito como eu exporto todos os dados dos meus pacientes a qualquer momento (e o que acontece com eles se a empresa fechar), com contrato de LGPD e CNPJ, e saber de pelo menos um colega de nutrição esportiva usando de verdade.",
+  "Um preço de quem está começando, uns R$ 29,90 enquanto eu tiver menos de 10 pacientes, e ver nos 30 dias grátis que pelo menos 3 deles registram sozinhos sem eu ficar cobrando.",
+  "Duas ou três colegas do meu grupo usando há alguns meses e contando que os pacientes registram de verdade entre uma consulta e outra.",
+  "Usar os 30 dias grátis e ver pelo menos 3 pacientes meus ainda registrando no fim do mês, sem eu ter que ficar cobrando.",
+  "Ver no teste que pelo menos 3 pacientes meus continuaram registrando até o retorno e que isso fez mais gente marcar a consulta seguinte, ou um plano mais barato para quem tem poucos pacientes.",
+  "Se desse para trazer meus pacientes e planos do Dietbox sem redigitar e eu cancelar o Dietbox na renovação, pagando um sistema só.",
+  "Garantia por escrito de que eu exporto tudo dos meus pacientes (prontuário, planos, medidas, exames) quando quiser, inclusive depois de cancelar ou se a empresa fechar.",
+  "Ver números de outras nutricionistas mostrando que os pacientes continuam registrando depois de dois ou três meses, não só nos primeiros 14 dias.",
+  "Ver no teste, com os meus pacientes, a fila me mostrar alguém saindo do plano que eu não teria percebido pelo WhatsApp, e isso me poupar mensagem à noite em vez de criar mais uma tela para eu olhar.",
+  "Saber quem está por trás (CNPJ, contrato de tratamento de dados pela LGPD) e poder exportar tudo dos meus pacientes a qualquer momento; aí eu testaria com 3 pacientes quando a minha assinatura do Dietbox estiver para vencer.",
+  "Um plano grátis de verdade para até 5 pacientes, cobrando só quando eu passar disso, num preço que não suba depois.",
+  "Ser de graça, ou bem mais barato, enquanto eu tiver poucos pacientes, e só cobrar quando a carteira crescer; ou me mostrar que isso me traz ou segura paciente, não só organiza os que eu já tenho.",
+  "Se ele substituísse de vez o sistema que eu já pago, para eu cancelar o outro e ficar com uma conta só.",
+  "Um preço de entrada travado bem mais baixo, uns R$ 29,90 por mês enquanto eu tiver poucos pacientes no app.",
+  "Ver por escrito que eu exporto tudo (prontuários, exames, histórico) a qualquer momento num formato que eu abro sem o app, e como os dados são guardados e protegidos pela LGPD, de preferência com uma colega nutri que já usa há uns meses dizendo que funciona.",
+  "Poder montar o plano alimentar no Pace Fit na consulta, com cálculo e tabela, do jeito que faço no Dietbox, para eu cancelar o Dietbox quando a assinatura acabar e pagar um sistema só, ou um preço bem menor enquanto ele for um complemento.",
+  "Se trouxesse meus pacientes e o histórico do Dietbox para dentro sem eu redigitar nada, a ponto de eu cancelar o Dietbox no fim da assinatura e pagar um sistema só."
+ ],
+ "purchases_first_month_per_buyer": 1.0,
+ "price_answers": 20
+}

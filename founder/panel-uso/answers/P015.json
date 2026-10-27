@@ -1,0 +1,13 @@
+{
+  "id": "P015",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "price",
+  "reason": "Eu até abriria os 30 dias grátis, porque não pede cartão, mas no dia 31 eu cancelo: já pago um sistema para o consultório e R$ 69,90 a mais todo mês para uma fila de quem saiu do plano não entra na minha conta. Minha agenda está cheia, e quem some eu já vejo no retorno do mês ou pelo WhatsApp à noite.",
+  "objection": "Já pago um sistema, não quero pagar dois. Cardápio, agenda e prontuário eu já tenho lá, e manter dois lugares para o mesmo paciente é trabalho dobrado.",
+  "would_change_my_mind": "Se ele substituísse de vez o sistema que eu já pago, para eu cancelar o outro e ficar com uma conta só.",
+  "price_too_cheap": 15,
+  "price_cheap": 29.9,
+  "price_expensive": 45,
+  "price_too_expensive": 60
+}

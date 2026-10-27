@@ -1,0 +1,13 @@
+{
+  "id": "P007",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "price",
+  "reason": "Eu entraria no teste grátis na hora, porque não pede cartão, mas pagar R$ 69,90 por mês para acompanhar meia dúzia de pacientes não cabe no que eu faturo hoje. Com tão pouca gente, eu ainda sei de cabeça quem sumiu, e cobro pelo WhatsApp entre um retorno e outro.",
+  "objection": "Meu paciente não vai registrar todo dia num app. Na primeira semana até registra, mas no retorno de 30 ou 45 dias já parou, e aí a fila só vai me dizer o que eu já sei: que ele largou.",
+  "would_change_my_mind": "Ver no teste que pelo menos 3 pacientes meus continuaram registrando até o retorno e que isso fez mais gente marcar a consulta seguinte, ou um plano mais barato para quem tem poucos pacientes.",
+  "price_too_cheap": 10,
+  "price_cheap": 25,
+  "price_expensive": 40,
+  "price_too_expensive": 60
+}

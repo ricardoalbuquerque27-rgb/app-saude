@@ -1,0 +1,13 @@
+{
+  "id": "P016",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "price",
+  "reason": "Eu até ativaria os 30 dias grátis, já que não pede cartão, mas cancelaria antes do dia 31: R$ 69,90 por mês somado ao software de dieta que eu já pago, só para ter uma fila de quem está saindo do plano, não fecha a conta num pacote de três meses.",
+  "objection": "Meus pacientes de corrida e musculação já registram treino no Strava e no app da academia, e treino é do personal, não meu; pedir para eles registrarem tudo de novo em mais um app eu acho que não pega, e aí a fila fica vazia e eu pago por nada.",
+  "would_change_my_mind": "Um preço de entrada travado bem mais baixo, uns R$ 29,90 por mês enquanto eu tiver poucos pacientes no app.",
+  "price_too_cheap": 12,
+  "price_cheap": 29.9,
+  "price_expensive": 45,
+  "price_too_expensive": 69.9
+}

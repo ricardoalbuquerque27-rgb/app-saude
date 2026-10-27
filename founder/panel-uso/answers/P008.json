@@ -1,0 +1,13 @@
+{
+  "id": "P008",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "Já pago o Dietbox, monto o plano lá dentro da consulta e meus pacientes já usam o app dele; teria que prescrever de novo num segundo sistema e pedir para o paciente instalar outro app, e com agenda cheia e retorno todo mês eu não tenho tempo nem motivo para isso.",
+  "objection": "Já pago um sistema, não quero pagar dois nem fazer o mesmo plano duas vezes. A fila é interessante, mas meus pacientes voltam todo mês e eu já fico sabendo pelo WhatsApp quem saiu do plano.",
+  "would_change_my_mind": "Se desse para trazer meus pacientes e planos do Dietbox sem redigitar e eu cancelar o Dietbox na renovação, pagando um sistema só.",
+  "price_too_cheap": 15,
+  "price_cheap": 29.9,
+  "price_expensive": 49.9,
+  "price_too_expensive": 79.9
+}

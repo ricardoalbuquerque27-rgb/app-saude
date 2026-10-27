@@ -1,0 +1,13 @@
+{
+  "id": "P001",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "trust",
+  "reason": "Ninguém do meu grupo de nutricionistas usa nem comentou disso, e eu não assino ferramenta que nenhuma colega testou antes. Além disso, meu paciente de musculação e corrida já registra treino em outro app e mal responde o WhatsApp; duvido que vá lançar refeição e água todo dia em mais um.",
+  "objection": "Meu paciente não vai registrar todo dia num app. Se ele não registra, a fila fica vazia e eu pago R$ 69,90 para olhar uma tela sem nada, e continuo cobrando ele no WhatsApp à noite do mesmo jeito.",
+  "would_change_my_mind": "Duas ou três colegas do grupo dizendo que usam há alguns meses e que os pacientes delas de fato continuam registrando depois do primeiro mês.",
+  "price_too_cheap": 15,
+  "price_cheap": 35,
+  "price_expensive": 80,
+  "price_too_expensive": 130
+}

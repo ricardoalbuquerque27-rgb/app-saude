@@ -1,0 +1,13 @@
+{
+  "id": "P020",
+  "buys": true,
+  "purchases_first_month": 1,
+  "reason_code": "need",
+  "reason": "Sem cartão e sem migrar ninguém, eu entro no teste no mesmo dia, como entro em tudo. O que me prende é a fila de quem faltou ao treino e parou de registrar, porque hoje eu só descubro isso no WhatsApp à noite ou na consulta seguinte. Pago os R$ 69,90 se no dia 30 meus pacientes de musculação estiverem mesmo registrando.",
+  "objection": "No teste vou ter dois sistemas, este e o que já uso com o histórico de todo mundo, e pagar os dois por causa de 5 pacientes não fecha a conta. E não fala nada de corrida: se o treino for só série de academia, metade dos meus pacientes fica de fora.",
+  "would_change_my_mind": "Se no dia 14 menos de 3 pacientes estiverem registrando, ou se o treino não servir para corrida, eu cancelo antes de pagar e volto pro que eu já tinha.",
+  "price_too_cheap": 25,
+  "price_cheap": 49,
+  "price_expensive": 99,
+  "price_too_expensive": 149
+}

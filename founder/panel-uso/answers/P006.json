@@ -1,0 +1,13 @@
+{
+  "id": "P006",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "need",
+  "reason": "Tenho poucos pacientes ativos e já acompanho todos pelo WhatsApp; uma fila para avisar quem saiu do plano não me diz nada que eu não saiba. E paciente meu larga diário alimentar em duas semanas, então essa fila ia ficar cheia de \"parou de registrar\" e só.",
+  "objection": "O problema não é eu não ver quem largou, é o paciente não registrar. Um app a mais não muda isso, e a garantia de 3 pacientes registrando no dia 14 é justamente o prazo em que eles ainda estão animados. E fila com \"quem faltou ao treino\" me soa como coisa de personal, não de nutri.",
+  "would_change_my_mind": "Usar os 30 dias grátis e ver pelo menos 3 pacientes meus ainda registrando no fim do mês, sem eu ter que ficar cobrando.",
+  "price_too_cheap": 15,
+  "price_cheap": 29,
+  "price_expensive": 49,
+  "price_too_expensive": 79
+}

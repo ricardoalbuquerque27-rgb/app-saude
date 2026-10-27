@@ -1,0 +1,13 @@
+{
+  "id": "P013",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "price",
+  "reason": "Como é grátis e sem cartão, eu até abro os 30 dias, mas pagar R$ 69,90 por mês além do que já gasto com software para ver uma fila de quem sumiu eu não pago: no dia 30 eu cancelo, como faço com tudo.",
+  "objection": "Meu paciente de musculação e corrida já registra treino no app dele e com o personal, e treino não é comigo. Não acredito que ele vá abrir mais um app para lançar refeição e peso depois da segunda semana, e aí a fila fica vazia e eu pago por nada.",
+  "would_change_my_mind": "Um plano grátis de verdade para até 5 pacientes, cobrando só quando eu passar disso, num preço que não suba depois.",
+  "price_too_cheap": 15,
+  "price_cheap": 29.9,
+  "price_expensive": 49.9,
+  "price_too_expensive": 79.9
+}
