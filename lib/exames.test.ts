@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { chaveDoExame } from "./examRanges";
+import { chaveDoExame, type ExamContext } from "./examRanges";
 import {
   avisosDaLinha,
   compararExames,
@@ -7,6 +7,7 @@ import {
   fraseSemComparacao,
   resumoDoComparativo,
   descricaoDaSerie,
+  situacaoParaANutricionista,
   type LinhaDeExame,
   type LinhaDoComparativo,
 } from "./exames";
@@ -49,6 +50,210 @@ function dois(anterior: string, ultimo: string, faixa: string | null = "70 a 99"
   );
   return linha;
 }
+
+/**
+ * A regra da nutricionista (o selo do comparativo e o `status` gravado). Os
+ * testes vieram do `classifyExam`, que punha a tabela do app antes do laudo;
+ * agora o laudo vem primeiro, como no comparativo (spec do uso pretendido).
+ */
+describe("situacaoParaANutricionista", () => {
+  const sit = (titulo: string, valor: unknown, unidade?: unknown, referencia?: unknown, ctx: ExamContext = {}) =>
+    situacaoParaANutricionista(
+      { titulo, valor, unidade: (unidade ?? null) as string | null, referencia: (referencia ?? null) as string | null },
+      ctx
+    );
+
+  describe("a faixa do laudo", () => {
+    it("a faixa do laudo com duas vírgulas decimais classifica pelos dois lados", () => {
+      expect(sit("Marcador Zeta", "1,5", null, "0,9 a 1,7")).toEqual({ situacao: "normal", faixa: "0,9 a 1,7", fonte: "laudo" });
+      expect(sit("Marcador Zeta", "1,8", null, "0,9 a 1,7").situacao).toBe("alterado");
+    });
+
+    it("a faixa do laudo vence a da tabela", () => {
+      const r = situacaoParaANutricionista({ titulo: "Glicose", valor: 92, unidade: null, referencia: "10 a 20" }, {});
+      expect(r).toEqual({ situacao: "alterado", faixa: "10 a 20", fonte: "laudo" });
+    });
+
+    it("a borda estrita do laudo vale: 190 com '< 190' está fora", () => {
+      expect(sit("Marcador Zeta", "190", null, "< 190").situacao).toBe("alterado");
+      expect(sit("Marcador Zeta", "190", null, "≤ 190").situacao).toBe("normal");
+      expect(sit("Marcador Zeta", "40", null, "> 40").situacao).toBe("alterado");
+    });
+
+    it("laudo em níveis não classifica pela primeira faixa", () => {
+      const r = sit("Marcador Zeta", "6,0", null, "Normal: < 5,7 %; Pré-diabetes: 5,7 a 6,4 %; Diabetes: ≥ 6,5 %");
+      expect(r).toEqual({ situacao: null, faixa: null, fonte: null });
+    });
+
+    it("valor sem número não tem situação", () => {
+      expect(sit("Marcador Zeta", "Não reagente", null, "< 1,0")).toEqual({ situacao: null, faixa: null, fonte: null });
+    });
+  });
+
+  describe("o nome casa pela regra estrita, e a tabela só vale na unidade dela", () => {
+    it("Vitamina K não usa a faixa do potássio", () => {
+      expect(sit("Vitamina K", "1,2").fonte).toBeNull();
+      expect(sit("Vitamina K", "1,2", null, "0,2 a 3,2")).toEqual({ situacao: "normal", faixa: "0,2 a 3,2", fonte: "laudo" });
+    });
+
+    it("HCM não usa a faixa da hemoglobina", () => {
+      const r = sit("Hemoglobina corpuscular média", "30", "pg", null, { sex: "F" });
+      expect(r.fonte).not.toBe("tabela");
+      expect(r.faixa ?? "").not.toContain("g/dL");
+    });
+
+    it("VLDL e não-HDL não usam a faixa do colesterol total", () => {
+      expect(sit("VLDL-colesterol", "35", "mg/dL", "< 30")).toEqual({ situacao: "alterado", faixa: "< 30", fonte: "laudo" });
+      expect(sit("Colesterol não-HDL", "170", "mg/dL", "< 160")).toMatchObject({ situacao: "alterado", fonte: "laudo" });
+    });
+
+    it("Glicose pós-prandial não usa a faixa da glicose de jejum", () => {
+      const r = sit("Glicose pós-prandial", "135", "mg/dL");
+      expect(r.fonte).not.toBe("tabela");
+      expect(r.faixa).not.toBe("70–99 mg/dL (jejum)");
+    });
+
+    it("B12 em pmol/L vai pelo laudo: 235 com '148 a 664' é normal", () => {
+      expect(sit("Vitamina B12", "235", "pmol/L", "148 a 664")).toEqual({ situacao: "normal", faixa: "148 a 664", fonte: "laudo" });
+    });
+
+    it("sem laudo, na unidade da tabela (ou sem unidade), vale a tabela", () => {
+      expect(sit("Vitamina B12", "235", "pg/mL").situacao).toBe("atencao");
+      expect(sit("Vitamina B12", "235").fonte).toBe("tabela");
+      expect(sit("TSH", "2,1", "mUI/L").fonte).toBe("tabela");
+    });
+
+    it("'Glicose em jejum - soro' continua sendo glicose", () => {
+      expect(sit("Glicose em jejum - soro", "92", "mg/dL")).toEqual({ situacao: "normal", faixa: "70–99 mg/dL (jejum)", fonte: "tabela" });
+    });
+
+    it("glicose em mmol/L sem laudo não é 'alterado' pela faixa em mg/dL", () => {
+      expect(sit("Glicose", "5,1", "mmol/L")).toEqual({ situacao: null, faixa: null, fonte: null });
+      expect(sit("Glicose", "5,1", "mmol/L", "3,9 a 5,5").situacao).toBe("normal");
+    });
+
+    it("o texto da tabela na referência não vale como laudo de outra unidade", () => {
+      expect(sit("Glicose", "5,1", "mmol/L", "70–99 mg/dL (jejum)")).toEqual({ situacao: null, faixa: null, fonte: null });
+    });
+
+    it("TSH ultrassensível é o TSH, em qualquer grafia", () => {
+      for (const nome of ["TSH ultrassensível", "TSH ultra-sensível", "TSH ultra sensível"]) {
+        expect(sit(nome, "5,1", "µUI/mL")).toMatchObject({ fonte: "tabela", faixa: "0,4–4,0 µUI/mL" });
+      }
+    });
+
+    it("potássio e sódio aceitam mmol/L, que é o mesmo número que mEq/L", () => {
+      expect(sit("Potássio", "5,6", "mmol/L").fonte).toBe("tabela");
+      expect(sit("Sódio", "140", "mmol/L").situacao).toBe("normal");
+    });
+
+    it("sem o sexo, o exame que depende dele fica sem situação (não chutamos)", () => {
+      expect(sit("HDL-c", 30, "mg/dL")).toEqual({ situacao: null, faixa: null, fonte: null });
+      expect(sit("HDL-c", 30, "mg/dL", null, { sex: "F" }).faixa).toBe("≥ 50 mg/dL (mulheres)");
+    });
+  });
+
+  describe("unidade e referência que não são texto", () => {
+    it.each([
+      ["número", 12],
+      ["nulo", null],
+      ["objeto", { texto: "70 a 99" }],
+      ["lista", ["70", "99"]],
+      ["booleano", true],
+    ])("unidade e referência %s não lançam erro", (_rotulo, valor) => {
+      // exame da tabela: a unidade que não é texto conta como em branco, e a tabela manda
+      expect(sit("Glicose", 92, valor, valor)).toMatchObject({ situacao: "normal", fonte: "tabela" });
+      // exame fora da tabela: sem referência legível, sem situação, sem erro
+      expect(sit("Marcador Zeta", "1,5", valor, valor)).toEqual({ situacao: null, faixa: null, fonte: null });
+    });
+
+    it("referência que não é texto não vira faixa nem some com a que é texto", () => {
+      expect(sit("Marcador Zeta", "1,5", 5, "0,9 a 1,7").situacao).toBe("normal");
+    });
+  });
+
+  describe("as grafias comuns do laudo vão para a entrada da tabela", () => {
+    // Homem, porque HDL, TGO e hemoglobina mudam por sexo. Cada valor a tabela julga "alterado".
+    const ALTERADO: [string, number, string, string][] = [
+      ["LDL-c", 180, "mg/dL", "< 130 mg/dL (ideal < 100)"],
+      ["LDL-COLESTEROL (CALCULADO)", 180, "mg/dL", "< 130 mg/dL (ideal < 100)"],
+      ["Colesterol LDL calculado", 180, "mg/dL", "< 130 mg/dL (ideal < 100)"],
+      ["COLESTEROL LDL - FRIEDEWALD", 180, "mg/dL", "< 130 mg/dL (ideal < 100)"],
+      ["HDL-C", 30, "mg/dL", "≥ 40 mg/dL (homens)"],
+      ["Colesterol total e frações", 260, "mg/dL", "< 190 mg/dL"],
+      ["Colesterol e frações", 260, "mg/dL", "< 190 mg/dL"],
+      ["PCR ultrassensível", 12, "mg/L", "< 3 mg/L"],
+      ["PCR-US", 12, "mg/L", "< 3 mg/L"],
+      ["Proteína C reativa ultrassensível", 12, "mg/L", "< 3 mg/L"],
+      ["PCR ultra-sensível", 12, "mg/L", "< 3 mg/L"],
+      ["Proteína C reativa ultra sensível", 12, "mg/L", "< 3 mg/L"],
+      ["25-Hidroxi Vitamina D", 15, "ng/mL", "30–100 ng/mL"],
+      ["VITAMINA D (25-HIDROXI)", 15, "ng/mL", "30–100 ng/mL"],
+      ["Glicose basal", 130, "mg/dL", "70–99 mg/dL (jejum)"],
+      ["Hemograma - Hemoglobina", 10, "g/dL", "13–17 g/dL (homens)"],
+      ["Hemoglobina (hemograma)", 10, "g/dL", "13–17 g/dL (homens)"],
+      ["TRANSAMINASE OXALACÉTICA (TGO/AST)", 70, "U/L", "até 40 U/L (homens)"],
+      ["Transaminase glutâmico oxalacética (TGO)", 70, "U/L", "até 40 U/L (homens)"],
+      ["Transaminase pirúvica (TGP/ALT)", 70, "U/L", "até 41 U/L (homens)"],
+      ["Transaminase glutâmico pirúvica (TGP)", 70, "U/L", "até 41 U/L (homens)"],
+      ["Triglicérides séricos", 260, "mg/dL", "< 150 mg/dL"],
+    ];
+
+    it.each(ALTERADO)("'%s' sem laudo é julgado pela tabela, como 'alterado'", (nome, valor, unidade, faixa) => {
+      expect(sit(nome, valor, unidade, null, { sex: "M" })).toEqual({ situacao: "alterado", faixa, fonte: "tabela" });
+    });
+
+    it("e sem unidade também: o laudo muitas vezes a omite", () => {
+      expect(sit("LDL-c", 180, null, null, { sex: "M" }).situacao).toBe("alterado");
+      expect(sit("PCR-US", "12").fonte).toBe("tabela");
+    });
+  });
+
+  describe("as grafias novas não juntam exame diferente", () => {
+    // A lista do teste da chaveDoExame em examRanges.test.ts ("não casa com nenhuma entrada").
+    it.each([
+      "VLDL-colesterol",
+      "VLDL-colesterol (calculado)",
+      "Colesterol (VLDL) calculado",
+      "Colesterol não-HDL",
+      "Colesterol não-HDL calculado",
+      "Vitamina K",
+      "Vitamina K (25-hidroxi)",
+      "Hemoglobina corpuscular média",
+      "Hemoglobina corpuscular média (hemograma)",
+      "HCM",
+      "Glicose pós-prandial",
+      "Glicose basal pós-prandial",
+      "Capacidade total de ligação do ferro",
+      "Capacidade total de ligação do ferro (calculada)",
+      "T4",
+      "T4 basal",
+      "Jejum",
+      "Jejum basal",
+      "Calculado",
+      "Calculada",
+      "Friedewald",
+      "Ultrassensível",
+      "Basal",
+      "Hemograma",
+      "Transaminase",
+      "Séricos",
+      "Séricas",
+      "Vitamina C",
+      "Proteína C",
+      "1,25-Dihidroxivitamina D",
+      "17-Hidroxiprogesterona",
+      "Hemoglobina e frações",
+      "Proteínas totais e frações",
+      "Troponina ultrassensível",
+      "Insulina basal",
+      "LDL e HDL",
+      "TGO e TGP",
+    ])("'%s' sem laudo não tem situação", (nome) => {
+      expect(sit(nome, 5, "mg/dL", null, { sex: "M" })).toEqual({ situacao: null, faixa: null, fonte: null });
+    });
+  });
+});
 
 describe("chaveDoExame", () => {
   it("as grafias da mesma entrada da tabela dão a mesma chave", () => {

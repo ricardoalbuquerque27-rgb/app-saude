@@ -179,42 +179,64 @@ type Resultado = {
 type SemNumero = { data: string; texto: string; ordem: number };
 
 /**
- * A faixa do último resultado, que é a régua da linha inteira, e o selo dele:
- *  1. a do laudo dele (`reference_range`), se `parseReferenceRange` a lê (uma
+ * A situação de um resultado para a nutricionista: o selo do comparativo e o
+ * `status` que se grava no exame (que a fila conta). É o juízo clínico, que o
+ * paciente não vê (ele vê só `situacaoNoLaudo`):
+ *  1. a faixa do laudo (`referencia`), se `parseReferenceRange` a lê (uma
  *     faixa ou um limite só, fora de parênteses, sem palavra de estrato) e se
  *     não é, letra por letra, um texto de faixa da tabela do app
  *     (`ehTextoDaTabela`). Esse texto é da tabela gravado no lugar do laudo:
  *     o casamento frouxo antigo do classifyExam dava ao VLDL-colesterol o
  *     "< 190 mg/dL" do colesterol total, e o VLDL de 24 para 35 "seguia na
- *     faixa". Selo: dentro "normal", fora "alterado";
+ *     faixa". Dentro "normal", fora "alterado";
  *  2. senão, a da tabela do app (`faixaDaTabela`), só quando o nome casa com
  *     uma entrada pela regra estrita ("VLDL-colesterol" não leva a do
  *     colesterol total), a unidade do resultado está em branco ou é uma da
  *     entrada (glicose de 5,1 mmol/L contra 70–99 mg/dL seria "abaixo da
  *     faixa" para um valor normal), e o exame não depende do sexo ou o sexo é
- *     conhecido. Selo: os três níveis da entrada;
- *  3. senão, nenhuma: a linha diz "sem faixa para comparar", sem selo.
- * A prioridade é a da spec, a do laudo antes da tabela.
+ *     conhecido. Os três níveis da entrada;
+ *  3. senão, nenhuma.
+ * O laudo vem antes da tabela, como na spec do comparativo. Unidade e
+ * referência que não são texto valem como ausentes: o JSON da IA trazia
+ * número ou objeto no lugar delas, e `.trim` num número derrubava a leitura.
+ */
+export function situacaoParaANutricionista(
+  r: { titulo: string; valor: unknown; unidade: string | null; referencia: string | null },
+  ctx: ExamContext
+): { situacao: ExamLevel | null; faixa: string | null; fonte: "laudo" | "tabela" | null } {
+  const nenhuma = { situacao: null, faixa: null, fonte: null };
+  const v = parseExamNumber(r.valor);
+  if (v == null || typeof r.titulo !== "string" || !r.titulo.trim()) return nenhuma;
+  const unidade = typeof r.unidade === "string" ? r.unidade : null;
+  const referencia = typeof r.referencia === "string" ? r.referencia : null;
+
+  const doLaudo = ehTextoDaTabela(referencia) ? null : faixaDoTexto(referencia);
+  if (doLaudo) {
+    return {
+      situacao: dentro(v, doLaudo) ? "normal" : "alterado",
+      faixa: (referencia ?? "").trim(),
+      fonte: "laudo",
+    };
+  }
+
+  const daTabela = faixaDaTabela(r.titulo, v, ctx, unidade);
+  if (daTabela) return { situacao: daTabela.situacao, faixa: daTabela.faixa, fonte: "tabela" };
+  return nenhuma;
+}
+
+/**
+ * A faixa do último resultado, que é a régua da linha inteira, e o selo dele,
+ * pela `situacaoParaANutricionista`. A faixa da tabela que não se lê como
+ * número não serve de régua: a linha fica "sem faixa para comparar", sem selo.
  */
 function faixaDoUltimo(
   ultimo: Resultado,
   ctx: ExamContext
 ): { faixa: FaixaNumerica | null; texto: string | null; situacao: ExamLevel | null } {
-  const doLaudo = ehTextoDaTabela(ultimo.referencia) ? null : faixaDoTexto(ultimo.referencia);
-  if (doLaudo) {
-    return {
-      faixa: doLaudo,
-      texto: (ultimo.referencia ?? "").trim(),
-      situacao: dentro(ultimo.valor, doLaudo) ? "normal" : "alterado",
-    };
-  }
-
-  const daTabela = faixaDaTabela(ultimo.titulo, ultimo.valor, ctx, ultimo.unidade);
-  if (daTabela) {
-    const faixa = faixaDoTexto(daTabela.faixa);
-    if (faixa) return { faixa, texto: daTabela.faixa, situacao: daTabela.situacao };
-  }
-  return { faixa: null, texto: null, situacao: null };
+  const r = situacaoParaANutricionista(ultimo, ctx);
+  const faixa = faixaDoTexto(r.faixa);
+  if (!faixa) return { faixa: null, texto: null, situacao: null };
+  return { faixa, texto: r.faixa, situacao: r.situacao };
 }
 
 /**
