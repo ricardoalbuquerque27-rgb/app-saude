@@ -224,6 +224,101 @@ export function situacaoParaANutricionista(
   return nenhuma;
 }
 
+export type ExameParaGravar = {
+  title: string;
+  result_value: string | null;
+  unit: string | null;
+  reference_range: string | null;
+  status: ExamLevel | null;
+  notes: string | null;
+  date: string;
+  exam_type: string | null;
+};
+
+const textoOuNulo = (t: string | null | undefined) => (typeof t === "string" && t.trim() ? t.trim() : null);
+
+/**
+ * A linha de `exams` das três entradas (o laudo lido pela IA, o formulário e a
+ * Gaia). A `reference_range` é a faixa como veio do laudo ou como a pessoa a
+ * digitou, nunca o texto da tabela por cima: a IA e o formulário gravavam o
+ * texto da tabela no lugar, e foi isso que pediu o `ehTextoDaTabela`. O
+ * `status` é o juízo da nutricionista, que a fila conta (nulo sem faixa, e a
+ * fila não o conta). As `notes` são só o que a pessoa escreveu: a explicação
+ * automática que ia junto julgava o exame para o paciente.
+ */
+export function exameParaGravar(
+  e: {
+    titulo: string;
+    valor: string | null;
+    unidade: string | null;
+    referencia: string | null;
+    data: string;
+    tipo: string | null;
+    notas: string | null;
+  },
+  ctx: ExamContext
+): ExameParaGravar {
+  const title = textoOuNulo(e.titulo) ?? "";
+  const result_value = textoOuNulo(e.valor);
+  const unit = textoOuNulo(e.unidade);
+  const reference_range = textoOuNulo(e.referencia);
+  const { situacao } = situacaoParaANutricionista(
+    { titulo: title, valor: result_value, unidade: unit, referencia: reference_range },
+    ctx
+  );
+  return {
+    title,
+    result_value,
+    unit,
+    reference_range,
+    status: situacao,
+    notes: textoOuNulo(e.notas),
+    date: e.data,
+    exam_type: textoOuNulo(e.tipo),
+  };
+}
+
+// As frases que o `classifyExam` antigo escrevia nas notas (o `explain` e o
+// ramo do laudo), fixas. O "(…)" pode ter parênteses dentro ("70–99 mg/dL
+// (jejum)"), por isso o `.*?` vai até o primeiro ")." e não até o primeiro ")".
+const FRASES_AUTOMATICAS: RegExp[] = [
+  /Resultado (?:dentro|acima|abaixo) da faixa de referência \(.*?\)\.(?:\s*Vale acompanhar\.)?/g,
+  /Resultado no limite, (?:dentro|acima|abaixo) da faixa \(.*?\)\.(?:\s*Vale acompanhar\.)?/g,
+  /Resultado (?:dentro|acima|abaixo) da referência informada \(.*?\)\.(?:\s*Confirme com um médico\.)?/g,
+  /Isto é uma orientação geral — confirme com um médico para avaliação\./g,
+  /Dica: informe seu sexo no perfil para uma faixa mais precisa\./g,
+  /Atenção: faixas de adulto; para menores de 18, siga a referência do pediatra\./g,
+  /Para avaliar .*? eu preciso saber o sexo — as faixas de referência mudam bastante entre homens e mulheres\./g,
+];
+
+/**
+ * As notas de um exame sem a explicação automática do `classifyExam` antigo,
+ * que julgava o resultado ("Vale acompanhar… confirme com um médico") e que o
+ * paciente não vê mais. O que a pessoa escreveu fica; o " — " que ligava a
+ * nota dela à explicação sai.
+ */
+export function semExplicacaoAutomatica(notes: string | null): string | null {
+  if (!notes) return null;
+  let t = notes;
+  for (const frase of FRASES_AUTOMATICAS) t = t.replace(frase, " ");
+  t = t
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^(?:—\s*)+|(?:\s*—)+$/g, "")
+    .trim();
+  return t || null;
+}
+
+/**
+ * O que o paciente vê nas notas de um exame. A leitura antiga do laudo
+ * ("Exame (IA)") nunca gravou nota da pessoa, só a explicação automática do
+ * item, e a IA às vezes mandava a dela em texto livre: nada dali aparece.
+ */
+export function notasDoExame(ex: { exam_type: string | null; notes: string | null }): string | null {
+  if (ex.exam_type === "Exame (IA)") return null;
+  return semExplicacaoAutomatica(ex.notes);
+}
+
 /**
  * A faixa do último resultado, que é a régua da linha inteira, e o selo dele,
  * pela `situacaoParaANutricionista`. A faixa da tabela que não se lê como

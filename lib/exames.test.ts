@@ -7,6 +7,9 @@ import {
   fraseSemComparacao,
   resumoDoComparativo,
   descricaoDaSerie,
+  exameParaGravar,
+  notasDoExame,
+  semExplicacaoAutomatica,
   situacaoParaANutricionista,
   type LinhaDeExame,
   type LinhaDoComparativo,
@@ -252,6 +255,71 @@ describe("situacaoParaANutricionista", () => {
     ])("'%s' sem laudo não tem situação", (nome) => {
       expect(sit(nome, 5, "mg/dL", null, { sex: "M" })).toEqual({ situacao: null, faixa: null, fonte: null });
     });
+  });
+});
+
+describe("exameParaGravar", () => {
+  const base = { data: "2026-10-27", tipo: null, notas: null };
+  it("grava a faixa do laudo, aparada, e o status pela regra da nutricionista", () => {
+    const r = exameParaGravar({ ...base, titulo: " LDL-c ", valor: "180", unidade: "mg/dL", referencia: " < 130 " }, { sex: "M" });
+    expect(r).toMatchObject({ title: "LDL-c", result_value: "180", unit: "mg/dL", reference_range: "< 130", status: "alterado", notes: null });
+  });
+  it("sem laudo: a referência fica vazia, nunca o texto da tabela, e o status vem da tabela", () => {
+    const r = exameParaGravar({ ...base, titulo: "Glicose", valor: "92", unidade: "mg/dL", referencia: null }, {});
+    expect(r.reference_range).toBeNull();
+    expect(r.status).toBe("normal");
+  });
+  it("sem faixa nenhuma, o status é nulo", () => {
+    expect(exameParaGravar({ ...base, titulo: "Marcador Zeta", valor: "1,5", unidade: null, referencia: null }, {}).status).toBeNull();
+  });
+  it("notes é só o que a pessoa escreveu", () => {
+    expect(exameParaGravar({ ...base, titulo: "TSH", valor: "2,1", unidade: "mUI/L", referencia: "0,4 a 4,0", notas: " jejum de 12 h " }, {}).notes).toBe("jejum de 12 h");
+  });
+  it("texto vazio vira nulo, e a data e o tipo passam", () => {
+    const r = exameParaGravar({ titulo: "TSH", valor: " ", unidade: "", referencia: "  ", data: "2026-09-01", tipo: " Laboratório ", notas: "" }, {});
+    expect(r).toEqual({
+      title: "TSH", result_value: null, unit: null, reference_range: null,
+      status: null, notes: null, date: "2026-09-01", exam_type: "Laboratório",
+    });
+  });
+});
+
+describe("semExplicacaoAutomatica", () => {
+  it("tira as frases-modelo do classifyExam antigo", () => {
+    expect(semExplicacaoAutomatica("Resultado acima da faixa de referência (< 190 mg/dL). Isto é uma orientação geral — confirme com um médico para avaliação.")).toBeNull();
+    expect(semExplicacaoAutomatica("Resultado no limite, acima da faixa (200–900 pg/mL). Vale acompanhar. Isto é uma orientação geral — confirme com um médico para avaliação.")).toBeNull();
+    expect(semExplicacaoAutomatica("Resultado dentro da faixa de referência (70–99 mg/dL (jejum)).")).toBeNull();
+    expect(semExplicacaoAutomatica("Resultado abaixo da referência informada (15 a 40). Confirme com um médico.")).toBeNull();
+    expect(semExplicacaoAutomatica("Resultado dentro da referência informada (15 a 40).")).toBeNull();
+    expect(semExplicacaoAutomatica("Dica: informe seu sexo no perfil para uma faixa mais precisa.")).toBeNull();
+    expect(semExplicacaoAutomatica("Atenção: faixas de adulto; para menores de 18, siga a referência do pediatra.")).toBeNull();
+    expect(semExplicacaoAutomatica("Para avaliar Ferritina eu preciso saber o sexo — as faixas de referência mudam bastante entre homens e mulheres.")).toBeNull();
+  });
+  it("tira as frases juntas, como o classifyExam as escrevia", () => {
+    expect(
+      semExplicacaoAutomatica(
+        "Resultado acima da faixa de referência (≥ 50 mg/dL (mulheres)). Isto é uma orientação geral — confirme com um médico para avaliação. Dica: informe seu sexo no perfil para uma faixa mais precisa. Atenção: faixas de adulto; para menores de 18, siga a referência do pediatra."
+      )
+    ).toBeNull();
+  });
+  it("mantém a nota do paciente e tira o ' — ' que ligava", () => {
+    expect(semExplicacaoAutomatica("jejum de 12 h — Resultado dentro da faixa de referência (70–99 mg/dL (jejum)).")).toBe("jejum de 12 h");
+  });
+  it("nota sem frase-modelo volta igual; vazio vira nulo", () => {
+    expect(semExplicacaoAutomatica("Coletado no laboratório X")).toBe("Coletado no laboratório X");
+    expect(semExplicacaoAutomatica("Coletado às 7h — em jejum")).toBe("Coletado às 7h — em jejum");
+    expect(semExplicacaoAutomatica("")).toBeNull();
+    expect(semExplicacaoAutomatica(null)).toBeNull();
+  });
+});
+
+describe("notasDoExame: o que o paciente vê nas notas", () => {
+  it("a leitura antiga do laudo ('Exame (IA)') só gravava nota automática: nada aparece", () => {
+    expect(notasDoExame({ exam_type: "Exame (IA)", notes: "Seu LDL está alto; reduza frituras." })).toBeNull();
+  });
+  it("nas outras, a nota sem a explicação automática", () => {
+    expect(notasDoExame({ exam_type: null, notes: "jejum de 12 h — Resultado dentro da faixa de referência (70–99 mg/dL (jejum))." })).toBe("jejum de 12 h");
+    expect(notasDoExame({ exam_type: "Laboratório", notes: null })).toBeNull();
   });
 });
 
