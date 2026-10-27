@@ -4,6 +4,7 @@ import {
   classifyExam,
   dentroDaFaixa,
   faixaDaTabela,
+  linhaDoLaudo,
   parseReferenceRange,
   situacaoNoLaudo,
   textoDaSituacaoNoLaudo,
@@ -250,6 +251,27 @@ describe("situacaoNoLaudo: só a faixa impressa no laudo", () => {
     expect(textoDaSituacaoNoLaudo({ situacao: "acima", faixa: "até 130" })).toBe("acima da faixa do laudo (até 130)");
     expect(textoDaSituacaoNoLaudo({ situacao: "abaixo", faixa: "15 a 40" })).toBe("abaixo da faixa do laudo (15 a 40)");
     expect(textoDaSituacaoNoLaudo({ situacao: "sem faixa", faixa: null })).toBe("sem faixa do laudo");
+  });
+});
+
+describe("linhaDoLaudo: a linha que o paciente vê", () => {
+  it("dentro, acima e abaixo trazem a faixa; fora é acima ou abaixo", () => {
+    expect(linhaDoLaudo("92", "70 a 99")).toEqual({ texto: "dentro da faixa do laudo (70 a 99)", fora: false });
+    expect(linhaDoLaudo("180", "< 130")).toEqual({ texto: "acima da faixa do laudo (< 130)", fora: true });
+    expect(linhaDoLaudo("12", "15 a 40")).toEqual({ texto: "abaixo da faixa do laudo (15 a 40)", fora: true });
+  });
+  it("referência do laudo que não se compara (níveis, texto) aparece como está, sem comparação", () => {
+    expect(linhaDoLaudo("6,0", " Normal: < 5,7 %; Pré-diabetes: 5,7 a 6,4 % ")).toEqual({
+      texto: "referência do laudo: Normal: < 5,7 %; Pré-diabetes: 5,7 a 6,4 %",
+      fora: false,
+    });
+    expect(linhaDoLaudo("Negativo", "Negativo")).toEqual({ texto: "referência do laudo: Negativo", fora: false });
+  });
+  it("sem referência, ou com o texto da tabela do app no lugar dela, é 'sem faixa do laudo'", () => {
+    expect(linhaDoLaudo("92", null)).toEqual({ texto: "sem faixa do laudo", fora: false });
+    expect(linhaDoLaudo("92", "  ")).toEqual({ texto: "sem faixa do laudo", fora: false });
+    expect(linhaDoLaudo("210", "< 190 mg/dL")).toEqual({ texto: "sem faixa do laudo", fora: false });
+    expect(linhaDoLaudo("92", 99)).toEqual({ texto: "sem faixa do laudo", fora: false });
   });
 });
 

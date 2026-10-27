@@ -548,6 +548,22 @@ export function textoDaSituacaoNoLaudo(s: { situacao: SituacaoNoLaudo; faixa: st
   return `${s.situacao} da faixa do laudo (${s.faixa})`;
 }
 
+/**
+ * A linha do resultado para o paciente (página Exames, leitura do laudo,
+ * formulário e Gaia): a `textoDaSituacaoNoLaudo`, ou, quando o laudo traz uma
+ * referência que não se compara (em níveis, "Negativo"), essa referência como
+ * está, sem comparação: mostrar o que o laudo imprime é constatar. O texto da
+ * tabela do app gravado no lugar do laudo não aparece: não é do laudo.
+ * `fora` é acima ou abaixo da faixa, o que a tela pinta de atenção.
+ */
+export function linhaDoLaudo(valor: unknown, referencia: unknown): { texto: string; fora: boolean } {
+  const s = situacaoNoLaudo(valor, referencia);
+  if (s.situacao !== "sem faixa") return { texto: textoDaSituacaoNoLaudo(s), fora: s.situacao !== "dentro" };
+  const ref = typeof referencia === "string" ? referencia.trim() : "";
+  if (ref && !ehTextoDaTabela(ref)) return { texto: `referência do laudo: ${ref}`, fora: false };
+  return { texto: textoDaSituacaoNoLaudo(s), fora: false };
+}
+
 // As palavras de cada entrada da tabela: a união das palavras de todas as keys
 // dela, contada como uma só (a entrada da glicose tem "glicose", "glicemia",
 // "jejum", "em" e "de"). Na ordem de TABLE.

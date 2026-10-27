@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import {
   FileText,
   Plus,
@@ -9,16 +9,17 @@ import {
   Sparkles,
   Upload,
   Save,
-  ArrowUp,
-  ArrowDown,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { Exam } from "@/lib/types";
 import { PageHeader, Modal, Field, EmptyState } from "@/components/ui";
 import { todayISO, formatDate } from "@/lib/date";
 import { useLiveRefresh } from "@/lib/useLiveRefresh";
-import { classifyExam, type Sex } from "@/lib/examRanges";
+import { linhaDoLaudo, type Sex } from "@/lib/examRanges";
+import { exameParaGravar, notasDoExame } from "@/lib/exames";
+import type { ItemTranscrito } from "@/lib/laudo";
 import { meuPerfil } from "@/lib/perfil";
+import OQueEOExame from "@/components/OQueEOExame";
 
 function ageFromBirth(birth?: string | null): number | null {
   if (!birth) return null;
@@ -28,26 +29,16 @@ function ageFromBirth(birth?: string | null): number | null {
   return age >= 0 && age < 130 ? age : null;
 }
 
-const STATUS = [
-  { value: "normal", label: "Normal", cls: "bg-app-primaria-fundo text-app-primaria" },
-  { value: "atencao", label: "Atenção", cls: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" },
-  { value: "alterado", label: "Alterado", cls: "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300" },
-];
+// A leitura do laudo só transcreve (rota analyze-exam): sem resumo,
+// interpretação, recomendação nem situação, que eram juízo para o paciente.
+type ExamAnalysis = { itens: ItemTranscrito[] };
 
-type ExamItem = {
-  nome: string;
-  valor?: string;
-  unidade?: string;
-  referencia?: string;
-  status?: string;
-  explicacao?: string;
-};
-type ExamAnalysis = {
-  resumo: string;
-  itens: ExamItem[];
-  interpretacao: string[];
-  recomendacoes: string[];
-};
+// O paciente vê onde o valor fica na faixa do laudo, e nada mais: sem selo de
+// Normal, Atenção ou Alterado (spec do uso pretendido). Fora da faixa é aviso.
+function LinhaDoLaudo({ valor, referencia }: { valor: unknown; referencia: unknown }) {
+  const l = linhaDoLaudo(valor, referencia);
+  return <p className={`text-xs ${l.fora ? "text-app-atencao" : "text-app-texto-2"}`}>{l.texto}</p>;
+}
 
 function fileToData(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -97,7 +88,6 @@ export default function ExamesPage() {
   const [resultValue, setResultValue] = useState("");
   const [unit, setUnit] = useState("");
   const [reference, setReference] = useState("");
-  const [status, setStatus] = useState("normal");
   const [notes, setNotes] = useState("");
   const [profileCtx, setProfileCtx] = useState<{ sex: Sex; age: number | null }>({
     sex: null,
@@ -129,7 +119,8 @@ export default function ExamesPage() {
   // Recarrega quando a IA registra um exame.
   useLiveRefresh("exames", load);
 
-  // Perfil (sexo/idade) para personalizar a classificação automática.
+  // Perfil (sexo/idade): o `status` gravado é o juízo da nutricionista, que
+  // usa a tabela do app (com sexo e idade) quando o laudo não tem faixa.
   useEffect(() => {
     (async () => {
       const data = await meuPerfil(supabase, "sex, birth_date");
@@ -140,28 +131,6 @@ export default function ExamesPage() {
     })();
   }, [supabase]);
 
-  // Classificação automática enquanto o usuário digita.
-  const auto = useMemo(
-    () =>
-      classifyExam({
-        name: title,
-        value: resultValue,
-        unit,
-        reference,
-        ctx: profileCtx,
-      }),
-    [title, resultValue, unit, reference, profileCtx]
-  );
-
-  // Preenche situação e faixa automaticamente a partir da classificação.
-  useEffect(() => {
-    if (auto.matched) {
-      setStatus(auto.status);
-      if (auto.faixa && !reference.trim()) setReference(auto.faixa);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [auto.matched, auto.status, auto.faixa]);
-
   function resetForm() {
     setDate(todayISO());
     setTitle("");
@@ -169,7 +138,6 @@ export default function ExamesPage() {
     setResultValue("");
     setUnit("");
     setReference("");
-    setStatus("normal");
     setNotes("");
   }
 
@@ -183,14 +151,10 @@ export default function ExamesPage() {
     if (!user) return;
     await supabase.from("exams").insert({
       user_id: user.id,
-      date,
-      title: title.trim(),
-      exam_type: examType.trim() || null,
-      result_value: resultValue.trim() || null,
-      unit: unit.trim() || null,
-      reference_range: reference.trim() || auto.faixa || null,
-      status,
-      notes: notes.trim() || (auto.matched ? auto.explicacao : null),
+      ...exameParaGravar(
+        { titulo: title, valor: resultValue, unidade: unit, referencia: reference, data: date, tipo: examType, notas: notes },
+        profileCtx
+      ),
     });
     setSaving(false);
     setOpen(false);
@@ -232,12 +196,6 @@ export default function ExamesPage() {
     }
   }
 
-  const statusCounts = {
-    alterado: exams.filter((e) => e.status === "alterado").length,
-    atencao: exams.filter((e) => e.status === "atencao").length,
-    normal: exams.filter((e) => !e.status || e.status === "normal").length,
-  };
-
   async function saveAnalysisItems() {
     if (!analysis?.itens?.length) return;
     setSavingItems(true);
@@ -253,16 +211,10 @@ export default function ExamesPage() {
       .filter((it) => it.nome)
       .map((it) => ({
         user_id: user.id,
-        date: today,
-        title: it.nome,
-        exam_type: "Exame (IA)",
-        result_value: it.valor ?? null,
-        unit: it.unidade ?? null,
-        reference_range: it.referencia ?? null,
-        status: ["normal", "atencao", "alterado"].includes(it.status ?? "")
-          ? (it.status as string)
-          : "normal",
-        notes: (it as any).explicacao ?? null,
+        ...exameParaGravar(
+          { titulo: it.nome, valor: it.valor, unidade: it.unidade, referencia: it.referencia, data: today, tipo: "Exame (IA)", notas: null },
+          profileCtx
+        ),
       }));
     if (rows.length) await supabase.from("exams").insert(rows);
     setSavingItems(false);
@@ -300,8 +252,8 @@ export default function ExamesPage() {
               Ler exame com IA
             </p>
             <p className="mt-0.5 text-sm text-app-texto-2">
-              Envie o PDF ou uma foto do exame. A IA lê, explica em linguagem
-              simples e destaca o que está fora da referência.
+              Envie o PDF ou uma foto do exame. A IA copia os resultados e a
+              faixa que o laudo traz.
             </p>
             <button
               onClick={() => fileRef.current?.click()}
@@ -326,9 +278,9 @@ export default function ExamesPage() {
 
         {analysis && (
           <div className="mt-4 space-y-4 border-t border-app-linha pt-4">
-            {analysis.resumo && (
-              <p className="text-sm leading-relaxed text-app-texto">
-                {analysis.resumo}
+            {analysis.itens.length === 0 && (
+              <p className="text-sm text-app-texto-2">
+                Não deu para ler resultados neste arquivo. Tente uma foto mais nítida ou o PDF.
               </p>
             )}
 
@@ -336,63 +288,27 @@ export default function ExamesPage() {
               <div>
                 <p className="eyebrow mb-1">Resultados</p>
                 <div className="divide-y divide-app-linha">
-                  {analysis.itens.map((it, i) => {
-                    const st =
-                      STATUS.find((s) => s.value === it.status) ?? STATUS[0];
-                    return (
-                      <div
-                        key={i}
-                        className="flex items-center justify-between gap-2 py-2.5 text-sm"
-                      >
-                        <div className="min-w-0">
-                          <span className="font-medium text-app-texto">
-                            {it.nome}
-                          </span>
-                          {(it.valor || it.unidade) && (
+                  {analysis.itens.map((it, i) => (
+                    <div key={i} className="flex items-start justify-between gap-3 py-2.5 text-sm">
+                      <div className="min-w-0">
+                        <p>
+                          <span className="font-medium text-app-texto">{it.nome}</span>
+                          {it.valor && (
                             <span className="tabular text-app-texto-2">
                               {" "}
                               — {it.valor}
                               {it.unidade ? ` ${it.unidade}` : ""}
                             </span>
                           )}
-                          {it.referencia && (
-                            <span className="tabular text-app-texto-2">
-                              {" "}
-                              (ref.: {it.referencia})
-                            </span>
-                          )}
-                        </div>
-                        <span
-                          className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${st.cls}`}
-                        >
-                          {st.label}
-                        </span>
+                        </p>
+                        <LinhaDoLaudo valor={it.valor} referencia={it.referencia} />
                       </div>
-                    );
-                  })}
+                      <div className="shrink-0">
+                        <OQueEOExame nome={it.nome} />
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </div>
-            )}
-
-            {analysis.interpretacao.length > 0 && (
-              <div>
-                <p className="eyebrow mb-1">O que significa</p>
-                <ul className="list-disc space-y-1 pl-5 text-sm text-app-texto">
-                  {analysis.interpretacao.map((t, i) => (
-                    <li key={i}>{t}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {analysis.recomendacoes.length > 0 && (
-              <div>
-                <p className="eyebrow mb-1">Recomendações</p>
-                <ul className="list-disc space-y-1 pl-5 text-sm text-app-texto">
-                  {analysis.recomendacoes.map((t, i) => (
-                    <li key={i}>{t}</li>
-                  ))}
-                </ul>
               </div>
             )}
 
@@ -426,29 +342,6 @@ export default function ExamesPage() {
         )}
       </div>
 
-      {!loading && exams.length > 0 && (
-        <div className="mb-4 grid grid-cols-3 gap-3">
-          <div className="card py-3 text-center">
-            <p className="tabular text-2xl font-semibold text-rose-600 dark:text-rose-400">
-              {statusCounts.alterado}
-            </p>
-            <p className="text-xs text-app-texto-2">Alterados</p>
-          </div>
-          <div className="card py-3 text-center">
-            <p className="tabular text-2xl font-semibold text-amber-600 dark:text-amber-400">
-              {statusCounts.atencao}
-            </p>
-            <p className="text-xs text-app-texto-2">Em atenção</p>
-          </div>
-          <div className="card py-3 text-center">
-            <p className="tabular text-2xl font-semibold text-app-primaria">
-              {statusCounts.normal}
-            </p>
-            <p className="text-xs text-app-texto-2">Normais</p>
-          </div>
-        </div>
-      )}
-
       {loading ? (
         <div className="flex justify-center py-16 text-app-texto-2">
           <Loader2 className="h-6 w-6 animate-spin" />
@@ -462,78 +355,32 @@ export default function ExamesPage() {
       ) : (
         <div className="space-y-3">
           {exams.map((ex) => {
-            const st = STATUS.find((s) => s.value === ex.status) ?? STATUS[0];
-            const key = st.value;
-            // Direção (acima/abaixo) recalculada a partir do valor e faixa.
-            const dir = classifyExam({
-              name: ex.title,
-              value: ex.result_value,
-              unit: ex.unit,
-              reference: ex.reference_range,
-              ctx: profileCtx,
-            });
-            const showDir = dir.matched && dir.direction !== "normal";
-            const iconTint =
-              key === "alterado"
-                ? "bg-rose-100 text-rose-600 dark:bg-rose-950/40 dark:text-rose-300"
-                : key === "atencao"
-                  ? "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
-                  : "bg-app-primaria-fundo text-app-primaria";
+            const notas = notasDoExame(ex);
             return (
               <div
                 key={ex.id}
                 className="card flex items-start gap-3"
               >
-                <div
-                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${iconTint}`}
-                >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-app-primaria-fundo text-app-primaria">
                   <FileText className="h-5 w-5" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-semibold text-app-texto">
-                      {ex.title}
-                    </p>
-                    <span
-                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${st.cls}`}
-                    >
-                      {showDir &&
-                        (dir.direction === "alto" ? (
-                          <ArrowUp className="h-3 w-3" />
-                        ) : (
-                          <ArrowDown className="h-3 w-3" />
-                        ))}
-                      {st.label}
-                      {showDir && (
-                        <span className="font-normal opacity-80">
-                          · {dir.direction === "alto" ? "acima" : "abaixo"}
-                        </span>
-                      )}
-                    </span>
-                  </div>
+                  <p className="font-semibold text-app-texto">{ex.title}</p>
                   <p className="tabular text-xs text-app-texto-2">
                     {formatDate(ex.date)}
                     {ex.exam_type ? ` · ${ex.exam_type}` : ""}
                   </p>
                   {ex.result_value && (
-                    <p className="tabular mt-1 text-sm text-app-texto">
-                      <span className="font-semibold">
-                        {ex.result_value}
-                        {ex.unit ? ` ${ex.unit}` : ""}
-                      </span>
-                      {ex.reference_range && (
-                        <span className="text-app-texto-2">
-                          {" "}
-                          (ref.: {ex.reference_range})
-                        </span>
-                      )}
+                    <p className="tabular mt-1 text-sm font-semibold text-app-texto">
+                      {ex.result_value}
+                      {ex.unit ? ` ${ex.unit}` : ""}
                     </p>
                   )}
-                  {ex.notes && (
-                    <p className="mt-1 text-xs text-app-texto-2">
-                      {ex.notes}
-                    </p>
-                  )}
+                  <LinhaDoLaudo valor={ex.result_value} referencia={ex.reference_range} />
+                  {notas && <p className="mt-1 text-xs text-app-texto-2">{notas}</p>}
+                  <div className="mt-2">
+                    <OQueEOExame nome={ex.title} />
+                  </div>
                 </div>
                 <button
                   onClick={() => remove(ex.id)}
@@ -612,46 +459,11 @@ export default function ExamesPage() {
               />
             </Field>
           </div>
-          <Field label="Situação">
-            {auto.matched && (
-              <div
-                className={`mb-2 rounded-xl border px-3 py-2 text-sm ${
-                  (STATUS.find((s) => s.value === auto.status) ?? STATUS[0]).cls
-                } border-transparent`}
-              >
-                <span className="font-semibold">
-                  Classificação automática:{" "}
-                  {(STATUS.find((s) => s.value === auto.status) ?? STATUS[0]).label}
-                </span>
-                {auto.explicacao && (
-                  <p className="mt-0.5 text-xs opacity-90">{auto.explicacao}</p>
-                )}
-              </div>
-            )}
-            <div className="flex gap-2">
-              {STATUS.map((s) => (
-                <button
-                  key={s.value}
-                  type="button"
-                  onClick={() => setStatus(s.value)}
-                  className={`min-h-[44px] flex-1 rounded-lg border px-3 text-sm font-medium transition ${
-                    status === s.value
-                      ? "border-app-primaria bg-app-primaria-fundo text-app-primaria"
-                      : "border-app-campo text-app-texto-2 hover:bg-app-primaria-fundo"
-                  }`}
-                >
-                  {s.label}
-                </button>
-              ))}
+          {resultValue.trim() && reference.trim() && (
+            <div className="-mt-2">
+              <LinhaDoLaudo valor={resultValue} referencia={reference} />
             </div>
-            <p className="mt-1 text-xs text-app-texto-2">
-              {auto.matched
-                ? "Preenchida automaticamente pela faixa de referência — você pode ajustar se quiser."
-                : auto.needs?.includes("sexo")
-                  ? "Informe seu sexo no Perfil para eu classificar este exame automaticamente (a faixa muda entre homens e mulheres)."
-                  : "Exame fora da tabela automática. Selecione a situação ou informe a faixa de referência acima."}
-            </p>
-          </Field>
+          )}
           <Field label="Observações">
             <textarea
               className="input min-h-[60px]"
