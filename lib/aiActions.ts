@@ -5,11 +5,12 @@
 // autenticado do próprio usuário (a RLS garante que ele só escreve nos seus
 // próprios dados). O user_id é sempre definido pelo servidor, nunca pelo modelo.
 
-import { todayISO, addDaysISO } from "@/lib/date";
+import { todayISO, addDaysISO, formatDate } from "@/lib/date";
 import { adicionarAgua } from "@/lib/agua";
 import { numeroBR } from "@/lib/numeros";
 import { NOTA_DA_GAIA } from "@/lib/planCheckIn";
-import { classifyExam, EXAM_STATUS_LABEL, type Sex } from "@/lib/examRanges";
+import { chaveDoExame, linhaDoLaudo, type Sex } from "@/lib/examRanges";
+import { exameParaGravar } from "@/lib/exames";
 
 // Idade em anos a partir da data de nascimento (AAAA-MM-DD).
 function ageFromBirth(birth?: string | null): number | null {
@@ -239,7 +240,7 @@ export const AI_TOOLS = [
     function: {
       name: "registrar_exame",
       description:
-        "Registra o resultado de um exame na aba Exames. Use quando o usuário informar um resultado de exame (ex.: colesterol, glicose, vitamina D) e quiser guardar. NÃO tente classificar se está normal/alterado: o app calcula isso automaticamente com base em faixas de referência ajustadas por sexo e idade. Apenas extraia nome, valor e unidade.",
+        "Registra o resultado de um exame na aba Exames, quando o usuário pedir para guardar. Extraia nome, valor, unidade e, se ele disser, a faixa do laudo. Não diga se o resultado está bom ou ruim.",
       parameters: {
         type: "object",
         properties: {
@@ -269,15 +270,6 @@ export const AI_TOOLS = [
             type: "string",
             description: "Data do exame no formato AAAA-MM-DD. Se omitido, usa hoje.",
           },
-          sexo: {
-            type: "string",
-            description: "Sexo biológico, se informado no chat (para classificar).",
-            enum: ["M", "F"],
-          },
-          idade: {
-            type: "number",
-            description: "Idade, se informada no chat (opcional).",
-          },
         },
         required: ["titulo", "valor"],
       },
@@ -286,34 +278,24 @@ export const AI_TOOLS = [
   {
     type: "function",
     function: {
-      name: "avaliar_exame",
+      name: "ler_exame",
       description:
-        "Classifica um resultado de exame (normal/atenção/alterado) SEM salvar nada. Use quando o usuário só quiser saber se um valor está bom (pergunta de curiosidade, ex.: 'colesterol 190 tá normal?'). Depois de avaliar, PERGUNTE se ele quer que você adicione na aba Exames — só aí use 'registrar_exame'. Se a resposta indicar que falta o sexo, peça o sexo (ou que ele preencha no perfil) e chame de novo passando 'sexo'.",
+        "Lê exames do usuário para dizer o valor e se está dentro, acima ou abaixo da faixa impressa no laudo, sem salvar. Use quando ele perguntar sobre um exame. Com 'valor', responde sobre o valor que ele digitou; sem 'valor', procura nos registros dele.",
       parameters: {
         type: "object",
         properties: {
-          titulo: {
+          nome: {
             type: "string",
-            description: "Nome do exame. Ex.: 'Colesterol total', 'Glicose'.",
+            description: "Nome do exame. Ex.: 'LDL', 'Glicose', 'Vitamina D'.",
           },
-          valor: { type: "string", description: "Valor numérico do resultado." },
-          unidade: { type: "string", description: "Unidade. Ex.: 'mg/dL'." },
+          valor: { type: "string", description: "Valor que o usuário digitou, se ele disser (opcional)." },
+          unidade: { type: "string", description: "Unidade. Ex.: 'mg/dL' (opcional)." },
           referencia: {
             type: "string",
-            description: "Faixa de referência do laudo, se informada (opcional).",
-          },
-          sexo: {
-            type: "string",
-            description:
-              "Sexo biológico do usuário, se ele informar no chat (usado quando não está no perfil).",
-            enum: ["M", "F"],
-          },
-          idade: {
-            type: "number",
-            description: "Idade do usuário, se ele informar no chat (opcional).",
+            description: "Faixa impressa no laudo, se ele disser (opcional). Ex.: '< 130', '70 a 99'.",
           },
         },
-        required: ["titulo", "valor"],
+        required: ["nome"],
       },
     },
   },
@@ -498,6 +480,16 @@ export const TOOL_AREAS: Record<string, string> = {
 };
 
 const DIAS = ["segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo"];
+
+// O nome em palavras, sem acento, caixa nem pontuação ("LDL-c" vira "ldl", "c").
+function nomeEmPalavras(t: string): string[] {
+  return t
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+}
 
 function toNum(v: any): number | null {
   const n = Number(v);
@@ -746,114 +738,81 @@ export async function executeAction(
       case "registrar_exame": {
         const titulo = typeof args.titulo === "string" ? args.titulo.trim() : "";
         if (!titulo) return { ok: false, resumo: "Faltou o nome do exame." };
-        const valor =
-          typeof args.valor === "string" && args.valor.trim()
-            ? args.valor.trim()
-            : args.valor != null
-              ? String(args.valor)
-              : null;
-        const unidade =
-          typeof args.unidade === "string" && args.unidade.trim()
-            ? args.unidade.trim()
-            : null;
-        const refInformada =
-          typeof args.referencia === "string" && args.referencia.trim()
-            ? args.referencia.trim()
-            : null;
-        const obs =
-          typeof args.observacoes === "string" && args.observacoes.trim()
-            ? args.observacoes.trim()
-            : null;
+        const texto = (v: any) => (typeof v === "string" ? v : v != null ? String(v) : null);
 
-        // Personaliza a classificação com sexo e idade (perfil + o que veio no chat).
+        // O `status` gravado é o juízo da nutricionista (a fila o conta), com a
+        // tabela do app quando o laudo não tem faixa, e a tabela usa o sexo e a
+        // idade do perfil. Os argumentos `sexo` e `idade` saíram: só serviam
+        // para julgar o exame para o paciente.
         const { data: prof } = await supabase
           .from("profiles")
           .select("sex, birth_date")
           .eq("id", uid)
           .maybeSingle();
-        const sexoArg = args.sexo === "M" || args.sexo === "F" ? args.sexo : null;
-        const idadeArg = toNum(args.idade);
-        const cls = classifyExam({
-          name: titulo,
-          value: valor,
-          unit: unidade,
-          reference: refInformada,
-          ctx: {
-            sex: (sexoArg ?? (prof?.sex as Sex) ?? null) as Sex,
-            age: idadeArg != null ? idadeArg : ageFromBirth(prof?.birth_date),
+        const linha = exameParaGravar(
+          {
+            titulo,
+            valor: texto(args.valor),
+            unidade: texto(args.unidade),
+            referencia: typeof args.referencia === "string" ? args.referencia : null,
+            data: isValidDate(args.data) ? args.data : todayISO(),
+            tipo: typeof args.tipo === "string" ? args.tipo : null,
+            notas: typeof args.observacoes === "string" ? args.observacoes : null,
           },
-        });
-
-        const status = cls.matched ? cls.status : "normal";
-        const reference_range = cls.faixa || refInformada;
-        const notes = [obs, cls.matched ? cls.explicacao : null].filter(Boolean).join(" — ") || null;
-
-        const { error } = await supabase.from("exams").insert({
-          user_id: uid,
-          date: isValidDate(args.data) ? args.data : todayISO(),
-          title: titulo,
-          exam_type:
-            typeof args.tipo === "string" && args.tipo.trim() ? args.tipo.trim() : null,
-          result_value: valor,
-          unit: unidade,
-          reference_range: reference_range,
-          status,
-          notes,
-        });
+          { sex: ((prof?.sex as Sex) ?? null) as Sex, age: ageFromBirth(prof?.birth_date) }
+        );
+        const { error } = await supabase.from("exams").insert({ user_id: uid, ...linha });
         if (error) throw error;
-
-        const resumo = cls.matched
-          ? `Exame "${titulo}" registrado como ${EXAM_STATUS_LABEL[status]} (${cls.explicacao}) na aba Exames.`
-          : cls.needs?.includes("sexo")
-            ? `Exame "${titulo}" registrado, mas NÃO classifiquei porque falta o sexo. Sugira ao usuário informar o sexo (no Perfil ou aqui no chat) para eu classificar.`
-            : `Exame "${titulo}" registrado na aba Exames. Não consegui classificar automaticamente (fora da minha tabela); confirme com um profissional.`;
-        return { ok: true, resumo };
+        return { ok: true, resumo: `Exame "${linha.title}" registrado na aba Exames.` };
       }
 
-      case "avaliar_exame": {
-        const titulo = typeof args.titulo === "string" ? args.titulo.trim() : "";
+      case "ler_exame": {
+        // A constatação sai daqui, calculada, e só pela faixa do laudo: a Gaia
+        // não julga o exame (spec do uso pretendido). Quem interpreta é a
+        // nutricionista.
+        const nome = typeof args.nome === "string" ? args.nome.trim() : "";
+        if (!nome) return { ok: false, resumo: "Preciso do nome do exame." };
         const valor =
           typeof args.valor === "string" && args.valor.trim()
             ? args.valor.trim()
-            : args.valor != null
+            : typeof args.valor === "number"
               ? String(args.valor)
               : null;
-        if (!titulo || valor == null) {
-          return { ok: false, resumo: "Preciso do nome e do valor do exame." };
+        const unidadeDe = (u: any) => (typeof u === "string" && u.trim() ? ` ${u.trim()}` : "");
+
+        if (valor != null) {
+          const { texto } = linhaDoLaudo(valor, args.referencia);
+          return { ok: true, resumo: `${nome}: ${valor}${unidadeDe(args.unidade)}, ${texto}.` };
         }
-        const { data: prof } = await supabase
-          .from("profiles")
-          .select("sex, birth_date")
-          .eq("id", uid)
-          .maybeSingle();
-        const sexoArg = args.sexo === "M" || args.sexo === "F" ? args.sexo : null;
-        const idadeArg = toNum(args.idade);
-        const cls = classifyExam({
-          name: titulo,
-          value: valor,
-          unit: typeof args.unidade === "string" ? args.unidade : null,
-          reference: typeof args.referencia === "string" ? args.referencia : null,
-          ctx: {
-            sex: (sexoArg ?? (prof?.sex as Sex) ?? null) as Sex,
-            age: idadeArg != null ? idadeArg : ageFromBirth(prof?.birth_date),
-          },
+
+        const { data, error } = await supabase
+          .from("exams")
+          .select("title, result_value, unit, reference_range, date")
+          .eq("user_id", uid)
+          .order("date", { ascending: false })
+          .limit(200);
+        if (error) return { ok: false, resumo: "Não consegui ler seus exames agora. Tente de novo." };
+
+        // Pela chave do exame (a regra estrita de nome: "LDL-c" e "Colesterol
+        // LDL" são o mesmo) ou, fora da tabela, por todas as palavras do
+        // pedido no nome ("zeta" acha "Marcador Zeta"). Palavra inteira: por
+        // trecho, "LDL" pegava o VLDL, que é outro exame.
+        const chave = chaveDoExame(nome);
+        const pedidas = nomeEmPalavras(nome);
+        const achados = ((data ?? []) as any[])
+          .filter((e) => {
+            if (typeof e?.title !== "string") return false;
+            if (chaveDoExame(e.title) === chave) return true;
+            const doTitulo = new Set(nomeEmPalavras(e.title));
+            return pedidas.length > 0 && pedidas.every((p) => doTitulo.has(p));
+          })
+          .slice(0, 3);
+        if (!achados.length) return { ok: true, resumo: "Não achei esse exame nos seus registros." };
+        const linhas = achados.map((e) => {
+          const v = e.result_value ?? "sem valor";
+          return `${e.title}: ${v}${unidadeDe(e.unit)} em ${formatDate(e.date)}, ${linhaDoLaudo(e.result_value, e.reference_range).texto}`;
         });
-        if (cls.needs?.includes("sexo")) {
-          return {
-            ok: true,
-            resumo: `Para avaliar "${titulo}" eu preciso saber o SEXO do usuário (as faixas mudam muito entre homens e mulheres). PEÇA o sexo — ele pode preencher no Perfil ou te dizer agora aqui no chat. Quando ele disser, use atualizar_perfil para salvar e chame avaliar_exame de novo (ou passe o parâmetro 'sexo').`,
-          };
-        }
-        if (!cls.matched) {
-          return {
-            ok: true,
-            resumo: `Não tenho faixa de referência confiável para "${titulo}". NÃO foi salvo. Oriente a confirmar o valor de referência no laudo ou com um profissional. Pergunte se mesmo assim quer registrar na aba Exames.`,
-          };
-        }
-        return {
-          ok: true,
-          resumo: `Avaliação (NÃO salva): ${titulo} = ${valor} → ${EXAM_STATUS_LABEL[cls.status]}. ${cls.explicacao} Agora PERGUNTE ao usuário se ele quer que você adicione este exame na aba Exames.`,
-        };
+        return { ok: true, resumo: linhas.join("\n") };
       }
 
       case "registrar_dose": {

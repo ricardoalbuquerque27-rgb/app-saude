@@ -18,16 +18,6 @@ export type ExamDirection = "baixo" | "normal" | "alto";
 
 export type ExamContext = { sex?: Sex; age?: number | null };
 
-export type ExamClassification = {
-  matched: boolean; // conseguimos classificar?
-  status: ExamLevel;
-  direction: ExamDirection;
-  faixa: string; // texto da faixa de referência usada
-  explicacao: string; // explicação amigável em pt-BR
-  source: "tabela" | "referencia" | "nenhuma";
-  needs?: ("sexo" | "idade")[]; // dados que faltam para classificar bem
-};
-
 // Extrai o primeiro número de um texto (aceita vírgula decimal).
 export function parseExamNumber(input: unknown): number | null {
   if (typeof input === "number") return Number.isFinite(input) ? input : null;
@@ -511,8 +501,9 @@ export const TEXTOS_DE_FAIXA_DA_TABELA: ReadonlySet<string> = new Set(
  * tabela do app? Então não é o laudo do laboratório: o casamento frouxo antigo
  * do `classifyExam` gravava em `reference_range` o texto da entrada que ele
  * achava (o VLDL-colesterol saía com "< 190 mg/dL", do colesterol total), e o
- * formulário de exames e a IA ainda gravam o texto da tabela quando o laudo
- * não traz faixa.
+ * formulário de exames e a IA gravavam o texto da tabela quando o laudo não
+ * trazia faixa. Desde o `exameParaGravar` nada grava mais, mas as linhas
+ * antigas seguem no banco.
  */
 export function ehTextoDaTabela(texto: string | null | undefined): boolean {
   return !!texto && TEXTOS_DE_FAIXA_DA_TABELA.has(texto.trim().replace(/\s+/g, " "));
@@ -659,7 +650,7 @@ function entradaDaTabela(nome: string): RangeDef | null {
 // resultado por dia", colesterol total 200 (10/07) e 190 (02/10) mais
 // VLDL-colesterol 24 (02/10) viravam UMA linha, "VLDL-colesterol, 24, entrou
 // na faixa", e o 190 sumia. Fora da tabela vale o nome normalizado (sem
-// acento, caixa nem pontuação). É o mesmo casamento do `classifyExam`.
+// acento, caixa nem pontuação). É o mesmo casamento da `situacaoParaANutricionista`.
 export function chaveDoExame(nome: string): string {
   return entradaDaTabela(nome)?.keys[0] ?? norm(nome);
 }
@@ -699,7 +690,7 @@ export function unidadeDoExame(nome: string, unidade: string | null | undefined)
 // dela), com a unidade em que a entrada está e a situação do `valor` nela (os
 // três níveis da entrada: é o selo do comparativo). Só quando a `unidade` do
 // resultado é vazia ou da entrada (`naUnidadeDaEntrada`). Exame que depende do
-// sexo, sem o sexo, fica sem faixa: não chutamos, como no `classifyExam`.
+// sexo, sem o sexo, fica sem faixa: não chutamos.
 export function faixaDaTabela(
   nome: string,
   valor: number,
@@ -712,138 +703,3 @@ export function faixaDaTabela(
   return { faixa: r.faixa, unidade: def.unit, situacao: r.status };
 }
 
-const STATUS_LABEL: Record<ExamLevel, string> = {
-  normal: "Normal",
-  atencao: "Atenção",
-  alterado: "Alterado",
-};
-
-function explain(
-  status: ExamLevel,
-  direction: ExamDirection,
-  faixa: string,
-  ctx: ExamContext,
-  sexUsed: boolean
-): string {
-  const dirTxt = direction === "alto" ? "acima" : direction === "baixo" ? "abaixo" : "dentro";
-  const base =
-    status === "normal"
-      ? `Resultado dentro da faixa de referência (${faixa}).`
-      : status === "atencao"
-        ? `Resultado no limite, ${dirTxt} da faixa (${faixa}). Vale acompanhar.`
-        : `Resultado ${dirTxt} da faixa de referência (${faixa}).`;
-  const parts = [base];
-  if (status !== "normal") {
-    parts.push("Isto é uma orientação geral — confirme com um médico para avaliação.");
-  }
-  if (sexUsed && !ctx.sex) {
-    parts.push("Dica: informe seu sexo no perfil para uma faixa mais precisa.");
-  }
-  if (ctx.age != null && ctx.age < 18) {
-    parts.push("Atenção: faixas de adulto; para menores de 18, siga a referência do pediatra.");
-  }
-  return parts.join(" ");
-}
-
-// Classifica um exame: a página Exames do paciente (o selo e o "acima/abaixo"),
-// o formulário (que preenche a situação e a faixa) e a IA (que grava o exame).
-// `reference` (opcional) é a faixa impressa no laudo.
-//
-// 1. A tabela do app, quando o nome casa com uma entrada pela regra estrita de
-//    `entradaDaTabela` (a mesma do comparativo do nutricionista) e a unidade é
-//    vazia ou a da entrada. O casamento antigo, por palavra solta, julgava a
-//    "Vitamina K" pela faixa do potássio e a HCM pela da hemoglobina; e a
-//    tabela em qualquer unidade dava "atenção" à B12 de 235 pmol/L, que o laudo
-//    (148 a 664) põe dentro.
-// 2. Senão, a faixa do laudo, com a borda estrita do "<" e do ">" e sem a
-//    referência em níveis (`parseReferenceRange`). Texto da tabela não vale
-//    como laudo (`ehTextoDaTabela`): o formulário preenche a referência com ele
-//    assim que o nome casa, e a glicose de 5,1 mmol/L ia contra "70–99 mg/dL".
-export function classifyExam(params: {
-  name: string;
-  value: unknown;
-  unit?: string | null;
-  reference?: string | null;
-  ctx?: ExamContext;
-}): ExamClassification {
-  const { name, value } = params;
-  // A rota analyze-exam passa o JSON da IA direto, e a IA devolve número,
-  // objeto ou nulo onde se espera texto. `.normalize` e `.trim` num valor que
-  // não é texto lançavam erro e derrubavam a leitura do laudo inteiro; o que
-  // não é texto vale como ausente (a unidade em branco deixa a tabela valer).
-  const unit = typeof params.unit === "string" ? params.unit : null;
-  const reference = typeof params.reference === "string" ? params.reference : null;
-  const ctx: ExamContext = params.ctx ?? {};
-  const v = parseExamNumber(value);
-
-  if (v == null || !name?.trim()) {
-    return {
-      matched: false,
-      status: "normal",
-      direction: "normal",
-      faixa: "",
-      explicacao: "",
-      source: "nenhuma",
-    };
-  }
-
-  // 1) Tabela curada (personalizada por sexo/idade), na unidade dela
-  const daUnidade = entradaDaTabela(name);
-  const def = daUnidade && naUnidadeDaEntrada(daUnidade, unit) ? daUnidade : null;
-  // Exame que depende de sexo, mas não sabemos o sexo: não chutamos.
-  // Tentamos a faixa do laudo; se não houver, pedimos o sexo.
-  const faltaSexo = !!def?.sexDependent && !ctx.sex;
-  if (def && !faltaSexo) {
-    const r = def.classify(v, ctx);
-    return {
-      matched: true,
-      status: r.status,
-      direction: r.direction,
-      faixa: r.faixa,
-      explicacao: explain(r.status, r.direction, r.faixa, ctx, !!def.sexDependent),
-      source: "tabela",
-    };
-  }
-
-  // 2) Faixa de referência do laudo
-  const parsed = ehTextoDaTabela(reference) ? null : parseReferenceRange(reference);
-  if (parsed && (parsed.min != null || parsed.max != null)) {
-    let status: ExamLevel = "normal";
-    let direction: ExamDirection = "normal";
-    if (!dentroDaFaixa(v, parsed)) {
-      status = "alterado";
-      direction =
-        parsed.max != null && (parsed.maxExclusivo ? v >= parsed.max : v > parsed.max) ? "alto" : "baixo";
-    }
-    const faixa = (reference ?? "").trim();
-    const dirTxt = direction === "alto" ? "acima" : direction === "baixo" ? "abaixo" : "dentro";
-    const explicacao =
-      status === "normal"
-        ? `Resultado dentro da referência informada (${faixa}).`
-        : `Resultado ${dirTxt} da referência informada (${faixa}). Confirme com um médico.`;
-    return { matched: true, status, direction, faixa, explicacao, source: "referencia" };
-  }
-
-  // 3) Não foi possível classificar
-  if (faltaSexo) {
-    return {
-      matched: false,
-      status: "normal",
-      direction: "normal",
-      faixa: "",
-      explicacao: `Para avaliar ${name.trim()} eu preciso saber o sexo — as faixas de referência mudam bastante entre homens e mulheres.`,
-      source: "nenhuma",
-      needs: ["sexo"],
-    };
-  }
-  return {
-    matched: false,
-    status: "normal",
-    direction: "normal",
-    faixa: reference?.trim() || "",
-    explicacao: "",
-    source: "nenhuma",
-  };
-}
-
-export { STATUS_LABEL as EXAM_STATUS_LABEL };

@@ -20,10 +20,9 @@ const SYSTEM =
   "PERSONALIDADE (seja sempre a Gaia):\n" +
   "- Acolhedora, próxima e SEM JULGAMENTO: nunca envergonhe o usuário por peso, comida, recaída ou resultado. " +
   "Todo corpo, meta e ritmo são bem-vindos (inclusive quem usa caneta/GLP-1).\n" +
-  "- Adapte o tom ao momento (misture os três jeitos conforme a situação):\n" +
+  "- Adapte o tom ao momento (misture os dois jeitos conforme a situação):\n" +
   "  • Conquistas e rotina: motive com energia leve, comemore os pequenos passos e aponte o próximo passo.\n" +
   "  • Deslizes ou dificuldade: fique serena e gentil, tire a pressão e foque no próximo dia.\n" +
-  "  • Exames, saúde e tratamento: tom calmo e confiável de especialista — explique simples e reforce procurar um profissional.\n" +
   "- Fale como gente: frases curtas, use o primeiro nome do usuário quando souber. Emojis com moderação e a cara da Gaia (🌱 e 💚 combinam), no máximo 1 por mensagem.\n" +
   "- Você é a mesma Gaia em qualquer tela (é um balão flutuante presente no app todo). Refira-se a si mesma como Gaia quando fizer sentido, sem repetir o nome a cada frase.\n\n" +
   "Sobre o app, para orientar o usuário:\n" +
@@ -43,9 +42,11 @@ const SYSTEM =
   "Se você acabou de sugerir algo e o usuário ainda não confirmou, PERGUNTE antes (a não ser que ele já tenha pedido).\n" +
   "- Para APAGAR/REMOVER, tenha certeza do que ele quer; confirme em 1 frase o que foi apagado. Nunca apague sem pedido explícito.\n" +
   "- TREINOS: para montar um treino que o usuário vai repetir, prefira criar uma ROTINA (criar_rotina) com os exercícios e metas (séries, reps, carga, descanso) — assim ele pode 'Iniciar treino' com cronômetro. Use adicionar_ao_plano_semanal para encaixar treinos nos dias da semana. Ao montar um plano semanal, envie todas as sessões de uma vez, com o dia certo e detalhes úteis.\n" +
-  "- EXAMES: quando o usuário só mencionar um resultado ou perguntar se está normal (curiosidade), use 'avaliar_exame' (NÃO salva) para responder com a classificação correta e DEPOIS pergunte se ele quer que você adicione na aba Exames. Só use 'registrar_exame' (que salva) quando ele pedir para registrar/salvar ou confirmar que quer adicionar. Nunca classifique exame por conta própria — use sempre as ferramentas.\n" +
+  "- EXAMES: você pode explicar, em termos gerais, o que um exame mede, e dizer o valor e se está dentro, acima ou abaixo da faixa impressa no laudo, usando 'ler_exame' (nunca de cabeça). Você NÃO diz o que o resultado indica sobre a saúde da pessoa (causa, doença, risco, \"pode ser\"), NÃO chama o resultado de bom, ruim, normal, alterado ou preocupante e NÃO sugere conduta (comida, suplemento, remédio, exame novo). Quem interpreta é a nutricionista: ofereça mandar a pergunta a ela com 'falar_com_nutricionista'; sem nutricionista, diga para levar ao médico que pediu o exame. Para guardar um resultado, use 'registrar_exame'.\n" +
+  "  Pode: \"O LDL é uma das formas de colesterol que circula no sangue. O seu deu 180 mg/dL, acima da faixa que o laudo traz (até 130). Quem interpreta é a sua nutricionista. Quer que eu mande a pergunta para ela?\"\n" +
+  "  Não pode: \"Seu LDL está alto, isso aumenta o risco cardiovascular; corte as frituras.\"\n" +
   "- PRESCRIÇÃO DO NUTRICIONISTA (regra dura): se os dados abaixo mostrarem uma prescrição ativa, aquelas metas e aquele plano foram definidos por um profissional. NUNCA use 'definir_metas', 'adicionar_ao_plano_semanal', 'remover_do_plano' ou 'criar_rotina' para alterar o que está prescrito, mesmo que o usuário peça. Explique de quem veio, e ofereça enviar o pedido ao profissional com 'falar_com_nutricionista'. Se ele insistir, diga que ele pode mudar no Perfil, mas que o nutricionista será avisado da mudança — sem drama e sem julgamento. Sugestões você pode dar à vontade, desde que dentro do que foi prescrito.\n" +
-  "- DADOS FALTANDO (regra geral, vale para TUDO): para qualquer pergunta sobre resultados, exames, metas, calorias, IMC, progresso, hidratação etc., se você precisar de um dado que não tem (sexo, idade, altura, peso atual, metas, nível de atividade), NUNCA chute nem dê resposta genérica. Peça o dado com gentileza, sempre oferecendo os DOIS caminhos: preencher no Perfil OU informar aqui no chat. Quando o usuário informar dados de cadastro (sexo, altura, data de nascimento), salve com 'atualizar_perfil'; metas, com 'definir_metas'; peso, com 'registrar_peso'. Os campos que faltam aparecem na lista 'Dados do cadastro AUSENTES' nos dados abaixo — consulte-a antes de responder. Nunca invente números.\n" +
+  "- DADOS FALTANDO (regra geral, vale para TUDO): para qualquer pergunta sobre metas, calorias, IMC, progresso, hidratação etc., se você precisar de um dado que não tem (sexo, idade, altura, peso atual, metas, nível de atividade), NUNCA chute nem dê resposta genérica. Peça o dado com gentileza, sempre oferecendo os DOIS caminhos: preencher no Perfil OU informar aqui no chat. Quando o usuário informar dados de cadastro (sexo, altura, data de nascimento), salve com 'atualizar_perfil'; metas, com 'definir_metas'; peso, com 'registrar_peso'. Os campos que faltam aparecem na lista 'Dados do cadastro AUSENTES' nos dados abaixo — consulte-a antes de responder. Nunca invente números.\n" +
   "- Depois de executar, confirme em 1 frase curta o que foi feito e onde o usuário encontra (ex.: 'Pronto! Adicionei na aba Treinos › Plano semanal.').\n" +
   "- Se uma ação falhar, avise com naturalidade e ofereça tentar de novo. Nunca invente que salvou se a ferramenta não confirmou.\n\n" +
   "Como responder:\n" +
@@ -149,7 +150,7 @@ async function buildUserContext(supabase: any, uid: string): Promise<string> {
   const weekAgo = addDaysISO(today, -6);
   const dow = (new Date(today + "T12:00:00").getDay() + 6) % 7;
 
-  const [prof, weight, meals, wkCount, plan, log, exams, treat, wkToday] =
+  const [prof, weight, meals, wkCount, plan, log, treat, wkToday] =
     await Promise.all([
     supabase
       .from("profiles")
@@ -186,13 +187,6 @@ async function buildUserContext(supabase: any, uid: string): Promise<string> {
       .eq("user_id", uid)
       .eq("date", today)
       .maybeSingle(),
-    supabase
-      .from("exams")
-      .select("title, result_value, unit, status")
-      .eq("user_id", uid)
-      .neq("status", "normal")
-      .order("date", { ascending: false })
-      .limit(5),
     supabase
       .from("treatments")
       .select("medication, dose, frequency_days")
@@ -272,15 +266,6 @@ async function buildUserContext(supabase: any, uid: string): Promise<string> {
         .map((x: any) => x.sport + (x.title ? ` (${x.title})` : ""))
         .join(", ")}`
     );
-  if ((exams.data ?? []).length)
-    parts.push(
-      `Exames alterados recentes: ${(exams.data ?? [])
-        .map(
-          (e: any) =>
-            `${e.title} ${e.result_value ?? ""}${e.unit ?? ""} (${e.status})`
-        )
-        .join("; ")}`
-    );
   if (treat.data) {
     const freq =
       treat.data.frequency_days === 7
@@ -291,7 +276,7 @@ async function buildUserContext(supabase: any, uid: string): Promise<string> {
     parts.push(
       `Tratamento com caneta (GLP-1): usa ${treat.data.medication}${
         treat.data.dose ? ` (${treat.data.dose})` : ""
-      }, aplicação ${freq}. ORIENTE de acordo: priorize proteína (preservar músculo), boa hidratação, comer devagar e em menor quantidade, fibras contra constipação, e reforce procurar o médico para ajuste de dose ou efeitos fortes. NUNCA sugira ou altere doses de medicamento.`
+      }, aplicação ${freq}. Não oriente sobre o tratamento; dúvidas sobre ele vão ao médico que acompanha. NUNCA sugira ou altere doses de medicamento.`
     );
   }
 
