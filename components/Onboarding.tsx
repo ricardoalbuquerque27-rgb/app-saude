@@ -256,8 +256,9 @@ export default function Onboarding({ initialName }: { initialName?: string }) {
                 </div>
               </div>
               <p className="text-[13px] text-app-texto-2">
-                Usamos sexo e idade só para ajustar as faixas de referência dos
-                seus exames. Você pode deixar em branco.
+                Usamos sexo e idade para calcular suas metas, e sua
+                nutricionista, se você tiver uma, também vê. Você pode deixar em
+                branco.
               </p>
                 </>
               )}

@@ -306,6 +306,17 @@ describe("ler_exame: constata pelo laudo, sem salvar", () => {
     expect(r.resumo).toBe("Marcador Zeta: 1,5 em 01/10/2026, dentro da faixa do laudo (0,9 a 1,7)");
   });
 
+  it("com a leitura cheia (200) e nada casando, não diz que o exame não existe", async () => {
+    // O que ficou fora dos 200 mais recentes não é "não tem" (CLAUDE.md,
+    // "Leitura em páginas, e só o teto é falha").
+    const exames = Array.from({ length: 200 }, (_, i) => ({
+      user_id: PACIENTE, title: `Exame ${i}`, result_value: "1", unit: null, reference_range: null,
+      date: `2026-${String((i % 9) + 1).padStart(2, "0")}-10`,
+    }));
+    const r = await executeAction("ler_exame", '{"nome":"Vitamina D"}', bancoDosExames({ exames }).banco, PACIENTE);
+    expect(r).toEqual({ ok: true, resumo: "Não achei esse exame nos seus 200 exames mais recentes." });
+  });
+
   it("sem exame com esse nome", async () => {
     const r = await executeAction("ler_exame", '{"nome":"Ferritina"}', bancoDosExames({}).banco, PACIENTE);
     expect(r).toEqual({ ok: true, resumo: "Não achei esse exame nos seus registros." });

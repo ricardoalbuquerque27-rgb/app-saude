@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { PageHeader } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
+import { semExameNemTratamento } from "@/lib/historicoDaIa";
 
 type Insight = {
   area: string;
@@ -208,10 +209,10 @@ export default function SaudePage() {
           )}
 
           {/* Insights conectados */}
-          {a.insights?.length > 0 && (
+          {semExameNemTratamento(a.insights).length > 0 && (
             <div className="space-y-3">
               <h2 className="section-title">Conexões encontradas</h2>
-              {a.insights.map((ins, i) => {
+              {semExameNemTratamento(a.insights).map((ins, i) => {
                 const Icon = AREA_ICON[ins.area] ?? Activity;
                 const st = sevStyle(ins.severidade);
                 return (

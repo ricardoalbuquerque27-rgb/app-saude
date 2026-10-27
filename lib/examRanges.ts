@@ -1,16 +1,16 @@
-// Classificação de exames laboratoriais com base em faixas de referência.
+// Faixas de referência de exames laboratoriais: a leitura da faixa impressa no
+// laudo (`parseReferenceRange`), o nome e a unidade de cada exame
+// (`chaveDoExame`, `unidadeDoExame`) e a tabela curada do app (adulto, com
+// faixas por sexo e idade quando isso muda a referência: `faixaDaTabela`).
 //
-// Estratégia (em ordem):
-//   1. Tabela curada de exames comuns (adulto), com faixas ajustadas por
-//      sexo e idade quando isso muda a referência.
-//   2. Se o exame não estiver na tabela, tenta interpretar a faixa de
-//      referência informada (ex.: a que vem impressa no laudo).
+// Duas regras usam isto, uma para cada lado (CLAUDE.md, "Uso pretendido"):
+//   - o paciente vê só a posição do valor na faixa do laudo
+//     (`situacaoNoLaudo` e `linhaDoLaudo`, aqui), nunca a tabela do app;
+//   - a nutricionista vê o selo da `situacaoParaANutricionista`
+//     (`lib/exames.ts`): o laudo primeiro, depois a tabela.
 //
 // Este módulo é PURO (sem dependências de servidor) para poder ser usado
 // tanto no back-end (chat/IA) quanto no front-end (formulário).
-//
-// AVISO: as faixas são referências gerais para adultos e servem apenas para
-// orientação. Não substituem a avaliação de um profissional de saúde.
 
 export type Sex = "M" | "F" | null | undefined;
 export type ExamLevel = "normal" | "atencao" | "alterado";
@@ -519,6 +519,14 @@ export type SituacaoNoLaudo = "dentro" | "acima" | "abaixo" | "sem faixa";
  * legível (referência em níveis, texto da tabela gravado no lugar do laudo,
  * valor sem número), não há o que comparar.
  */
+// Título ("1/40", "1:160"): o número que se lê dele é o 1, e "1/40" contra
+// "< 1/80" saía "acima" sendo abaixo.
+const TITULO = /\d\s*[/:]\s*\d/;
+// Ponto de milhar ("4.000", "250.000"). O `parseExamNumber` lê o ponto como
+// decimal, o que só dá certo quando os dois lados o escrevem: "4500" contra
+// "4.000 a 11.000" saía "acima" para um leucograma normal.
+const MILHAR = /\d\.\d{3}(?!\d)/;
+
 export function situacaoNoLaudo(
   valor: unknown,
   referencia: unknown
@@ -526,9 +534,27 @@ export function situacaoNoLaudo(
   const semFaixa = { situacao: "sem faixa" as const, faixa: null };
   const v = parseExamNumber(valor);
   if (v == null || typeof referencia !== "string" || ehTextoDaTabela(referencia)) return semFaixa;
+  const textoDoValor = typeof valor === "string" ? valor.trim() : String(valor);
+  if (TITULO.test(textoDoValor) || TITULO.test(referencia)) return semFaixa;
+  if (MILHAR.test(textoDoValor) !== MILHAR.test(referencia)) return semFaixa;
   const faixa = parseReferenceRange(referencia);
   if (!faixa || (faixa.min == null && faixa.max == null)) return semFaixa;
   const texto = referencia.trim();
+
+  // Valor com operador ("< 10", "> 90") é um intervalo, não um ponto: só se
+  // afirma quando o intervalo inteiro cai de um lado. "< 10" contra "10 a 50"
+  // é abaixo; "< 20" pode ser qualquer um dos dois. Outros operadores (≤, ≥)
+  // não se afirmam.
+  if (/[≤≥]|<=|>=/.test(textoDoValor)) return semFaixa;
+  if (textoDoValor.startsWith("<")) {
+    if (faixa.min != null) return v <= faixa.min ? { situacao: "abaixo", faixa: texto } : semFaixa;
+    return v <= faixa.max! ? { situacao: "dentro", faixa: texto } : semFaixa;
+  }
+  if (textoDoValor.startsWith(">")) {
+    if (faixa.max != null) return v >= faixa.max ? { situacao: "acima", faixa: texto } : semFaixa;
+    return v >= faixa.min! ? { situacao: "dentro", faixa: texto } : semFaixa;
+  }
+
   if (dentroDaFaixa(v, faixa)) return { situacao: "dentro", faixa: texto };
   const acima = faixa.max != null && (faixa.maxExclusivo ? v >= faixa.max : v > faixa.max);
   return { situacao: acima ? "acima" : "abaixo", faixa: texto };

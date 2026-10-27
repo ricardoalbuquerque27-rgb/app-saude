@@ -292,7 +292,8 @@ export const AI_TOOLS = [
           unidade: { type: "string", description: "Unidade. Ex.: 'mg/dL' (opcional)." },
           referencia: {
             type: "string",
-            description: "Faixa impressa no laudo, se ele disser (opcional). Ex.: '< 130', '70 a 99'.",
+            description:
+              "Faixa impressa no laudo, só se o usuário escreveu (opcional). Nunca preencha de memória: o app chama de 'faixa do laudo' o que vier aqui. Ex.: '< 130', '70 a 99'.",
           },
         },
         required: ["nome"],
@@ -304,7 +305,7 @@ export const AI_TOOLS = [
     function: {
       name: "atualizar_perfil",
       description:
-        "Salva dados de cadastro do usuário no perfil: sexo, altura e data de nascimento. Use quando o usuário informar esses dados no chat (por exemplo, quando você precisar do sexo para avaliar um exame e ele responder). Isso deixa salvo para as próximas vezes.",
+        "Salva dados de cadastro do usuário no perfil: sexo, altura e data de nascimento. Use quando o usuário informar esses dados no chat (por exemplo, quando você precisar do sexo ou da idade para calcular as metas e ele responder). Isso deixa salvo para as próximas vezes.",
       parameters: {
         type: "object",
         properties: {
@@ -480,6 +481,9 @@ export const TOOL_AREAS: Record<string, string> = {
 };
 
 const DIAS = ["segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo"];
+
+// Quantos exames o `ler_exame` lê, do mais recente ao mais antigo.
+const LIMITE_DO_LER_EXAME = 200;
 
 // O nome em palavras, sem acento, caixa nem pontuação ("LDL-c" vira "ldl", "c").
 function nomeEmPalavras(t: string): string[] {
@@ -790,7 +794,7 @@ export async function executeAction(
           .select("title, result_value, unit, reference_range, date")
           .eq("user_id", uid)
           .order("date", { ascending: false })
-          .limit(200);
+          .limit(LIMITE_DO_LER_EXAME);
         if (error) return { ok: false, resumo: "Não consegui ler seus exames agora. Tente de novo." };
 
         // Pela chave do exame (a regra estrita de nome: "LDL-c" e "Colesterol
@@ -807,7 +811,17 @@ export async function executeAction(
             return pedidas.length > 0 && pedidas.every((p) => doTitulo.has(p));
           })
           .slice(0, 3);
-        if (!achados.length) return { ok: true, resumo: "Não achei esse exame nos seus registros." };
+        if (!achados.length) {
+          // A leitura cheia pode ter deixado o exame de fora: o que não veio não
+          // é "não tem" (CLAUDE.md, "Leitura em páginas, e só o teto é falha").
+          const cheia = (data ?? []).length >= LIMITE_DO_LER_EXAME;
+          return {
+            ok: true,
+            resumo: cheia
+              ? `Não achei esse exame nos seus ${LIMITE_DO_LER_EXAME} exames mais recentes.`
+              : "Não achei esse exame nos seus registros.",
+          };
+        }
         const linhas = achados.map((e) => {
           const v = e.result_value ?? "sem valor";
           return `${e.title}: ${v}${unidadeDe(e.unit)} em ${formatDate(e.date)}, ${linhaDoLaudo(e.result_value, e.reference_range).texto}`;

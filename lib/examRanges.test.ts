@@ -241,6 +241,30 @@ describe("situacaoNoLaudo: só a faixa impressa no laudo", () => {
   it("valor com operador compara o número", () => {
     expect(situacaoNoLaudo("< 0,5", "< 1,0").situacao).toBe("dentro");
   });
+  // O paciente lê a linha como fato: o que não dá para afirmar fica "sem faixa".
+  it("título (1/40) não se compara como número", () => {
+    expect(situacaoNoLaudo("1/40", "< 1/80").situacao).toBe("sem faixa");
+    expect(situacaoNoLaudo("1:160", "< 1:80").situacao).toBe("sem faixa");
+  });
+  it("milhar escrito de um lado só não se compara; dos dois lados, sim", () => {
+    expect(situacaoNoLaudo("4500", "4.000 a 11.000").situacao).toBe("sem faixa");
+    expect(situacaoNoLaudo("6.500", "4000 a 11000").situacao).toBe("sem faixa");
+    expect(situacaoNoLaudo("6.500", "4.000 a 11.000").situacao).toBe("dentro");
+    expect(situacaoNoLaudo("250.000", "150.000 a 450.000").situacao).toBe("dentro");
+    expect(situacaoNoLaudo("5,4", "3,9 a 5,5").situacao).toBe("dentro");
+  });
+  it("valor com '<' ou '>' só se afirma quando não há dúvida", () => {
+    expect(situacaoNoLaudo("< 10", "10 a 50").situacao).toBe("abaixo");
+    expect(situacaoNoLaudo("< 20", "10 a 50").situacao).toBe("sem faixa");
+    expect(situacaoNoLaudo("< 0,5", "0,1 a 1,0").situacao).toBe("sem faixa");
+    expect(situacaoNoLaudo("> 100", "10 a 50").situacao).toBe("acima");
+    expect(situacaoNoLaudo("> 20", "10 a 50").situacao).toBe("sem faixa");
+    expect(situacaoNoLaudo("> 60", "> 40").situacao).toBe("dentro");
+    expect(situacaoNoLaudo("< 30", "> 40").situacao).toBe("abaixo");
+    expect(situacaoNoLaudo("> 200", "< 190").situacao).toBe("acima");
+    expect(situacaoNoLaudo("≤ 5", "10 a 50").situacao).toBe("sem faixa");
+  });
+
   it("nunca usa a tabela do app: glicose sem laudo é 'sem faixa'", () => {
     expect(situacaoNoLaudo("150", null).situacao).toBe("sem faixa");
   });

@@ -64,7 +64,9 @@ Isso não é óbvio lendo a árvore de arquivos.
   `situacaoNoLaudo`, `textoDaSituacaoNoLaudo` e `linhaDoLaudo`), a leitura
   do laudo em `lib/laudo.ts` (`transcricaoDoLaudo`), o "O que é?" em
   `lib/explicacaoDeExame.ts` (`nomeValido`, `pedidoDaExplicacao`,
-  `explicacaoAceitavel`, `respostaDaExplicacao`), os números em pt-BR em `lib/numeros.ts` (`numeroBR` e
+  `explicacaoAceitavel`, `respostaDaExplicacao`), o histórico da IA sem os
+  cartões de exame e tratamento em `lib/historicoDaIa.ts`
+  (`semExameNemTratamento`), os números em pt-BR em `lib/numeros.ts` (`numeroBR` e
   `numeroFixo`, que mantém o zero: "66,0"), a leitura em
   páginas em `lib/paginacao.ts` (`lerEmPaginas`),
   `lib/temaClinico.ts` e `lib/temaApp.ts` com `lib/contraste.ts` (as duas
@@ -641,7 +643,12 @@ Spec: `docs/superpowers/specs/2026-10-27-uso-pretendido-da-ia-design.md`. A
 RDC 657/2022 separa o software de bem-estar do software de diagnóstico ou
 tratamento pelo que ele **faz**, não pelo aviso que o acompanha. Por isso,
 **para o paciente, o app constata e explica; não julga exame nem orienta
-tratamento.** O juízo clínico é da nutricionista, e a tela dela não muda.
+tratamento.** O juízo clínico é da nutricionista, e a tela dela não muda
+(o comparativo calcula igual). Num exame **novo**, duas coisas que ela vê
+mudam, como a spec decidiu: o `status` gravado segue o laudo antes da tabela
+(uma vitamina D de 25 com laudo "20 a 100" já não entra na fila, onde a
+tabela a punha), e o exame sem faixa nenhuma vai sem selo no "Ver todos os
+resultados", em vez de "Normal".
 
 - **Pode:** mostrar o valor, a unidade, a data e a faixa impressa no laudo;
   dizer dentro, acima ou abaixo da faixa do laudo; explicar em termos gerais
@@ -660,11 +667,21 @@ fila e o `status` gravado. A leitura do laudo (`analyze-exam`) só transcreve
 nome, valor, unidade e faixa (`transcricaoDoLaudo`). O "O que é?"
 (`app/api/explicar-exame`, `components/OQueEOExame.tsx`) **só manda à IA o
 nome do exame**, entre aspas e como dado, e a resposta passa pela checagem
-de palavras (`explicacaoAceitavel`): a explicação das telas não tem como
-falar do resultado. A Gaia não tem ferramenta que julgue (o `avaliar_exame`
-virou `ler_exame`, que constata pelo laudo, calculado no código), não recebe
+de palavras (`explicacaoAceitavel`, que recusa também doença, hipótese e
+qualquer faixa numérica: "o ideal é abaixo de 100 mg/dL" embaixo do valor do
+paciente seria a tabela voltando por outra porta): a explicação das telas não
+tem como falar do resultado. A linha do paciente só afirma o que dá para
+afirmar: título ("1/40"), milhar escrito de um lado só ("4500" contra "4.000
+a 11.000") e valor com operador que pode cair dos dois lados ("< 20" contra
+"10 a 50") ficam "sem faixa do laudo". A Gaia não tem ferramenta que julgue (o `avaliar_exame`
+virou `ler_exame`, que constata pelo laudo, calculado no código, e com a
+leitura cheia não diz que o exame não existe), não recebe
 os exames no contexto e não orienta quem usa a caneta. Os insights da Saúde
-e os Relatórios não leem exames nem tratamento.
+e os Relatórios não leem exames nem tratamento, e o histórico guardado
+deles não mostra mais os cartões de "Exames" e "Tratamento"
+(`semExameNemTratamento`). Os textos de tela também não prometem mais
+"ajustar as faixas de referência dos seus exames": sexo e idade servem às
+metas e à nutricionista.
 
 **IA nova segue a regra.** A guarda `lib/usoPretendido.test.ts` acusa nas
 rotas de `app/api/` e em `lib/aiActions.ts` os textos que eram as portas do
@@ -675,7 +692,7 @@ acordo"); a regra em si é maior que a guarda.
 
 ```bash
 npm run dev      # desenvolvimento
-npm test         # 1174 testes unitários (vitest)
+npm test         # 1195 testes unitários (vitest)
 ferramentas/testar-sql.sh   # migrações e testes SQL num Postgres local
 npm run build    # produção
 ```
@@ -826,11 +843,12 @@ Modal fora do lugar: procure um `transform` num ancestral.
   com a unidade) aparece ao paciente como "sem faixa do laudo". A data
   `today` que a IA grava quando não acha a do laudo (dois laudos no mesmo
   dia) também segue em aberto.
-- **O histórico da Saúde e dos Relatórios mostra o que foi gerado antes.** As
-  análises guardadas (`health_insights`, `reports`) de antes do uso
-  pretendido podem ligar "um exame alterado a um padrão da dieta" ou mandar
-  "procurar um médico" pelas alterações, e seguem aparecendo até o paciente
-  apagar ou gerar outra. Esconder por data é decisão do dono do produto.
+- **O texto livre do histórico da Saúde e dos Relatórios mostra o que foi
+  gerado antes.** Os cartões de "Exames" e "Tratamento" já não aparecem, mas
+  o resumo, as prioridades e os passos das análises guardadas de antes do uso
+  pretendido (`health_insights`, `reports`) podem falar do exame alterado, e
+  seguem aparecendo até o paciente apagar ou gerar outra. Esconder por data é
+  decisão do dono do produto.
 - **A dica de alimentação e os treinos da Gaia** (porções, substituições, o
   treino que ela monta sem prescrição) ficaram como estavam: pedem uma spec
   própria, que olhe também a atribuição privativa do nutricionista.

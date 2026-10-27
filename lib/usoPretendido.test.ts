@@ -8,7 +8,12 @@ import { describe, it, expect } from "vitest";
 // "normal" ou "alterado" ao paciente (avaliar_exame), a "interpretação" e as
 // "recomendações" da leitura do laudo e a orientação a quem usa a caneta.
 // Voltaram a aparecer? A IA voltou a julgar.
-const PROIBIDOS = ["avaliar_exame", "interpretacao", "recomendacoes", "ORIENTE de acordo"];
+const PROIBIDOS = ["avaliar_exame", "avaliar um exame", "interpretacao", "recomendacoes", "ORIENTE de acordo"];
+
+// As telas do paciente prometiam o juízo que saiu: o sexo e a idade "ajustam
+// as faixas de referência dos seus exames" e ajudam "a leitura dos exames".
+// Hoje eles só servem para o `status` que a nutricionista vê.
+const PROMESSAS = ["faixas de referência dos seus exames", "acertar suas metas e a leitura dos exames"];
 
 function arquivos(dir: string): string[] {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
@@ -23,6 +28,17 @@ describe("a IA não julga exame nem orienta tratamento", () => {
       .flatMap((f) => {
         const texto = fs.readFileSync(f, "utf8");
         return PROIBIDOS.filter((p) => texto.includes(p)).map((p) => `${f}: ${p}`);
+      });
+    expect(achados).toEqual([]);
+  });
+
+  it("nenhuma tela promete ao paciente faixa ajustada ou leitura de exame", () => {
+    const achados = ["app", "components", "lib"]
+      .flatMap(arquivos)
+      .filter((f) => /\.(ts|tsx)$/.test(f) && !f.endsWith(".test.ts"))
+      .flatMap((f) => {
+        const texto = fs.readFileSync(f, "utf8").replace(/\s+/g, " ");
+        return PROMESSAS.filter((p) => texto.includes(p)).map((p) => `${f}: ${p}`);
       });
     expect(achados).toEqual([]);
   });

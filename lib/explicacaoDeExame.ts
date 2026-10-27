@@ -36,26 +36,41 @@ const semAcento = (t: string) => t.toLowerCase().normalize("NFD").replace(/[\u03
 
 // Conservadora de propósito: perder uma explicação boa de vez em quando é
 // melhor que mostrar uma que julga. O `\b` só funciona no texto sem acento.
-// "alto" e "baixo" ficam fora: "lipoproteína de alta densidade" é o HDL.
+// "alto" e "baixo" ficam fora: "lipoproteína de alta densidade" é o HDL; e
+// "ligad" e "relacionad" também, porque a glicada é "a hemoglobina ligada à
+// glicose". A doença e a hipótese ("pode sugerir diabetes") entram pelo nome.
 const TRECHOS = [
-  "risco", "doenc", "pode indicar", "sinal de", "diagnost", "tratament", "remedio", "medicament",
+  "risco", "doenc", "pode indicar", "sinal de", "diagnost", "tratament", "remedio", "medic",
   "suplement", "recomend", "procure", "normal", "altera", "ruim", "preocup", "otim",
+  "diabet", "anemi", "tireoidism", "hipertens", "infart", "derrame", "cancer", "lesao", "insuficien",
+  "suger", "signific", "apont", "associad", "elevad", "aument", "problema", "ideal", "referencia",
 ];
 // Começo de palavra: "indica", "indicam", "podem indicar"; "deve", "devem".
 const COMECOS = /\b(?:indic|deve)/;
 // Palavra inteira: "bombeia" não é "bom".
 const PALAVRAS = /\b(?:bom|boa|bons|boas|normais)\b/;
+// Faixa numérica: "70 a 99", "0,4–4,0", "abaixo de 100", "100 mg/dL". A faixa
+// que a IA escrevesse apareceria embaixo do valor do paciente como se fosse a
+// régua dele. O número do nome ("B12", "T4", "25-hidroxi") não casa.
+const FAIXAS = [
+  /\d\s*(?:a|e|ate|-|–)\s*\d/,
+  /\b(?:acima|abaixo|menor|maior|inferior|superior|entre)\b\D{0,15}\d/,
+  /\d\s*(?:mg|ng|pg|mcg|ug|µg|mmol|meq|mui|ui|u\/l|g\/dl|%)/,
+];
 
 export function explicacaoAceitavel(texto: string): boolean {
   const t = semAcento(texto);
   if (TRECHOS.some((p) => t.includes(p))) return false;
+  if (FAIXAS.some((r) => r.test(t))) return false;
   return !COMECOS.test(t) && !PALAVRAS.test(t);
 }
 
 /** O que a rota devolve para o texto que a IA escreveu. */
 export function respostaDaExplicacao(textoDaIA: string): string {
   const t = (textoDaIA ?? "").trim();
-  if (/^nao reconheco\.?$/.test(semAcento(t))) return TEXTO_NAO_RECONHECIDO;
+  // A IA às vezes devolve a frase entre aspas, como o pedido a mostra, ou com
+  // algo depois ("NÃO RECONHEÇO este exame."): crua, ela ia para a tela.
+  if (semAcento(t).replace(/["'“”«»]/g, "").trim().startsWith("nao reconheco")) return TEXTO_NAO_RECONHECIDO;
   if (!t || !explicacaoAceitavel(t)) return TEXTO_SEM_EXPLICACAO;
   return t;
 }
