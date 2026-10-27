@@ -518,6 +518,36 @@ export function ehTextoDaTabela(texto: string | null | undefined): boolean {
   return !!texto && TEXTOS_DE_FAIXA_DA_TABELA.has(texto.trim().replace(/\s+/g, " "));
 }
 
+export type SituacaoNoLaudo = "dentro" | "acima" | "abaixo" | "sem faixa";
+
+/**
+ * Onde o valor fica na faixa impressa no laudo: é tudo o que o paciente vê do
+ * resultado. A tabela do app nunca entra aqui: julgar pela tabela (com sexo,
+ * idade e o nível "atenção") é juízo clínico, e esse fica com a nutricionista
+ * (`situacaoParaANutricionista`; spec do uso pretendido, "A regra"). Sem faixa
+ * legível (referência em níveis, texto da tabela gravado no lugar do laudo,
+ * valor sem número), não há o que comparar.
+ */
+export function situacaoNoLaudo(
+  valor: unknown,
+  referencia: unknown
+): { situacao: SituacaoNoLaudo; faixa: string | null } {
+  const semFaixa = { situacao: "sem faixa" as const, faixa: null };
+  const v = parseExamNumber(valor);
+  if (v == null || typeof referencia !== "string" || ehTextoDaTabela(referencia)) return semFaixa;
+  const faixa = parseReferenceRange(referencia);
+  if (!faixa || (faixa.min == null && faixa.max == null)) return semFaixa;
+  const texto = referencia.trim();
+  if (dentroDaFaixa(v, faixa)) return { situacao: "dentro", faixa: texto };
+  const acima = faixa.max != null && (faixa.maxExclusivo ? v >= faixa.max : v > faixa.max);
+  return { situacao: acima ? "acima" : "abaixo", faixa: texto };
+}
+
+export function textoDaSituacaoNoLaudo(s: { situacao: SituacaoNoLaudo; faixa: string | null }): string {
+  if (s.situacao === "sem faixa" || !s.faixa) return "sem faixa do laudo";
+  return `${s.situacao} da faixa do laudo (${s.faixa})`;
+}
+
 // As palavras de cada entrada da tabela: a união das palavras de todas as keys
 // dela, contada como uma só (a entrada da glicose tem "glicose", "glicemia",
 // "jejum", "em" e "de"). Na ordem de TABLE.

@@ -5,6 +5,8 @@ import {
   dentroDaFaixa,
   faixaDaTabela,
   parseReferenceRange,
+  situacaoNoLaudo,
+  textoDaSituacaoNoLaudo,
   TEXTOS_DE_FAIXA_DA_TABELA,
   type ExamLevel,
 } from "./examRanges";
@@ -214,6 +216,40 @@ describe("dentroDaFaixa", () => {
     expect(dentroDaFaixa(70, parseReferenceRange("70 a 99")!)).toBe(true);
     expect(dentroDaFaixa(99, parseReferenceRange("70 a 99")!)).toBe(true);
     expect(dentroDaFaixa(99.5, parseReferenceRange("70 a 99")!)).toBe(false);
+  });
+});
+
+describe("situacaoNoLaudo: só a faixa impressa no laudo", () => {
+  it("dentro, acima e abaixo", () => {
+    expect(situacaoNoLaudo("92", "70 a 99")).toEqual({ situacao: "dentro", faixa: "70 a 99" });
+    expect(situacaoNoLaudo("180", "até 130").situacao).toBe("acima");
+    expect(situacaoNoLaudo("12", "15 a 40").situacao).toBe("abaixo");
+  });
+  it("o '<' e o '>' são estritos; o 'a–b' é inclusivo", () => {
+    expect(situacaoNoLaudo("190", "< 190").situacao).toBe("acima");
+    expect(situacaoNoLaudo("40", "> 40").situacao).toBe("abaixo");
+    expect(situacaoNoLaudo("99", "70 a 99").situacao).toBe("dentro");
+  });
+  it("sem faixa: níveis, texto da tabela, valor sem número, referência que não é texto ou vazia", () => {
+    expect(situacaoNoLaudo("6,0", "Normal: < 5,7 %; Pré-diabetes: 5,7 a 6,4 %; Diabetes: ≥ 6,5 %").situacao).toBe("sem faixa");
+    expect(situacaoNoLaudo("210", "< 190 mg/dL").situacao).toBe("sem faixa"); // texto da tabela (ehTextoDaTabela)
+    expect(situacaoNoLaudo("Negativo", "Negativo").situacao).toBe("sem faixa");
+    expect(situacaoNoLaudo("Não reagente", "< 1,0").situacao).toBe("sem faixa");
+    expect(situacaoNoLaudo("92", 99).situacao).toBe("sem faixa");
+    expect(situacaoNoLaudo("92", "").situacao).toBe("sem faixa");
+    expect(situacaoNoLaudo("92", null)).toEqual({ situacao: "sem faixa", faixa: null });
+  });
+  it("valor com operador compara o número", () => {
+    expect(situacaoNoLaudo("< 0,5", "< 1,0").situacao).toBe("dentro");
+  });
+  it("nunca usa a tabela do app: glicose sem laudo é 'sem faixa'", () => {
+    expect(situacaoNoLaudo("150", null).situacao).toBe("sem faixa");
+  });
+  it("os textos", () => {
+    expect(textoDaSituacaoNoLaudo({ situacao: "dentro", faixa: "70 a 99 mg/dL" })).toBe("dentro da faixa do laudo (70 a 99 mg/dL)");
+    expect(textoDaSituacaoNoLaudo({ situacao: "acima", faixa: "até 130" })).toBe("acima da faixa do laudo (até 130)");
+    expect(textoDaSituacaoNoLaudo({ situacao: "abaixo", faixa: "15 a 40" })).toBe("abaixo da faixa do laudo (15 a 40)");
+    expect(textoDaSituacaoNoLaudo({ situacao: "sem faixa", faixa: null })).toBe("sem faixa do laudo");
   });
 });
 
