@@ -138,7 +138,7 @@ export default function RelatoriosPage() {
             Seu relatório inteligente
           </p>
           <p className="mt-1 max-w-md text-sm text-app-texto-2">
-            A IA analisa seus treinos, dieta, hábitos, medidas e exames dos últimos
+            A IA analisa seus treinos, dieta, hábitos e medidas dos últimos
             30 dias e traz pontos fortes, o que melhorar e padrões a evitar. Cada
             relatório fica salvo no histórico para você comparar sua evolução.
           </p>

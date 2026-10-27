@@ -7,11 +7,9 @@ import {
   Sparkles,
   HeartPulse,
   Check,
-  FileText,
   Salad,
   Dumbbell,
   Droplets,
-  Syringe,
   Scale,
   Activity,
   Info,
@@ -36,11 +34,9 @@ type Analysis = {
 type Row = { id: string; created_at: string; content: Analysis };
 
 const AREA_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
-  Exames: FileText,
   Dieta: Salad,
   Treino: Dumbbell,
   "Hábitos": Droplets,
-  Tratamento: Syringe,
   Peso: Scale,
   Geral: Activity,
 };
@@ -131,7 +127,7 @@ export default function SaudePage() {
     <div className="max-w-2xl space-y-5">
       <PageHeader
         title="Inteligência de Saúde"
-        subtitle="A IA conecta seus exames, dieta, treino e hábitos e mostra o que importa."
+        subtitle="A IA conecta sua dieta, treino e hábitos e mostra o que importa."
       />
 
       <button
