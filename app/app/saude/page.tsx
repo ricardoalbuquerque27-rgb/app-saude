@@ -7,17 +7,16 @@ import {
   Sparkles,
   HeartPulse,
   Check,
-  FileText,
   Salad,
   Dumbbell,
   Droplets,
-  Syringe,
   Scale,
   Activity,
   Info,
 } from "lucide-react";
 import { PageHeader } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
+import { semExameNemTratamento } from "@/lib/historicoDaIa";
 
 type Insight = {
   area: string;
@@ -36,11 +35,9 @@ type Analysis = {
 type Row = { id: string; created_at: string; content: Analysis };
 
 const AREA_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
-  Exames: FileText,
   Dieta: Salad,
   Treino: Dumbbell,
   "Hábitos": Droplets,
-  Tratamento: Syringe,
   Peso: Scale,
   Geral: Activity,
 };
@@ -131,7 +128,7 @@ export default function SaudePage() {
     <div className="max-w-2xl space-y-5">
       <PageHeader
         title="Inteligência de Saúde"
-        subtitle="A IA conecta seus exames, dieta, treino e hábitos e mostra o que importa."
+        subtitle="A IA conecta sua dieta, treino e hábitos e mostra o que importa."
       />
 
       <button
@@ -212,10 +209,10 @@ export default function SaudePage() {
           )}
 
           {/* Insights conectados */}
-          {a.insights?.length > 0 && (
+          {semExameNemTratamento(a.insights).length > 0 && (
             <div className="space-y-3">
               <h2 className="section-title">Conexões encontradas</h2>
-              {a.insights.map((ins, i) => {
+              {semExameNemTratamento(a.insights).map((ins, i) => {
                 const Icon = AREA_ICON[ins.area] ?? Activity;
                 const st = sevStyle(ins.severidade);
                 return (

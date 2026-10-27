@@ -10,6 +10,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { semExameNemTratamento } from "@/lib/historicoDaIa";
 import { PageHeader } from "@/components/ui";
 
 type Improve = { area: string; observacao: string; sugestao: string };
@@ -138,7 +139,7 @@ export default function RelatoriosPage() {
             Seu relatório inteligente
           </p>
           <p className="mt-1 max-w-md text-sm text-app-texto-2">
-            A IA analisa seus treinos, dieta, hábitos, medidas e exames dos últimos
+            A IA analisa seus treinos, dieta, hábitos e medidas dos últimos
             30 dias e traz pontos fortes, o que melhorar e padrões a evitar. Cada
             relatório fica salvo no histórico para você comparar sua evolução.
           </p>
@@ -198,11 +199,11 @@ export default function RelatoriosPage() {
                   </section>
                 )}
 
-                {report.a_melhorar.length > 0 && (
+                {semExameNemTratamento(report.a_melhorar).length > 0 && (
                   <section>
                     <h2 className="section-title mb-3">O que melhorar</h2>
                     <div className="grid gap-3 sm:grid-cols-2">
-                      {report.a_melhorar.map((m, i) => (
+                      {semExameNemTratamento(report.a_melhorar).map((m, i) => (
                         <div key={i} className="card">
                           <span className="inline-block rounded-full bg-app-primaria-fundo px-2 py-0.5 text-[11px] font-semibold text-app-primaria">
                             {m.area}

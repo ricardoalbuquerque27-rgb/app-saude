@@ -14,12 +14,12 @@ const SYSTEM =
   `Você é um coach de saúde, nutrição e treino analisando os dados dos últimos ~30 dias de um usuário do app ${NOME}. ` +
   "Gere uma análise HONESTA, prática e motivadora, em português do Brasil. " +
   "Baseie-se APENAS nos dados fornecidos. Se houver poucos dados, diga isso e recomende o que a pessoa deveria começar a registrar. " +
-  "Não invente números. Para alterações em exames, recomende procurar um médico/nutricionista — você não faz diagnóstico.\n\n" +
+  "Não invente números. Não fale de exames nem de medicamentos e não tire conclusão sobre a saúde da pessoa: fale de hábitos, registros e metas.\n\n" +
   "Responda APENAS com JSON válido (sem markdown), exatamente neste formato:\n" +
   "{\n" +
   '  "resumo": "2 a 4 frases com a visão geral do período",\n' +
   '  "pontos_fortes": ["o que está indo bem"],\n' +
-  '  "a_melhorar": [{ "area": "Dieta|Treino|Hábitos|Medidas|Exames|Geral", "observacao": "o que os dados mostram", "sugestao": "o que fazer" }],\n' +
+  '  "a_melhorar": [{ "area": "Dieta|Treino|Hábitos|Medidas|Geral", "observacao": "o que os dados mostram", "sugestao": "o que fazer" }],\n' +
   '  "padroes_a_evitar": ["padrões/riscos observados nos dados"],\n' +
   '  "proximos_passos": ["ações concretas e simples para os próximos dias"]\n' +
   "}\n" +
@@ -56,7 +56,9 @@ export async function POST() {
   // aceitava registro com data futura.
   const { desde, ate } = limitesDaJanela(todayISO(), 30);
 
-  const [profileRes, mealsRes, workoutsRes, logsRes, measRes, examsRes, planRes] =
+  // Sem exames: "procurar um médico" para as alterações era julgar o exame
+  // para o paciente (spec do uso pretendido).
+  const [profileRes, mealsRes, workoutsRes, logsRes, measRes, planRes] =
     await Promise.all([
       supabase.from("profiles").select("*").eq("id", uid).maybeSingle(),
       supabase
@@ -83,12 +85,6 @@ export async function POST() {
         .eq("user_id", uid)
         .order("date", { ascending: true })
         .limit(90),
-      supabase
-        .from("exams")
-        .select("date, title, exam_type, result_value, unit, reference_range, status")
-        .eq("user_id", uid)
-        .order("date", { ascending: false })
-        .limit(25),
       supabase.from("workout_plan").select("day_of_week, sport, title"),
     ]);
 
@@ -97,7 +93,6 @@ export async function POST() {
   const workouts = workoutsRes.data ?? [];
   const logs = logsRes.data ?? [];
   const meas = measRes.data ?? [];
-  const exams = examsRes.data ?? [];
   const plan = planRes.data ?? [];
 
   const age = profile?.birth_date
@@ -188,18 +183,10 @@ export async function POST() {
           ? meas[meas.length - 1].body_fat_pct
           : null,
     },
-    exames: exams.map((e: any) => ({
-      titulo: e.title,
-      valor: e.result_value,
-      unidade: e.unit,
-      referencia: e.reference_range,
-      status: e.status,
-      data: e.date,
-    })),
   };
 
   const hasAnyData =
-    meals.length || workouts.length || logs.length || meas.length || exams.length;
+    meals.length || workouts.length || logs.length || meas.length;
 
   const userPrompt =
     (hasAnyData

@@ -1,0 +1,13 @@
+{
+  "id": "P011",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "Meu acompanhamento já roda no WhatsApp e na planilha, e eu nunca paguei software de nutrição. Talvez eu até abrisse o teste grátis porque não pede cartão, mas no primeiro mês eu não pagaria nada, e é bem provável que eu esquecesse dele na correria da semana.",
+  "objection": "Meu paciente de corrida e de musculação já anota tudo em outro lugar, no relógio ou num app de treino. Não acredito que ele vá registrar refeição, água e treino em mais um app, e aí eu pago R$ 69,90 por uma fila vazia e continuo respondendo no WhatsApp à noite do mesmo jeito.",
+  "would_change_my_mind": "Ver no teste, com os meus pacientes, a fila me mostrar alguém saindo do plano que eu não teria percebido pelo WhatsApp, e isso me poupar mensagem à noite em vez de criar mais uma tela para eu olhar.",
+  "price_too_cheap": 19,
+  "price_cheap": 45,
+  "price_expensive": 89,
+  "price_too_expensive": 140
+}

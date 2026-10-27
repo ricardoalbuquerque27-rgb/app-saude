@@ -195,7 +195,20 @@ const T = {
     id: "e" + i, routine_id, user_id: PAC, name, target_sets, target_reps,
     target_weight_kg, rest_seconds, position, notes: null, created_at: "2026-10-06T20:32:31Z",
   })),
-  exams: [], dose_logs: [], side_effects: [], nutri_templates: [], push_subscriptions: [],
+  // Três exames da Maria para a página Exames (uso pretendido): um dentro da
+  // faixa do laudo, um acima e um antigo, gravado pelo classifyExam de antes,
+  // com o texto da tabela no lugar do laudo e a explicação automática nas notas.
+  exams: [
+    { id: "ex-maria-1", user_id: PAC, date: dias(12), title: "Vitamina D", exam_type: null, result_value: "38",
+      unit: "ng/mL", reference_range: "30 a 100", status: "normal", notes: null, created_at: naHora(12, "09:00") },
+    { id: "ex-maria-2", user_id: PAC, date: dias(12), title: "LDL-c", exam_type: null, result_value: "180",
+      unit: "mg/dL", reference_range: "< 130", status: "alterado", notes: null, created_at: naHora(12, "09:01") },
+    { id: "ex-maria-3", user_id: PAC, date: dias(55), title: "Colesterol total", exam_type: null, result_value: "210",
+      unit: "mg/dL", reference_range: "< 190 mg/dL", status: "alterado",
+      notes: "Resultado acima da faixa de referência (< 190 mg/dL). Isto é uma orientação geral — confirme com um médico para avaliação.",
+      created_at: naHora(55, "09:00") },
+  ],
+  dose_logs: [], side_effects: [], nutri_templates: [], push_subscriptions: [],
   // Vazia no cenário de hoje: a Maria nunca mexeu numa meta por conta própria.
   prescription_deviations: [],
   // A Maria teve consulta há 20 dias e tem a próxima daqui a 3.

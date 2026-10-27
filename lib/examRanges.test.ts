@@ -1,12 +1,13 @@
 import { describe, it, expect } from "vitest";
 import {
   chaveDoExame,
-  classifyExam,
   dentroDaFaixa,
   faixaDaTabela,
+  linhaDoLaudo,
   parseReferenceRange,
+  situacaoNoLaudo,
+  textoDaSituacaoNoLaudo,
   TEXTOS_DE_FAIXA_DA_TABELA,
-  type ExamLevel,
 } from "./examRanges";
 
 describe("parseReferenceRange", () => {
@@ -217,158 +218,82 @@ describe("dentroDaFaixa", () => {
   });
 });
 
-describe("classifyExam (faixa do laudo)", () => {
-  it("a faixa do laudo com duas vírgulas decimais classifica pelos dois lados", () => {
-    // Antes: 0,9 a 1 -> o 1,5 normal saía "alterado, acima".
-    const dentro = classifyExam({ name: "Marcador Zeta", value: "1,5", reference: "0,9 a 1,7" });
-    expect(dentro.source).toBe("referencia");
-    expect(dentro.status).toBe("normal");
-    const fora = classifyExam({ name: "Marcador Zeta", value: "1,8", reference: "0,9 a 1,7" });
-    expect(fora.status).toBe("alterado");
-    expect(fora.direction).toBe("alto");
+describe("situacaoNoLaudo: só a faixa impressa no laudo", () => {
+  it("dentro, acima e abaixo", () => {
+    expect(situacaoNoLaudo("92", "70 a 99")).toEqual({ situacao: "dentro", faixa: "70 a 99" });
+    expect(situacaoNoLaudo("180", "até 130").situacao).toBe("acima");
+    expect(situacaoNoLaudo("12", "15 a 40").situacao).toBe("abaixo");
+  });
+  it("o '<' e o '>' são estritos; o 'a–b' é inclusivo", () => {
+    expect(situacaoNoLaudo("190", "< 190").situacao).toBe("acima");
+    expect(situacaoNoLaudo("40", "> 40").situacao).toBe("abaixo");
+    expect(situacaoNoLaudo("99", "70 a 99").situacao).toBe("dentro");
+  });
+  it("sem faixa: níveis, texto da tabela, valor sem número, referência que não é texto ou vazia", () => {
+    expect(situacaoNoLaudo("6,0", "Normal: < 5,7 %; Pré-diabetes: 5,7 a 6,4 %; Diabetes: ≥ 6,5 %").situacao).toBe("sem faixa");
+    expect(situacaoNoLaudo("210", "< 190 mg/dL").situacao).toBe("sem faixa"); // texto da tabela (ehTextoDaTabela)
+    expect(situacaoNoLaudo("Negativo", "Negativo").situacao).toBe("sem faixa");
+    expect(situacaoNoLaudo("Não reagente", "< 1,0").situacao).toBe("sem faixa");
+    expect(situacaoNoLaudo("92", 99).situacao).toBe("sem faixa");
+    expect(situacaoNoLaudo("92", "").situacao).toBe("sem faixa");
+    expect(situacaoNoLaudo("92", null)).toEqual({ situacao: "sem faixa", faixa: null });
+  });
+  it("valor com operador compara o número", () => {
+    expect(situacaoNoLaudo("< 0,5", "< 1,0").situacao).toBe("dentro");
+  });
+  // O paciente lê a linha como fato: o que não dá para afirmar fica "sem faixa".
+  it("título (1/40) não se compara como número", () => {
+    expect(situacaoNoLaudo("1/40", "< 1/80").situacao).toBe("sem faixa");
+    expect(situacaoNoLaudo("1:160", "< 1:80").situacao).toBe("sem faixa");
+  });
+  it("milhar escrito de um lado só não se compara; dos dois lados, sim", () => {
+    expect(situacaoNoLaudo("4500", "4.000 a 11.000").situacao).toBe("sem faixa");
+    expect(situacaoNoLaudo("6.500", "4000 a 11000").situacao).toBe("sem faixa");
+    expect(situacaoNoLaudo("6.500", "4.000 a 11.000").situacao).toBe("dentro");
+    expect(situacaoNoLaudo("250.000", "150.000 a 450.000").situacao).toBe("dentro");
+    expect(situacaoNoLaudo("5,4", "3,9 a 5,5").situacao).toBe("dentro");
+  });
+  it("valor com '<' ou '>' só se afirma quando não há dúvida", () => {
+    expect(situacaoNoLaudo("< 10", "10 a 50").situacao).toBe("abaixo");
+    expect(situacaoNoLaudo("< 20", "10 a 50").situacao).toBe("sem faixa");
+    expect(situacaoNoLaudo("< 0,5", "0,1 a 1,0").situacao).toBe("sem faixa");
+    expect(situacaoNoLaudo("> 100", "10 a 50").situacao).toBe("acima");
+    expect(situacaoNoLaudo("> 20", "10 a 50").situacao).toBe("sem faixa");
+    expect(situacaoNoLaudo("> 60", "> 40").situacao).toBe("dentro");
+    expect(situacaoNoLaudo("< 30", "> 40").situacao).toBe("abaixo");
+    expect(situacaoNoLaudo("> 200", "< 190").situacao).toBe("acima");
+    expect(situacaoNoLaudo("≤ 5", "10 a 50").situacao).toBe("sem faixa");
   });
 
-  it("a tabela continua mandando no exame que ela conhece", () => {
-    const r = classifyExam({ name: "Glicose", value: 92, reference: "10 a 20" });
-    expect(r.source).toBe("tabela");
-    expect(r.status).toBe("normal");
+  it("nunca usa a tabela do app: glicose sem laudo é 'sem faixa'", () => {
+    expect(situacaoNoLaudo("150", null).situacao).toBe("sem faixa");
   });
-
-  it("a borda estrita do laudo vale: 190 com '< 190' está acima", () => {
-    const r = classifyExam({ name: "Marcador Zeta", value: "190", reference: "< 190" });
-    expect(r.source).toBe("referencia");
-    expect(r.status).toBe("alterado");
-    expect(r.direction).toBe("alto");
-    expect(classifyExam({ name: "Marcador Zeta", value: "190", reference: "≤ 190" }).status).toBe("normal");
-    const min = classifyExam({ name: "Marcador Zeta", value: "40", reference: "> 40" });
-    expect(min.status).toBe("alterado");
-    expect(min.direction).toBe("baixo");
+  it("os textos", () => {
+    expect(textoDaSituacaoNoLaudo({ situacao: "dentro", faixa: "70 a 99 mg/dL" })).toBe("dentro da faixa do laudo (70 a 99 mg/dL)");
+    expect(textoDaSituacaoNoLaudo({ situacao: "acima", faixa: "até 130" })).toBe("acima da faixa do laudo (até 130)");
+    expect(textoDaSituacaoNoLaudo({ situacao: "abaixo", faixa: "15 a 40" })).toBe("abaixo da faixa do laudo (15 a 40)");
+    expect(textoDaSituacaoNoLaudo({ situacao: "sem faixa", faixa: null })).toBe("sem faixa do laudo");
   });
+});
 
-  it("laudo em níveis não classifica pela primeira faixa", () => {
-    const r = classifyExam({
-      name: "Marcador Zeta",
-      value: "6,0",
-      reference: "Normal: < 5,7 %; Pré-diabetes: 5,7 a 6,4 %; Diabetes: ≥ 6,5 %",
+describe("linhaDoLaudo: a linha que o paciente vê", () => {
+  it("dentro, acima e abaixo trazem a faixa; fora é acima ou abaixo", () => {
+    expect(linhaDoLaudo("92", "70 a 99")).toEqual({ texto: "dentro da faixa do laudo (70 a 99)", fora: false });
+    expect(linhaDoLaudo("180", "< 130")).toEqual({ texto: "acima da faixa do laudo (< 130)", fora: true });
+    expect(linhaDoLaudo("12", "15 a 40")).toEqual({ texto: "abaixo da faixa do laudo (15 a 40)", fora: true });
+  });
+  it("referência do laudo que não se compara (níveis, texto) aparece como está, sem comparação", () => {
+    expect(linhaDoLaudo("6,0", " Normal: < 5,7 %; Pré-diabetes: 5,7 a 6,4 % ")).toEqual({
+      texto: "referência do laudo: Normal: < 5,7 %; Pré-diabetes: 5,7 a 6,4 %",
+      fora: false,
     });
-    expect(r.matched).toBe(false);
-    expect(r.source).toBe("nenhuma");
+    expect(linhaDoLaudo("Negativo", "Negativo")).toEqual({ texto: "referência do laudo: Negativo", fora: false });
   });
-});
-
-describe("classifyExam: o nome casa pela regra estrita, e a tabela só vale na unidade dela", () => {
-  // O classifyExam casava o nome por palavra solta (findDef): "Vitamina K"
-  // era julgada pela faixa do potássio (chave "k"), HCM pela da hemoglobina,
-  // VLDL e não-HDL pela do colesterol total. E usava a tabela em qualquer
-  // unidade: a B12 em pmol/L ia contra 200–900 pg/mL e saía "atenção" com o
-  // laudo dizendo que estava dentro. É o que a página Exames do paciente
-  // mostra, o que a IA grava e o que o formulário preenche.
-  const tabela = (r: ReturnType<typeof classifyExam>) => r.source === "tabela";
-
-  it("Vitamina K não usa a faixa do potássio", () => {
-    expect(tabela(classifyExam({ name: "Vitamina K", value: "1,2" }))).toBe(false);
-    const comLaudo = classifyExam({ name: "Vitamina K", value: "1,2", reference: "0,2 a 3,2" });
-    expect(comLaudo.source).toBe("referencia");
-    expect(comLaudo.status).toBe("normal");
-  });
-
-  it("HCM não usa a faixa da hemoglobina", () => {
-    const r = classifyExam({ name: "Hemoglobina corpuscular média", value: "30", unit: "pg", ctx: { sex: "F" } });
-    expect(tabela(r)).toBe(false);
-    expect(r.faixa).not.toContain("g/dL");
-  });
-
-  it("VLDL e não-HDL não usam a faixa do colesterol total", () => {
-    const vldl = classifyExam({ name: "VLDL-colesterol", value: "35", unit: "mg/dL", reference: "< 30" });
-    expect(vldl.source).toBe("referencia");
-    expect(vldl.faixa).toBe("< 30");
-    expect(vldl.status).toBe("alterado");
-    const naoHdl = classifyExam({ name: "Colesterol não-HDL", value: "170", unit: "mg/dL", reference: "< 160" });
-    expect(naoHdl.source).toBe("referencia");
-    expect(naoHdl.status).toBe("alterado");
-  });
-
-  it("Glicose pós-prandial não usa a faixa da glicose de jejum", () => {
-    const r = classifyExam({ name: "Glicose pós-prandial", value: "135", unit: "mg/dL" });
-    expect(tabela(r)).toBe(false);
-    expect(r.faixa).not.toBe("70–99 mg/dL (jejum)");
-  });
-
-  it("B12 em pmol/L vai pelo laudo: 235 com '148 a 664' é normal", () => {
-    const r = classifyExam({ name: "Vitamina B12", value: "235", unit: "pmol/L", reference: "148 a 664" });
-    expect(r.source).toBe("referencia");
-    expect(r.status).toBe("normal");
-    expect(r.faixa).toBe("148 a 664");
-  });
-
-  it("na unidade da tabela (ou sem unidade), a tabela continua mandando", () => {
-    expect(classifyExam({ name: "Vitamina B12", value: "235", unit: "pg/mL" }).status).toBe("atencao");
-    expect(classifyExam({ name: "Vitamina B12", value: "235" }).source).toBe("tabela");
-    expect(classifyExam({ name: "TSH", value: "2,1", unit: "mUI/L" }).source).toBe("tabela");
-  });
-
-  it("'Glicose em jejum - soro' continua sendo glicose", () => {
-    const r = classifyExam({ name: "Glicose em jejum - soro", value: "92", unit: "mg/dL" });
-    expect(r.source).toBe("tabela");
-    expect(r.faixa).toBe("70–99 mg/dL (jejum)");
-  });
-
-  it("glicose em mmol/L sem laudo não é 'alterado, abaixo' pela faixa em mg/dL", () => {
-    const r = classifyExam({ name: "Glicose", value: "5,1", unit: "mmol/L" });
-    expect(r.matched).toBe(false);
-    expect(classifyExam({ name: "Glicose", value: "5,1", unit: "mmol/L", reference: "3,9 a 5,5" }).status).toBe("normal");
-  });
-
-  it("o texto da tabela na referência não vale como laudo de outra unidade", () => {
-    // O formulário preenche a referência com o texto da tabela assim que o
-    // nome casa; trocada a unidade depois, a glicose de 5,1 mmol/L ia contra
-    // "70–99 mg/dL (jejum)" pelo caminho do laudo e saía "alterado, abaixo".
-    const r = classifyExam({ name: "Glicose", value: "5,1", unit: "mmol/L", reference: "70–99 mg/dL (jejum)" });
-    expect(r.matched).toBe(false);
-  });
-
-  it("TSH ultrassensível é o TSH, em qualquer grafia", () => {
-    for (const nome of ["TSH ultrassensível", "TSH ultra-sensível", "TSH ultra sensível"]) {
-      const r = classifyExam({ name: nome, value: "5,1", unit: "µUI/mL" });
-      expect(r.source).toBe("tabela");
-      expect(r.faixa).toBe("0,4–4,0 µUI/mL");
-    }
-  });
-
-  it("potássio e sódio aceitam mmol/L, que é o mesmo número que mEq/L", () => {
-    expect(classifyExam({ name: "Potássio", value: "5,6", unit: "mmol/L" }).source).toBe("tabela");
-    expect(classifyExam({ name: "Sódio", value: "140", unit: "mmol/L" }).status).toBe("normal");
-  });
-});
-
-describe("classifyExam: unidade e referência que não são texto", () => {
-  // A rota analyze-exam passa o JSON da IA direto (`unit: it?.unidade`,
-  // `reference: it?.referencia`), e a IA devolve número, objeto ou nulo no
-  // lugar do texto. `.normalize` e `.trim` num número lançavam erro e a
-  // leitura do laudo inteiro caía no 500.
-  it.each([
-    ["número", 12],
-    ["nulo", null],
-    ["objeto", { texto: "70 a 99" }],
-    ["lista", ["70", "99"]],
-    ["booleano", true],
-  ])("unidade e referência %s não lançam erro", (_rotulo, valor) => {
-    const entrada = { unit: valor as any, reference: valor as any };
-    // exame da tabela: a unidade que não é texto conta como em branco, e a tabela manda
-    const daTabela = classifyExam({ name: "Glicose", value: 92, ...entrada });
-    expect(daTabela.source).toBe("tabela");
-    expect(daTabela.status).toBe("normal");
-    // exame fora da tabela: sem referência legível, não classifica, sem erro
-    const fora = classifyExam({ name: "Marcador Zeta", value: "1,5", ...entrada });
-    expect(fora.matched).toBe(false);
-    expect(fora.source).toBe("nenhuma");
-    expect(fora.faixa).toBe("");
-  });
-
-  it("referência que não é texto não vira faixa nem some com a que é texto", () => {
-    expect(classifyExam({ name: "Marcador Zeta", value: "1,5", unit: 5 as any, reference: "0,9 a 1,7" }).status).toBe(
-      "normal"
-    );
+  it("sem referência, ou com o texto da tabela do app no lugar dela, é 'sem faixa do laudo'", () => {
+    expect(linhaDoLaudo("92", null)).toEqual({ texto: "sem faixa do laudo", fora: false });
+    expect(linhaDoLaudo("92", "  ")).toEqual({ texto: "sem faixa do laudo", fora: false });
+    expect(linhaDoLaudo("210", "< 190 mg/dL")).toEqual({ texto: "sem faixa do laudo", fora: false });
+    expect(linhaDoLaudo("92", 99)).toEqual({ texto: "sem faixa do laudo", fora: false });
   });
 });
 
@@ -379,8 +304,8 @@ describe("grafias comuns do laudo vão para a entrada certa", () => {
   // `classifyExam` dava `source: "nenhuma"` e o chat gravava "normal" (o
   // LDL-c de 180 saía da fila de triagem, que só conta status <> 'normal').
   // Cada linha: o nome, a primeira key da entrada (a chave do comparativo), um
-  // valor que a tabela julga "alterado" e a faixa dela. Homem, porque HDL, TGO
-  // e hemoglobina mudam por sexo.
+  // valor que a tabela julga "alterado" e a faixa dela. O julgamento pela
+  // tabela é conferido na situacaoParaANutricionista (lib/exames.test.ts).
   const ALTERADO: [string, string, number, string, string][] = [
     // colesterol
     ["LDL-c", "ldl", 180, "mg/dL", "< 130 mg/dL (ideal < 100)"],
@@ -410,22 +335,8 @@ describe("grafias comuns do laudo vão para a entrada certa", () => {
     ["Triglicérides séricos", "triglicerideos", 260, "mg/dL", "< 150 mg/dL"],
   ];
 
-  it.each(ALTERADO)("'%s' é julgado pela tabela, como 'alterado'", (nome, _chave, valor, unidade, faixa) => {
-    const r = classifyExam({ name: nome, value: valor, unit: unidade, ctx: { sex: "M" } });
-    expect(r.source).toBe("tabela");
-    expect(r.matched).toBe(true);
-    expect(r.faixa).toBe(faixa);
-    const status: ExamLevel = r.status;
-    expect(status).toBe("alterado");
-  });
-
   it.each(ALTERADO)("'%s' tem a chave da entrada ('%s')", (nome, chave) => {
     expect(chaveDoExame(nome)).toBe(chave);
-  });
-
-  it("e sem unidade também: o laudo muitas vezes a omite", () => {
-    expect(classifyExam({ name: "LDL-c", value: 180, ctx: { sex: "M" } }).status).toBe("alterado");
-    expect(classifyExam({ name: "PCR-US", value: "12" }).source).toBe("tabela");
   });
 
   it("a grafia nova junta com a curta: LDL-c e Colesterol LDL são o mesmo exame", () => {
@@ -436,13 +347,6 @@ describe("grafias comuns do laudo vão para a entrada certa", () => {
     expect(chaveDoExame("Glicose basal")).toBe(chaveDoExame("Glicemia de jejum"));
   });
 
-  it("o laudo sem sexo continua pedindo o sexo (HDL-c, TGO e hemoglobina mudam por sexo)", () => {
-    const r = classifyExam({ name: "HDL-c", value: 30, unit: "mg/dL" });
-    expect(r.needs).toEqual(["sexo"]);
-    expect(classifyExam({ name: "HDL-c", value: 30, unit: "mg/dL", ctx: { sex: "F" } }).faixa).toBe(
-      "≥ 50 mg/dL (mulheres)"
-    );
-  });
 });
 
 describe("as grafias novas não juntam exame diferente", () => {
@@ -499,9 +403,6 @@ describe("as grafias novas não juntam exame diferente", () => {
 
   it.each(SEPARADOS)("'%s' não casa com nenhuma entrada", (nome, chave) => {
     expect(chaveDoExame(nome)).toBe(chave);
-    const r = classifyExam({ name: nome, value: 5, unit: "mg/dL", ctx: { sex: "M" } });
-    expect(r.source).toBe("nenhuma");
-    expect(r.faixa).toBe("");
   });
 
   it("o TSH ultrassensível segue sendo o TSH, e a PCR ultrassensível segue sendo a PCR", () => {

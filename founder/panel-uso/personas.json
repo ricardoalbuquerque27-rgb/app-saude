@@ -1,0 +1,222 @@
+[
+ {
+  "id": "P001",
+  "name": "Diego",
+  "age": 30,
+  "segment": "Nutrição esportiva (pacientes de musculação e corrida, parte online)",
+  "income": 92000,
+  "behaviour": "Pergunta às colegas antes",
+  "behaviour_how": "Só assina o que as colegas do grupo de nutricionistas já usam e recomendam.",
+  "objection": "Meu paciente não vai registrar todo dia num app",
+  "habit": "você responde paciente no WhatsApp à noite, depois do jantar"
+ },
+ {
+  "id": "P002",
+  "name": "Julian",
+  "age": 33,
+  "segment": "Consultório, começando (até 3 anos de formada, poucos pacientes ativos)",
+  "income": 53000,
+  "behaviour": "Não acredita em app para o paciente",
+  "behaviour_how": "Já pediu diário alimentar e viu o paciente largar em duas semanas.",
+  "objection": "Empresa nova: e se sumir com os dados dos meus pacientes?",
+  "habit": "você faz o retorno a cada 30 ou 45 dias"
+ },
+ {
+  "id": "P003",
+  "name": "Bilal",
+  "age": 27,
+  "segment": "Nutrição esportiva (pacientes de musculação e corrida, parte online)",
+  "income": 66000,
+  "behaviour": "Já paga Dietbox ou WebDiet",
+  "behaviour_how": "Monta o plano alimentar no sistema durante a consulta e o paciente usa o app dele; está no meio da assinatura.",
+  "objection": "Empresa nova: e se sumir com os dados dos meus pacientes?",
+  "habit": "você posta no Instagram para trazer paciente novo"
+ },
+ {
+  "id": "P004",
+  "name": "Selin",
+  "age": 30,
+  "segment": "Consultório, começando (até 3 anos de formada, poucos pacientes ativos)",
+  "income": 40000,
+  "behaviour": "Acompanha pelo WhatsApp e planilha",
+  "behaviour_how": "Nunca pagou software de nutrição; manda o plano em PDF e responde dúvida no WhatsApp à noite.",
+  "objection": "Prescrever treino é do personal, não meu",
+  "habit": "você atende dentro de uma academia, e boa parte dos pacientes treina lá"
+ },
+ {
+  "id": "P005",
+  "name": "Adrian",
+  "age": 41,
+  "segment": "Consultório, consolidada (agenda cheia, retornos todo mês)",
+  "income": 103000,
+  "behaviour": "Pergunta às colegas antes",
+  "behaviour_how": "Só assina o que as colegas do grupo de nutricionistas já usam e recomendam.",
+  "objection": "Prescrever treino é do personal, não meu",
+  "habit": "você atende três dias no consultório e dois online"
+ },
+ {
+  "id": "P006",
+  "name": "Ravi",
+  "age": 32,
+  "segment": "Consultório, começando (até 3 anos de formada, poucos pacientes ativos)",
+  "income": 35000,
+  "behaviour": "Não acredita em app para o paciente",
+  "behaviour_how": "Já pediu diário alimentar e viu o paciente largar em duas semanas.",
+  "objection": "Prescrever treino é do personal, não meu",
+  "habit": "você atende três dias no consultório e dois online"
+ },
+ {
+  "id": "P007",
+  "name": "Felix",
+  "age": 30,
+  "segment": "Consultório, começando (até 3 anos de formada, poucos pacientes ativos)",
+  "income": 30000,
+  "behaviour": "Testa ferramenta nova",
+  "behaviour_how": "Assina o teste grátis de tudo que aparece no Instagram e troca de sistema sem dó.",
+  "objection": "Meu paciente não vai registrar todo dia num app",
+  "habit": "você faz o retorno a cada 30 ou 45 dias"
+ },
+ {
+  "id": "P008",
+  "name": "Seth",
+  "age": 32,
+  "segment": "Consultório, consolidada (agenda cheia, retornos todo mês)",
+  "income": 71000,
+  "behaviour": "Já paga Dietbox ou WebDiet",
+  "behaviour_how": "Monta o plano alimentar no sistema durante a consulta e o paciente usa o app dele; está no meio da assinatura.",
+  "objection": "Já pago um sistema, não quero pagar dois",
+  "habit": "você responde paciente no WhatsApp à noite, depois do jantar"
+ },
+ {
+  "id": "P009",
+  "name": "Ezra",
+  "age": 42,
+  "segment": "Nutrição esportiva (pacientes de musculação e corrida, parte online)",
+  "income": 74000,
+  "behaviour": "Já paga Dietbox ou WebDiet",
+  "behaviour_how": "Monta o plano alimentar no sistema durante a consulta e o paciente usa o app dele; está no meio da assinatura.",
+  "objection": "Empresa nova: e se sumir com os dados dos meus pacientes?",
+  "habit": "você atende três dias no consultório e dois online"
+ },
+ {
+  "id": "P010",
+  "name": "Talia",
+  "age": 41,
+  "segment": "Consultório, começando (até 3 anos de formada, poucos pacientes ativos)",
+  "income": 42000,
+  "behaviour": "Não acredita em app para o paciente",
+  "behaviour_how": "Já pediu diário alimentar e viu o paciente largar em duas semanas.",
+  "objection": "Meu paciente não vai registrar todo dia num app",
+  "habit": "você posta no Instagram para trazer paciente novo"
+ },
+ {
+  "id": "P011",
+  "name": "Clara",
+  "age": 44,
+  "segment": "Nutrição esportiva (pacientes de musculação e corrida, parte online)",
+  "income": 116000,
+  "behaviour": "Acompanha pelo WhatsApp e planilha",
+  "behaviour_how": "Nunca pagou software de nutrição; manda o plano em PDF e responde dúvida no WhatsApp à noite.",
+  "objection": "Já pago um sistema, não quero pagar dois",
+  "habit": "você responde paciente no WhatsApp à noite, depois do jantar"
+ },
+ {
+  "id": "P012",
+  "name": "Leah",
+  "age": 40,
+  "segment": "Nutrição esportiva (pacientes de musculação e corrida, parte online)",
+  "income": 111000,
+  "behaviour": "Já paga Dietbox ou WebDiet",
+  "behaviour_how": "Monta o plano alimentar no sistema durante a consulta e o paciente usa o app dele; está no meio da assinatura.",
+  "objection": "Empresa nova: e se sumir com os dados dos meus pacientes?",
+  "habit": "você responde paciente no WhatsApp à noite, depois do jantar"
+ },
+ {
+  "id": "P013",
+  "name": "Ethan",
+  "age": 39,
+  "segment": "Nutrição esportiva (pacientes de musculação e corrida, parte online)",
+  "income": 123000,
+  "behaviour": "Caça preço",
+  "behaviour_how": "Usa o plano grátis ou a promoção dos primeiros meses e cancela quando o preço sobe.",
+  "objection": "Prescrever treino é do personal, não meu",
+  "habit": "você atende três dias no consultório e dois online"
+ },
+ {
+  "id": "P014",
+  "name": "Sienna",
+  "age": 37,
+  "segment": "Consultório, começando (até 3 anos de formada, poucos pacientes ativos)",
+  "income": 48000,
+  "behaviour": "Acompanha pelo WhatsApp e planilha",
+  "behaviour_how": "Nunca pagou software de nutrição; manda o plano em PDF e responde dúvida no WhatsApp à noite.",
+  "objection": "Trocar de sistema dá trabalho, e eu perco o histórico",
+  "habit": "você atende dentro de uma academia, e boa parte dos pacientes treina lá"
+ },
+ {
+  "id": "P015",
+  "name": "Andre",
+  "age": 27,
+  "segment": "Consultório, consolidada (agenda cheia, retornos todo mês)",
+  "income": 119000,
+  "behaviour": "Caça preço",
+  "behaviour_how": "Usa o plano grátis ou a promoção dos primeiros meses e cancela quando o preço sobe.",
+  "objection": "Já pago um sistema, não quero pagar dois",
+  "habit": "você responde paciente no WhatsApp à noite, depois do jantar"
+ },
+ {
+  "id": "P016",
+  "name": "Olivia",
+  "age": 35,
+  "segment": "Nutrição esportiva (pacientes de musculação e corrida, parte online)",
+  "income": 115000,
+  "behaviour": "Caça preço",
+  "behaviour_how": "Usa o plano grátis ou a promoção dos primeiros meses e cancela quando o preço sobe.",
+  "objection": "Prescrever treino é do personal, não meu",
+  "habit": "você vende o acompanhamento em pacotes de três meses"
+ },
+ {
+  "id": "P017",
+  "name": "Harper",
+  "age": 27,
+  "segment": "Consultório, consolidada (agenda cheia, retornos todo mês)",
+  "income": 102000,
+  "behaviour": "Acompanha pelo WhatsApp e planilha",
+  "behaviour_how": "Nunca pagou software de nutrição; manda o plano em PDF e responde dúvida no WhatsApp à noite.",
+  "objection": "Empresa nova: e se sumir com os dados dos meus pacientes?",
+  "habit": "você divide a sala com outros profissionais de saúde"
+ },
+ {
+  "id": "P018",
+  "name": "Tariq",
+  "age": 35,
+  "segment": "Consultório, consolidada (agenda cheia, retornos todo mês)",
+  "income": 91000,
+  "behaviour": "Já paga Dietbox ou WebDiet",
+  "behaviour_how": "Monta o plano alimentar no sistema durante a consulta e o paciente usa o app dele; está no meio da assinatura.",
+  "objection": "O preço pesa com os poucos pacientes que eu tenho",
+  "habit": "você divide a sala com outros profissionais de saúde"
+ },
+ {
+  "id": "P019",
+  "name": "Noor",
+  "age": 35,
+  "segment": "Consultório, consolidada (agenda cheia, retornos todo mês)",
+  "income": 71000,
+  "behaviour": "Já paga Dietbox ou WebDiet",
+  "behaviour_how": "Monta o plano alimentar no sistema durante a consulta e o paciente usa o app dele; está no meio da assinatura.",
+  "objection": "Trocar de sistema dá trabalho, e eu perco o histórico",
+  "habit": "você atende três dias no consultório e dois online"
+ },
+ {
+  "id": "P020",
+  "name": "Mason",
+  "age": 37,
+  "segment": "Nutrição esportiva (pacientes de musculação e corrida, parte online)",
+  "income": 69000,
+  "behaviour": "Testa ferramenta nova",
+  "behaviour_how": "Assina o teste grátis de tudo que aparece no Instagram e troca de sistema sem dó.",
+  "objection": "Trocar de sistema dá trabalho, e eu perco o histórico",
+  "habit": "você responde paciente no WhatsApp à noite, depois do jantar"
+ }
+]

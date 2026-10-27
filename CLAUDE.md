@@ -45,8 +45,9 @@ Isso não é óbvio lendo a árvore de arquivos.
   botão do painel, `entradaDoRegistro`; o Observar, `observarDaConsulta` e
   `ultimoObservarPorPaciente`; o "antes" de cada medida, `anteriores`),
   `lib/aiActions.ts` (só `atualizar_peso` e `remover_ultimo` de peso, que não
-  podem pegar a medida da consulta, e o `definir_metas`, que não grava por cima
-  da prescrição nem quando a leitura dela falha),
+  podem pegar a medida da consulta, o `definir_metas`, que não grava por cima
+  da prescrição nem quando a leitura dela falha, e os exames da Gaia,
+  `registrar_exame` e `ler_exame`; veja "Uso pretendido"),
   `lib/evolucao.ts` (a conta dos gráficos do Corpo: o período,
   `inicioDoPeriodo` e `limitadoEmUmAno`; a média semanal, `semanasDePeso`; os
   pontos da consulta e as séries de medida, `variacaoDaMedida`; o anel da meta,
@@ -54,10 +55,18 @@ Isso não é óbvio lendo a árvore de arquivos.
   escala, o eixo e as frases de título, `rotuloDoPeso`, e de `aria-label`),
   `lib/exames.ts` (o comparativo dos exames: `compararExames`,
   `resumoDoComparativo`, `descricaoDaSerie`, `avisosDaLinha`,
-  `fraseSemComparacao`, `dataDoComparativo`), a faixa, o nome e a unidade de
-  exame em `lib/examRanges.ts` (`parseReferenceRange`, `dentroDaFaixa`,
-  `chaveDoExame`, `faixaDaTabela`, `unidadeDoExame`, `ehTextoDaTabela`,
-  `classifyExam`), os números em pt-BR em `lib/numeros.ts` (`numeroBR` e
+  `fraseSemComparacao`, `dataDoComparativo`; a regra da nutricionista,
+  `situacaoParaANutricionista`; a linha gravada, `exameParaGravar`; e as
+  notas que o paciente vê, `semExplicacaoAutomatica` e `notasDoExame`), a
+  faixa, o nome e a unidade de exame em `lib/examRanges.ts`
+  (`parseReferenceRange`, `dentroDaFaixa`, `chaveDoExame`, `faixaDaTabela`,
+  `unidadeDoExame`, `ehTextoDaTabela`; e a regra do paciente,
+  `situacaoNoLaudo`, `textoDaSituacaoNoLaudo` e `linhaDoLaudo`), a leitura
+  do laudo em `lib/laudo.ts` (`transcricaoDoLaudo`), o "O que é?" em
+  `lib/explicacaoDeExame.ts` (`nomeValido`, `pedidoDaExplicacao`,
+  `explicacaoAceitavel`, `respostaDaExplicacao`), o histórico da IA sem os
+  cartões de exame e tratamento em `lib/historicoDaIa.ts`
+  (`semExameNemTratamento`), os números em pt-BR em `lib/numeros.ts` (`numeroBR` e
   `numeroFixo`, que mantém o zero: "66,0"), a leitura em
   páginas em `lib/paginacao.ts` (`lerEmPaginas`),
   `lib/temaClinico.ts` e `lib/temaApp.ts` com `lib/contraste.ts` (as duas
@@ -202,11 +211,16 @@ intervalo "a–b" são inclusivos) e devolve nulo para referência em níveis (m
 de uma faixa fora de parênteses, ou palavra de sexo, idade, fase, risco ou
 nível): lida pela primeira faixa, a glicada que subiu "entrava na faixa". O
 que está entre parênteses é comentário, menos quando o texto TODO é
-"(70 a 99)": aí vale o de dentro. `classifyExam` trata `unit` e `reference`
-que não são texto (o JSON da IA vem direto na rota `analyze-exam`) como
-ausentes, em vez de lançar erro.
-Para dois nomes serem o mesmo exame, `chaveDoExame`, `faixaDaTabela` e o
-`classifyExam` (`lib/examRanges.ts`) exigem nome igual a uma key da tabela, ou
+"(70 a 99)": aí vale o de dentro. A regra do selo é uma função só,
+`situacaoParaANutricionista` (`lib/exames.ts`): o laudo antes da tabela, e
+unidade e referência que não são texto valem como ausentes. É ela que dá o
+`status` gravado num exame novo (`exameParaGravar`, a linha das três
+entradas: o laudo lido, o formulário e a Gaia), e **a faixa gravada é a do
+laudo**, como veio ou como a pessoa digitou: nunca mais o texto da tabela
+por cima. O `classifyExam`, que punha a tabela antes do laudo e julgava o
+exame para o paciente, saiu (veja "Uso pretendido").
+Para dois nomes serem o mesmo exame, `chaveDoExame`, `faixaDaTabela` e a
+`situacaoParaANutricionista` exigem nome igual a uma key da tabela, ou
 todas as palavras do nome nas keys de UMA entrada **e** o nome contendo uma
 key inteira; palavra de amostra (soro, sérico, plasma, sangue…) e de método
 (calculado, Friedewald, ultrassensível, basal, hemograma, transaminase) não
@@ -216,7 +230,7 @@ inteira, "Basal" ou "Calculado" não são exame. O casamento frouxo antigo
 Vitamina K em potássio: juntar à toa inventa uma conclusão clínica, separar à
 toa só dá duas linhas. O estrito, por sua vez, perdeu grafias que o laudo
 escreve todo dia ("LDL-c", "Colesterol LDL calculado", "PCR-US", "25-Hidroxi
-Vitamina D"), e o chat gravava "normal" para elas (o LDL-c de 180 saía da fila
+Vitamina D"), e o chat chegou a gravar "normal" para elas (o LDL-c de 180 saía da fila
 de triagem): grafia comum nova entra como key da entrada, ou como palavra de
 método quando é só o jeito de medir. A palavra que juntaria exame diferente
 fica como key, não como neutra: "e frações" é key do colesterol total porque
@@ -623,11 +637,62 @@ do fundador pelo `NEXT_PUBLIC_WHATSAPP_VAGAS`, configurado na Vercel:
 O convite do paciente (`textoDoConvite`, em `PacientesClient`) diz o que ele
 vai fazer e que o app é de graça.
 
+## Uso pretendido
+
+Spec: `docs/superpowers/specs/2026-10-27-uso-pretendido-da-ia-design.md`. A
+RDC 657/2022 separa o software de bem-estar do software de diagnóstico ou
+tratamento pelo que ele **faz**, não pelo aviso que o acompanha. Por isso,
+**para o paciente, o app constata e explica; não julga exame nem orienta
+tratamento.** O juízo clínico é da nutricionista, e a tela dela não muda
+(o comparativo calcula igual). Num exame **novo**, duas coisas que ela vê
+mudam, como a spec decidiu: o `status` gravado segue o laudo antes da tabela
+(uma vitamina D de 25 com laudo "20 a 100" já não entra na fila, onde a
+tabela a punha), e o exame sem faixa nenhuma vai sem selo no "Ver todos os
+resultados", em vez de "Normal".
+
+- **Pode:** mostrar o valor, a unidade, a data e a faixa impressa no laudo;
+  dizer dentro, acima ou abaixo da faixa do laudo; explicar em termos gerais
+  o que o exame mede; dizer que quem interpreta é a nutricionista (ou o
+  médico que pediu) e oferecer mandar a pergunta a ela.
+- **Não pode:** dizer o que o resultado indica (causa, doença, risco, "pode
+  ser"); chamar de bom, ruim, normal, alterado ou preocupante; sugerir
+  conduta (comida, suplemento, remédio, exame novo); orientar sobre o
+  tratamento com remédio (a caneta GLP-1 inclusive).
+
+Duas regras, uma para cada lado: `situacaoNoLaudo` (só o laudo, nunca a
+tabela do app) e a linha dela, `linhaDoLaudo`, para o paciente, na página
+Exames, na leitura do laudo, no formulário e na Gaia; e
+`situacaoParaANutricionista` (laudo, depois a tabela) para o comparativo, a
+fila e o `status` gravado. A leitura do laudo (`analyze-exam`) só transcreve
+nome, valor, unidade e faixa (`transcricaoDoLaudo`). O "O que é?"
+(`app/api/explicar-exame`, `components/OQueEOExame.tsx`) **só manda à IA o
+nome do exame**, entre aspas e como dado, e a resposta passa pela checagem
+de palavras (`explicacaoAceitavel`, que recusa também doença, hipótese e
+qualquer faixa numérica: "o ideal é abaixo de 100 mg/dL" embaixo do valor do
+paciente seria a tabela voltando por outra porta): a explicação das telas não
+tem como falar do resultado. A linha do paciente só afirma o que dá para
+afirmar: título ("1/40"), milhar escrito de um lado só ("4500" contra "4.000
+a 11.000") e valor com operador que pode cair dos dois lados ("< 20" contra
+"10 a 50") ficam "sem faixa do laudo". A Gaia não tem ferramenta que julgue (o `avaliar_exame`
+virou `ler_exame`, que constata pelo laudo, calculado no código, e com a
+leitura cheia não diz que o exame não existe), não recebe
+os exames no contexto e não orienta quem usa a caneta. Os insights da Saúde
+e os Relatórios não leem exames nem tratamento, e o histórico guardado
+deles não mostra mais os cartões de "Exames" e "Tratamento"
+(`semExameNemTratamento`). Os textos de tela também não prometem mais
+"ajustar as faixas de referência dos seus exames": sexo e idade servem às
+metas e à nutricionista.
+
+**IA nova segue a regra.** A guarda `lib/usoPretendido.test.ts` acusa nas
+rotas de `app/api/` e em `lib/aiActions.ts` os textos que eram as portas do
+juízo ("avaliar_exame", "interpretacao", "recomendacoes", "ORIENTE de
+acordo"); a regra em si é maior que a guarda.
+
 ## Comandos
 
 ```bash
 npm run dev      # desenvolvimento
-npm test         # 1073 testes unitários (vitest)
+npm test         # 1195 testes unitários (vitest)
 ferramentas/testar-sql.sh   # migrações e testes SQL num Postgres local
 npm run build    # produção
 ```
@@ -763,22 +828,42 @@ Modal fora do lugar: procure um `transform` num ancestral.
   anos inclusive); o texto de venda "atende ao CFN" não sai antes de conferir.
 - No gráfico da página Medidas do paciente, o ponto da medida da consulta não
   se distingue; a marca "Medida na consulta" fica só na linha da lista.
-- **Exames gravados antes guardam o julgamento antigo.** O `classifyExam`
-  (página Exames do paciente, formulário e IA) já usa a regra estrita de nome,
-  a unidade da entrada e o "<" estrito, mas as linhas gravadas antes guardam o
-  `status` e a `reference_range` do casamento frouxo, e a página Exames do
-  paciente mostra o `status` gravado (a Vitamina K pode seguir "alterado" pela
-  faixa do potássio), até alguém regravar essas linhas. O comparativo do nutri
-  não lê o `status` gravado (o selo sai da faixa da linha) e lê a
-  `reference_range` como laudo, menos quando ela é, letra por letra, texto da
-  tabela (`ehTextoDaTabela`). Mas a lista "Ver todos os resultados" do mesmo
-  nutri também mostra o `status` gravado, e por isso pode discordar do selo do
-  comparativo na mesma tela. E a IA (`app/api/analyze-exam/route.ts`,
-  `lib/aiActions.ts`) grava o texto da tabela em `reference_range` sempre que a
-  tabela classifica, sobrescrevendo a faixa que o laudo trazia (o formulário só
-  preenche o campo vazio): por isso `ehTextoDaTabela` continua necessário. A
-  data `today` que a IA grava quando não acha a do laudo (dois laudos no mesmo
+- **Exames gravados antes guardam o julgamento antigo.** As linhas gravadas
+  antes do `exameParaGravar` guardam o `status` e a `reference_range` do
+  casamento frouxo e do `classifyExam` (a Vitamina K pode seguir "alterado"
+  pela faixa do potássio) e, nas notas, a explicação automática. O paciente
+  já não vê nada disso (a página Exames não lê o `status`, calcula a linha
+  pelo laudo e passa as notas por `notasDoExame`), mas a nutricionista vê: a
+  lista "Ver todos os resultados" e a fila contam o `status` gravado, e por
+  isso o selo do comparativo pode discordar da lista na mesma tela. Nos
+  exames antigos, paciente e nutricionista podem ver juízos diferentes.
+  Recalcular pede migração. A IA não sobrescreve mais a faixa do laudo, mas o
+  `ehTextoDaTabela` continua necessário pelas linhas antigas: e por ele um
+  laudo real escrito, letra por letra, como o texto da tabela ("< 150 mg/dL",
+  com a unidade) aparece ao paciente como "sem faixa do laudo". A data
+  `today` que a IA grava quando não acha a do laudo (dois laudos no mesmo
   dia) também segue em aberto.
+- **O texto livre do histórico da Saúde e dos Relatórios mostra o que foi
+  gerado antes.** Os cartões de "Exames" e "Tratamento" já não aparecem, mas
+  o resumo, as prioridades e os passos das análises guardadas de antes do uso
+  pretendido (`health_insights`, `reports`) podem falar do exame alterado, e
+  seguem aparecendo até o paciente apagar ou gerar outra. Esconder por data é
+  decisão do dono do produto.
+- **A dica de alimentação e os treinos da Gaia** (porções, substituições, o
+  treino que ela monta sem prescrição) ficaram como estavam: pedem uma spec
+  própria, que olhe também a atribuição privativa do nutricionista.
+- **A Gaia ainda pode escrever uma interpretação em texto livre.** O prompt
+  orienta e o código garante o resto (não há ferramenta que julgue, a
+  constatação vem calculada e os exames não estão no contexto), mas ao ler um
+  exame pelo `ler_exame` ela vê o valor. A checagem de palavras do "O que é?"
+  também não pega tudo ("LDL alto entope as artérias" passa): é uma rede, e a
+  lista cresce com os casos.
+- **O "O que é?" não guarda as explicações** e não tem limite por usuário:
+  cada toque é uma chamada à Groq (guardar pediria tabela e migração). Entra
+  na revisão de custo de sexta (`founder/ops.md`, 4.6).
+- **O parecer formal sobre a ANVISA** (RDC 657/2022) e o texto de uso
+  pretendido nos termos de uso (o apêndice da spec, para o advogado) seguem
+  por fazer.
 - **O `persist` de Hábitos (`app/app/habitos/page.tsx`) regrava a linha inteira
   do dia a partir do estado da tela e não confere o `error`.** O que mudou fora
   da tela (o assistente ou o "+250 ml" da Início registrando água) pode voltar

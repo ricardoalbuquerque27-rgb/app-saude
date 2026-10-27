@@ -305,8 +305,8 @@ export default function PerfilPage() {
             <option value="M">Masculino</option>
           </select>
           <p className="mt-1 text-[13px] text-app-texto-2">
-            Usado para ajustar as faixas de referência dos seus exames (junto
-            com a idade). Não é exibido para ninguém.
+            Usado, junto com a idade, para calcular suas metas. Se você tiver
+            uma nutricionista no app, ela também vê.
           </p>
         </Field>
 

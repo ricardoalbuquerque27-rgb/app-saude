@@ -53,7 +53,7 @@ export async function getPending(supabase: any, uid: string): Promise<Pending> {
       key: "perfil",
       label: "Complete seu perfil",
       description:
-        "Informe sexo, altura e data de nascimento — ajuda a IA a acertar suas metas e a leitura dos exames.",
+        "Informe sexo, altura e data de nascimento — ajuda a IA a acertar suas metas.",
       href: "/app/perfil",
     });
   }

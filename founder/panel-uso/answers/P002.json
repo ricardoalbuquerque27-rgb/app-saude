@@ -1,0 +1,13 @@
+{
+  "id": "P002",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "trust",
+  "reason": "Eu teria de pôr os dados dos meus pacientes, e o meu nome junto, no app de uma empresa nova que eu não conheço, e a oferta não diz uma palavra sobre onde esses dados ficam ou o que acontece com eles se a empresa fechar. E com poucos pacientes e retorno a cada 30 ou 45 dias, eu já sei de cabeça quem está largando; não preciso pagar R$ 69,90 por uma fila disso.",
+  "objection": "E se essa empresa sumir daqui a seis meses com o prontuário e os exames dos meus pacientes? Ainda por cima eu já pedi diário alimentar e o paciente largou em duas semanas; um app que ele tem de instalar não vai ser diferente, e a garantia só me dá mais 30 dias grátis, não faz o paciente registrar.",
+  "would_change_my_mind": "Poder exportar tudo dos meus pacientes (registros das consultas, medidas, exames) quando eu quiser, e ver por escrito, com LGPD, onde os dados ficam e o que acontece com eles se a empresa fechar.",
+  "price_too_cheap": 15,
+  "price_cheap": 30,
+  "price_expensive": 50,
+  "price_too_expensive": 80
+}

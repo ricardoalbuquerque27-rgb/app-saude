@@ -1,0 +1,13 @@
+{
+  "id": "P010",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "Eu já pedi diário alimentar e vi o paciente largar em duas semanas, e um app não muda isso: a fila só mostra alguma coisa se ele registrar, e sem registro eu pago R$ 69,90 para ver uma lista de quem parou. Com os poucos pacientes que eu tenho hoje, acompanho pelo WhatsApp mesmo, e o meu aperto agora é trazer paciente novo, não vigiar os que já tenho.",
+  "objection": "A garantia mede no dia 14, que é justamente quando o paciente ainda está animado. O problema começa depois: no segundo mês ninguém registra mais nada, e aí a fila vira só uma lista de gente que sumiu, coisa que eu já sei sem pagar.",
+  "would_change_my_mind": "Ver números de outras nutricionistas mostrando que os pacientes continuam registrando depois de dois ou três meses, não só nos primeiros 14 dias.",
+  "price_too_cheap": 15,
+  "price_cheap": 29,
+  "price_expensive": 49,
+  "price_too_expensive": 79
+}

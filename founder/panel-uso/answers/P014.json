@@ -1,0 +1,13 @@
+{
+  "id": "P014",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "need",
+  "reason": "Tenho poucos pacientes e vejo a maioria na academia toda semana, então já sei quem sumiu ou faltou ao treino sem precisar de fila. Até testaria os 30 dias porque não pede cartão, mas pagar R$ 69,90 todo mês para acompanhar meia dúzia de gente que eu já acompanho pelo WhatsApp não fecha a conta para mim agora.",
+  "objection": "Meus pacientes mal respondem a planilha; não acredito que vão registrar refeição e água num app todo dia. Aí eu fico com duas coisas para olhar, o WhatsApp e o sistema, e o histórico de cada um ainda partido em dois lugares.",
+  "would_change_my_mind": "Ser de graça, ou bem mais barato, enquanto eu tiver poucos pacientes, e só cobrar quando a carteira crescer; ou me mostrar que isso me traz ou segura paciente, não só organiza os que eu já tenho.",
+  "price_too_cheap": 15,
+  "price_cheap": 29,
+  "price_expensive": 50,
+  "price_too_expensive": 80
+}

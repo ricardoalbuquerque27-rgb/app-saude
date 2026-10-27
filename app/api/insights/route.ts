@@ -11,18 +11,18 @@ const MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
 
 const SYSTEM =
   `Você é uma inteligência de saúde do app ${NOME}. Sua especialidade é CONECTAR os dados de diferentes áreas ` +
-  "(exames, dieta, treino, hábitos, tratamento e peso) para gerar insights que isoladamente não apareceriam. " +
-  "Ex.: ligar um exame alterado a um padrão da dieta, ou o sono ao desempenho nos treinos.\n\n" +
+  "(dieta, treino, hábitos e peso) para gerar insights que isoladamente não apareceriam. " +
+  "Ex.: ligar o sono ao desempenho nos treinos.\n\n" +
   "Regras:\n" +
   "- Português do Brasil, tom claro, prático e acolhedor.\n" +
   "- Baseie-se APENAS nos dados fornecidos. Não invente números. Se faltarem dados, diga o que registrar.\n" +
-  "- Você NÃO faz diagnóstico nem prescreve/ajusta medicamentos ou doses. Para exames alterados, condições médicas ou dúvidas sobre a caneta (GLP-1), oriente procurar médico/nutricionista.\n" +
+  "- Não fale de exames nem de medicamentos e não tire conclusão sobre a saúde da pessoa: fale de hábitos, registros e metas.\n" +
   "- Priorize CONEXÕES entre áreas. Cada insight deve explicar o dado observado e como ele se conecta a outra área.\n\n" +
   "Responda APENAS com JSON válido (sem markdown), exatamente neste formato:\n" +
   "{\n" +
   '  "resumo": "2 a 3 frases com a visão geral conectando as áreas",\n' +
   '  "prioridades": ["até 3 ações mais importantes agora"],\n' +
-  '  "insights": [{ "area": "Exames|Dieta|Treino|Hábitos|Tratamento|Peso|Geral", "severidade": "bom|atencao|alerta", "titulo": "curto", "observacao": "o que os dados mostram (com números)", "conexao": "como isso se conecta a outra área", "acao": "o que fazer" }],\n' +
+  '  "insights": [{ "area": "Dieta|Treino|Hábitos|Peso|Geral", "severidade": "bom|atencao|alerta", "titulo": "curto", "observacao": "o que os dados mostram (com números)", "conexao": "como isso se conecta a outra área", "acao": "o que fazer" }],\n' +
   '  "pontos_fortes": ["o que já está indo bem"]\n' +
   "}\n" +
   "Máximo 6 insights, ordenados do mais importante ao menos. Use os números dos dados quando fizer sentido.";
@@ -57,7 +57,9 @@ export async function POST() {
   // aceitava registro com data futura.
   const { desde, ate } = limitesDaJanela(todayISO(), 30);
 
-  const [profileRes, mealsRes, workoutsRes, logsRes, measRes, examsRes, treatRes] =
+  // Sem exames nem tratamento: ligar "um exame alterado a um padrão da dieta"
+  // era interpretar exame para o paciente (spec do uso pretendido).
+  const [profileRes, mealsRes, workoutsRes, logsRes, measRes] =
     await Promise.all([
       supabase.from("profiles").select("*").eq("id", uid).maybeSingle(),
       supabase
@@ -84,20 +86,6 @@ export async function POST() {
         .eq("user_id", uid)
         .order("date", { ascending: true })
         .limit(90),
-      supabase
-        .from("exams")
-        .select("date, title, result_value, unit, reference_range, status")
-        .eq("user_id", uid)
-        .order("date", { ascending: false })
-        .limit(30),
-      supabase
-        .from("treatments")
-        .select("medication, dose, frequency_days, start_date, active")
-        .eq("user_id", uid)
-        .eq("active", true)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
     ]);
 
   const profile = profileRes.data as any;
@@ -105,8 +93,6 @@ export async function POST() {
   const workouts = workoutsRes.data ?? [];
   const logs = logsRes.data ?? [];
   const meas = measRes.data ?? [];
-  const exams = examsRes.data ?? [];
-  const treat = treatRes.data as any;
 
   const age = profile?.birth_date
     ? Math.floor(
@@ -162,31 +148,15 @@ export async function POST() {
           ? meas[meas.length - 1].body_fat_pct
           : null,
     },
-    tratamento: treat
-      ? {
-          medicamento: treat.medication,
-          dose: treat.dose,
-          frequencia_dias: treat.frequency_days,
-          inicio: treat.start_date,
-        }
-      : null,
-    exames: exams.map((e: any) => ({
-      titulo: e.title,
-      valor: e.result_value,
-      unidade: e.unit,
-      referencia: e.reference_range,
-      status: e.status,
-      data: e.date,
-    })),
   };
 
   const hasAnyData =
-    meals.length || workouts.length || logs.length || meas.length || exams.length;
+    meals.length || workouts.length || logs.length || meas.length;
 
   const userPrompt =
     (hasAnyData
       ? "Analise e conecte estes dados do usuário para gerar os insights de saúde."
-      : "O usuário quase não tem dados. Gere insights iniciais explicando o que registrar (dieta, treino, hábitos, exames) para receber uma análise conectada.") +
+      : "O usuário quase não tem dados. Gere insights iniciais explicando o que registrar (dieta, treino e hábitos) para receber uma análise conectada.") +
     "\n\nDADOS (JSON):\n" +
     JSON.stringify(summary);
 

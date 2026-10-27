@@ -1,0 +1,13 @@
+{
+  "id": "P005",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "trust",
+  "reason": "Só assino o que as colegas do grupo já usam e indicam, e ninguém lá fala desse. Com a agenda cheia, não vou parar para chamada com fundador nem pedir para paciente meu instalar app novo para testar algo que ninguém validou. E metade da fila é sobre treino, que é coisa do personal, não minha.",
+  "objection": "Ninguém que eu conheço usa. É um app novo, feito por uma pessoa só, com dez vagas por mês: se some daqui a um ano, fico eu explicando para os pacientes por que o app parou e onde foram os registros deles.",
+  "would_change_my_mind": "Duas ou três colegas do meu grupo usando há alguns meses e contando que os pacientes registram de verdade entre uma consulta e outra.",
+  "price_too_cheap": 20,
+  "price_cheap": 40,
+  "price_expensive": 90,
+  "price_too_expensive": 130
+}
