@@ -1,36 +1,21 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { withTimeout, isAbortError, parseModelJson } from "@/lib/aiHttp";
-import { classifyExam, type Sex } from "@/lib/examRanges";
-
-function ageFromBirth(birth?: string | null): number | null {
-  if (!birth) return null;
-  const d = new Date(birth + "T12:00:00");
-  if (isNaN(d.getTime())) return null;
-  const age = Math.floor((Date.now() - d.getTime()) / (365.25 * 24 * 3600 * 1000));
-  return age >= 0 && age < 130 ? age : null;
-}
+import { transcricaoDoLaudo } from "@/lib/laudo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
 
+// Só a transcrição: o juízo do exame é da nutricionista, e o paciente vê a
+// posição do valor na faixa do laudo, calculada no app (spec do uso
+// pretendido). O prompt antigo pedia "interpretação" e "recomendações".
 const SYSTEM =
-  "Você é um assistente de saúde que ajuda a pessoa a ENTENDER um exame (geralmente exame de sangue ou laboratorial). " +
-  "Leia o documento/imagem, extraia os resultados e compare com os valores de referência que aparecem nele. " +
-  "Explique em linguagem SIMPLES, em português do Brasil, o que os principais achados significam. " +
-  "IMPORTANTE (segurança): você NÃO faz diagnóstico e NÃO substitui um médico. Sempre oriente confirmar com um profissional de saúde, " +
-  "principalmente se houver valores alterados. Não recomende medicamentos.\n\n" +
-  "Responda APENAS com JSON válido (sem markdown), exatamente neste formato:\n" +
-  "{\n" +
-  '  "resumo": "2 a 4 frases com a visão geral do exame",\n' +
-  '  "itens": [{ "nome": "ex.: Colesterol total", "valor": "180", "unidade": "mg/dL", "referencia": "< 200", "status": "normal|atencao|alterado" }],\n' +
-  '  "interpretacao": ["explicações simples do que os principais resultados indicam"],\n' +
-  '  "recomendacoes": ["orientações gerais e hábitos; SEMPRE inclua procurar um médico para avaliação"]\n' +
-  "}\n" +
-  'Marque "status" como "alterado" quando o valor estiver claramente fora da referência, "atencao" quando estiver no limite, e "normal" quando estiver dentro. ' +
-  "Se não conseguir ler o exame, retorne resumo explicando e listas vazias.";
+  "Você transcreve um laudo de exame (de sangue ou laboratorial). Leia o documento ou a imagem e copie, para cada resultado, o nome, o valor, a unidade e a faixa de referência exatamente como estão impressos. " +
+  "Não explique, não interprete, não classifique e não recomende nada. " +
+  'Responda APENAS com JSON válido (sem markdown), neste formato: {"itens": [{"nome": "Colesterol total", "valor": "180", "unidade": "mg/dL", "referencia": "< 190"}]}. ' +
+  'Se não houver faixa impressa, use null. Se não conseguir ler o laudo, devolva {"itens": []}.';
 
 const MEDIA_TYPES = new Set([
   "application/pdf",
@@ -147,41 +132,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Reclassifica cada item com nossas faixas de referência (personalizadas
-    // por sexo e idade), em vez de confiar no palpite da IA.
-    const { data: prof } = await supabase
-      .from("profiles")
-      .select("sex, birth_date")
-      .eq("id", user.id)
-      .maybeSingle();
-    const ctx = {
-      sex: (prof?.sex as Sex) ?? null,
-      age: ageFromBirth(prof?.birth_date),
-    };
-    const rawItens = Array.isArray(result.itens) ? result.itens : [];
-    const itens = rawItens.map((it: any) => {
-      const cls = classifyExam({
-        name: String(it?.nome ?? ""),
-        value: it?.valor,
-        unit: it?.unidade,
-        reference: it?.referencia,
-        ctx,
-      });
-      if (!cls.matched) return it; // mantém o que a IA leu
-      return {
-        ...it,
-        status: cls.status,
-        referencia: cls.faixa || it?.referencia,
-        explicacao: cls.explicacao,
-      };
-    });
-
-    return NextResponse.json({
-      resumo: String(result.resumo ?? ""),
-      itens,
-      interpretacao: Array.isArray(result.interpretacao) ? result.interpretacao : [],
-      recomendacoes: Array.isArray(result.recomendacoes) ? result.recomendacoes : [],
-    });
+    return NextResponse.json({ itens: transcricaoDoLaudo(result) });
   } catch (err: any) {
     if (isAbortError(err)) {
       return NextResponse.json(
