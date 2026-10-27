@@ -443,6 +443,12 @@ advogado: as regras mudam e dependem da cidade.
     referência" são o que mais se aproxima. A ANVISA também prepara uma revisão
     para IA.
   - Confirmar com um especialista regulatório antes de vender.
+  - O passo 2 (o app constata e explica, sem julgar exame nem orientar
+    tratamento) está feito em
+    `docs/superpowers/specs/2026-10-27-uso-pretendido-da-ia-design.md`: a
+    leitura do laudo só transcreve, o paciente vê só a posição na faixa do
+    laudo e a Gaia não tem ferramenta que julgue. O parecer formal segue em
+    aberto.
 - [ ] **CFN.** O "atende ao CFN" não sai antes de ler o texto oficial da
   Resolução CFN 594/2017 (`founder/board.md`).
 
@@ -486,8 +492,9 @@ advogado: as regras mudam e dependem da cidade.
    - Cotar política, termos e contrato de operador com 2 ou 3 escritórios.
    - Decidir encarregado e relatório de impacto (alto risco).
    - Confirmar o prazo em dobro de pequeno porte no incidente.
-4. **ANVISA:** um especialista confirma se o app, com a leitura de laudo pela
-   IA, fica fora da RDC 657/2022.
+4. **ANVISA:** um especialista confirma se o app fica fora da RDC 657/2022,
+   agora que a leitura de laudo pela IA só transcreve e o juízo do exame é da
+   nutricionista (o passo 2, feito).
 5. **Contador.**
    - O CNAE: 6203-1/00 ou 6319-4/00.
    - A data do Emissor Nacional da NFS-e.

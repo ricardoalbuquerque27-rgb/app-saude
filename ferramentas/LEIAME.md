@@ -73,6 +73,12 @@ paciente: `tirar-prints.cjs`, `conferir-inicio.cjs`, `conferir-dieta.cjs`,
 subiu com outro cenário e começam voltando o mock ao início (`POST /__reset`);
 `OUT` diz onde vão os PNGs.
 
+O cenário padrão tem três exames da Maria para conferir a página Exames do
+paciente: a Vitamina D dentro da faixa do laudo, o LDL-c acima e um Colesterol
+total antigo, gravado como o `classifyExam` de antes gravava (o texto da tabela
+no lugar do laudo e a explicação automática nas notas), que tem de aparecer
+"sem faixa do laudo" e sem a nota.
+
 `conferir-inicio.cjs` confere a Início da Maria em 390 px e acusa com código de
 saída 1: a ordem das seções, a saudação pela hora de São Paulo, a contagem do
 "Para hoje" e o "Não deu para carregar tudo" com os recados falhando (e, aí, o
