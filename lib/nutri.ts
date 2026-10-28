@@ -11,7 +11,7 @@ import { alertasDeConsulta, COLUNAS_CONSULTA, type Consulta } from "@/lib/consul
  * Tipo de cada alerta. A tela liga uma ação a cada um (abrir a dose, a
  * prescrição, a aba de treino...), então o tipo não pode ser lido do texto.
  */
-export type TipoAlerta = "dose" | "prescricao" | "parado" | "treino" | "exame" | "consulta";
+export type TipoAlerta = "dose" | "prescricao" | "parado" | "treino" | "exame" | "consulta" | "refeicao";
 
 export type Alerta = { tipo: TipoAlerta; nivel: number; texto: string };
 
@@ -39,6 +39,11 @@ export function textoSemConfirmacao(n: number): string {
   return `${n} ${n === 1 ? "treino" : "treinos"} sem confirmação (7d)`;
 }
 
+// O singular existe pela regra acima: a fila só alerta a partir de 3.
+export function textoRefeicoesPuladas(n: number): string {
+  return `Pulou ${n} ${n === 1 ? "refeição" : "refeições"} do plano (7d)`;
+}
+
 export function textoExames(n: number): string {
   return `${n} exame${n > 1 ? "s" : ""} fora da referência`;
 }
@@ -48,8 +53,8 @@ export type PatientSummary = {
   name: string;
   /**
    * Último dia com QUALQUER registro do paciente (refeição, treino, log
-   * diário, medida que ele lançou). A medida da consulta não conta: quem
-   * registrou foi o nutricionista.
+   * diário, medida que ele lançou, resposta "comi"/"não comi" a uma refeição do
+   * plano). A medida da consulta não conta: quem registrou foi o nutricionista.
    */
   lastActivity: string | null;
   /** Dias distintos com registro do paciente nos últimos 7 dias (0–7). */
@@ -70,6 +75,8 @@ export type PatientSummary = {
   planSemResposta7: number;
   /** Divergências abertas entre o prescrito e o que está valendo. */
   desvios: number;
+  /** "Não comi" a refeições do plano nos últimos 7 dias. */
+  refeicoesPuladas7: number;
   /** Motivos de atenção, já em texto pronto para exibir. */
   alerts: string[];
   /**
@@ -111,7 +118,7 @@ export async function getPatientsSummary(
 }
 
 /**
- * O resumo e se alguma consulta falhou. Faz 9 consultas no total,
+ * O resumo e se alguma consulta falhou. Faz 11 consultas no total,
  * independente da quantidade de pacientes (usa .in(user_id, ids)), mais 4
  * por paciente sem registro nos últimos 30 dias. A conta em si fica em
  * `montarResumos`.
@@ -139,7 +146,7 @@ export async function resumirPacientes(
 
   const [
     mealsRes, wkRes, logsRes, bodyRes, examsRes, treatRes, planRes, checksRes, desviosRes,
-    consultasRes,
+    consultasRes, respostasRes,
   ] = await Promise.all([
       supabase
         .from("meals")
@@ -202,11 +209,19 @@ export async function resumirPacientes(
         .select(COLUNAS_CONSULTA)
         .in("patient_id", ids)
         .in("status", ["pedido", "agendada"]),
+      // As respostas às refeições do plano ("comi" / "não comi"), dos 30 dias,
+      // com teto: contam como registro e dão o "Pulou N refeições do plano".
+      supabase
+        .from("meal_checks")
+        .select("user_id, date, status")
+        .in("user_id", ids)
+        .gte("date", d30)
+        .lte("date", today),
     ]);
 
   const respostas = [
     mealsRes, wkRes, logsRes, bodyRes, examsRes, treatRes, planRes, checksRes, desviosRes,
-    consultasRes,
+    consultasRes, respostasRes,
   ];
   let falhou = respostas.some((r) => r.error);
   const dados: DadosResumo = {
@@ -220,6 +235,7 @@ export async function resumirPacientes(
     checks: checksRes.data ?? [],
     desvios: desviosRes.data ?? [],
     consultas: consultasRes.data ?? [],
+    respostas: respostasRes.data ?? [],
   };
   const resumos = montarResumos(dados, ids, names, today);
 
@@ -242,7 +258,7 @@ async function ultimosRegistros(
 ): Promise<{ datas: Record<string, string>; falhou: boolean }> {
   const datas: Record<string, string> = {};
   let falhou = false;
-  const tabelas = ["meals", "workouts", "daily_logs", "body_measurements"];
+  const tabelas = ["meals", "workouts", "daily_logs", "body_measurements", "meal_checks"];
   await Promise.all(
     ids.flatMap((id) =>
       tabelas.map(async (tabela) => {
@@ -287,6 +303,8 @@ export type DadosResumo = {
   desvios: any[];
   /** Pedidos e agendadas, para os alertas de consulta. */
   consultas?: Consulta[];
+  /** As respostas às refeições do plano (meal_checks), dos 30 dias. */
+  respostas?: { user_id: string; date: string; status: string }[];
   /**
    * Último dia com registro de quem não tem nenhum nos 30 dias que as
    * consultas trazem. Sem isto, quem parou há 45 dias virava "Nunca
@@ -328,8 +346,10 @@ export function montarResumos(
     // registrar" contados da consulta, e o alerta de parado sumia depois de
     // toda consulta. Para o peso ela continua valendo (pesoDe30Dias).
     const doPaciente = myBody.filter((b) => b.measured_by == null);
+    // A resposta "comi" / "não comi" também é registro do paciente.
+    const minhasRespostas = (dados.respostas ?? []).filter((r) => r.user_id === id);
     const activeDays = new Set<string>();
-    for (const r of [...myMeals, ...myWk, ...myLogs, ...doPaciente]) {
+    for (const r of [...myMeals, ...myWk, ...myLogs, ...doPaciente, ...minhasRespostas]) {
       if (r.date && r.date <= today) activeDays.add(r.date as string);
     }
     const sortedDays = Array.from(activeDays).sort();
@@ -395,6 +415,7 @@ export function montarResumos(
       planFaltas7: adesao.faltas,
       planSemResposta7: adesao.semResposta,
       desvios: desvios.filter((d) => d.patient_id === id).length,
+      refeicoesPuladas7: minhasRespostas.filter((r) => r.status === "skipped" && naJanela(r.date, today, 7)).length,
       alerts: [],
       alertas: [],
       gravidade: null,
@@ -423,6 +444,11 @@ export function montarResumos(
     if (summary.planFaltas7 > 0) alertar("treino", 4, textoFaltas(summary.planFaltas7));
     if (summary.planSemResposta7 >= 2)
       alertar("treino", 4, textoSemConfirmacao(summary.planSemResposta7));
+    // A partir de 3: com cinco ou seis refeições por dia, uma só na semana
+    // seria ruído. "Sem resposta" não alerta: quem não tem o app na Tela de
+    // Início do iPhone nem recebe a notificação.
+    if (summary.refeicoesPuladas7 >= 3)
+      alertar("refeicao", 4, textoRefeicoesPuladas(summary.refeicoesPuladas7));
     for (const a of deConsulta) if (a.nivel > 2) alertar(a.tipo, a.nivel, a.texto);
     if (summary.alteredExams > 0) alertar("exame", 5, textoExames(summary.alteredExams));
 

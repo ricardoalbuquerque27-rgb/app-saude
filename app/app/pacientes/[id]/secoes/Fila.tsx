@@ -136,6 +136,13 @@ export async function Fila({
             Ver consultas
           </Link>
         );
+      // "Pulou N refeições do plano": a semana por refeição mora na Alimentação.
+      case "refeicao":
+        return (
+          <Link href={hrefDaAba(uid, "alimentacao")} className={`inline-flex ${ACAO_NA_FILA}`}>
+            Ver alimentação
+          </Link>
+        );
     }
   }
 
