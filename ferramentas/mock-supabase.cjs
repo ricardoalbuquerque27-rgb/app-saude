@@ -13,10 +13,11 @@
 // escritas de escrever(): o upsert do perfil (o CRN), o PATCH/DELETE de
 // body_measurements com a RLS do paciente (a medida da consulta não se altera
 // nem se apaga, e o banco recusa sem erro), o upsert da água do dia
-// (daily_logs), o insert e o delete de refeição (meals) e o check-in do treino
-// (plan_completions). POST
+// (daily_logs), o insert e o delete de refeição (meals), o check-in do treino
+// (plan_completions) e a resposta das refeições (meal_checks). POST
 // /__reset volta tudo ao que o cenário subiu; POST /__falhar derruba os GET de
-// uma tabela (500) até o próximo /__reset, ou só as escritas, com "escrita": true.
+// uma tabela (500) até o próximo /__reset, ou só as escritas, com "escrita": true;
+// GET /__tabela?nome=<tabela> devolve as linhas que a tabela tem agora.
 
 const http = require("http");
 
@@ -875,6 +876,7 @@ if (CENARIO === "carteira") {
 T.consultation_records ||= [];
 T.consultation_addenda ||= [];
 T.exercises ||= [];
+T.meal_checks ||= [];
 
 // As tabelas que as funções mexem, do jeito que o cenário subiu: POST /__reset
 // volta a elas, e o roteiro de verificações pode rodar duas vezes seguidas.
@@ -888,9 +890,11 @@ T.exercises ||= [];
 // página recarregada voltava a "sem resposta".
 // `workouts` e `exercises` porque o "Finalizar" da sessão ao vivo e o "Fui"
 // (que cria o treino "Confirmado pelo plano semanal") gravam de verdade.
+// `meal_checks` porque o "Comi" e o "Não comi" (do app e da rota que o botão da
+// notificação chama) gravam de verdade, e a Dieta recarregada mostra a resposta.
 const TABELAS_COM_ESTADO = [
   "appointments", "consultation_records", "consultation_addenda", "body_measurements", "profiles",
-  "daily_logs", "meals", "plan_completions", "workouts", "exercises",
+  "daily_logs", "meals", "plan_completions", "workouts", "exercises", "meal_checks",
 ];
 const ESTADO_INICIAL = JSON.stringify(Object.fromEntries(TABELAS_COM_ESTADO.map((n) => [n, T[n] ?? []])));
 
@@ -1333,6 +1337,11 @@ const sessao = (id) => ({
  *  - workouts e exercises, POST (o "Finalizar" da sessão ao vivo e o treino que
  *    o "Fui" cria), e workouts, DELETE (o desfazer do check-in e o treino cujas
  *    séries falharam), que leva as séries junto, como a cascata do banco.
+ *  - meal_checks, POST (o upsert de `marcarRefeicao`, com
+ *    `on_conflict=user_id,date,meal_type`) e DELETE (o "Desfazer"): a resposta
+ *    da refeição, só de quem pede, e com a refeição ligada (`meal_id`) sendo
+ *    dela, como a RLS da migração 20261027120000; senão 403. Apagar a refeição
+ *    ligada deixa a resposta com `meal_id` nulo (o `on delete set null`).
  *  Nas escritas de insert, só linha de quem pede (a RLS `user_id = auth.uid()`),
  *  senão 403.
  */
@@ -1421,11 +1430,35 @@ function escrever(tabela, metodo, params, corpo, quem, prefer) {
     return { status: 204, dados: null, cabecalhos: contagem(visiveis.length) };
   }
 
+  if (tabela === "meal_checks" && metodo === "POST") {
+    const novos = (Array.isArray(dados) ? dados : [dados]).filter((x) => x && typeof x === "object");
+    const daPessoa = (id) => id == null || (T.meals || []).some((m) => m.id === id && m.user_id === quem);
+    if (novos.some((n) => n.user_id !== quem || !daPessoa(n.meal_id)))
+      return { status: 403, dados: { code: "42501", message: 'new row violates row-level security policy for table "meal_checks"' }, cabecalhos: {} };
+    const lista = (T.meal_checks ||= []);
+    const gravados = novos.map((n) => {
+      let linha = lista.find((l) => l.user_id === n.user_id && l.date === n.date && l.meal_type === n.meal_type);
+      if (linha) Object.assign(linha, n, { updated_at: new Date().toISOString() });
+      else lista.push((linha = { id: `meal_checks-novo-${++seqEscrita}`, meal_id: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), ...n }));
+      return linha;
+    });
+    return { status: 201, dados: representacao ? gravados : [], cabecalhos: {} };
+  }
+
+  if (tabela === "meal_checks" && metodo === "DELETE") {
+    const visiveis = aplicaFiltros(T.meal_checks || [], params).filter((l) => l.user_id === quem);
+    T.meal_checks = (T.meal_checks || []).filter((l) => !visiveis.includes(l));
+    if (representacao) return { status: 200, dados: visiveis, cabecalhos: contagem(visiveis.length) };
+    return { status: 204, dados: null, cabecalhos: contagem(visiveis.length) };
+  }
+
   if (tabela === "meals" && metodo === "DELETE") {
     // A RLS de meals (`user_id = auth.uid()`) só deixa enxergar, e portanto
     // apagar, a refeição da própria pessoa.
     const visiveis = aplicaFiltros(T.meals, params).filter((l) => l.user_id === quem);
     T.meals = T.meals.filter((l) => !visiveis.includes(l));
+    // meal_checks.meal_id tem `on delete set null`.
+    for (const c of T.meal_checks || []) if (visiveis.some((m) => m.id === c.meal_id)) c.meal_id = null;
     if (representacao) return { status: 200, dados: visiveis, cabecalhos: contagem(visiveis.length) };
     return { status: 204, dados: null, cabecalhos: contagem(visiveis.length) };
   }
@@ -1480,6 +1513,9 @@ const srv = http.createServer((req, res) => {
     // quem é quem, para eles não repetirem os ids.
     if (url.pathname === "/__cenario")
       return envia(200, { cenario: CENARIO, nutri: NUT, pacientes: PACIENTES });
+    // As linhas de uma tabela agora, para o roteiro conferir o que a tela gravou.
+    if (url.pathname === "/__tabela")
+      return envia(200, T[url.searchParams.get("nome") || ""] ?? null);
     if (url.pathname === "/__reset") {
       reiniciar();
       return envia(200, { ok: true });
