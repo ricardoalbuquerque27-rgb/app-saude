@@ -496,6 +496,19 @@ function carteira() {
         ],
         routines: rot.routines,
         routine_exercises: rot.routine_exercises,
+        // As respostas às refeições do plano (lembretes das refeições): três
+        // "não comi" nos últimos 7 dias, que dão o "Pulou 3 refeições do plano
+        // (7d)" na fila, e alguns "comi". O resto da semana fica sem resposta.
+        // Só em dias que já têm refeição: a resposta conta como registro, e
+        // uma de hoje mudaria o "6/7 dias" que o roteiro confere.
+        meal_checks: [
+          [1, "Almoço", "skipped"], [2, "Jantar", "skipped"], [4, "Almoço", "skipped"],
+          [1, "Café da manhã", "done"], [2, "Almoço", "done"],
+          [3, "Almoço", "done"], [3, "Lanche da tarde", "done"],
+        ].map(([n, meal_type, status], i) => ({
+          id: `mc-${k}-${i}`, user_id: uid, date: dias(n), meal_type, status, meal_id: null,
+          created_at: em(n, "13:00"), updated_at: em(n, "13:00"),
+        })),
       },
       cardapio(k, uid, "Plano alimentar — fase 1", "Beba água entre as refeições. Se bater fome à noite, deixe a ceia para depois do jantar.", 21),
       // Faltou ao treino de ontem (o = 1) e há 15 dias; deixou sem resposta o

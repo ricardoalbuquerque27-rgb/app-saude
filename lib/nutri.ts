@@ -1,6 +1,6 @@
 import { todayISO, addDaysISO, diasNaJanela, naJanela } from "@/lib/date";
 import { numeroBR } from "@/lib/numeros";
-import { computeAdherence } from "@/lib/planCheckIn";
+import { computeAdherence, weekDates } from "@/lib/planCheckIn";
 import { alertasDeConsulta, COLUNAS_CONSULTA, type Consulta } from "@/lib/consultas";
 
 // Camada de dados do lado do nutricionista. Todas as consultas rodam com o
@@ -1251,4 +1251,50 @@ export async function getDesviosAbertos(
     .is("acknowledged_at", null)
     .order("created_at", { ascending: false });
   return { data: (data as Desvio[] | null) ?? [], error };
+}
+
+// ---------------------------------------------------------------------------
+// As refeições da semana (aba Alimentação): o "comi" / "não comi" de cada
+// refeição do plano, de segunda a domingo.
+
+export type EstadoDaCasa = "comeu" | "nao_comeu" | "sem_resposta" | "hoje" | "futuro";
+
+/**
+ * Uma linha por refeição do plano, na ordem de `tipos`, e os sete dias da
+ * semana de `hoje`. Hoje sem resposta não é "sem resposta": às 8h o jantar
+ * ainda não aconteceu (a regra do "hoje" da semana de treino). Dia que não
+ * chegou fica vazio, mesmo com resposta gravada (data futura não é refeição
+ * feita, como em lib/date.ts).
+ */
+export function semanaDasRefeicoes(
+  tipos: string[],
+  respostas: { date: string; meal_type: string; status: string }[],
+  hoje: string
+): { refeicao: string; dias: { data: string; estado: EstadoDaCasa }[] }[] {
+  const datas = weekDates(hoje);
+  return tipos.map((refeicao) => ({
+    refeicao,
+    dias: datas.map((data) => {
+      if (data > hoje) return { data, estado: "futuro" as const };
+      const r = respostas.find((x) => x.date === data && x.meal_type === refeicao);
+      const estado: EstadoDaCasa =
+        r?.status === "done" ? "comeu" : r?.status === "skipped" ? "nao_comeu" : data === hoje ? "hoje" : "sem_resposta";
+      return { data, estado };
+    }),
+  }));
+}
+
+const DIAS_DA_SEMANA = ["segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo"];
+const ESTADO_POR_EXTENSO: Record<EstadoDaCasa, string> = {
+  comeu: "comeu",
+  nao_comeu: "não comeu",
+  sem_resposta: "sem resposta",
+  hoje: "ainda sem resposta",
+  futuro: "ainda não chegou",
+};
+
+/** O texto da casa para o leitor de tela: "Almoço, terça: não comeu". */
+export function rotuloDaCasa(refeicao: string, data: string, estado: EstadoDaCasa): string {
+  const dia = DIAS_DA_SEMANA[(new Date(data + "T12:00:00").getDay() + 6) % 7];
+  return `${refeicao}, ${dia}: ${ESTADO_POR_EXTENSO[estado]}`;
 }

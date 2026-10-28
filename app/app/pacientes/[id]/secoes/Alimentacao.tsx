@@ -1,12 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
 import { addDaysISO, formatDate, todayISO } from "@/lib/date";
-import { MEAL_TYPES } from "@/lib/cardapio";
+import { MEAL_TYPES, tiposDoCardapio } from "@/lib/cardapio";
 import {
   compararComMeta,
   getPatientSeries,
   mediasDaSemana,
   notaDasMedias,
   notaMedia,
+  semanaDasRefeicoes,
   separarDesvios,
   textoDaMeta,
   textoDoDesvio,
@@ -26,6 +27,8 @@ import { VerHistorico } from "@/components/clinico/VerHistorico";
 import { EditorCardapio } from "@/components/clinico/EditorCardapio";
 import type { ItemCardapio, PlanoAlimentar } from "@/components/MealPlanEditor";
 import { ErroSecao } from "@/components/clinico/ErroSecao";
+import { SemanaDasRefeicoes } from "@/components/clinico/SemanaDasRefeicoes";
+import { weekDates } from "@/lib/planCheckIn";
 
 const ROTULO_CAMPO: Record<CampoMeta, string> = {
   daily_calorie_goal: "Calorias",
@@ -76,7 +79,7 @@ export async function Alimentacao({
   // histórico.
   const desde = addDaysISO(hoje, -13);
 
-  const [serieRes, presc, desviosRes, cardapioRes, refeicoesRes] = await Promise.all([
+  const [serieRes, presc, desviosRes, cardapioRes, refeicoesRes, respostasRes] = await Promise.all([
     getPatientSeries(supabase, uid, 14),
     prescricao,
     desviosAbertos,
@@ -96,6 +99,14 @@ export async function Alimentacao({
       .lte("date", hoje)
       .order("date", { ascending: false })
       .limit(60),
+    // As respostas da semana ("comi" / "não comi"), de segunda até hoje. A
+    // falha desta leitura só derruba o bloco dela, não a aba.
+    supabase
+      .from("meal_checks")
+      .select("date, meal_type, status")
+      .eq("user_id", uid)
+      .gte("date", weekDates(hoje)[0])
+      .lte("date", hoje),
   ]);
 
   const plano = (cardapioRes.data ?? null) as PlanoAlimentar | null;
@@ -306,6 +317,16 @@ export async function Alimentacao({
           )}
         </Editavel>
       </div>
+
+      {plano && itens.length > 0 && (
+        <div className="mt-8">
+          <h3 className={TITULO_BLOCO}>Refeições da semana</h3>
+          <SemanaDasRefeicoes
+            semana={semanaDasRefeicoes(tiposDoCardapio(itens), (respostasRes.data ?? []) as any[], hoje)}
+            falhou={!!respostasRes.error}
+          />
+        </div>
+      )}
 
       <VerHistorico>
         <h3 className={TITULO_BLOCO}>Refeições dos últimos 14 dias</h3>

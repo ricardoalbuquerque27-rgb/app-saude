@@ -28,6 +28,8 @@ import {
   textoSemConfirmacao,
   textoExames,
   textoRefeicoesPuladas,
+  semanaDasRefeicoes,
+  rotuloDaCasa,
   type DadosResumo,
   type DadosAtividade,
   type DailySeries,
@@ -1423,5 +1425,55 @@ describe("as refeições do plano na fila", () => {
     );
     expect(r.resumos[0].lastActivity).toBe(addDaysISO(hoje, -40));
     expect(r.resumos[0].alerts).toContain("40 dias sem registrar");
+  });
+});
+
+describe("semanaDasRefeicoes", () => {
+  // 2026-10-28 é uma quarta: a semana vai de 26 (segunda) a 01/11 (domingo).
+  const QUARTA = "2026-10-28";
+  const r = (date: string, meal_type: string, status: string) => ({ date, meal_type, status });
+
+  it("vai de segunda a domingo, uma linha por refeição, na ordem dada", () => {
+    const s = semanaDasRefeicoes(["Café da manhã", "Almoço"], [], QUARTA);
+    expect(s.map((l) => l.refeicao)).toEqual(["Café da manhã", "Almoço"]);
+    expect(s[0].dias.map((d) => d.data)).toEqual([
+      "2026-10-26", "2026-10-27", "2026-10-28", "2026-10-29", "2026-10-30", "2026-10-31", "2026-11-01",
+    ]);
+  });
+
+  it("os estados de cada casa", () => {
+    const [almoco] = semanaDasRefeicoes(
+      ["Almoço"],
+      [
+        r("2026-10-26", "Almoço", "done"),
+        r("2026-10-27", "Almoço", "skipped"),
+        r("2026-10-30", "Almoço", "skipped"),
+        r("2026-10-26", "Jantar", "skipped"),
+      ],
+      QUARTA
+    );
+    expect(almoco.dias.map((d) => d.estado)).toEqual([
+      "comeu", "nao_comeu", "hoje", "futuro", "futuro", "futuro", "futuro",
+    ]);
+  });
+
+  it("hoje respondido mostra a resposta; passado sem resposta é sem resposta", () => {
+    const [almoco] = semanaDasRefeicoes(["Almoço"], [r(QUARTA, "Almoço", "skipped")], "2026-10-28");
+    expect(almoco.dias[2].estado).toBe("nao_comeu");
+    const [jantar] = semanaDasRefeicoes(["Jantar"], [], "2026-11-01");
+    expect(jantar.dias.slice(0, 6).every((d) => d.estado === "sem_resposta")).toBe(true);
+    expect(jantar.dias[6].estado).toBe("hoje");
+  });
+});
+
+describe("rotuloDaCasa", () => {
+  it("a refeição, o dia da semana e o estado por extenso", () => {
+    expect(rotuloDaCasa("Almoço", "2026-10-27", "nao_comeu")).toBe("Almoço, terça: não comeu");
+    expect(rotuloDaCasa("Jantar", "2026-10-26", "comeu")).toBe("Jantar, segunda: comeu");
+    expect(rotuloDaCasa("Ceia", "2026-10-28", "sem_resposta")).toBe("Ceia, quarta: sem resposta");
+    expect(rotuloDaCasa("Ceia", "2026-10-29", "hoje")).toBe("Ceia, quinta: ainda sem resposta");
+    expect(rotuloDaCasa("Ceia", "2026-10-30", "futuro")).toBe("Ceia, sexta: ainda não chegou");
+    expect(rotuloDaCasa("Ceia", "2026-10-31", "futuro")).toBe("Ceia, sábado: ainda não chegou");
+    expect(rotuloDaCasa("Ceia", "2026-11-01", "futuro")).toBe("Ceia, domingo: ainda não chegou");
   });
 });
