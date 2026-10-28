@@ -360,6 +360,29 @@ const contexto = (b) =>
     await reset();
   });
 
+  await etapa("inicio", async () => {
+    // O "Para hoje" conta a refeição respondida como feita, "Não comi" também.
+    await reset();
+    const faltam = async () => {
+      await p.goto(APP + "/app", { waitUntil: "networkidle", timeout: 120000 });
+      await p.waitForTimeout(600);
+      const t = (await p.locator("main").innerText()).replace(/\s+/g, " ");
+      const m = t.match(/(\d+) refeições ainda faltam|1 refeição ainda falta/);
+      return m ? (m[1] ? Number(m[1]) : 1) : 0;
+    };
+    const antes = await faltam();
+    ok(antes === 4, `sem resposta, as quatro refeições do plano faltam (${antes})`);
+    await marcar({ data: hoje, refeicao: "Almoço", resposta: "nao_comi" });
+    const depois = await faltam();
+    ok(depois === 3, `depois de "Não comi" no almoço, faltam três (${depois})`);
+    await comFalha("meal_checks", async () => {
+      await p.goto(APP + "/app", { waitUntil: "networkidle", timeout: 120000 });
+      ok((await p.getByText("Não deu para carregar tudo. Recarregue a página.", { exact: true }).count()) === 1,
+        'com as respostas falhando, o "Para hoje" diz que não carregou tudo');
+    });
+    await reset();
+  });
+
   await b.close();
   await reset();
   const falhas = resultados.filter((r) => !r).length;
