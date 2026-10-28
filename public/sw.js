@@ -125,7 +125,13 @@ function abrir(url) {
       }
     });
     if (doApp) {
-      return Promise.resolve(doApp.focus ? doApp.focus() : null).then(() => doApp.postMessage({ tipo: "abrir", url }));
+      // O recado sai mesmo se o focus() recusar (o WebKit pode, pela regra do
+      // gesto do usuário): o sistema já traz o app para a frente no toque, e
+      // sem o recado ele ficaria na tela em que estava.
+      return Promise.resolve()
+        .then(() => doApp.focus && doApp.focus())
+        .catch(() => {})
+        .then(() => doApp.postMessage({ tipo: "abrir", url }));
     }
     if (self.clients.openWindow) return self.clients.openWindow(url);
   });
@@ -145,7 +151,12 @@ self.addEventListener("notificationclick", (event) => {
         method: "POST",
         credentials: "same-origin",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ data: d.refeicao.data, refeicao: d.refeicao.refeicao, resposta: event.action }),
+        body: JSON.stringify({
+          data: d.refeicao.data,
+          refeicao: d.refeicao.refeicao,
+          resposta: event.action,
+          usuario: d.refeicao.usuario,
+        }),
       })
         .then((r) => {
           if (!r.ok) throw new Error(String(r.status));

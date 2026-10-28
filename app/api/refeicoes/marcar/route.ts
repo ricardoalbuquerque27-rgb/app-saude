@@ -29,6 +29,11 @@ export async function POST(req: Request) {
   if (!pedido) {
     return NextResponse.json({ error: "Pedido inválido." }, { status: 400 });
   }
+  // A notificação é de uma conta e o aparelho pode estar com outra logada (o
+  // tablet da família): marcar ali gravaria o almoço de quem estiver logado.
+  if (pedido.usuario && pedido.usuario !== user.id) {
+    return NextResponse.json({ error: "Esta notificação é de outra conta." }, { status: 403 });
+  }
 
   const r = await marcarRefeicao(supabase, user.id, pedido);
   if (r.ok) return NextResponse.json({ ok: true });

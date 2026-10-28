@@ -1,6 +1,7 @@
 import { todayISO, addDaysISO, diasNaJanela, naJanela } from "@/lib/date";
 import { numeroBR } from "@/lib/numeros";
 import { computeAdherence, weekDates } from "@/lib/planCheckIn";
+import { lerEmPaginas } from "@/lib/paginacao";
 import { alertasDeConsulta, COLUNAS_CONSULTA, type Consulta } from "@/lib/consultas";
 
 // Camada de dados do lado do nutricionista. Todas as consultas rodam com o
@@ -211,12 +212,7 @@ export async function resumirPacientes(
         .in("status", ["pedido", "agendada"]),
       // As respostas às refeições do plano ("comi" / "não comi"), dos 30 dias,
       // com teto: contam como registro e dão o "Pulou N refeições do plano".
-      supabase
-        .from("meal_checks")
-        .select("user_id, date, status")
-        .in("user_id", ids)
-        .gte("date", d30)
-        .lte("date", today),
+      lerRespostasDoResumo(supabase, ids, d30, today).then((r) => ({ data: r.data, error: r.falhou ? "falhou" : null })),
     ]);
 
   const respostas = [
@@ -248,6 +244,37 @@ export async function resumirPacientes(
   falhou ||= ultimos.falhou;
   dados.ultimoRegistro = ultimos.datas;
   return { resumos: montarResumos(dados, ids, names, today), falhou };
+}
+
+/** Quantas respostas o resumo aceita antes de desistir (~280 pacientes respondendo tudo). */
+export const TETO_DAS_RESPOSTAS = 50_000;
+
+/**
+ * As respostas às refeições do plano (meal_checks) de toda a carteira numa
+ * janela, em páginas (`lerEmPaginas`). Com seis refeições por dia, 30 dias de
+ * uns seis pacientes respondendo tudo passam de 1.000 linhas, e o PostgREST
+ * corta ali SEM erro: o "Pulou N refeições" sumia calado do fim da fila.
+ */
+export async function lerRespostasDoResumo(
+  supabase: any,
+  ids: string[],
+  desde: string,
+  ate: string
+): Promise<{ data: { user_id: string; date: string; status: string }[]; falhou: boolean }> {
+  return lerEmPaginas<{ user_id: string; date: string; status: string }>(
+    (de, fim, contar) =>
+      supabase
+        .from("meal_checks")
+        .select("user_id, date, status", contar ? { count: "exact" } : undefined)
+        .in("user_id", ids)
+        .gte("date", desde)
+        .lte("date", ate)
+        .order("user_id", { ascending: true })
+        .order("date", { ascending: true })
+        .order("id", { ascending: true })
+        .range(de, fim),
+    TETO_DAS_RESPOSTAS
+  );
 }
 
 /** Último dia com registro de cada paciente, sem limite de janela. */
@@ -1265,11 +1292,18 @@ export type EstadoDaCasa = "comeu" | "nao_comeu" | "sem_resposta" | "hoje" | "fu
  * ainda não aconteceu (a regra do "hoje" da semana de treino). Dia que não
  * chegou fica vazio, mesmo com resposta gravada (data futura não é refeição
  * feita, como em lib/date.ts).
+ *
+ * `registradas` são as refeições do paciente na semana (data e tipo): a
+ * registrada à mão, sem resposta, é "comeu". Sem isso, quem registra tudo
+ * pelo formulário (o plano não oferece botão na refeição já registrada, e o
+ * lembrete não vai para ela) aparecia como "sem resposta" a semana inteira. A
+ * resposta vence o registro: o "não comi" diz mais que um registro antigo.
  */
 export function semanaDasRefeicoes(
   tipos: string[],
   respostas: { date: string; meal_type: string; status: string }[],
-  hoje: string
+  hoje: string,
+  registradas: { date: string; meal_type: string }[] = []
 ): { refeicao: string; dias: { data: string; estado: EstadoDaCasa }[] }[] {
   const datas = weekDates(hoje);
   return tipos.map((refeicao) => ({
@@ -1277,8 +1311,15 @@ export function semanaDasRefeicoes(
     dias: datas.map((data) => {
       if (data > hoje) return { data, estado: "futuro" as const };
       const r = respostas.find((x) => x.date === data && x.meal_type === refeicao);
+      const registrou = registradas.some((x) => x.date === data && x.meal_type === refeicao);
       const estado: EstadoDaCasa =
-        r?.status === "done" ? "comeu" : r?.status === "skipped" ? "nao_comeu" : data === hoje ? "hoje" : "sem_resposta";
+        r?.status === "done" || (!r && registrou)
+          ? "comeu"
+          : r?.status === "skipped"
+            ? "nao_comeu"
+            : data === hoje
+              ? "hoje"
+              : "sem_resposta";
       return { data, estado };
     }),
   }));

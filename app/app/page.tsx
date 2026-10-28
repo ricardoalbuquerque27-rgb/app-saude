@@ -277,8 +277,6 @@ export default async function DashboardPage() {
   // "Definir metas" para quem já definiu: o bloco diz que não carregou.
   const seuDiaFalhou =
     !!mealsTodayRes.error ||
-    // Sem as respostas, a refeição respondida ("não comi") voltaria a faltar.
-    !!respostasHojeRes.error ||
     !!dailyTodayRes.error ||
     !!profileRes.error ||
     !!workoutsWeekRes.error ||

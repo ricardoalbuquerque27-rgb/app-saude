@@ -169,9 +169,12 @@ export default function AppShell({
   // O toque numa notificação (a refeição de um lembrete) com o app já aberto:
   // o service worker põe a janela na frente e manda o endereço por recado,
   // porque o client.navigate dele pode não existir no iPhone (public/sw.js).
-  // Na mesma página, recarrega (location.assign): a Dieta lê a data do
+  // Na mesma página, troca o endereço e recarrega: a Dieta lê a data do
   // endereço só ao montar, e um router.push para outro dia mudaria a URL sem
-  // mudar a tela. Em outra página, router.push. Só caminho do app.
+  // mudar a tela. Não é location.assign: com o mesmo endereço, ou só outra
+  // âncora, ele só pula para a âncora, e quem tinha mudado o dia pela seta
+  // (que não mexe no endereço) ficava no dia da seta. Em outra página,
+  // router.push. Só caminho do app.
   useEffect(() => {
     const sw = typeof navigator !== "undefined" ? navigator.serviceWorker : undefined;
     if (!sw) return;
@@ -180,8 +183,10 @@ export default function AppShell({
       if (!recado || recado.tipo !== "abrir") return;
       const url = caminhoDoApp(recado.url);
       if (!url) return;
-      if (new URL(url, window.location.origin).pathname === window.location.pathname) window.location.assign(url);
-      else router.push(url);
+      if (new URL(url, window.location.origin).pathname === window.location.pathname) {
+        window.history.replaceState(window.history.state, "", url);
+        window.location.reload();
+      } else router.push(url);
     };
     sw.addEventListener("message", ouvir);
     sw.startMessages?.();

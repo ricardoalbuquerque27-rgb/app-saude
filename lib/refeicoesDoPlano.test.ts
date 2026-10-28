@@ -305,6 +305,9 @@ describe("as entradas", () => {
       .toEqual({ data: HOJE, refeicao: "Café da manhã", resposta: "comi", itemId: "i3" });
     expect(lerPedido({ data: HOJE, refeicao: "Almoço", resposta: "desfazer", itemId: null }))
       .toEqual({ data: HOJE, refeicao: "Almoço", resposta: "desfazer", itemId: null });
+    // O da notificação leva de quem ela é.
+    expect(lerPedido({ data: HOJE, refeicao: "Almoço", resposta: "comi", usuario: "pac-1" }))
+      .toEqual({ data: HOJE, refeicao: "Almoço", resposta: "comi", itemId: null, usuario: "pac-1" });
   });
 
   it("lerPedido recusa o que não é pedido", () => {
@@ -317,6 +320,7 @@ describe("as entradas", () => {
       { data: HOJE, refeicao: "   ", resposta: "comi" },
       { data: HOJE, refeicao: "x".repeat(201), resposta: "comi" },
       { data: HOJE, refeicao: "Almoço", resposta: "comi", itemId: 5 },
+      { data: HOJE, refeicao: "Almoço", resposta: "comi", usuario: 7 },
     ]) {
       expect(lerPedido(corpo)).toBeNull();
     }

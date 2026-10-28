@@ -142,6 +142,15 @@ const contexto = (b) =>
     ok(!checks.some((c) => c.date === hoje && c.meal_type === "Almoço"), "desfazer apaga a resposta");
     ok(!(await tabela("meals")).some((m) => ligada && m.id === ligada.id), "e a refeição ligada");
 
+    // O botão da notificação manda de quem ela é; com outra conta logada no
+    // aparelho, a rota recusa em vez de gravar o almoço de quem estiver ali.
+    r = await marcar({ data: hoje, refeicao: "Almoço", resposta: "nao_comi", usuario: "outra-conta" });
+    ok(r.status() === 403, "notificação de outra conta: 403", `veio ${r.status()}`);
+    ok(!(await tabela("meal_checks")).some((c) => c.date === hoje && c.meal_type === "Almoço"), "e nada é gravado");
+    r = await marcar({ data: hoje, refeicao: "Almoço", resposta: "nao_comi", usuario: resp && resp.user_id });
+    ok(r.status() === 200, "notificação da própria conta: 200", `veio ${r.status()}`);
+    await marcar({ data: hoje, refeicao: "Almoço", resposta: "desfazer" });
+
     r = await marcar({ data: somaDias(hoje, -8), refeicao: "Almoço", resposta: "comi" });
     const corpo = await r.json().catch(() => ({}));
     ok(r.status() === 400 && corpo.error === "Essa refeição é de mais de 7 dias.", "8 dias atrás: 400 com a frase da spec", `${r.status()} ${JSON.stringify(corpo)}`);
@@ -203,8 +212,10 @@ const contexto = (b) =>
     // Já na Dieta, outro dia: a página recarrega (o marcador posto em window some).
     await p.waitForTimeout(800);
     await p.evaluate(() => { window.__marcador = 1; });
+    // O endereço troca antes do recarregar (replaceState): espera-se o load.
+    const recarregou = p.waitForEvent("load", { timeout: 60000 });
     await recado({ tipo: "abrir", url: `/app/dieta?data=${anteontem}#refeicao-jantar` });
-    await p.waitForURL((x) => x.searchParams.get("data") === anteontem, { timeout: 60000 });
+    await recarregou;
     await p.waitForLoadState("networkidle");
     u = new URL(p.url());
     ok(u.searchParams.get("data") === anteontem && u.hash === "#refeicao-jantar", "na Dieta, o recado troca o dia", p.url());
@@ -212,6 +223,26 @@ const contexto = (b) =>
     await p.locator("#plano").waitFor({ timeout: 60000 });
     ok((await p.getByRole("button", { name: `${rotuloDoDia(anteontem, hoje)}, escolher outra data` }).count()) === 1,
       "e a Dieta mostra o outro dia");
+
+    // A seta muda o dia sem mudar o endereço: o recado com o MESMO endereço
+    // (ou só outra âncora) tem de recarregar, senão o location.assign só pula
+    // para a âncora e a tela segue no dia da seta.
+    const tresAtras = somaDias(hoje, -3);
+    await p.getByRole("button", { name: "Dia anterior" }).click();
+    await p.getByRole("button", { name: `${rotuloDoDia(tresAtras, hoje)}, escolher outra data` }).waitFor({ timeout: 15000 });
+    await recado({ tipo: "abrir", url: `/app/dieta?data=${anteontem}#refeicao-jantar` });
+    await p.getByRole("button", { name: `${rotuloDoDia(anteontem, hoje)}, escolher outra data` })
+      .waitFor({ timeout: 30000 }).catch(() => {});
+    ok((await p.getByRole("button", { name: `${rotuloDoDia(anteontem, hoje)}, escolher outra data` }).count()) === 1,
+      "depois da seta, o recado com o mesmo endereço volta ao dia da refeição");
+    await p.getByRole("button", { name: "Dia anterior" }).click();
+    await p.getByRole("button", { name: `${rotuloDoDia(tresAtras, hoje)}, escolher outra data` }).waitFor({ timeout: 15000 });
+    await recado({ tipo: "abrir", url: `/app/dieta?data=${anteontem}#refeicao-almoco` });
+    await p.getByRole("button", { name: `${rotuloDoDia(anteontem, hoje)}, escolher outra data` })
+      .waitFor({ timeout: 30000 }).catch(() => {});
+    ok((await p.getByRole("button", { name: `${rotuloDoDia(anteontem, hoje)}, escolher outra data` }).count()) === 1 &&
+      new URL(p.url()).hash === "#refeicao-almoco",
+      "e o recado que só muda a âncora também", p.url());
 
     // Recado de fora do app, ou de outro tipo, não sai da página.
     const antes = p.url();
@@ -379,6 +410,10 @@ const contexto = (b) =>
       await p.goto(APP + "/app", { waitUntil: "networkidle", timeout: 120000 });
       ok((await p.getByText("Não deu para carregar tudo. Recarregue a página.", { exact: true }).count()) === 1,
         'com as respostas falhando, o "Para hoje" diz que não carregou tudo');
+      // As respostas não entram nos anéis nem no Score: sem elas, o "Seu dia"
+      // fica (o deploy antes da migração os apagaria para todos).
+      ok((await p.getByText("Não deu para carregar os números de hoje.", { exact: true }).count()) === 0,
+        'e o "Seu dia" continua com os números');
     });
     await reset();
   });

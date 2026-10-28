@@ -94,6 +94,7 @@ describe("o endereço da refeição", () => {
 describe("notificacaoDaRefeicao", () => {
   it("título com a pergunta, os dois corpos, a tag, a url, os botões e a falha", () => {
     const n = notificacaoDaRefeicao({
+      user_id: "pac-1",
       data: "2026-10-28",
       refeicao: "Almoço",
       itens: [{ description: "Arroz, feijão e frango" }],
@@ -107,7 +108,9 @@ describe("notificacaoDaRefeicao", () => {
       { action: "comi", title: "Comi" },
       { action: "nao_comi", title: "Não comi" },
     ]);
-    expect(n.refeicao).toEqual({ data: "2026-10-28", refeicao: "Almoço" });
+    // De quem é a notificação: a rota recusa a resposta com outra conta logada
+    // no aparelho (o tablet da família).
+    expect(n.refeicao).toEqual({ data: "2026-10-28", refeicao: "Almoço", usuario: "pac-1" });
     expect(n.falha).toBe("Não deu para marcar sua resposta (Almoço). Toque para abrir o app.");
   });
 
@@ -115,7 +118,7 @@ describe("notificacaoDaRefeicao", () => {
     const longo =
       "Arroz integral, feijão, frango grelhado, salada de folhas verdes, tomate, cenoura ralada, azeite, limão e uma fruta";
     expect(longo.length).toBeGreaterThan(110);
-    const n = notificacaoDaRefeicao({ data: "2026-10-28", refeicao: "Almoço", itens: [{ description: longo }] });
+    const n = notificacaoDaRefeicao({ user_id: "u", data: "2026-10-28", refeicao: "Almoço", itens: [{ description: longo }] });
     expect(n.body.length).toBeLessThanOrEqual(110);
     expect(n.body.endsWith("…")).toBe(true);
     const corpo = n.body.slice(0, -1);
@@ -127,16 +130,17 @@ describe("notificacaoDaRefeicao", () => {
 
   it("até 110 caracteres, fica como está", () => {
     const exato = "a".repeat(110);
-    expect(notificacaoDaRefeicao({ data: "2026-10-28", refeicao: "Ceia", itens: [{ description: exato }] }).body).toBe(exato);
+    expect(notificacaoDaRefeicao({ user_id: "u", data: "2026-10-28", refeicao: "Ceia", itens: [{ description: exato }] }).body).toBe(exato);
   });
 
   it("uma palavra só, maior que 110, é cortada no meio", () => {
-    const n = notificacaoDaRefeicao({ data: "2026-10-28", refeicao: "Ceia", itens: [{ description: "x".repeat(150) }] });
+    const n = notificacaoDaRefeicao({ user_id: "u", data: "2026-10-28", refeicao: "Ceia", itens: [{ description: "x".repeat(150) }] });
     expect(n.body).toBe("x".repeat(109) + "…");
   });
 
   it("ou mais 1 opção, ou mais N opções, e a quebra de linha vira espaço", () => {
     const um = notificacaoDaRefeicao({
+      user_id: "u",
       data: "2026-10-28",
       refeicao: "Café da manhã",
       itens: [{ description: "Ovos\n+ pão " }, { description: "Iogurte" }],
@@ -145,6 +149,7 @@ describe("notificacaoDaRefeicao", () => {
     expect(um.bodySemBotoes).toBe("Toque para marcar. Ovos + pão · ou mais 1 opção");
     expect(um.tag).toBe("refeicao-2026-10-28-cafe-da-manha");
     const tres = notificacaoDaRefeicao({
+      user_id: "u",
       data: "2026-10-28",
       refeicao: "Jantar",
       itens: [{ description: "a" }, { description: "b" }, { description: "c" }],

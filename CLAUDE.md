@@ -102,7 +102,8 @@ Isso não é óbvio lendo a árvore de arquivos.
   (`papelDasCalorias`). As
   consultas ao banco não têm teste (nem
   `lib/perfil.ts`, que é só uma consulta), menos as que rodam contra um
-  Supabase em memória: as leituras do resumo, da linha do tempo e da série
+  Supabase em memória: as leituras do resumo (as respostas das refeições em
+  páginas, `lerRespostasDoResumo`), da linha do tempo e da série
   em `lib/nutri.test.ts`, o "antes" das medidas em `lib/registroDb.test.ts`,
   as leituras em páginas do Corpo e dos exames em `lib/evolucaoDb.test.ts`
   e `lib/examesDb.test.ts`, e as de Treinos (`lerTreinos`) em
@@ -394,7 +395,10 @@ testada por `supabase/testes/lembretes.sql`.
 - **Uma regra para a resposta**, `marcarRefeicao` (`lib/refeicoesDoPlano.ts`):
   os botões do plano (Dieta e Meu plano, `BotoesDaRefeicao` com as classes do
   check-in, `ESTILO_DO_CHECKIN`) a chamam direto; o botão da notificação chama
-  `POST /api/refeicoes/marcar` (só JSON, com o cookie), que chama a mesma. "Comi"
+  `POST /api/refeicoes/marcar` (só JSON, com o cookie), que chama a mesma. A
+  notificação leva de quem é (`usuario`, o `user_id` do envio) e a rota recusa
+  com 403 a de outra conta: no aparelho em que outra pessoa entrou depois, o
+  "Comi" gravaria o almoço de quem estiver logado. "Comi"
   com uma opção grava a refeição da opção e a resposta ligada; com várias, só a
   resposta, e o plano pergunta "Qual opção?" ("Foi esta"). **A refeição antiga
   sai antes da resposta nova**: se a segunda escrita falha, tentar de novo chega
@@ -415,10 +419,17 @@ testada por `supabase/testes/lembretes.sql`.
 - **O service worker** (`public/sw.js`, `pacefit-v5`) só escolhe o corpo
   (`Notification.maxActions`), chama a rota e, com o app aberto, põe a janela na
   frente e manda o endereço por recado (`postMessage`), que o `AppShell` segue:
-  o `client.navigate` pode não existir no iPhone. Na mesma página, o recado
-  recarrega (a Dieta lê o `?data=` só ao montar). O texto da falha ("Não deu
-  para marcar sua resposta…") viaja pronto na notificação. Nada disso aparece
-  no navegador de teste: quem confere é o passo 5 de "Para ligar".
+  o `client.navigate` pode não existir no iPhone. O recado sai mesmo se o
+  `focus()` recusar (o WebKit pode recusar, e o app ficaria na tela em que
+  estava). Na mesma página, o `AppShell` troca o endereço (`replaceState`) e
+  recarrega (a Dieta lê o `?data=` só ao montar); **não** `location.assign`, que
+  com o mesmo endereço, ou só outra âncora, só pula para a âncora, e quem tinha
+  mudado o dia pela seta (que não mexe no endereço) ficava no dia da seta. O
+  texto da falha ("Não deu para marcar sua resposta…") viaja pronto na
+  notificação. O `sw.js` roda num `vm` do Node em `lib/serviceWorker.test.ts`
+  (o corpo escolhido, o recado, o pedido do botão e a falha); a notificação de
+  verdade não aparece no navegador de teste: quem confere é o passo 5 de "Para
+  ligar".
 - **O login volta para a refeição**: sem sessão, o middleware leva a
   `/login?volta=<caminho>` (sem o `_rsc`), e o login vai ao `volta` com a âncora
   que o navegador trouxe; só caminho do app (`destinoDoLogin`).
@@ -430,17 +441,34 @@ testada por `supabase/testes/lembretes.sql`.
   chave.
 - **A nutricionista** vê "Pulou N refeições do plano (7d)" na fila (tipo
   `refeicao`, nível 4, a partir de 3 "não comi"; "sem resposta" não alerta),
-  com "Ver alimentação", e a semana por refeição na aba Alimentação. A
-  resposta conta como registro do paciente (dias com registro, parado). A
-  Início do paciente conta a refeição respondida como feita.
+  com "Ver alimentação", e a semana por refeição na aba Alimentação
+  (`semanaDasRefeicoes`), em que a refeição registrada à mão, sem resposta,
+  conta como "comeu" (a resposta vence): sem isso, quem registra pelo
+  formulário aparecia "sem resposta" na semana toda. A resposta conta como
+  registro do paciente (dias com registro, parado), e o resumo lê as respostas
+  de 30 dias em páginas (`lerRespostasDoResumo`): sete pacientes respondendo
+  cinco refeições por dia passam de 1.000, e o PostgREST cortava sem erro (o
+  paciente que ficava de fora perdia o alerta). A Início do paciente conta a refeição respondida como feita; sem as
+  respostas, o "Para hoje" diz que não carregou tudo, e o "Seu dia" fica (as
+  respostas não entram nos anéis nem no Score).
 
 **Para ligar** (nesta ordem; ligar faz chegar também o lembrete diário e o da
 caneta a quem os tiver ligado):
 
 1. Aplicar a migração `20261027120000_lembretes_das_refeicoes.sql` no SQL
-   Editor do Supabase. **Antes do deploy**: sem a tabela, os botões do plano
-   dizem que não carregaram as respostas.
-2. Fazer o deploy. Ainda desligado.
+   Editor do Supabase. **Antes do merge**, que dispara o deploy da Vercel: sem
+   a tabela, os botões do plano dizem que não carregaram as respostas, e o
+   "Para hoje" da Início, que não carregou tudo, para todos. Antes de aplicar,
+   em produção e só lendo: o dono (`pg_class.relowner`) de `meals`,
+   `meal_plans`, `meal_plan_items`, `push_subscriptions`, `patient_links` e
+   `profiles` é o papel que aplica a migração, e `relforcerowsecurity` é falso
+   nelas; senão a RLS barra a conta de `refeicoes_devidas_em`, que roda como o
+   dono, e ninguém recebe nada, sem erro (a réplica local roda como
+   superusuário e não pega). Depois de aplicar, dão falso
+   `has_function_privilege('anon', 'public.refeicoes_devidas_em(timestamp)', 'execute')`,
+   o mesmo com `authenticated`, e
+   `has_table_privilege('authenticated', 'public.meal_reminders_sent', 'select')`.
+2. Fazer o merge (o deploy). Ainda desligado.
 3. Gerar as chaves: `npx web-push generate-vapid-keys`. Na Vercel:
    `NEXT_PUBLIC_VAPID_PUBLIC_KEY` (a pública), `VAPID_PRIVATE_KEY` (a privada) e
    `CRON_SECRET` (um texto longo qualquer). O mesmo segredo no banco:
@@ -786,7 +814,7 @@ acordo"); a regra em si é maior que a guarda.
 
 ```bash
 npm run dev      # desenvolvimento
-npm test         # 1286 testes unitários (vitest)
+npm test         # 1296 testes unitários (vitest)
 ferramentas/testar-sql.sh   # migrações e testes SQL num Postgres local
 npm run build    # produção
 ```
@@ -914,6 +942,20 @@ Modal fora do lugar: procure um `transform` num ancestral.
   celular e o toque com o app aberto ou fechado só se conferem no passo 5 de
   "Para ligar". No iPhone, só chega com o app na Tela de Início, e quem não
   instala aparece como "sem resposta" para a nutricionista.
+- **Sair da conta não esquece o aparelho.** A inscrição de push fica em
+  `push_subscriptions` com a conta de quem a fez, e o "Sair" não a apaga: num
+  aparelho compartilhado (o tablet da família), depois de sair, as
+  notificações dela seguem chegando, com o cardápio no texto (o mesmo vale para
+  o lembrete diário e o da caneta, desde antes). O "Comi" de outra conta já não
+  grava (a rota dá 403), mas o texto aparece. Apagar a inscrição no "Sair"
+  tem custo: quem sai e entra de novo no próprio celular para de receber, com
+  a chave do Perfil ainda ligada, até ligar de novo. **Decidir antes do passo
+  3 de "Para ligar".**
+- **Também antes do passo 3:** o `/api/cron/reminders` manda em série e
+  depois de marcar como enviado (os sugeridos juntam todo mundo às 12:30, e um
+  estouro de tempo da função perde lembretes já marcados), e o erro do
+  `due_reminders` devolve 500 cedo e derruba os das refeições; e a frase de
+  falha do `sw.js` vai inteira no título, que o Android corta numa linha.
 - **"Comi" por reflexo.** Um toque é barato também para responder sem pensar: a
   "Refeições da semana" mostra o padrão, não a verdade de cada refeição.
 - **Cinco ou seis lembretes por dia podem cansar.** A chave do Perfil desliga

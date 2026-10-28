@@ -79,7 +79,7 @@ export async function Alimentacao({
   // histórico.
   const desde = addDaysISO(hoje, -13);
 
-  const [serieRes, presc, desviosRes, cardapioRes, refeicoesRes, respostasRes] = await Promise.all([
+  const [serieRes, presc, desviosRes, cardapioRes, refeicoesRes, respostasRes, registradasRes] = await Promise.all([
     getPatientSeries(supabase, uid, 14),
     prescricao,
     desviosAbertos,
@@ -104,6 +104,15 @@ export async function Alimentacao({
     supabase
       .from("meal_checks")
       .select("date, meal_type, status")
+      .eq("user_id", uid)
+      .gte("date", weekDates(hoje)[0])
+      .lte("date", hoje),
+    // As refeições registradas na semana (só data e tipo): a registrada à mão,
+    // sem resposta, é "comeu" na semana. Leitura própria, e não a dos 14 dias
+    // acima, que tem teto de 60 linhas.
+    supabase
+      .from("meals")
+      .select("date, meal_type")
       .eq("user_id", uid)
       .gte("date", weekDates(hoje)[0])
       .lte("date", hoje),
@@ -322,8 +331,13 @@ export async function Alimentacao({
         <div className="mt-8">
           <h3 className={TITULO_BLOCO}>Refeições da semana</h3>
           <SemanaDasRefeicoes
-            semana={semanaDasRefeicoes(tiposDoCardapio(itens), (respostasRes.data ?? []) as any[], hoje)}
-            falhou={!!respostasRes.error}
+            semana={semanaDasRefeicoes(
+              tiposDoCardapio(itens),
+              (respostasRes.data ?? []) as any[],
+              hoje,
+              (registradasRes.data ?? []) as any[]
+            )}
+            falhou={!!respostasRes.error || !!registradasRes.error}
           />
         </div>
       )}

@@ -111,8 +111,12 @@ export type NotificacaoDaRefeicao = {
   tag: string;
   url: string;
   actions: { action: "comi" | "nao_comi"; title: string }[];
-  /** O que o botão manda à rota /api/refeicoes/marcar. */
-  refeicao: { data: string; refeicao: string };
+  /**
+   * O que o botão manda à rota /api/refeicoes/marcar. `usuario` é de quem é a
+   * notificação: com outra conta logada no aparelho (o tablet da família), a
+   * rota recusa, em vez de marcar o almoço de quem estiver logado.
+   */
+  refeicao: { data: string; refeicao: string; usuario: string };
   /** A notificação que aparece quando o botão não consegue marcar. */
   falha: string;
 };
@@ -132,6 +136,7 @@ function cortar(texto: string): string {
 }
 
 export function notificacaoDaRefeicao(r: {
+  user_id: string;
   data: string;
   refeicao: string;
   itens: { description: string }[];
@@ -149,7 +154,7 @@ export function notificacaoDaRefeicao(r: {
       { action: "comi", title: "Comi" },
       { action: "nao_comi", title: "Não comi" },
     ],
-    refeicao: { data: r.data, refeicao: r.refeicao },
+    refeicao: { data: r.data, refeicao: r.refeicao, usuario: r.user_id },
     falha: `Não deu para marcar sua resposta (${r.refeicao}). Toque para abrir o app.`,
   };
 }

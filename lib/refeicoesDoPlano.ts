@@ -33,6 +33,8 @@ export type PedidoDeMarcacao = {
   resposta: RespostaDaRefeicao;
   /** A opção do cardápio ("Comi isso", "Foi esta"); sem ela, o "Comi" decide. */
   itemId?: string | null;
+  /** De quem é a notificação (o botão dela manda); a rota confere com a sessão. */
+  usuario?: string;
 };
 
 export type ResultadoDaMarcacao = { ok: true } | { ok: false; erro: string; invalido: boolean };
@@ -66,7 +68,15 @@ export function lerPedido(corpo: unknown): PedidoDeMarcacao | null {
   if (refeicao.length < 1 || refeicao.length > 200) return null;
   if (!RESPOSTAS.includes(c.resposta as RespostaDaRefeicao)) return null;
   if (c.itemId != null && typeof c.itemId !== "string") return null;
-  return { data: c.data, refeicao, resposta: c.resposta as RespostaDaRefeicao, itemId: (c.itemId as string | null) ?? null };
+  if (c.usuario != null && typeof c.usuario !== "string") return null;
+  const pedido: PedidoDeMarcacao = {
+    data: c.data,
+    refeicao,
+    resposta: c.resposta as RespostaDaRefeicao,
+    itemId: (c.itemId as string | null) ?? null,
+  };
+  if (typeof c.usuario === "string") pedido.usuario = c.usuario;
+  return pedido;
 }
 
 type Opcao = {
