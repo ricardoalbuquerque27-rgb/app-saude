@@ -1,5 +1,5 @@
 import webpush from "web-push";
-import { VAPID_PUBLIC_KEY } from "./vapidPublicKey";
+import { VAPID_PUBLIC_KEY, pushConfigurado } from "./vapidPublicKey";
 
 export { VAPID_PUBLIC_KEY };
 
@@ -11,6 +11,9 @@ export function getWebPush() {
     const privateKey = process.env.VAPID_PRIVATE_KEY;
     if (!privateKey) {
       throw new Error("VAPID_PRIVATE_KEY não configurada");
+    }
+    if (!pushConfigurado()) {
+      throw new Error("NEXT_PUBLIC_VAPID_PUBLIC_KEY não configurada");
     }
     webpush.setVapidDetails(
       process.env.VAPID_SUBJECT || "mailto:comercial@paceit.com.br",
