@@ -13,6 +13,16 @@ export const MEAL_TYPES = [
   "Ceia",
 ];
 
+/**
+ * As refeições de um cardápio, sem repetir: as de `MEAL_TYPES` na ordem do
+ * dia, depois as de fora da lista na ordem em que aparecem. É a ordem dos
+ * horários no Perfil e das linhas da "Refeições da semana" da nutricionista.
+ */
+export function tiposDoCardapio(itens: { meal_type: string }[]): string[] {
+  const tipos = new Set(itens.map((i) => i.meal_type));
+  return [...MEAL_TYPES.filter((t) => tipos.has(t)), ...Array.from(tipos).filter((t) => !MEAL_TYPES.includes(t))];
+}
+
 // A sugestão para fechar a proteína do dia (spec "Sugestão para fechar a
 // meta"). Mora aqui, e não na Início ou na Dieta, porque as duas telas usam a
 // mesma conta e este módulo já guarda a ordem das refeições e pode ser lido no

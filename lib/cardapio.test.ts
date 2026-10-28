@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { partesDaSugestao, sugestaoDeProteina, textoDaSugestao, type ItemDoPlano } from "./cardapio";
+import { partesDaSugestao, sugestaoDeProteina, textoDaSugestao, tiposDoCardapio, type ItemDoPlano } from "./cardapio";
 
 // O cardápio da Maria no mock (ferramentas/mock-supabase.cjs, meal_plan_items),
 // só com as colunas que a sugestão lê.
@@ -257,5 +257,23 @@ describe("partesDaSugestao", () => {
       const { frase, descricao } = partesDaSugestao(x);
       expect(`${frase} (${descricao}).`).toBe(textoDaSugestao(x));
     }
+  });
+});
+
+describe("tiposDoCardapio", () => {
+  it("põe os de MEAL_TYPES na ordem deles, depois os outros na ordem em que aparecem, sem repetir", () => {
+    expect(
+      tiposDoCardapio([
+        { meal_type: "Jantar" },
+        { meal_type: "Pré-treino" },
+        { meal_type: "Café da manhã" },
+        { meal_type: "Jantar" },
+        { meal_type: "Pós-treino" },
+      ])
+    ).toEqual(["Café da manhã", "Jantar", "Pré-treino", "Pós-treino"]);
+  });
+
+  it("cardápio vazio não tem refeição", () => {
+    expect(tiposDoCardapio([])).toEqual([]);
   });
 });
