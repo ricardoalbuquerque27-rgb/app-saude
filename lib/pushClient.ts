@@ -1,7 +1,8 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
-import { VAPID_PUBLIC_KEY } from "@/lib/vapidPublicKey";
+import { VAPID_PUBLIC_KEY, pushConfigurado } from "@/lib/vapidPublicKey";
+import { chaveDaBase64, mesmaChave } from "@/lib/chaveDePush";
 
 export function pushSupported() {
   return (
@@ -12,32 +13,34 @@ export function pushSupported() {
   );
 }
 
-function urlB64ToUint8Array(base64: string) {
-  const padding = "=".repeat((4 - (base64.length % 4)) % 4);
-  const b64 = (base64 + padding).replace(/-/g, "+").replace(/_/g, "/");
-  const raw = atob(b64);
-  const arr = new Uint8Array(raw.length);
-  for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
-  return arr;
-}
-
 // Pede permissão (se necessário), cria a assinatura de push e salva no banco.
 // Retorna "ok" | "denied" | "unsupported" | "error".
 export async function ensurePushSubscription(): Promise<
   "ok" | "denied" | "unsupported" | "error"
 > {
-  if (!pushSupported()) return "unsupported";
+  // Sem a chave pública o push está desligado no app inteiro: nada se inscreve.
+  if (!pushConfigurado() || !pushSupported()) return "unsupported";
   let perm = Notification.permission;
   if (perm === "default") perm = await Notification.requestPermission();
   if (perm !== "granted") return "denied";
 
   try {
     const reg = await navigator.serviceWorker.ready;
+    const chave = chaveDaBase64(VAPID_PUBLIC_KEY);
     let sub = await reg.pushManager.getSubscription();
+    // A inscrição que o navegador guarda pode ser de outra chave (a que estava
+    // escrita no código, ou uma trocada depois): reaproveitada, nunca
+    // receberia nada. Sai, com a linha dela no banco, e entra uma nova.
+    if (sub && !mesmaChave(sub.options?.applicationServerKey, chave)) {
+      const velho = sub.endpoint;
+      await sub.unsubscribe().catch(() => false);
+      await createClient().from("push_subscriptions").delete().eq("endpoint", velho);
+      sub = null;
+    }
     if (!sub) {
       sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlB64ToUint8Array(VAPID_PUBLIC_KEY),
+        applicationServerKey: chave,
       });
     }
     const json = sub.toJSON() as {

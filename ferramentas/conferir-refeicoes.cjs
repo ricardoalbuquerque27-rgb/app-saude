@@ -182,6 +182,39 @@ const contexto = (b) =>
     await c.close();
   });
 
+  await etapa("recado", async () => {
+    // O recado que o service worker manda ao app aberto, despachado à mão em
+    // navigator.serviceWorker (o navegador de teste não mostra notificação).
+    const ontem = somaDias(hoje, -1);
+    const anteontem = somaDias(hoje, -2);
+    const recado = (dados) =>
+      p.evaluate((d) => navigator.serviceWorker.dispatchEvent(new MessageEvent("message", { data: d })), dados);
+    await p.goto(APP + "/app", { waitUntil: "networkidle", timeout: 120000 });
+    await p.waitForTimeout(800);
+    await recado({ tipo: "abrir", url: `/app/dieta?data=${ontem}#refeicao-almoco` });
+    await p.waitForURL("**/app/dieta**", { timeout: 60000 });
+    let u = new URL(p.url());
+    ok(u.pathname === "/app/dieta" && u.searchParams.get("data") === ontem && u.hash === "#refeicao-almoco",
+      "da Início, o recado leva à refeição", p.url());
+
+    // Já na Dieta, outro dia: a página recarrega (o marcador posto em window some).
+    await p.waitForTimeout(800);
+    await p.evaluate(() => { window.__marcador = 1; });
+    await recado({ tipo: "abrir", url: `/app/dieta?data=${anteontem}#refeicao-jantar` });
+    await p.waitForURL((x) => x.searchParams.get("data") === anteontem, { timeout: 60000 });
+    await p.waitForLoadState("networkidle");
+    u = new URL(p.url());
+    ok(u.searchParams.get("data") === anteontem && u.hash === "#refeicao-jantar", "na Dieta, o recado troca o dia", p.url());
+    ok((await p.evaluate(() => window.__marcador)) === undefined, "e a página recarregou");
+
+    // Recado de fora do app, ou de outro tipo, não sai da página.
+    const antes = p.url();
+    await recado({ tipo: "abrir", url: "https://outro.site/app" });
+    await recado({ tipo: "outro", url: "/app" });
+    await p.waitForTimeout(1500);
+    ok(p.url() === antes, "recado de fora do app, ou de outro tipo, não sai da página", p.url());
+  });
+
   await b.close();
   await reset();
   const falhas = resultados.filter((r) => !r).length;
