@@ -1,0 +1,13 @@
+{
+  "id": "P011",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "Meu acompanhamento é PDF e WhatsApp à noite, e funciona; meus pacientes de corrida e musculação já registram treino no relógio, no Strava ou no app do personal, e pedir mais um app para eles é pedir que larguem em duas semanas. Não vou montar um sistema novo, nem de graça, para descobrir na fila o que eles já me contam no WhatsApp.",
+  "objection": "Atleta não vai registrar treino duas vezes. Se o treino que ele faz não entra sozinho do relógio, a fila vai me mostrar 'faltou ao treino' de quem treinou, e eu vou perder tempo conferindo alerta falso. E 'Comi/Não comi' cinco vezes por dia para quem já está cansado de cronograma de treino vai virar notificação ignorada.",
+  "would_change_my_mind": "Ver que o treino vem automático do relógio ou do Strava, e uma colega de nutrição esportiva me mostrando a fila dela com pacientes atletas registrando de verdade depois de um mês.",
+  "price_too_cheap": 19,
+  "price_cheap": 39,
+  "price_expensive": 79,
+  "price_too_expensive": 129
+}

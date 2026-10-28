@@ -1,0 +1,13 @@
+{
+  "id": "P018",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "Eu já monto o plano no Dietbox durante a consulta e meu paciente já usa o app de lá; estou no meio da assinatura. Pagar mais R$ 69,90 para ter um segundo sistema com 3 a 5 pacientes, e eu ter que olhar dois lugares, não fecha a conta para mim agora.",
+  "objection": "Vou pagar dois sistemas e prescrever em dois lugares. Com poucos pacientes nele, a fila não me diz quase nada, e o paciente que já tem um app meu não vai querer instalar outro.",
+  "would_change_my_mind": "Se ele substituísse o Dietbox de vez, com o plano alimentar montado tão rápido quanto lá, e eu pudesse cancelar o outro quando a minha assinatura vencer.",
+  "price_too_cheap": 15,
+  "price_cheap": 29,
+  "price_expensive": 55,
+  "price_too_expensive": 89
+}

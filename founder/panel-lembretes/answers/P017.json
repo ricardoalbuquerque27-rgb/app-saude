@@ -1,0 +1,13 @@
+{
+  "id": "P017",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "trust",
+  "reason": "Minha agenda está cheia e vejo todo mundo no retorno do mês; o WhatsApp e a planilha dão conta. Colocar dado de paciente, exame e prontuário com meu CRN numa empresa que só tem 10 vagas porque o próprio fundador faz tudo é risco demais para resolver um problema que eu já resolvo de graça.",
+  "objection": "Empresa nova e pequena: se ela fechar ou vazar alguma coisa, quem responde no CRN sou eu. Não vi uma linha sobre LGPD, onde ficam os dados nem como eu tiro tudo de lá se quiser sair.",
+  "would_change_my_mind": "Ver por escrito como os dados ficam protegidos e que eu consigo exportar tudo, pacientes, registros e prontuários, em planilha ou PDF a qualquer momento, inclusive se a empresa encerrar; e uma colega de confiança usando há alguns meses.",
+  "price_too_cheap": 19.9,
+  "price_cheap": 39.9,
+  "price_expensive": 89.9,
+  "price_too_expensive": 129.9
+}

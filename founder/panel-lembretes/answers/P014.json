@@ -1,0 +1,13 @@
+{
+  "id": "P014",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "need",
+  "reason": "Tenho poucos pacientes ativos e vejo a maioria na academia toda semana; o que a fila me mostraria eu já fico sabendo no WhatsApp ou no corredor. Pagar R$ 69,90 por mês, sendo que nunca paguei software nenhum, ainda não cabe para o tamanho da minha carteira.",
+  "objection": "Meus pacientes já falam comigo pelo WhatsApp e mal abrem o PDF do plano; não acredito que vão instalar mais um app e ficar registrando refeição e respondendo notificação depois da primeira semana. Aí eu fico com dois lugares para olhar em vez de um.",
+  "would_change_my_mind": "Ver no teste grátis que os meus pacientes da academia continuam registrando sozinhos, sem eu cobrar, e que a fila me aponta alguém que eu ia perder sem perceber; um paciente que fica já paga a mensalidade.",
+  "price_too_cheap": 15,
+  "price_cheap": 29.9,
+  "price_expensive": 49.9,
+  "price_too_expensive": 79.9
+}

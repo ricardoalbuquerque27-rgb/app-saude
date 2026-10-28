@@ -1,0 +1,13 @@
+{
+  "id": "P019",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "Eu já monto o plano no Dietbox durante a consulta e o paciente já usa o app dele; para testar isso eu teria que prescrever tudo de novo em outro sistema e pedir para o paciente instalar um segundo app. Com a agenda cheia e retorno todo mês, não tenho tempo para fazer o trabalho em dobro, nem para pagar R$ 69,90 em cima do que já pago.",
+  "objection": "Vou ter dois sistemas, dois cardápios e dois apps para o mesmo paciente, e o histórico continua no Dietbox. Se um dia eu quiser ficar só com esse, perco tudo o que já está lá.",
+  "would_change_my_mind": "Puxar o plano alimentar e o histórico do Dietbox ou do WebDiet sem eu redigitar nada, para eu poder trocar de vez quando a minha assinatura vencer.",
+  "price_too_cheap": 19,
+  "price_cheap": 35,
+  "price_expensive": 59,
+  "price_too_expensive": 89
+}

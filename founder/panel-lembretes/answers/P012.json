@@ -1,0 +1,13 @@
+{
+  "id": "P012",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "trust",
+  "reason": "Já pago o Dietbox e estou no meio da assinatura; meus pacientes já usam o app dele. Colocar dado de paciente numa empresa nova, feita por um fundador só, e ainda pedir para eles instalarem um segundo app, não compensa o risco agora, por mais que a fila de quem saiu do plano me poupe WhatsApp à noite.",
+  "objection": "Se essa empresa fechar daqui a seis meses, para onde vão os dados e o registro das consultas dos meus pacientes? Não vi uma palavra sobre LGPD, onde ficam os dados ou como eu exporto tudo se quiser sair.",
+  "would_change_my_mind": "Ver por escrito como os dados são guardados e como eu exporto o prontuário e o histórico dos pacientes a qualquer momento, e uma colega nutricionista que eu conheça usando há alguns meses.",
+  "price_too_cheap": 19,
+  "price_cheap": 39,
+  "price_expensive": 89,
+  "price_too_expensive": 129
+}
