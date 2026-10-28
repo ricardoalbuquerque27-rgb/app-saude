@@ -17,7 +17,7 @@ describe("os horários", () => {
   it("os sugeridos e o formato são os da migração (refeicoes_devidas_em)", () => {
     const sql = readFileSync("supabase/migrations/20261027120000_lembretes_das_refeicoes.sql", "utf8");
     const pares = Object.fromEntries(
-      [...sql.matchAll(/\('([^']+)',\s*'(\d\d:\d\d)'\)/g)].map((m) => [m[1], m[2]])
+      Array.from(sql.matchAll(/\('([^']+)',\s*'(\d\d:\d\d)'\)/g), (m) => [m[1], m[2]])
     );
     expect(pares).toEqual(HORARIOS_SUGERIDOS);
     expect(sql).toContain(`'${FORMATO_DO_HORARIO}'`);
