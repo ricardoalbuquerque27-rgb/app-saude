@@ -1,0 +1,13 @@
+{
+  "id": "P006",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "trust",
+  "reason": "Já vi paciente largar o diário alimentar em duas semanas, e 14 dias é justamente o tempo em que ele ainda está animado; o teste de vocês acaba antes de o problema aparecer. Com os poucos pacientes que eu tenho, um WhatsApp na semana resolve, e R$ 69,90 por mês pesa no meu começo de consultório.",
+  "objection": "O paciente parar de usar o app depois do primeiro mês, e eu ficar pagando por uma fila vazia. E ainda vem com treino no meio, que é coisa do personal, não minha.",
+  "would_change_my_mind": "Ver números de outras nutricionistas mostrando que os pacientes ainda respondem o 'Comi' ou 'Não comi' depois de 60 dias, não só nos primeiros 14.",
+  "price_too_cheap": 12,
+  "price_cheap": 25,
+  "price_expensive": 45,
+  "price_too_expensive": 65
+}

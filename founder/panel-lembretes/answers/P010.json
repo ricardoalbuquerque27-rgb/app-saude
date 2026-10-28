@@ -1,0 +1,13 @@
+{
+  "id": "P010",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "Já vi paciente largar o diário alimentar em duas semanas, e o teste de vocês termina justamente no dia 14, quando a empolgação ainda não acabou. Com poucos pacientes ativos, o que me tira o sono é trazer paciente novo pelo Instagram, não uma fila para vigiar três ou quatro pessoas que eu já acompanho pelo WhatsApp.",
+  "objection": "Meu paciente não vai registrar todo dia num app. O 'Comi' na notificação é mais fácil que um diário, mas no segundo mês ele vai silenciar a notificação, e eu vou pagar R$ 69,90 por uma fila vazia ou cheia de 'sem resposta'.",
+  "would_change_my_mind": "Ver números de outras nutricionistas mostrando que os pacientes ainda respondem depois de 60 ou 90 dias, não só no dia 14, ou um preço bem menor enquanto eu tenho poucos pacientes, cobrando por paciente ativo.",
+  "price_too_cheap": 15,
+  "price_cheap": 29,
+  "price_expensive": 55,
+  "price_too_expensive": 89
+}

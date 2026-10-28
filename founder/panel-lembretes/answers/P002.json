@@ -1,0 +1,13 @@
+{
+  "id": "P002",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "trust",
+  "reason": "Empresa nova, implantação feita por um fundador só, e eu colocando dados de saúde dos meus pacientes lá dentro: se isso fechar em seis meses, quem responde pelo prontuário sou eu. E já pedi diário alimentar e vi o paciente largar em duas semanas, então 14 dias de registro não me provam nada sobre o retorno de 30 ou 45.",
+  "objection": "Se a empresa sumir, o que acontece com os dados e com os registros de consulta dos meus pacientes? Consigo exportar tudo e levar embora? E paciente registrando por 14 dias é lua de mel, eu quero ver no dia 40.",
+  "would_change_my_mind": "Saber por escrito onde ficam os dados, que eu posso exportar tudo (registros, medidas, exames) a qualquer hora, e o que acontece com eles se o serviço fechar; com isso eu faria o teste grátis com 3 pacientes e decidiria no retorno seguinte.",
+  "price_too_cheap": 10,
+  "price_cheap": 25,
+  "price_expensive": 49,
+  "price_too_expensive": 79
+}

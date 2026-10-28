@@ -1,0 +1,13 @@
+{
+  "id": "P001",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "trust",
+  "reason": "Ninguém do meu grupo de nutricionistas usa nem falou desse Pace Fit, e eu não assino ferramenta que nenhuma colega testou antes. Até pego o teste grátis se sobrar tempo, mas pagar R$ 69,90 por algo que só o fundador garante, agora, não.",
+  "objection": "Meu paciente não vai registrar todo dia num app. O pessoal da musculação e da corrida já anota treino em outro lugar e me manda print no WhatsApp; uma fila só presta se ele registrar, e a garantia de 3 pacientes registrando em 14 dias não me diz nada sobre o mês 3.",
+  "would_change_my_mind": "Duas ou três colegas do grupo usando há uns meses e contando que os pacientes delas continuam respondendo o 'você comeu?' depois da empolgação da primeira semana.",
+  "price_too_cheap": 19.9,
+  "price_cheap": 39.9,
+  "price_expensive": 89.9,
+  "price_too_expensive": 129.9
+}

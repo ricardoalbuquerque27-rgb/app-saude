@@ -1,0 +1,13 @@
+{
+  "id": "P008",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "Já pago o Dietbox, monto o plano lá durante a consulta e meus pacientes já usam o app dele; minha agenda está cheia e eu não vou prescrever duas vezes nem pagar mais R$ 69,90 por um segundo sistema para 3 ou 5 pacientes.",
+  "objection": "Ter de lançar meta e cardápio em dois lugares e pedir para o paciente instalar mais um app, quando ele já tem o do sistema que eu pago. A fila é interessante, mas eu já vejo quem sumiu pelo WhatsApp à noite.",
+  "would_change_my_mind": "Se, quando a assinatura do Dietbox vencer, ele fizer tudo o que o Dietbox faz (cálculo do plano, antropometria, anamnese) por um preço igual ou menor, para eu trocar de vez em vez de somar.",
+  "price_too_cheap": 15,
+  "price_cheap": 29,
+  "price_expensive": 49,
+  "price_too_expensive": 79
+}

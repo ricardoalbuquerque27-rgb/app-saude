@@ -1,0 +1,13 @@
+{
+  "id": "P007",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "price",
+  "reason": "Eu faria o teste na hora, porque é sem cartão e eu testo tudo, mas o primeiro mês é grátis e no fim dele eu não pagaria R$ 69,90 por uma fila de quatro ou cinco pacientes, ganhando uns R$ 2.500 por mês. Com o meu volume, eu mesma mando um oi no WhatsApp no meio do caminho entre um retorno e outro.",
+  "objection": "Meu paciente não vai registrar todo dia num app. O 'Comi/Não comi' na notificação ajuda, mas aposto que na segunda semana metade já silenciou, e a garantia só me dá mais 30 dias grátis, não faz o paciente usar.",
+  "would_change_my_mind": "Chegar ao dia 30 com os meus próprios pacientes ainda respondendo sozinhos, sem eu ficar cobrando, e um plano mais barato enquanto eu tenho poucos pacientes ativos.",
+  "price_too_cheap": 15,
+  "price_cheap": 29.9,
+  "price_expensive": 59.9,
+  "price_too_expensive": 99
+}
