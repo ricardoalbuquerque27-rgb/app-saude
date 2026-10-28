@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { sendPush } from "@/lib/webpush";
+import { pushConfigurado } from "@/lib/vapidPublicKey";
 import { NOME } from "@/lib/marca";
 
 export const runtime = "nodejs";
@@ -18,6 +19,12 @@ export async function POST() {
   if (!process.env.VAPID_PRIVATE_KEY) {
     return NextResponse.json(
       { error: "Push não configurado (falta VAPID_PRIVATE_KEY no servidor)." },
+      { status: 503 }
+    );
+  }
+  if (!pushConfigurado()) {
+    return NextResponse.json(
+      { error: "Push não configurado (falta NEXT_PUBLIC_VAPID_PUBLIC_KEY no servidor)." },
       { status: 503 }
     );
   }

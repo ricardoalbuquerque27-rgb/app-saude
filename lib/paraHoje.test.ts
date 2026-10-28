@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { montarParaHoje, type EntradaParaHoje } from "./paraHoje";
+import { refeicoesQueFaltam, montarParaHoje, type EntradaParaHoje } from "./paraHoje";
 
 /** Dia sem nada a fazer e com todas as leituras certas. */
 const VAZIA: EntradaParaHoje = {
@@ -154,5 +154,18 @@ describe("montarParaHoje", () => {
         { tipo: "cardapio", faltam: 2 },
       ]);
     });
+  });
+});
+
+describe("refeicoesQueFaltam", () => {
+  it("registrada ou respondida (comi ou não comi) não falta", () => {
+    expect(refeicoesQueFaltam(["Café da manhã", "Almoço", "Almoço", "Jantar"], ["Café da manhã"], ["Jantar"])).toBe(1);
+  });
+  it("sem registro nem resposta, falta", () => {
+    expect(refeicoesQueFaltam(["Almoço"], [], [])).toBe(1);
+  });
+  it("registro ou resposta de refeição fora do plano não conta", () => {
+    expect(refeicoesQueFaltam([], ["Almoço"], ["Jantar"])).toBe(0);
+    expect(refeicoesQueFaltam(["Almoço", "Jantar"], ["Lanche"], ["Ceia"])).toBe(2);
   });
 });

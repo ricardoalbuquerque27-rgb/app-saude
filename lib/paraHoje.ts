@@ -9,7 +9,7 @@ export type EntradaParaHoje = {
   confirmados: string[]; // plan_id com check-in hoje
   temNutri: boolean;
   aplicacao: { atrasada: boolean } | null; // só quando é hoje ou atrasada
-  refeicoesFaltando: number; // tipos do cardápio sem registro hoje
+  refeicoesFaltando: number; // tipos do cardápio sem registro e sem resposta hoje (refeicoesQueFaltam)
   pendencias: { key: string; urgent?: boolean }[]; // de getPending
   falhou: boolean; // alguma leitura acima falhou
 };
@@ -86,4 +86,15 @@ export function montarParaHoje(e: EntradaParaHoje): ParaHoje {
 
   const estado = e.falhou ? "incompleto" : pendentes === 0 ? "em-dia" : "pendente";
   return { linhas, pendentes, estado };
+}
+
+/**
+ * Quantas refeições do cardápio ainda faltam hoje: as que não têm registro
+ * NEM resposta ("comi" ou "não comi", da notificação ou do plano). "Não comi"
+ * também é resposta: a linha "N refeições ainda faltam" não pode cobrar de
+ * quem já disse que não comeu.
+ */
+export function refeicoesQueFaltam(tiposDoPlano: string[], registradas: string[], respondidas: string[]): number {
+  const feitas = new Set([...registradas, ...respondidas]);
+  return new Set(tiposDoPlano.filter((t) => !feitas.has(t))).size;
 }

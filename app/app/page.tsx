@@ -5,7 +5,7 @@ import { ProgressRing } from "@/components/ProgressRing";
 import { todayISO, addDaysISO, hojeLongo, limitesDaJanela, saudacao } from "@/lib/date";
 import { computeHealthScore } from "@/lib/healthScore";
 import { getPending } from "@/lib/pending";
-import { montarParaHoje } from "@/lib/paraHoje";
+import { montarParaHoje, refeicoesQueFaltam } from "@/lib/paraHoje";
 import { sugestaoDeProteina } from "@/lib/cardapio";
 import { papelDasCalorias, pesoDe30Dias, pesoMaisRecente, textoVariacaoPeso } from "@/lib/nutri";
 import { dataCurta } from "@/lib/consultas";
@@ -76,6 +76,7 @@ export default async function DashboardPage() {
     cardapioRes,
     vinculoRes,
     consultasRes,
+    respostasHojeRes,
     pending,
   ] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", uid).maybeSingle(),
@@ -158,6 +159,9 @@ export default async function DashboardPage() {
     // As consultas da última semana em diante (inclusive as futuras) e os
     // pedidos abertos, por início crescente (getConsultasDoCartao), para a linha.
     getConsultasDoCartao(supabase, uid),
+    // As respostas do plano hoje ("comi" / "não comi"): a refeição respondida
+    // não "falta" no "Para hoje".
+    supabase.from("meal_checks").select("meal_type").eq("user_id", uid).eq("date", today),
     getPending(supabase, uid),
   ]);
 
@@ -303,9 +307,6 @@ export default async function DashboardPage() {
     : null;
   const doseHojeOuAtrasada = diasAteADose != null && diasAteADose <= 0;
 
-  const tiposFaltando = new Set(
-    itensDoPlano.map((i) => i.meal_type).filter((t) => !tiposJaRegistrados.includes(t))
-  );
 
   const falhouParaHoje =
     !!notasRes.error ||
@@ -314,6 +315,8 @@ export default async function DashboardPage() {
     !!cardapioRes.error ||
     !!itensRes?.error ||
     !!mealsTodayRes.error ||
+    // Sem as respostas, a refeição respondida ("não comi") voltaria a faltar.
+    !!respostasHojeRes.error ||
     !!treatmentRes.error ||
     // Sem o vínculo, o treino do nutricionista viraria "seu treino".
     !!vinculoRes.error ||
@@ -325,7 +328,11 @@ export default async function DashboardPage() {
     confirmados: todayCompletions.map((c) => c.plan_id).filter(Boolean),
     temNutri,
     aplicacao: doseHojeOuAtrasada ? { atrasada: (diasAteADose as number) < 0 } : null,
-    refeicoesFaltando: tiposFaltando.size,
+    refeicoesFaltando: refeicoesQueFaltam(
+      itensDoPlano.map((i) => i.meal_type),
+      tiposJaRegistrados,
+      ((respostasHojeRes.data ?? []) as { meal_type: string }[]).map((r) => r.meal_type)
+    ),
     pendencias: pending.items,
     falhou: falhouParaHoje,
   });

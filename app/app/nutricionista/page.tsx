@@ -15,6 +15,7 @@ import { CartaoConsulta } from "@/components/CartaoConsulta";
 import { getConsultasDoCartao } from "@/lib/consultasDb";
 import NutriNotes, { type Nota } from "@/components/NutriNotes";
 import MealPlanView from "@/components/MealPlanView";
+import type { RespostaGravada } from "@/lib/refeicoesDoPlano";
 import ConectarNutri from "@/components/ConectarNutri";
 import RevogarNutri from "@/components/RevogarNutri";
 
@@ -78,7 +79,7 @@ export default async function MeuNutricionistaPage({
 
   const nutriId = link.nutritionist_id as string;
 
-  const [profRes, prescRes, planoRes, notasRes, refeicoesRes, sessoesRes, consultasRes] =
+  const [profRes, prescRes, planoRes, notasRes, refeicoesRes, respostasRes, sessoesRes, consultasRes] =
     await Promise.all([
       supabase.from("profiles").select("full_name").eq("id", nutriId).maybeSingle(),
       supabase
@@ -105,7 +106,13 @@ export default async function MeuNutricionistaPage({
         .limit(50),
       supabase
         .from("meals")
-        .select("meal_type")
+        .select("id, meal_type, description")
+        .eq("user_id", uid)
+        .eq("date", today),
+      // As respostas do plano hoje ("comi" / "não comi"), as mesmas da Dieta.
+      supabase
+        .from("meal_checks")
+        .select("meal_type, status, meal_id")
         .eq("user_id", uid)
         .eq("date", today),
       supabase
@@ -128,7 +135,10 @@ export default async function MeuNutricionistaPage({
   // (o dia e a adesão contariam em dobro). Com a leitura falhando, o cardápio
   // diz que não carregou, no lugar das marcas e dos botões.
   const refeicoesFalharam = !!refeicoesRes.error;
-  const jaRegistrados = (refeicoesRes.data ?? []).map((m: any) => m.meal_type);
+  const registradas = (refeicoesRes.data ?? []) as { id: string; meal_type: string; description: string }[];
+  // Com as respostas falhando, o mesmo motivo: o plano não oferece botão.
+  const respostasFalharam = !!respostasRes.error;
+  const respostas = (respostasRes.data ?? []) as RespostaGravada[];
   const sessoes = (sessoesRes.data ?? []) as any[];
 
   let itensCardapio: any[] = [];
@@ -304,15 +314,16 @@ export default async function MeuNutricionistaPage({
               observacao={plano.notes}
               itens={itensCardapio as any}
               date={today}
-              jaRegistrados={jaRegistrados}
+              registradas={registradas}
+              respostas={respostas}
               refeicoesFalharam={refeicoesFalharam}
+              respostasFalharam={respostasFalharam}
             />
-            {/* Sem as refeições do dia o cardápio não oferece "Comi isso", e a nota
-                falaria de um botão que não está na tela. */}
-            {!refeicoesFalharam && (
+            {/* Sem as refeições ou as respostas do dia o cardápio não oferece
+                botão, e a nota falaria de um botão que não está na tela. */}
+            {!refeicoesFalharam && !respostasFalharam && (
               <p className="text-[13px] text-app-texto-2">
-                Tocar em “Comi isso” registra a refeição na sua Dieta — não
-                precisa digitar de novo.
+                “Comi” e “Comi isso” registram a refeição na sua Dieta, sem digitar de novo.
               </p>
             )}
           </>

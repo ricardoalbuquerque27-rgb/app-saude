@@ -6,7 +6,8 @@
 // v3: a v2 guardava a resposta do router.refresh() de /app (ver abaixo); trocar
 // o nome apaga esse cache no "activate".
 // v4: o ícone trocou (o haltere saiu), e o /icon.svg em cache era o velho.
-const CACHE = "pacefit-v4";
+// v5: os botões das refeições ("Comi" / "Não comi") e o recado ao app.
+const CACHE = "pacefit-v5";
 const OFFLINE_URLS = ["/app", "/manifest.webmanifest", "/icon.svg"];
 
 self.addEventListener("install", (event) => {
@@ -82,6 +83,12 @@ self.addEventListener("fetch", (event) => {
 });
 
 // Recebe uma notificação push (funciona com o app fechado).
+//
+// A dos lembretes das refeições ("Almoço: você comeu?") traz dois corpos e os
+// botões. Quem sabe se o botão aparece é o celular: o iPhone (app web na Tela
+// de Início) não mostra botão, e lá o texto começa com "Toque para marcar.",
+// antes do cardápio, porque a tela bloqueada corta o fim. O resto já vem
+// pronto e testado do servidor (lib/lembretesDasRefeicoes.ts).
 self.addEventListener("push", (event) => {
   let data = {};
   try {
@@ -90,31 +97,80 @@ self.addEventListener("push", (event) => {
     data = { title: "Pace Fit", body: event.data ? event.data.text() : "" };
   }
   const title = data.title || "Pace Fit";
+  const semBotoes = !(self.Notification && Notification.maxActions >= 2);
   event.waitUntil(
     self.registration.showNotification(title, {
-      body: data.body || "",
+      body: (semBotoes && data.bodySemBotoes) || data.body || "",
       icon: "/icon-192.png",
       badge: "/icon-192.png",
       tag: data.tag || "pacefit",
       renotify: true,
-      data: { url: data.url || "/app" },
+      actions: !semBotoes && Array.isArray(data.actions) ? data.actions : [],
+      data: { url: data.url || "/app", refeicao: data.refeicao || null, falha: data.falha || null },
     })
   );
 });
 
-// Ao tocar na notificação, abre/foca o app.
+// Leva a pessoa ao endereço. Com o app aberto (em outra tela, em segundo
+// plano), põe a janela na frente e manda um recado: o AppShell navega. O
+// client.navigate de antes pode não existir no navegador do iPhone, e o app
+// voltava para a frente na tela em que estava. Sem o app aberto, abre direto.
+function abrir(url) {
+  return self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((lista) => {
+    const doApp = lista.find((c) => {
+      try {
+        return new URL(c.url).pathname.startsWith("/app");
+      } catch {
+        return false;
+      }
+    });
+    if (doApp) {
+      // O recado sai mesmo se o focus() recusar (o WebKit pode, pela regra do
+      // gesto do usuário): o sistema já traz o app para a frente no toque, e
+      // sem o recado ele ficaria na tela em que estava.
+      return Promise.resolve()
+        .then(() => doApp.focus && doApp.focus())
+        .catch(() => {})
+        .then(() => doApp.postMessage({ tipo: "abrir", url }));
+    }
+    if (self.clients.openWindow) return self.clients.openWindow(url);
+  });
+}
+
+// O toque: nos botões "Comi" e "Não comi", marca sem abrir o app (a rota usa o
+// cookie da sessão); se não der (sem internet, sessão vencida, gravação
+// recusada), mostra outra notificação, que leva à refeição. A resposta nunca
+// some calada. No texto, leva à refeição.
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const target = (event.notification.data && event.notification.data.url) || "/app";
-  event.waitUntil(
-    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
-      for (const client of list) {
-        if ("focus" in client) {
-          client.navigate?.(target);
-          return client.focus();
-        }
-      }
-      if (self.clients.openWindow) return self.clients.openWindow(target);
-    })
-  );
+  const d = event.notification.data || {};
+  const url = d.url || "/app";
+  if ((event.action === "comi" || event.action === "nao_comi") && d.refeicao) {
+    event.waitUntil(
+      fetch("/api/refeicoes/marcar", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          data: d.refeicao.data,
+          refeicao: d.refeicao.refeicao,
+          resposta: event.action,
+          usuario: d.refeicao.usuario,
+        }),
+      })
+        .then((r) => {
+          if (!r.ok) throw new Error(String(r.status));
+        })
+        .catch(() =>
+          self.registration.showNotification(d.falha || "Não deu para marcar sua resposta. Toque para abrir o app.", {
+            icon: "/icon-192.png",
+            badge: "/icon-192.png",
+            tag: (event.notification.tag || "pacefit") + "-falha",
+            data: { url },
+          })
+        )
+    );
+    return;
+  }
+  event.waitUntil(abrir(url));
 });

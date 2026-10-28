@@ -1,53 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import {
-  Smartphone,
-  Bell,
-  BellOff,
-  Check,
-  Share,
-  PlusSquare,
-  Download,
-  Loader2,
-} from "lucide-react";
+import { Smartphone, Bell, BellOff, Check, Download, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { VAPID_PUBLIC_KEY } from "@/lib/vapidPublicKey";
+import { pushConfigurado } from "@/lib/vapidPublicKey";
+import { ensurePushSubscription, pushSupported } from "@/lib/pushClient";
 import { meuPerfil } from "@/lib/perfil";
 import { NOME } from "@/lib/marca";
+import { PassosDoIphone, abertoNaTelaDeInicio, ehIphone } from "@/components/PassosDoIphone";
 
 type InstallEvent = Event & {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 };
-
-function isStandalone() {
-  if (typeof window === "undefined") return false;
-  return (
-    window.matchMedia("(display-mode: standalone)").matches ||
-    (window.navigator as unknown as { standalone?: boolean }).standalone === true
-  );
-}
-function isIOS() {
-  if (typeof navigator === "undefined") return false;
-  return /iphone|ipad|ipod/i.test(navigator.userAgent);
-}
-function pushSupported() {
-  return (
-    typeof window !== "undefined" &&
-    "serviceWorker" in navigator &&
-    "PushManager" in window &&
-    "Notification" in window
-  );
-}
-function urlB64ToUint8Array(base64: string) {
-  const padding = "=".repeat((4 - (base64.length % 4)) % 4);
-  const b64 = (base64 + padding).replace(/-/g, "+").replace(/_/g, "/");
-  const raw = atob(b64);
-  const arr = new Uint8Array(raw.length);
-  for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
-  return arr;
-}
 
 export default function PwaSettings() {
   const [installed, setInstalled] = useState(false);
@@ -75,7 +40,7 @@ export default function PwaSettings() {
   }, []);
 
   useEffect(() => {
-    setInstalled(isStandalone());
+    setInstalled(abertoNaTelaDeInicio());
     setSupported(pushSupported());
     setCanPrompt(
       !!(window as unknown as { __pfInstallPrompt?: Event }).__pfInstallPrompt
@@ -101,7 +66,7 @@ export default function PwaSettings() {
     const evt = (window as unknown as { __pfInstallPrompt?: InstallEvent })
       .__pfInstallPrompt;
     if (!evt) {
-      if (isIOS()) setShowIosHelp(true);
+      if (ehIphone()) setShowIosHelp(true);
       return;
     }
     await evt.prompt();
@@ -112,40 +77,6 @@ export default function PwaSettings() {
     }
     (window as unknown as { __pfInstallPrompt?: Event | null }).__pfInstallPrompt =
       null;
-  }
-
-  // Cria a assinatura de push e salva no banco.
-  async function subscribeAndSave(): Promise<boolean> {
-    const reg = await navigator.serviceWorker.ready;
-    let sub = await reg.pushManager.getSubscription();
-    if (!sub) {
-      sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlB64ToUint8Array(VAPID_PUBLIC_KEY),
-      });
-    }
-    const json = sub.toJSON() as {
-      endpoint?: string;
-      keys?: { p256dh?: string; auth?: string };
-    };
-    if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) return false;
-
-    const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return false;
-
-    const { error } = await supabase.from("push_subscriptions").upsert(
-      {
-        user_id: user.id,
-        endpoint: json.endpoint,
-        p256dh: json.keys.p256dh,
-        auth: json.keys.auth,
-      },
-      { onConflict: "endpoint" }
-    );
-    return !error;
   }
 
   async function savePrefs(enabled: boolean, t: string) {
@@ -166,18 +97,13 @@ export default function PwaSettings() {
 
   async function toggleReminder() {
     if (busy) return;
+    // Desligar só grava a coluna: a inscrição de push serve também aos
+    // lembretes das refeições e ao da caneta, e cancelá-la aqui os desligava
+    // calado.
     if (reminderOn) {
       setBusy(true);
       setReminderOn(false);
       try {
-        const reg = await navigator.serviceWorker?.ready;
-        const sub = await reg?.pushManager.getSubscription();
-        if (sub) {
-          const endpoint = sub.endpoint;
-          await sub.unsubscribe().catch(() => {});
-          const supabase = createClient();
-          await supabase.from("push_subscriptions").delete().eq("endpoint", endpoint);
-        }
         await savePrefs(false, time);
       } finally {
         setBusy(false);
@@ -192,15 +118,13 @@ export default function PwaSettings() {
     }
     setBusy(true);
     try {
-      let perm = Notification.permission;
-      if (perm === "default") perm = await Notification.requestPermission();
-      if (perm !== "granted") {
-        setPermDenied(perm === "denied");
+      const r = await ensurePushSubscription();
+      if (r === "denied") {
+        setPermDenied(typeof Notification !== "undefined" && Notification.permission === "denied");
         return;
       }
+      if (r !== "ok") return;
       setPermDenied(false);
-      const ok = await subscribeAndSave();
-      if (!ok) return;
       await savePrefs(true, time);
       setReminderOn(true);
     } finally {
@@ -260,37 +184,32 @@ export default function PwaSettings() {
                   className="btn-primary mt-3 w-full py-2.5 sm:w-auto sm:px-5"
                 >
                   <Download className="h-4 w-4" />
-                  {isIOS() ? "Como instalar" : "Instalar app"}
+                  {ehIphone() ? "Como instalar" : "Instalar app"}
                 </button>
 
-                {(showIosHelp || (isIOS() && !canPrompt)) && (
-                  <div className="mt-3 rounded-xl bg-app-pagina p-3 text-sm text-app-texto-2">
-                    <p className="font-medium text-app-texto">
-                      No iPhone/iPad (Safari):
-                    </p>
-                    <ol className="mt-2 space-y-1.5">
-                      <li className="flex items-center gap-2">
-                        <Share className="h-4 w-4 shrink-0 text-app-primaria" /> 1.
-                        Toque no botão <b>Compartilhar</b>.
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <PlusSquare className="h-4 w-4 shrink-0 text-app-primaria" />{" "}
-                        2. Escolha <b>Adicionar à Tela de Início</b>.
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <Check className="h-4 w-4 shrink-0 text-app-primaria" /> 3.
-                        Abra o app pela tela inicial para ativar os lembretes.
-                      </li>
-                    </ol>
-                  </div>
-                )}
+                {(showIosHelp || (ehIphone() && !canPrompt)) && <PassosDoIphone />}
               </>
             )}
           </div>
         </div>
       </div>
 
-      {/* Lembretes */}
+      {/* Lembretes. Sem a chave pública o push está desligado no app inteiro
+          (pushConfigurado): ligar inscreveria o celular numa chave que o
+          servidor não tem, e a chave e o "Testar agora" só confundiriam. */}
+      {!pushConfigurado() ? (
+        <div className="card">
+          <div className="flex items-start gap-3">
+            <div className="icon-badge">
+              <BellOff className="h-4 w-4" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h2 className="section-title">Lembrete diário</h2>
+              <p className="mt-1 text-sm text-app-texto-2">Os lembretes chegam em breve.</p>
+            </div>
+          </div>
+        </div>
+      ) : (
       <div className="card">
         <div className="flex items-start gap-3">
           <div className="icon-badge">
@@ -341,7 +260,7 @@ export default function PwaSettings() {
 
             {!supported && (
               <p className="mt-2 rounded-lg bg-app-atencao-fundo px-3 py-2 text-sm text-app-atencao">
-                {isIOS()
+                {ehIphone()
                   ? "No iPhone, instale o app na tela inicial (passo acima) e abra por lá para ativar os lembretes."
                   : "Seu navegador não suporta notificações push."}
               </p>
@@ -386,6 +305,7 @@ export default function PwaSettings() {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

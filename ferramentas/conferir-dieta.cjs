@@ -675,7 +675,11 @@ async function entrar(ctx, email = "maria.teste@exemplo.com") {
     const subtitulos = (await plano.locator("h3").allInnerTexts()).map((s) => s.replace(/\s+/g, " ").trim());
     ok(JSON.stringify(subtitulos) === JSON.stringify(["Café da manhã", "Almoço", "Lanche da tarde", "Jantar"]),
       "cada refeição é um subtítulo, sem “feito” (nada registrado hoje)", subtitulos.join(" | "));
-    ok((await comiIsso.count()) === 5, `cinco botões "Comi isso", um por opção (${await comiIsso.count()})`);
+    // A resposta de cada refeição (lembretes das refeições): "Comi isso" só na
+    // refeição de mais de uma opção (o café); nas de uma opção, "Comi" e "Não comi".
+    ok((await comiIsso.count()) === 2, `dois botões "Comi isso", um por opção do café (${await comiIsso.count()})`);
+    const comiDeUma = plano.getByRole("button", { name: "Comi", exact: true });
+    ok((await comiDeUma.count()) === 3, `e "Comi" nas três refeições de uma opção (${await comiDeUma.count()})`);
     const linhas = plano.locator("ul > li");
     ok((await linhas.count()) === 5, "as opções são linhas de lista");
     const primeira = (await linhas.nth(0).innerText()).replace(/\s+/g, " ");
@@ -722,8 +726,11 @@ async function entrar(ctx, email = "maria.teste@exemplo.com") {
       const cor = await comi.evaluate((e) => getComputedStyle(e).color);
       ok(cor === (await corDaVariavel(p, "--app-primaria", "color")), 'e o "comi" é texto em app-primaria');
     }
-    ok((await plano.locator("ul > li").nth(1).getByRole("button", { name: "Comi isso" }).count()) === 1, 'a outra opção do café segue com "Comi isso"');
-    ok((await comiIsso.count()) === 4, `restam quatro botões (${await comiIsso.count()})`);
+    // A resposta do café agora é "comi" com a primeira opção: a outra não oferece
+    // botão (a refeição já foi respondida), e o café ganha o "Desfazer".
+    ok((await plano.locator("ul > li").nth(1).getByRole("button", { name: "Comi isso" }).count()) === 0, 'a outra opção do café fica sem "Comi isso"');
+    ok((await comiIsso.count()) === 0, `nenhum "Comi isso" sobra (${await comiIsso.count()})`);
+    ok((await p.locator("#refeicao-cafe-da-manha").getByRole("button", { name: "Desfazer", exact: true }).count()) === 1, 'e o café tem "Desfazer"');
 
     // O que registrar mudou no resumo e na lista.
     ok((await numeroDoAnel("Calorias")) === 380, "o anel de calorias subiu para 380");
@@ -763,7 +770,7 @@ async function entrar(ctx, email = "maria.teste@exemplo.com") {
     await registradas.getByText("Nenhuma refeição neste dia.").waitFor({ timeout: 10000 }).catch(() => {});
     ok((await registradas.getByText("Nenhuma refeição neste dia.").count()) === 1, "excluir apaga a refeição (e a lista volta a dizer que não há nenhuma)");
     ok((await plano.locator("h3").first().innerText()).trim() === "Café da manhã", "o plano deixa de dizer “feito”");
-    ok((await comiIsso.count()) === 5, "e o botão volta nas cinco opções");
+    ok((await comiIsso.count()) === 2, "e o botão volta nas duas opções do café (excluir a refeição desfaz a resposta)");
   }));
 
   await etapa("Comi isso com a gravação falhando", async () => {
@@ -772,14 +779,14 @@ async function entrar(ctx, email = "maria.teste@exemplo.com") {
     await hidratado(primeiro);
     await comFalha("meals", async () => {
       await primeiro.click();
-      const aviso = plano.getByText("Não foi possível registrar. Tente de novo.", { exact: true });
-      ok(await aviso.waitFor({ timeout: 10000 }).then(() => true, () => false), 'gravação falhando: aparece "Não foi possível registrar. Tente de novo."');
+      const aviso = plano.getByText("Não foi possível salvar. Tente de novo.", { exact: true });
+      ok(await aviso.waitFor({ timeout: 10000 }).then(() => true, () => false), 'gravação falhando: aparece "Não foi possível salvar. Tente de novo."');
       if (await aviso.count()) {
         const [cor, perigo] = await Promise.all([aviso.evaluate((e) => getComputedStyle(e).color), corDaVariavel(p, "--app-perigo", "color")]);
         ok(cor === perigo, "e em app-perigo");
       }
       ok((await plano.locator("h3").first().innerText()).trim() === "Café da manhã", 'e a refeição não ficou “feita”');
-      ok((await comiIsso.count()) === 5, 'e o botão continua lá para tentar de novo');
+      ok((await comiIsso.count()) === 2, 'e o botão continua lá para tentar de novo');
     }, { escrita: true });
   });
 
@@ -817,7 +824,12 @@ async function entrar(ctx, email = "maria.teste@exemplo.com") {
     ok(JSON.stringify(subs) === JSON.stringify(["Café da manhã · feito", "Almoço · feito", "Lanche da tarde", "Jantar · feito"]),
       "e o plano marca “feito” nas refeições de ontem, pelo tipo", subs.join(" | "));
     ok((await plano.locator("ul > li span", { hasText: /^comi$/ }).count()) === 0, 'sem “comi” em opção: a descrição registrada é outra');
-    ok((await comiIsso.count()) === 5, 'e os botões seguem, para quem quiser registrar o plano nesse dia');
+    // Refeição já registrada não oferece "Comi": lançaria de novo. Só o lanche
+    // da tarde, sem registro, tem a resposta.
+    ok((await comiIsso.count()) === 0, 'as refeições registradas não oferecem "Comi isso"');
+    ok((await p.locator("#refeicao-lanche-da-tarde").getByRole("button", { name: "Comi", exact: true }).count()) === 1
+      && (await p.locator("#refeicao-almoco").getByRole("button").count()) === 0,
+      'o lanche da tarde (sem registro) tem "Comi", e o almoço registrado, nenhum botão');
     await p.screenshot({ path: `${OUT}/ontem-390.png`, fullPage: true });
   });
 
@@ -980,12 +992,13 @@ async function entrar(ctx, email = "maria.teste@exemplo.com") {
     const t = (await cartao.innerText()).replace(/\s+/g, " ");
     ok(!t.includes("ver em Meu plano"), 'sem o link "ver em Meu plano" (já está em Meu plano)');
     ok(t.includes("Plano alimentar — fase 1") && t.includes("seu nutricionista"), "com o título e “seu nutricionista”");
-    ok((await cartao.getByRole("button", { name: "Comi isso", exact: true }).count()) === 5, 'e os cinco "Comi isso"');
+    ok((await cartao.getByRole("button", { name: "Comi isso", exact: true }).count()) === 2
+      && (await cartao.getByRole("button", { name: "Comi", exact: true }).count()) === 3, 'e os mesmos botões da Dieta ("Comi isso" no café, "Comi" nas outras)');
     const r = await p.evaluate(() => ({
       caixaAlta: [...document.querySelectorAll("main *")].filter((e) => getComputedStyle(e).textTransform === "uppercase").length,
       doc: document.documentElement.scrollWidth, janela: innerWidth,
     }));
-    ok((await p.getByText(/^Tocar em “Comi isso” registra a refeição na sua Dieta/).count()) === 1, 'e a nota "Tocar em Comi isso registra a refeição…" aparece');
+    ok((await p.getByText(/^“Comi” e “Comi isso” registram a refeição na sua Dieta/).count()) === 1, 'e a nota "“Comi” e “Comi isso” registram a refeição…" aparece');
     ok(r.caixaAlta === 0, `sem caixa alta na aba do cardápio (${r.caixaAlta})`);
     ok(r.doc <= r.janela, `e sem rolagem horizontal (${r.doc} ≤ ${r.janela})`);
     await p.screenshot({ path: `${OUT}/meu-plano-cardapio-390.png`, fullPage: true });

@@ -66,10 +66,11 @@ novo.
 ## Cenários do mock
 
 `CENARIO` escolhe os dados que o mock devolve. Sem ele, valem os de sempre (a
-conta de teste da Maria), e é com esses que rodam os cinco roteiros do
+conta de teste da Maria), e é com esses que rodam os seis roteiros do
 paciente: `tirar-prints.cjs`, `conferir-inicio.cjs`, `conferir-dieta.cjs`,
-`conferir-consulta-paciente.cjs` e `conferir-treinos.cjs`. Os quatro
-`conferir-*` acusam com código de saída 1, recusam rodar (código 2) se o mock
+`conferir-consulta-paciente.cjs`, `conferir-treinos.cjs` e
+`conferir-refeicoes.cjs`. Os cinco `conferir-*` acusam com código de saída 1,
+recusam rodar (código 2) se o mock
 subiu com outro cenário e começam voltando o mock ao início (`POST /__reset`);
 `OUT` diz onde vão os PNGs.
 
@@ -142,6 +143,22 @@ tem" ("Nada planejado.", "Nenhuma rotina ainda", "Nenhum treino registrado"),
 sem as respostas a semana fica sem os botões do check-in e sem o "Confirmados",
 e "Tentar de novo" carrega. O check-in e o treino ao vivo de Treinos são do
 `conferir-inicio.cjs`.
+
+`conferir-refeicoes.cjs` confere os lembretes das refeições como a Maria, em
+390 px, por etapas (`SO=regex`): `rota` (o `POST /api/refeicoes/marcar` que o
+botão da notificação chama: 415 sem JSON, 401 sem sessão, 400 no pedido
+inválido e na data de 8 dias atrás, 500 com a escrita derrubada, e o que ficou
+gravado, pelo `/__tabela`); `login` (sem sessão, a refeição passa pelo
+`/login?volta=` e volta com a âncora); `recado` (o recado do service worker,
+despachado à mão em `navigator.serviceWorker`, leva à Dieta no dia, e na mesma
+página recarrega); `perfil` (sem a chave pública de push, os dois blocos dizem
+que os lembretes chegam em breve); `botoes` (Comi, Não comi, Comi isso, "Qual
+opção?", "Foi esta", Desfazer, a escrita e a leitura que falham, o `?data=`, a
+rolagem até `#refeicao-…` e Meu plano); e `inicio` (a refeição respondida sai
+do "N refeições ainda faltam"). Rode com o dev SEM
+`NEXT_PUBLIC_VAPID_PUBLIC_KEY` no `.env.local`: o push desligado é o estado
+que a etapa `perfil` confere. A notificação do sistema não aparece no navegador
+de teste; ela se confere num celular (o "Para ligar" do CLAUDE.md).
 
 `conferir-entrada.cjs` confere a página de entrada (`/`, a da nutricionista) e a
 tela de entrar, sem login e com qualquer cenário (a página não lê o banco). Em
@@ -435,7 +452,7 @@ cobrem as leituras que têm teste; a tabela "Medidas registradas" do Corpo, por
 exemplo, não tem. O de `lib/registroDb.test.ts` é mais simples: o `select`
 ignora a lista de colunas, e ele só confere filtro, ordem e `limit`.
 
-Cinco escritas pelo PostgREST também têm estado (o `/__reset` desfaz):
+Seis escritas pelo PostgREST também têm estado (o `/__reset` desfaz):
 
 - `PATCH` e `DELETE` em `body_measurements` seguem a RLS do paciente: só enxergam
   a linha dele com `measured_by` nulo. Numa linha da consulta o banco **não dá
@@ -458,12 +475,19 @@ Cinco escritas pelo PostgREST também têm estado (o `/__reset` desfaz):
   dia, só de quem pede. A Início e a leitura do treino são do servidor: sem
   guardar, a página recarregada voltava a "sem resposta", e não dava para ver
   "Feito" nem "Não fui" na tela.
+- `POST` (o upsert de `marcarRefeicao`, com `on_conflict=user_id,date,meal_type`)
+  e `DELETE` em `meal_checks`: a resposta das refeições, só de quem pede e com a
+  refeição ligada (`meal_id`) sendo dela, senão 403, como a RLS da migração.
+  Apagar a refeição ligada apaga a resposta junto, como o `on delete cascade`.
+  No cenário `carteira`, a Beatriz tem respostas da semana (três "não comi" em
+  7 dias), que dão o "Pulou 3 refeições do plano (7d)" e a "Refeições da semana"
+  que o `tirar-prints-nutri.cjs` confere.
 
-Dois endereços que não são do Supabase (além do `/__cenario`):
+Três endereços que não são do Supabase (além do `/__cenario`):
 
 - `POST /__reset` volta as consultas, os registros, os adendos, as medidas, os
-  perfis (o CRN), a água do dia, as refeições e os check-ins ao que o cenário
-  subiu, e desliga o `/__falhar`; os roteiros chamam no começo e no fim (e no
+  perfis (o CRN), a água do dia, as refeições, os check-ins e as respostas das
+  refeições ao que o cenário subiu, e desliga o `/__falhar`; os roteiros chamam no começo e no fim (e no
   `catch` do topo, se um erro derruba o roteiro no meio).
 - `POST /__falhar` com `{ "tabela": "consultation_records" }` faz os `GET` nessa
   tabela devolverem 500 até o próximo `/__reset`. As leituras da página são do
@@ -473,6 +497,8 @@ Dois endereços que não são do Supabase (além do `/__cenario`):
   escrita: true })`) só as escritas (`POST`, `PATCH`, `DELETE`) dão 500 e as
   leituras seguem: é a gravação que falha numa tela que, com a leitura falhando,
   nem mostraria o botão (o "+250 ml" da Início).
+- `GET /__tabela?nome=meal_checks` devolve as linhas da tabela agora: é como o
+  roteiro confere o que a tela ou a rota gravou.
 
 ## Funções e regras do banco (SQL)
 
@@ -486,9 +512,13 @@ ferramentas/testar-sql.sh            # todas as migrações e todos os testes
 
 `supabase/testes/base-local.sql` imita o que a Supabase já tem (o
 `auth.uid()` lido do JWT, os papéis `anon` e `authenticated`, `profiles`,
-`patient_links` e as funções de vínculo copiadas de produção), e cada teste
-troca de usuário como a Supabase faz: o JWT em `request.jwt.claims` e depois
-o papel, nessa ordem. Tudo numa transação que termina em `ROLLBACK`.
+`patient_links` e as funções de vínculo copiadas de produção, e as tabelas de
+refeição, cardápio, inscrição de push e `app_config` que os lembretes das
+refeições usam), e cada teste troca de usuário como a Supabase faz: o JWT em
+`request.jwt.claims` e depois o papel, nessa ordem. Tudo numa transação que
+termina em `ROLLBACK`. `lembretes.sql` chama a conta do envio
+(`refeicoes_devidas_em`) com a hora escrita, em datas de 2030, para não
+depender do relógio nem esbarrar na chamada de verdade do fim.
 
 Os 1440 px do computador não são acaso: as duas colunas da página do paciente
 só existem a partir de `xl` (1280 px). Abaixo disso a página é uma coluna.

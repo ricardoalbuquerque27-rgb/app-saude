@@ -27,6 +27,10 @@ import {
   textoFaltas,
   textoSemConfirmacao,
   textoExames,
+  textoRefeicoesPuladas,
+  lerRespostasDoResumo,
+  semanaDasRefeicoes,
+  rotuloDaCasa,
   type DadosResumo,
   type DadosAtividade,
   type DailySeries,
@@ -34,6 +38,7 @@ import {
 } from "./nutri";
 import type { Consulta } from "./consultas";
 import { addDaysISO, naJanela, todayISO } from "./date";
+import { bancoEmMemoria } from "./bancoEmMemoria";
 
 /** 2026-10-08 é uma quinta. A janela de 7 dias vai de 02 (sexta) a 08. */
 const HOJE = "2026-10-08";
@@ -919,15 +924,17 @@ type Linha = Record<string, any>;
  * `measured_by`. O Supabase falso das ferramentas ignora a lista de colunas e
  * não pegaria.
  */
-function bancoFalso(tabelas: Record<string, Linha[]>) {
+function bancoFalso(tabelas: Record<string, Linha[]>, falhando: string[] = []) {
   return {
     from(tabela: string) {
       let colunas: string[] | null = null;
       const filtros: ((l: Linha) => boolean)[] = [];
       const ordens: { col: string; asc: boolean }[] = [];
       let teto: number | null = null;
+      let faixa: [number, number] | null = null;
       const q: any = {
         select: (c: string) => ((colunas = c.trim() === "*" ? null : c.split(",").map((x) => x.trim())), q),
+        range: (de: number, ate: number) => ((faixa = [de, ate]), q),
         eq: (c: string, v: unknown) => (filtros.push((l) => l[c] === v), q),
         neq: (c: string, v: unknown) => (filtros.push((l) => l[c] !== v), q),
         in: (c: string, vs: unknown[]) => (filtros.push((l) => vs.includes(l[c])), q),
@@ -937,7 +944,9 @@ function bancoFalso(tabelas: Record<string, Linha[]>) {
         not: (c: string, _op: "is", _v: null) => (filtros.push((l) => l[c] != null), q),
         order: (c: string, o?: { ascending?: boolean }) => (ordens.push({ col: c, asc: o?.ascending !== false }), q),
         limit: (n: number) => ((teto = n), q),
-        then: (resolve: (r: { data: Linha[]; error: null }) => void) => {
+        then: (resolve: (r: { data: Linha[] | null; error: { message: string } | null }) => void) => {
+          // A tabela que falha devolve `{ data: null, error }`, sem lançar, como o supabase-js.
+          if (falhando.includes(tabela)) return resolve({ data: null, error: { message: "falha de teste" } });
           let out = (tabelas[tabela] ?? []).filter((l) => filtros.every((f) => f(l)));
           out = [...out].sort((a, b) => {
             for (const { col, asc } of ordens) {
@@ -946,6 +955,7 @@ function bancoFalso(tabelas: Record<string, Linha[]>) {
             }
             return 0;
           });
+          if (faixa) out = out.slice(faixa[0], faixa[1] + 1);
           if (teto != null) out = out.slice(0, teto);
           const lista = colunas;
           resolve({
@@ -1326,5 +1336,205 @@ describe("textos da fila", () => {
   it("exames", () => {
     expect(textoExames(1)).toBe("1 exame fora da referência");
     expect(textoExames(2)).toBe("2 exames fora da referência");
+  });
+});
+
+describe("as refeições do plano na fila", () => {
+  const resposta = (date: string, status: "done" | "skipped", meal_type = "Almoço", user_id = A) => ({
+    user_id, date, meal_type, status,
+  });
+
+  it("textoRefeicoesPuladas, com o singular", () => {
+    expect(textoRefeicoesPuladas(1)).toBe("Pulou 1 refeição do plano (7d)");
+    expect(textoRefeicoesPuladas(3)).toBe("Pulou 3 refeições do plano (7d)");
+  });
+
+  it("com 3 'não comi' em 7 dias, o alerta de refeição no nível 4, depois dos de treino", () => {
+    const s = resumo({
+      ...cenarioDeAlertas(),
+      respostas: [
+        resposta(addDaysISO(HOJE, -1), "skipped"),
+        resposta(addDaysISO(HOJE, -2), "skipped", "Jantar"),
+        resposta(addDaysISO(HOJE, -6), "skipped"),
+      ],
+    });
+    expect(s.refeicoesPuladas7).toBe(3);
+    const i = s.alertas.findIndex((a) => a.tipo === "refeicao");
+    expect(s.alertas[i]).toEqual({ tipo: "refeicao", nivel: 4, texto: "Pulou 3 refeições do plano (7d)" });
+    const ultimoTreino = s.alertas.map((a) => a.tipo).lastIndexOf("treino");
+    expect(ultimoTreino).toBeGreaterThanOrEqual(0);
+    expect(i).toBeGreaterThan(ultimoTreino);
+  });
+
+  it("com 2 não alerta; 'comi', o de 7 dias antes e o de amanhã não contam", () => {
+    const s = resumo({
+      meals: [{ user_id: A, date: HOJE, calories: 1, protein_g: 1 }],
+      respostas: [
+        resposta(HOJE, "skipped"),
+        resposta(addDaysISO(HOJE, -3), "skipped"),
+        resposta(addDaysISO(HOJE, -1), "done"),
+        resposta(addDaysISO(HOJE, -7), "skipped"),
+        resposta(addDaysISO(HOJE, 1), "skipped"),
+      ],
+    });
+    expect(s.refeicoesPuladas7).toBe(2);
+    expect(s.alertas.some((a) => a.tipo === "refeicao")).toBe(false);
+  });
+
+  it("a resposta é de cada paciente", () => {
+    const [a, b] = montarResumos(
+      dados({ respostas: [1, 2, 3].map((d) => resposta(addDaysISO(HOJE, -d), "skipped", "Almoço", B)) }),
+      [A, B],
+      {},
+      HOJE
+    );
+    expect(a.refeicoesPuladas7).toBe(0);
+    expect(b.refeicoesPuladas7).toBe(3);
+  });
+
+  it("a resposta conta como registro do paciente", () => {
+    const s = resumo({ respostas: [resposta(addDaysISO(HOJE, -1), "done")] });
+    expect(s.lastActivity).toBe(addDaysISO(HOJE, -1));
+    expect(s.daysLogged7).toBe(1);
+    expect(s.alerts).not.toContain("Nunca registrou nada");
+  });
+
+  it("resumirPacientes com a leitura das respostas falhando devolve falhou", async () => {
+    const r = await resumirPacientes(bancoFalso({}, ["meal_checks"]), [A], { [A]: "Ana" });
+    expect(r.falhou).toBe(true);
+  });
+
+  it("resumirPacientes lê as respostas dos 30 dias, até hoje", async () => {
+    const hoje = todayISO();
+    const r = await resumirPacientes(
+      bancoFalso({
+        meal_checks: [
+          { user_id: A, date: addDaysISO(hoje, -1), meal_type: "Almoço", status: "skipped" },
+          { user_id: A, date: addDaysISO(hoje, -2), meal_type: "Almoço", status: "skipped" },
+          { user_id: A, date: addDaysISO(hoje, -3), meal_type: "Almoço", status: "skipped" },
+          { user_id: A, date: addDaysISO(hoje, 1), meal_type: "Almoço", status: "skipped" },
+        ],
+      }),
+      [A]
+    );
+    expect(r.falhou).toBe(false);
+    expect(r.resumos[0].refeicoesPuladas7).toBe(3);
+    expect(r.resumos[0].alerts).toContain("Pulou 3 refeições do plano (7d)");
+  });
+
+  it("ultimosRegistros conta a resposta", async () => {
+    const hoje = todayISO();
+    const r = await resumirPacientes(
+      bancoFalso({ meal_checks: [{ user_id: A, date: addDaysISO(hoje, -40), meal_type: "Almoço", status: "done" }] }),
+      [A]
+    );
+    expect(r.resumos[0].lastActivity).toBe(addDaysISO(hoje, -40));
+    expect(r.resumos[0].alerts).toContain("40 dias sem registrar");
+  });
+});
+
+describe("semanaDasRefeicoes", () => {
+  // 2026-10-28 é uma quarta: a semana vai de 26 (segunda) a 01/11 (domingo).
+  const QUARTA = "2026-10-28";
+  const r = (date: string, meal_type: string, status: string) => ({ date, meal_type, status });
+
+  it("vai de segunda a domingo, uma linha por refeição, na ordem dada", () => {
+    const s = semanaDasRefeicoes(["Café da manhã", "Almoço"], [], QUARTA);
+    expect(s.map((l) => l.refeicao)).toEqual(["Café da manhã", "Almoço"]);
+    expect(s[0].dias.map((d) => d.data)).toEqual([
+      "2026-10-26", "2026-10-27", "2026-10-28", "2026-10-29", "2026-10-30", "2026-10-31", "2026-11-01",
+    ]);
+  });
+
+  it("os estados de cada casa", () => {
+    const [almoco] = semanaDasRefeicoes(
+      ["Almoço"],
+      [
+        r("2026-10-26", "Almoço", "done"),
+        r("2026-10-27", "Almoço", "skipped"),
+        r("2026-10-30", "Almoço", "skipped"),
+        r("2026-10-26", "Jantar", "skipped"),
+      ],
+      QUARTA
+    );
+    expect(almoco.dias.map((d) => d.estado)).toEqual([
+      "comeu", "nao_comeu", "hoje", "futuro", "futuro", "futuro", "futuro",
+    ]);
+  });
+
+  it("hoje respondido mostra a resposta; passado sem resposta é sem resposta", () => {
+    const [almoco] = semanaDasRefeicoes(["Almoço"], [r(QUARTA, "Almoço", "skipped")], "2026-10-28");
+    expect(almoco.dias[2].estado).toBe("nao_comeu");
+    const [jantar] = semanaDasRefeicoes(["Jantar"], [], "2026-11-01");
+    expect(jantar.dias.slice(0, 6).every((d) => d.estado === "sem_resposta")).toBe(true);
+    expect(jantar.dias[6].estado).toBe("hoje");
+  });
+});
+
+describe("semanaDasRefeicoes com as refeições registradas", () => {
+  // A refeição registrada à mão (pelo formulário) não tem resposta: o plano não
+  // oferece botão nela e o lembrete não é enviado. Sem contar o registro, a
+  // semana dizia "sem resposta" justo de quem registra tudo.
+  it("registrada sem resposta é 'comeu'; a resposta vence o registro", () => {
+    const [almoco] = semanaDasRefeicoes(
+      ["Almoço"],
+      [{ date: "2026-10-27", meal_type: "Almoço", status: "skipped" }],
+      "2026-10-28",
+      [
+        { date: "2026-10-26", meal_type: "Almoço" },
+        { date: "2026-10-27", meal_type: "Almoço" },
+        { date: "2026-10-28", meal_type: "Almoço" },
+        { date: "2026-10-26", meal_type: "Jantar" },
+      ]
+    );
+    expect(almoco.dias.slice(0, 3).map((d) => d.estado)).toEqual(["comeu", "nao_comeu", "comeu"]);
+  });
+});
+
+describe("rotuloDaCasa", () => {
+  it("a refeição, o dia da semana e o estado por extenso", () => {
+    expect(rotuloDaCasa("Almoço", "2026-10-27", "nao_comeu")).toBe("Almoço, terça: não comeu");
+    expect(rotuloDaCasa("Jantar", "2026-10-26", "comeu")).toBe("Jantar, segunda: comeu");
+    expect(rotuloDaCasa("Ceia", "2026-10-28", "sem_resposta")).toBe("Ceia, quarta: sem resposta");
+    expect(rotuloDaCasa("Ceia", "2026-10-29", "hoje")).toBe("Ceia, quinta: ainda sem resposta");
+    expect(rotuloDaCasa("Ceia", "2026-10-30", "futuro")).toBe("Ceia, sexta: ainda não chegou");
+    expect(rotuloDaCasa("Ceia", "2026-10-31", "futuro")).toBe("Ceia, sábado: ainda não chegou");
+    expect(rotuloDaCasa("Ceia", "2026-11-01", "futuro")).toBe("Ceia, domingo: ainda não chegou");
+  });
+});
+
+describe("lerRespostasDoResumo", () => {
+  // 30 dias de respostas de toda a carteira: com seis refeições por dia, uns
+  // seis pacientes respondendo tudo passam de 1.000 linhas, e o PostgREST corta
+  // ali SEM erro. O "Pulou N refeições" sumia calado do fim da fila.
+  const linhas = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({
+      id: `c${String(i).padStart(5, "0")}`,
+      user_id: `p${i % 12}`,
+      date: addDaysISO("2026-10-28", -(i % 30)),
+      meal_type: `Refeição ${i % 7}`,
+      status: i % 5 === 0 ? "skipped" : "done",
+    }));
+  const ids = Array.from({ length: 12 }, (_, i) => `p${i}`);
+
+  it("lê tudo em páginas, mesmo com o max-rows do projeto", async () => {
+    const banco = bancoEmMemoria({ meal_checks: linhas(2500) }, { maxRows: 1000 });
+    const r = await lerRespostasDoResumo(banco, ids, "2026-09-28", "2026-10-28");
+    expect(r.falhou).toBe(false);
+    expect(r.data).toHaveLength(2500);
+    expect(banco.chamadas.filter((c) => c.tabela === "meal_checks").length).toBeGreaterThan(1);
+  });
+
+  it("a página que falha é falha, não lista curta", async () => {
+    const banco = bancoEmMemoria({ meal_checks: linhas(2500) }, { falhar: (c, i) => c.tabela === "meal_checks" && i === 1 });
+    const r = await lerRespostasDoResumo(banco, ids, "2026-09-28", "2026-10-28");
+    expect(r.falhou).toBe(true);
+  });
+
+  it("só os pacientes e a janela pedidos", async () => {
+    const banco = bancoEmMemoria({ meal_checks: linhas(300) });
+    const r = await lerRespostasDoResumo(banco, ["p1"], "2026-10-20", "2026-10-28");
+    expect(r.data.length).toBeGreaterThan(0);
+    expect(r.data.every((x) => x.user_id === "p1" && x.date >= "2026-10-20" && x.date <= "2026-10-28")).toBe(true);
   });
 });

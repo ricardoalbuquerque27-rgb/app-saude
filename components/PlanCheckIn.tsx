@@ -46,6 +46,19 @@ const BOTAO =
   "tappable inline-flex min-h-[44px] items-center justify-center whitespace-nowrap rounded-[10px] text-sm font-semibold disabled:opacity-60";
 
 /**
+ * As classes do check-in, com nome, para a resposta das refeições
+ * (`BotoesDaRefeicao`) ter a mesma cara: o "Comi" sem resposta é o sólido, e
+ * o "Não comi" marcado, o aviso. Mudou aqui, muda lá.
+ */
+export const ESTILO_DO_CHECKIN = {
+  botao: BOTAO,
+  primario: SOLIDO,
+  secundario: SECUNDARIO,
+  aviso: AVISO,
+  confirmado: CONFIRMADO,
+};
+
+/**
  * Os botões do check-in de uma sessão, com a regra acima. `doNutri` é a sessão
  * prescrita pelo nutricionista com vínculo ativo (`prescribed_by` e o vínculo,
  * como em `montarParaHoje`): ela tem "Fui" e "Não fui". A do próprio paciente

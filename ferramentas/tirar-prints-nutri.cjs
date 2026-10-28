@@ -325,7 +325,7 @@ async function transbordo(page) {
   const ESPERADO = {
     carlos: { tem: ["Dose atrasada"], nao: ["mudança", "sem registrar", "Nunca registrou", "exame"] },
     beatriz: {
-      tem: ["2 mudanças na sua prescrição", "Faltou a 1 treino (7d)"],
+      tem: ["2 mudanças na sua prescrição", "Faltou a 1 treino (7d)", "Pulou 3 refeições do plano (7d)"],
       nao: ["Dose atrasada", "sem registrar", "Nunca registrou", "exame"],
     },
     joana: { tem: ["12 dias sem registrar", "1 exame fora da referência"], nao: ["Dose atrasada", "mudança"] },
@@ -336,6 +336,30 @@ async function transbordo(page) {
     const txt = await textoDe(fila(page));
     for (const t of e.tem) ok(txt.includes(t), `${k}: a fila diz "${t}"`, `fila: ${JSON.stringify(txt)}`);
     for (const t of e.nao) ok(!txt.includes(t), `${k}: a fila NÃO diz "${t}"`, `fila: ${JSON.stringify(txt)}`);
+    await page.close();
+  }
+  {
+    // Lembretes das refeições: o alerta leva à Alimentação, onde mora a semana
+    // por refeição, e cada casa diz por extenso o que o símbolo mostra.
+    const page = await abrir(pc, rota("beatriz"));
+    const ver = fila(page).getByRole("link", { name: "Ver alimentação", exact: true });
+    ok((await ver.count()) === 1, 'beatriz: o "Pulou 3 refeições" tem "Ver alimentação"');
+    if (await ver.count()) {
+      await ver.click();
+      await page.waitForURL((u) => u.searchParams.get("aba") === "alimentacao", { timeout: 60000 });
+      await page.waitForLoadState("networkidle");
+      ok(new URL(page.url()).searchParams.get("aba") === "alimentacao", "e abre a aba Alimentação");
+      // A aba chega por streaming (Suspense): espera o título antes de contar.
+      const titulo = page.getByRole("heading", { name: "Refeições da semana", exact: true });
+      await titulo.waitFor({ timeout: 60000 }).catch(() => {});
+      const bloco = page.locator("div", { has: titulo }).last();
+      ok((await titulo.count()) === 1, 'a Alimentação tem "Refeições da semana"');
+      const casas = await bloco.locator("td .sr-only").allInnerTexts();
+      ok(casas.length > 0 && casas.length % 7 === 0, `sete casas por refeição (${casas.length})`);
+      ok(casas.some((t) => /^[^,]+, (segunda|terça|quarta|quinta|sexta|sábado|domingo): não comeu$/.test(t)),
+        'e a casa do "não comi" diz "<Refeição>, <dia>: não comeu"', casas.slice(0, 8).join(" | "));
+      ok(casas.some((t) => /: comeu$/.test(t)), 'e há casa "comeu"');
+    }
     await page.close();
   }
   {

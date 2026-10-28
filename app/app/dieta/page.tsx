@@ -27,6 +27,7 @@ import { TextoDaSugestao } from "@/components/TextoDaSugestao";
 import { MEAL_TYPES, sugestaoDeProteina } from "@/lib/cardapio";
 import { rotuloDoDia } from "@/lib/consultas";
 import { papelDasCalorias, pesoMaisRecente } from "@/lib/nutri";
+import { dataDaDieta, type RespostaGravada } from "@/lib/refeicoesDoPlano";
 
 // A Dieta do paciente (spec do visual do app do paciente, "Dieta (paciente)"):
 // o cabeçalho com a navegação de dia, o resumo (anéis, macros e a sugestão de
@@ -39,8 +40,17 @@ import { papelDasCalorias, pesoMaisRecente } from "@/lib/nutri";
 
 type Plano = { nome: string; obs: string | null; itens: ItemCardapioPaciente[] };
 
-/** As refeições de UM dia. `date` diz de qual: a resposta de um dia que já não é o da tela não vale. */
-type DiaLido = { date: string; meals: Meal[]; falhou: boolean };
+/**
+ * As refeições e as respostas do plano ("comi" / "não comi") de UM dia. `date`
+ * diz de qual: a resposta de um dia que já não é o da tela não vale.
+ */
+type DiaLido = {
+  date: string;
+  meals: Meal[];
+  falhou: boolean;
+  respostas: RespostaGravada[];
+  respostasFalharam: boolean;
+};
 
 /** `cardapio` nulo sem `falhou` é "sem plano"; com `falhou`, é "não carregou". */
 type PlanoLido = { cardapio: Plano | null; falhou: boolean };
@@ -65,12 +75,13 @@ const kcal = (n: number) => Math.round(n).toLocaleString("pt-BR");
 
 export default function DietaPage() {
   const supabase = createClient();
-  const [date, setDate] = useState(todayISO());
+  const params = useSearchParams();
+  // A notificação de uma refeição abre a Dieta no dia dela (?data=), até hoje.
+  const [date, setDate] = useState(() => dataDaDieta(params.get("data"), todayISO()));
   const [dia, setDia] = useState<DiaLido | null>(null);
   const [plano, setPlano] = useState<PlanoLido | null>(null);
   const [contexto, setContexto] = useState<Contexto | null>(null);
   const [open, setOpen] = useState(false);
-  const params = useSearchParams();
   const [saving, setSaving] = useState(false);
 
   const [mealType, setMealType] = useState(MEAL_TYPES[0]);
@@ -94,7 +105,7 @@ export default function DietaPage() {
   const load = useCallback(async () => {
     const meu = ++pedido.current;
     const dataPedida = date;
-    const [mealsRes, planoRes] = await Promise.all([
+    const [mealsRes, planoRes, respostasRes] = await Promise.all([
       supabase
         .from("meals")
         .select("*")
@@ -109,6 +120,8 @@ export default function DietaPage() {
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
+      // As respostas do plano no dia (meal_checks), dos botões e da notificação.
+      supabase.from("meal_checks").select("meal_type, status, meal_id").eq("date", dataPedida),
     ]);
 
     let lido: PlanoLido;
@@ -135,7 +148,13 @@ export default function DietaPage() {
     }
 
     if (meu !== pedido.current) return;
-    setDia({ date: dataPedida, meals: (mealsRes.data ?? []) as Meal[], falhou: !!mealsRes.error });
+    setDia({
+      date: dataPedida,
+      meals: (mealsRes.data ?? []) as Meal[],
+      falhou: !!mealsRes.error,
+      respostas: (respostasRes.data ?? []) as RespostaGravada[],
+      respostasFalharam: !!respostasRes.error,
+    });
     setPlano(lido);
   }, [supabase, date]);
 
@@ -260,16 +279,18 @@ export default function DietaPage() {
   const meals = dia && dia.date === date ? dia.meals : [];
 
   // O plano chega depois do primeiro desenho. O link da Início aponta para
-  // #plano, e o navegador só rola até um id que já existe; sem isto o link
-  // chegava no topo da página. Uma vez só: depois de "Comi isso" a página
-  // recarrega e não pode puxar a pessoa de volta.
+  // #plano, e a notificação de uma refeição para #refeicao-<nome>; o navegador
+  // só rola até um id que já existe, e sem isto os dois chegavam no topo da
+  // página. Uma vez só: depois de "Comi isso" a página recarrega e não pode
+  // puxar a pessoa de volta.
   const planoNaTela = !carregando && !!plano?.cardapio && plano.cardapio.itens.length > 0;
   const jaRolouAoPlano = useRef(false);
   useEffect(() => {
     if (jaRolouAoPlano.current || !planoNaTela) return;
-    if (window.location.hash !== "#plano") return;
+    const ancora = window.location.hash;
+    if (ancora !== "#plano" && !/^#refeicao-[a-z0-9-]+$/.test(ancora)) return;
     jaRolouAoPlano.current = true;
-    document.getElementById("plano")?.scrollIntoView();
+    document.getElementById(ancora.slice(1))?.scrollIntoView();
   }, [planoNaTela]);
 
   function shiftDate(days: number) {
@@ -621,9 +642,10 @@ export default function DietaPage() {
                 observacao={plano.cardapio.obs}
                 itens={plano.cardapio.itens}
                 date={date}
-                jaRegistrados={meals.map((m) => m.meal_type)}
-                registradas={meals.map((m) => ({ meal_type: m.meal_type, description: m.description }))}
+                registradas={meals.map((m) => ({ id: m.id, meal_type: m.meal_type, description: m.description }))}
+                respostas={dia && dia.date === date ? dia.respostas : []}
                 refeicoesFalharam={!!dia?.falhou}
+                respostasFalharam={!!dia?.respostasFalharam}
                 onRegistrado={load}
                 nutriNome={contexto?.nutriNome || undefined}
                 linkPlano

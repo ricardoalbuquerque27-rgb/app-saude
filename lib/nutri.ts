@@ -1,6 +1,7 @@
 import { todayISO, addDaysISO, diasNaJanela, naJanela } from "@/lib/date";
 import { numeroBR } from "@/lib/numeros";
-import { computeAdherence } from "@/lib/planCheckIn";
+import { computeAdherence, weekDates } from "@/lib/planCheckIn";
+import { lerEmPaginas } from "@/lib/paginacao";
 import { alertasDeConsulta, COLUNAS_CONSULTA, type Consulta } from "@/lib/consultas";
 
 // Camada de dados do lado do nutricionista. Todas as consultas rodam com o
@@ -11,7 +12,7 @@ import { alertasDeConsulta, COLUNAS_CONSULTA, type Consulta } from "@/lib/consul
  * Tipo de cada alerta. A tela liga uma ação a cada um (abrir a dose, a
  * prescrição, a aba de treino...), então o tipo não pode ser lido do texto.
  */
-export type TipoAlerta = "dose" | "prescricao" | "parado" | "treino" | "exame" | "consulta";
+export type TipoAlerta = "dose" | "prescricao" | "parado" | "treino" | "exame" | "consulta" | "refeicao";
 
 export type Alerta = { tipo: TipoAlerta; nivel: number; texto: string };
 
@@ -39,6 +40,11 @@ export function textoSemConfirmacao(n: number): string {
   return `${n} ${n === 1 ? "treino" : "treinos"} sem confirmação (7d)`;
 }
 
+// O singular existe pela regra acima: a fila só alerta a partir de 3.
+export function textoRefeicoesPuladas(n: number): string {
+  return `Pulou ${n} ${n === 1 ? "refeição" : "refeições"} do plano (7d)`;
+}
+
 export function textoExames(n: number): string {
   return `${n} exame${n > 1 ? "s" : ""} fora da referência`;
 }
@@ -48,8 +54,8 @@ export type PatientSummary = {
   name: string;
   /**
    * Último dia com QUALQUER registro do paciente (refeição, treino, log
-   * diário, medida que ele lançou). A medida da consulta não conta: quem
-   * registrou foi o nutricionista.
+   * diário, medida que ele lançou, resposta "comi"/"não comi" a uma refeição do
+   * plano). A medida da consulta não conta: quem registrou foi o nutricionista.
    */
   lastActivity: string | null;
   /** Dias distintos com registro do paciente nos últimos 7 dias (0–7). */
@@ -70,6 +76,8 @@ export type PatientSummary = {
   planSemResposta7: number;
   /** Divergências abertas entre o prescrito e o que está valendo. */
   desvios: number;
+  /** "Não comi" a refeições do plano nos últimos 7 dias. */
+  refeicoesPuladas7: number;
   /** Motivos de atenção, já em texto pronto para exibir. */
   alerts: string[];
   /**
@@ -111,7 +119,7 @@ export async function getPatientsSummary(
 }
 
 /**
- * O resumo e se alguma consulta falhou. Faz 9 consultas no total,
+ * O resumo e se alguma consulta falhou. Faz 11 consultas no total,
  * independente da quantidade de pacientes (usa .in(user_id, ids)), mais 4
  * por paciente sem registro nos últimos 30 dias. A conta em si fica em
  * `montarResumos`.
@@ -139,7 +147,7 @@ export async function resumirPacientes(
 
   const [
     mealsRes, wkRes, logsRes, bodyRes, examsRes, treatRes, planRes, checksRes, desviosRes,
-    consultasRes,
+    consultasRes, respostasRes,
   ] = await Promise.all([
       supabase
         .from("meals")
@@ -202,11 +210,14 @@ export async function resumirPacientes(
         .select(COLUNAS_CONSULTA)
         .in("patient_id", ids)
         .in("status", ["pedido", "agendada"]),
+      // As respostas às refeições do plano ("comi" / "não comi"), dos 30 dias,
+      // com teto: contam como registro e dão o "Pulou N refeições do plano".
+      lerRespostasDoResumo(supabase, ids, d30, today).then((r) => ({ data: r.data, error: r.falhou ? "falhou" : null })),
     ]);
 
   const respostas = [
     mealsRes, wkRes, logsRes, bodyRes, examsRes, treatRes, planRes, checksRes, desviosRes,
-    consultasRes,
+    consultasRes, respostasRes,
   ];
   let falhou = respostas.some((r) => r.error);
   const dados: DadosResumo = {
@@ -220,6 +231,7 @@ export async function resumirPacientes(
     checks: checksRes.data ?? [],
     desvios: desviosRes.data ?? [],
     consultas: consultasRes.data ?? [],
+    respostas: respostasRes.data ?? [],
   };
   const resumos = montarResumos(dados, ids, names, today);
 
@@ -234,6 +246,37 @@ export async function resumirPacientes(
   return { resumos: montarResumos(dados, ids, names, today), falhou };
 }
 
+/** Quantas respostas o resumo aceita antes de desistir (~280 pacientes respondendo tudo). */
+export const TETO_DAS_RESPOSTAS = 50_000;
+
+/**
+ * As respostas às refeições do plano (meal_checks) de toda a carteira numa
+ * janela, em páginas (`lerEmPaginas`). Com seis refeições por dia, 30 dias de
+ * uns seis pacientes respondendo tudo passam de 1.000 linhas, e o PostgREST
+ * corta ali SEM erro: o "Pulou N refeições" sumia calado do fim da fila.
+ */
+export async function lerRespostasDoResumo(
+  supabase: any,
+  ids: string[],
+  desde: string,
+  ate: string
+): Promise<{ data: { user_id: string; date: string; status: string }[]; falhou: boolean }> {
+  return lerEmPaginas<{ user_id: string; date: string; status: string }>(
+    (de, fim, contar) =>
+      supabase
+        .from("meal_checks")
+        .select("user_id, date, status", contar ? { count: "exact" } : undefined)
+        .in("user_id", ids)
+        .gte("date", desde)
+        .lte("date", ate)
+        .order("user_id", { ascending: true })
+        .order("date", { ascending: true })
+        .order("id", { ascending: true })
+        .range(de, fim),
+    TETO_DAS_RESPOSTAS
+  );
+}
+
 /** Último dia com registro de cada paciente, sem limite de janela. */
 async function ultimosRegistros(
   supabase: any,
@@ -242,7 +285,7 @@ async function ultimosRegistros(
 ): Promise<{ datas: Record<string, string>; falhou: boolean }> {
   const datas: Record<string, string> = {};
   let falhou = false;
-  const tabelas = ["meals", "workouts", "daily_logs", "body_measurements"];
+  const tabelas = ["meals", "workouts", "daily_logs", "body_measurements", "meal_checks"];
   await Promise.all(
     ids.flatMap((id) =>
       tabelas.map(async (tabela) => {
@@ -287,6 +330,8 @@ export type DadosResumo = {
   desvios: any[];
   /** Pedidos e agendadas, para os alertas de consulta. */
   consultas?: Consulta[];
+  /** As respostas às refeições do plano (meal_checks), dos 30 dias. */
+  respostas?: { user_id: string; date: string; status: string }[];
   /**
    * Último dia com registro de quem não tem nenhum nos 30 dias que as
    * consultas trazem. Sem isto, quem parou há 45 dias virava "Nunca
@@ -328,8 +373,10 @@ export function montarResumos(
     // registrar" contados da consulta, e o alerta de parado sumia depois de
     // toda consulta. Para o peso ela continua valendo (pesoDe30Dias).
     const doPaciente = myBody.filter((b) => b.measured_by == null);
+    // A resposta "comi" / "não comi" também é registro do paciente.
+    const minhasRespostas = (dados.respostas ?? []).filter((r) => r.user_id === id);
     const activeDays = new Set<string>();
-    for (const r of [...myMeals, ...myWk, ...myLogs, ...doPaciente]) {
+    for (const r of [...myMeals, ...myWk, ...myLogs, ...doPaciente, ...minhasRespostas]) {
       if (r.date && r.date <= today) activeDays.add(r.date as string);
     }
     const sortedDays = Array.from(activeDays).sort();
@@ -395,6 +442,7 @@ export function montarResumos(
       planFaltas7: adesao.faltas,
       planSemResposta7: adesao.semResposta,
       desvios: desvios.filter((d) => d.patient_id === id).length,
+      refeicoesPuladas7: minhasRespostas.filter((r) => r.status === "skipped" && naJanela(r.date, today, 7)).length,
       alerts: [],
       alertas: [],
       gravidade: null,
@@ -423,6 +471,11 @@ export function montarResumos(
     if (summary.planFaltas7 > 0) alertar("treino", 4, textoFaltas(summary.planFaltas7));
     if (summary.planSemResposta7 >= 2)
       alertar("treino", 4, textoSemConfirmacao(summary.planSemResposta7));
+    // A partir de 3: com cinco ou seis refeições por dia, uma só na semana
+    // seria ruído. "Sem resposta" não alerta: quem não tem o app na Tela de
+    // Início do iPhone nem recebe a notificação.
+    if (summary.refeicoesPuladas7 >= 3)
+      alertar("refeicao", 4, textoRefeicoesPuladas(summary.refeicoesPuladas7));
     for (const a of deConsulta) if (a.nivel > 2) alertar(a.tipo, a.nivel, a.texto);
     if (summary.alteredExams > 0) alertar("exame", 5, textoExames(summary.alteredExams));
 
@@ -1225,4 +1278,64 @@ export async function getDesviosAbertos(
     .is("acknowledged_at", null)
     .order("created_at", { ascending: false });
   return { data: (data as Desvio[] | null) ?? [], error };
+}
+
+// ---------------------------------------------------------------------------
+// As refeições da semana (aba Alimentação): o "comi" / "não comi" de cada
+// refeição do plano, de segunda a domingo.
+
+export type EstadoDaCasa = "comeu" | "nao_comeu" | "sem_resposta" | "hoje" | "futuro";
+
+/**
+ * Uma linha por refeição do plano, na ordem de `tipos`, e os sete dias da
+ * semana de `hoje`. Hoje sem resposta não é "sem resposta": às 8h o jantar
+ * ainda não aconteceu (a regra do "hoje" da semana de treino). Dia que não
+ * chegou fica vazio, mesmo com resposta gravada (data futura não é refeição
+ * feita, como em lib/date.ts).
+ *
+ * `registradas` são as refeições do paciente na semana (data e tipo): a
+ * registrada à mão, sem resposta, é "comeu". Sem isso, quem registra tudo
+ * pelo formulário (o plano não oferece botão na refeição já registrada, e o
+ * lembrete não vai para ela) aparecia como "sem resposta" a semana inteira. A
+ * resposta vence o registro: o "não comi" diz mais que um registro antigo.
+ */
+export function semanaDasRefeicoes(
+  tipos: string[],
+  respostas: { date: string; meal_type: string; status: string }[],
+  hoje: string,
+  registradas: { date: string; meal_type: string }[] = []
+): { refeicao: string; dias: { data: string; estado: EstadoDaCasa }[] }[] {
+  const datas = weekDates(hoje);
+  return tipos.map((refeicao) => ({
+    refeicao,
+    dias: datas.map((data) => {
+      if (data > hoje) return { data, estado: "futuro" as const };
+      const r = respostas.find((x) => x.date === data && x.meal_type === refeicao);
+      const registrou = registradas.some((x) => x.date === data && x.meal_type === refeicao);
+      const estado: EstadoDaCasa =
+        r?.status === "done" || (!r && registrou)
+          ? "comeu"
+          : r?.status === "skipped"
+            ? "nao_comeu"
+            : data === hoje
+              ? "hoje"
+              : "sem_resposta";
+      return { data, estado };
+    }),
+  }));
+}
+
+const DIAS_DA_SEMANA = ["segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo"];
+const ESTADO_POR_EXTENSO: Record<EstadoDaCasa, string> = {
+  comeu: "comeu",
+  nao_comeu: "não comeu",
+  sem_resposta: "sem resposta",
+  hoje: "ainda sem resposta",
+  futuro: "ainda não chegou",
+};
+
+/** O texto da casa para o leitor de tela: "Almoço, terça: não comeu". */
+export function rotuloDaCasa(refeicao: string, data: string, estado: EstadoDaCasa): string {
+  const dia = DIAS_DA_SEMANA[(new Date(data + "T12:00:00").getDay() + 6) % 7];
+  return `${refeicao}, ${dia}: ${ESTADO_POR_EXTENSO[estado]}`;
 }

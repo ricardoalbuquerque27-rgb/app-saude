@@ -5,6 +5,18 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { todayISO } from "@/lib/date";
+import { idDaRefeicao } from "@/lib/lembretesDasRefeicoes";
+import {
+  ERRO_AO_MARCAR,
+  estadoDaRefeicao,
+  marcarRefeicao,
+  podeMarcar,
+  type EstadoDaRefeicao,
+  type RespostaDaRefeicao,
+  type RespostaGravada,
+} from "@/lib/refeicoesDoPlano";
+import BotoesDaRefeicao from "@/components/BotoesDaRefeicao";
 
 export type ItemCardapioPaciente = {
   id: string;
@@ -20,17 +32,20 @@ export type ItemCardapioPaciente = {
 // O cardápio prescrito, do lado do paciente, num cartão só (spec do visual do
 // app do paciente, "Dieta (paciente)"): o título e de quem é o plano, a
 // observação e, por fim, as refeições, cada uma com as opções em linhas
-// separadas por traço, sem uma caixa por opção. O ganho principal é o botão
-// "Comi isso": em vez de digitar a refeição, ele confirma o que já foi
-// prescrito e vira um registro normal em `meals`.
+// separadas por traço, sem uma caixa por opção. O ganho principal é a
+// resposta de cada refeição ("Comi", "Não comi", o "Comi isso" de cada opção):
+// em vez de digitar a refeição, ela confirma o que já foi prescrito, vira um
+// registro normal em `meals` e grava a resposta em meal_checks, a mesma da
+// notificação dos lembretes (`marcarRefeicao`, uma regra para os dois).
 export default function MealPlanView({
   nome,
   observacao,
   itens,
   date,
-  jaRegistrados,
   registradas,
+  respostas = [],
   refeicoesFalharam = false,
+  respostasFalharam = false,
   onRegistrado,
   nutriNome,
   linkPlano = false,
@@ -39,23 +54,25 @@ export default function MealPlanView({
   observacao: string | null;
   itens: ItemCardapioPaciente[];
   date: string;
-  /** meal_type das refeições já registradas no dia, para marcar "· feito". */
-  jaRegistrados: string[];
   /**
-   * Tipo e descrição das refeições registradas no dia. Com elas, a opção que
-   * foi de fato registrada ("Comi isso" grava a descrição do item) diz "comi"
-   * no lugar do botão; as outras opções da mesma refeição seguem com o botão.
-   * Sem elas (Meu plano só lê os tipos), só o "· feito" da refeição aparece.
+   * As refeições registradas no dia. O "comi" vem da resposta; a descrição só
+   * diz qual opção foi (a refeição que o "Comi" gravou tem a descrição da
+   * opção) e serve também às refeições de antes das respostas, que só casam
+   * pela descrição.
    */
-  registradas?: { meal_type: string; description: string }[];
+  registradas: { id: string; meal_type: string; description: string }[];
+  /** As respostas do dia (meal_checks). */
+  respostas?: RespostaGravada[];
   /**
-   * A leitura das refeições do dia falhou. `jaRegistrados` e `registradas`
-   * chegam vazios por falta de dado, e não porque nada foi registrado: sem
-   * "· feito", sem "comi" e, principalmente, sem "Comi isso" (quem já
-   * registrou seria convidado a registrar de novo, e o dia e a adesão do
-   * paciente contariam em dobro). O plano segue legível, com uma linha de aviso.
+   * A leitura das refeições do dia falhou. `registradas` chega vazia por falta
+   * de dado, e não porque nada foi registrado: sem "· feito", sem "comi" e,
+   * principalmente, sem botão (quem já registrou seria convidado a registrar de
+   * novo, e o dia e a adesão do paciente contariam em dobro). O plano segue
+   * legível, com uma linha de aviso.
    */
   refeicoesFalharam?: boolean;
+  /** A leitura das respostas falhou: pelo mesmo motivo, nenhum botão. */
+  respostasFalharam?: boolean;
   /** Quando ausente, recarrega a rota — serve o dashboard, que é servidor. */
   onRegistrado?: () => void;
   /** Primeiro nome do nutricionista, para "de Ricardo, seu nutricionista". */
@@ -66,35 +83,32 @@ export default function MealPlanView({
 }) {
   const supabase = createClient();
   const router = useRouter();
-  const [busy, setBusy] = useState<string | null>(null);
-  const [erro, setErro] = useState<string | null>(null);
+  // Qual refeição grava, com qual resposta e qual opção: o giro vai no botão tocado.
+  const [busy, setBusy] = useState<{ tipo: string; resposta: RespostaDaRefeicao; itemId: string | null } | null>(null);
+  const [erroEm, setErroEm] = useState<{ tipo: string; texto: string } | null>(null);
 
   const tipos = Array.from(new Set(itens.map((i) => i.meal_type)));
-  const comidas = new Set((registradas ?? []).map((r) => `${r.meal_type}\u0000${r.description.trim()}`));
+  const semEstado = refeicoesFalharam || respostasFalharam;
+  // Uma notificação velha não grava num dia de que a pessoa já não lembra
+  // (marcarRefeicao recusa); a tela nem oferece.
+  const dentroDaJanela = podeMarcar(date, todayISO());
+  const comBotoes = !semEstado && dentroDaJanela;
 
-  async function comiIsso(item: ItemCardapioPaciente) {
-    setBusy(item.id);
-    setErro(null);
+  async function marcar(tipo: string, resposta: RespostaDaRefeicao, itemId: string | null = null) {
+    setBusy({ tipo, resposta, itemId });
+    setErroEm(null);
     const {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) {
       setBusy(null);
+      setErroEm({ tipo, texto: ERRO_AO_MARCAR });
       return;
     }
-    const { error } = await supabase.from("meals").insert({
-      user_id: user.id,
-      date,
-      meal_type: item.meal_type,
-      description: item.description,
-      calories: item.calories,
-      protein_g: item.protein_g,
-      carbs_g: item.carbs_g,
-      fat_g: item.fat_g,
-    });
+    const r = await marcarRefeicao(supabase, user.id, { data: date, refeicao: tipo, resposta, itemId });
     setBusy(null);
-    if (error) {
-      setErro("Não foi possível registrar. Tente de novo.");
+    if (!r.ok) {
+      setErroEm({ tipo, texto: r.erro || ERRO_AO_MARCAR });
       return;
     }
     if (onRegistrado) onRegistrado();
@@ -143,15 +157,33 @@ export default function MealPlanView({
             Não deu para carregar as refeições do dia, então o plano não mostra o que já foi registrado.
           </p>
         )}
+        {!refeicoesFalharam && respostasFalharam && (
+          <p className="px-4 py-3 text-[15px] text-app-atencao">Não deu para carregar as respostas das refeições.</p>
+        )}
+        {!semEstado && !dentroDaJanela && (
+          <p className="px-4 py-3 text-[15px] text-app-texto-2">Dá para marcar o plano só nos últimos 7 dias.</p>
+        )}
 
         {tipos.map((tipo) => {
           const opcoes = itens
             .filter((i) => i.meal_type === tipo)
             .sort((a, b) => a.position - b.position);
-          const feito = !refeicoesFalharam && jaRegistrados.includes(tipo);
+          const estado: EstadoDaRefeicao | null = semEstado
+            ? null
+            : estadoDaRefeicao({
+                opcoes,
+                resposta: respostas.find((r) => r.meal_type === tipo) ?? null,
+                registradas: registradas.filter((r) => r.meal_type === tipo),
+              });
+          const feito = estado?.tipo === "registrada" || estado?.tipo === "comi";
+          const comiEm = estado && (estado.tipo === "registrada" || estado.tipo === "comi") ? estado.opcaoId : null;
+          const ocupadoAqui = busy?.tipo === tipo ? busy.resposta : null;
 
           return (
-            <div key={tipo}>
+            // O id é o destino da notificação dos lembretes
+            // (/app/dieta?data=…#refeicao-almoco); o scroll-mt deixa o
+            // bloco abaixo da barra de cima do celular, que é fixa.
+            <div key={tipo} id={idDaRefeicao(tipo)} className="scroll-mt-20">
               <h3 className="px-4 pb-1 pt-3.5 text-[15px] font-semibold text-app-texto">
                 {tipo}
                 {feito && (
@@ -161,10 +193,12 @@ export default function MealPlanView({
                   </>
                 )}
               </h3>
+              {comBotoes && estado?.tipo === "qual_opcao" && (
+                <p className="px-4 pb-1 text-[13px] text-app-texto-2">Qual opção?</p>
+              )}
 
               <ul className="divide-y divide-app-linha">
                 {opcoes.map((o, i) => {
-                  const comi = !refeicoesFalharam && comidas.has(`${o.meal_type}\u0000${o.description.trim()}`);
                   // "opção 1" só quando há mais de uma; os números são dado.
                   const meta = [
                     opcoes.length > 1 ? `opção ${i + 1}` : null,
@@ -173,6 +207,15 @@ export default function MealPlanView({
                   ]
                     .filter(Boolean)
                     .join(" · ");
+                  const rotulo =
+                    !comBotoes || !estado
+                      ? null
+                      : estado.tipo === "qual_opcao"
+                        ? "Foi esta"
+                        : estado.tipo === "sem_resposta" && opcoes.length > 1
+                          ? "Comi isso"
+                          : null;
+                  const girando = busy?.tipo === tipo && busy.itemId === o.id;
 
                   return (
                     <li key={o.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
@@ -180,39 +223,44 @@ export default function MealPlanView({
                         <span className="whitespace-pre-wrap text-[15px] text-app-texto">{o.description}</span>
                         {meta && <span className="tabular text-[13px] text-app-texto-2">{meta}</span>}
                       </div>
-                      {refeicoesFalharam ? null : comi ? (
+                      {comiEm === o.id ? (
                         <span className="inline-flex shrink-0 items-center gap-1 text-[13px] font-semibold text-app-primaria">
                           <Check aria-hidden="true" className="h-4 w-4" />
                           comi
                         </span>
-                      ) : (
+                      ) : rotulo ? (
                         // Secundário de 40 px, como na maquete; o ::after
                         // estende a área de toque a 44 px sem engordar o
                         // botão. O -3px é contado a partir da borda interna:
                         // com a borda de 1 px, -2px dava só 42 px de toque.
                         <button
-                          onClick={() => comiIsso(o)}
-                          disabled={busy === o.id}
+                          onClick={() => marcar(tipo, "comi", o.id)}
+                          disabled={busy !== null}
                           className="btn-ghost relative shrink-0 px-3 after:absolute after:inset-x-0 after:-inset-y-[3px] after:content-['']"
                         >
-                          {busy === o.id && <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />}
-                          Comi isso
+                          {girando && <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />}
+                          {rotulo}
                         </button>
-                      )}
+                      ) : null}
                     </li>
                   );
                 })}
               </ul>
+
+              {comBotoes && estado && (
+                <BotoesDaRefeicao
+                  estado={estado}
+                  umaOpcao={opcoes.length === 1}
+                  ocupado={ocupadoAqui && busy?.itemId == null ? ocupadoAqui : null}
+                  erro={erroEm?.tipo === tipo ? erroEm.texto : null}
+                  onMarcar={(resposta) => marcar(tipo, resposta)}
+                />
+              )}
             </div>
           );
         })}
       </div>
 
-      {erro && (
-        <p role="alert" className="border-t border-app-linha px-4 py-3 text-[15px] text-app-perigo">
-          {erro}
-        </p>
-      )}
     </section>
   );
 }

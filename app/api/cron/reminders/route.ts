@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { sendPush } from "@/lib/webpush";
+import { pushConfigurado } from "@/lib/vapidPublicKey";
+import { notificacaoDaRefeicao } from "@/lib/lembretesDasRefeicoes";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Endpoint chamado pelo agendador (Vercel Cron). Envia os lembretes que estão
-// no horário de cada usuário. Protegido pelo CRON_SECRET.
+// Endpoint chamado pelo agendador (o pacefit-reminders, no pg_cron do
+// Supabase, a cada 15 minutos). Envia os lembretes que estão no horário de
+// cada usuário: o diário, o da caneta e os das refeições. Protegido pelo
+// CRON_SECRET.
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret) {
@@ -18,6 +22,9 @@ export async function GET(request: Request) {
   }
   if (!process.env.VAPID_PRIVATE_KEY) {
     return NextResponse.json({ error: "VAPID_PRIVATE_KEY ausente." }, { status: 503 });
+  }
+  if (!pushConfigurado()) {
+    return NextResponse.json({ error: "NEXT_PUBLIC_VAPID_PUBLIC_KEY ausente." }, { status: 503 });
   }
 
   const supabase = createClient(
@@ -96,9 +103,31 @@ export async function GET(request: Request) {
     );
   }
 
+  // Os lembretes das refeições ("Almoço: você comeu?"), um por refeição do
+  // cardápio, no horário de cada paciente. A função marca o que devolve como
+  // enviado. O erro dela não derruba os lembretes acima (antes da migração
+  // 20261027120000 ela nem existe) e volta na resposta, para quem olha o log.
+  const { data: refeicoesDue, error: erroRefeicoes } = await supabase.rpc("refeicoes_devidas", {
+    p_secret: secret,
+  });
+  const refeicoes = (refeicoesDue ?? []) as {
+    user_id: string;
+    data: string;
+    refeicao: string;
+    itens: { description: string }[];
+    endpoint: string;
+    p256dh: string;
+    auth: string;
+  }[];
+  for (const r of refeicoes) {
+    await deliver({ endpoint: r.endpoint, p256dh: r.p256dh, auth: r.auth }, notificacaoDaRefeicao(r));
+  }
+
   return NextResponse.json({
     due: rows.length,
     dose: doseRows.length,
+    refeicoes: erroRefeicoes ? null : refeicoes.length,
+    ...(erroRefeicoes ? { erroRefeicoes: erroRefeicoes.message } : {}),
     sent,
     pruned,
   });

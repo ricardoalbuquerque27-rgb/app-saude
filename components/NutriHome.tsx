@@ -11,6 +11,7 @@ import {
   CalendarClock,
   ClipboardList,
   Dumbbell,
+  Utensils,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { EmptyState } from "@/components/ui";
@@ -39,6 +40,7 @@ const ICONE: Record<TipoAlerta, typeof Syringe> = {
   treino: Dumbbell,
   exame: FileText,
   consulta: CalendarClock,
+  refeicao: Utensils,
 };
 
 function PatientRow({ s }: { s: PatientSummary }) {

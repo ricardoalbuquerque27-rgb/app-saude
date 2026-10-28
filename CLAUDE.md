@@ -78,11 +78,20 @@ Isso não é óbvio lendo a árvore de arquivos.
   `sugestaoDeProteina`, `partesDaSugestao` e `textoDaSugestao`; `lib/anel.ts`,
   `rotuloDoAnel` e `avisoDoAnel`; `lib/healthScore.ts`, `computeHealthScore`,
   com `semRegistro` e `topPilar`; `lib/agua.ts`, `adicionarAgua`, contra um
-  banco falso no próprio arquivo)
+  banco falso no próprio arquivo; `refeicoesQueFaltam`, em `lib/paraHoje.ts`),
+  os lembretes das refeições (veja "Lembretes das refeições":
+  `lib/lembretesDasRefeicoes.ts`, os horários, o texto da notificação e a
+  situação do Perfil; `lib/refeicoesDoPlano.ts`, `marcarRefeicao` contra o
+  `bancoEmMemoria`, `estadoDaRefeicao`, `lerPedido`, `podeMarcar` e
+  `dataDaDieta`; `lib/destinoDoLogin.ts`, o `?volta=` do login;
+  `lib/chaveDePush.ts` e `lib/vapidPublicKey.ts`, a chave de push;
+  `tiposDoCardapio`, em `lib/cardapio.ts`)
   e, em `lib/nutri.ts`, a conta do resumo, da fila de triagem e da linha do
   tempo do nutri (`montarResumos`, `filaDeTriagem`, `montarLinhaDoTempo`),
   os textos da fila (`textoDesvios`, `textoParado`, `textoFaltas`,
-  `textoSemConfirmacao`, `textoExames`, `TEXTO_DOSE_ATRASADA`),
+  `textoSemConfirmacao`, `textoExames`, `textoRefeicoesPuladas`,
+  `TEXTO_DOSE_ATRASADA`), a semana por refeição da aba Alimentação
+  (`semanaDasRefeicoes`, `rotuloDaCasa`),
   as médias da semana e a comparação com a meta (`mediasDaSemana`,
   `compararComMeta`), os textos de meta e de desvio (`textoDaMeta`,
   `textoDoDesvio`, `textoDoDesvioDoPlano`), a divisão dos avisos entre meta
@@ -93,7 +102,8 @@ Isso não é óbvio lendo a árvore de arquivos.
   (`papelDasCalorias`). As
   consultas ao banco não têm teste (nem
   `lib/perfil.ts`, que é só uma consulta), menos as que rodam contra um
-  Supabase em memória: as leituras do resumo, da linha do tempo e da série
+  Supabase em memória: as leituras do resumo (as respostas das refeições em
+  páginas, `lerRespostasDoResumo`), da linha do tempo e da série
   em `lib/nutri.test.ts`, o "antes" das medidas em `lib/registroDb.test.ts`,
   as leituras em páginas do Corpo e dos exames em `lib/evolucaoDb.test.ts`
   e `lib/examesDb.test.ts`, e as de Treinos (`lerTreinos`) em
@@ -365,6 +375,117 @@ adivinhado. O "Observar no retorno" ali é o do registro concluído da
 (`ultimoObservarPorPaciente`): quem preenche hoje o registro de uma consulta
 antiga faria a instrução velha passar por atual.
 
+## Lembretes das refeições
+
+Spec: `docs/superpowers/specs/2026-10-27-lembretes-das-refeicoes-design.md`
+(o exemplo de como chega, `…/exemplo-notificacoes.png`). **Está montado e
+desligado**: sem `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, o push não existe no app
+(`pushConfigurado()`), os dois blocos do Perfil dizem que os lembretes chegam
+em breve e nada se inscreve. Ligar é o "Para ligar", abaixo.
+
+No horário de cada refeição do cardápio, o paciente com os lembretes ligados,
+vínculo ativo e cardápio recebe "Almoço: você comeu?", com "Comi" e "Não comi"
+(o Android mostra os botões; o iPhone, só com o app na Tela de Início, não
+mostra botão em app web, e o texto começa com "Toque para marcar."). A
+resposta mora em `meal_checks`, uma por refeição e por dia (`done`/`skipped`;
+nenhuma linha é sem resposta), com `meal_id` apontando para a refeição que o
+"Comi" gravou. A migração é `20261027120000_lembretes_das_refeicoes.sql`,
+testada por `supabase/testes/lembretes.sql`.
+
+- **Uma regra para a resposta**, `marcarRefeicao` (`lib/refeicoesDoPlano.ts`):
+  os botões do plano (Dieta e Meu plano, `BotoesDaRefeicao` com as classes do
+  check-in, `ESTILO_DO_CHECKIN`) a chamam direto; o botão da notificação chama
+  `POST /api/refeicoes/marcar` (só JSON, com o cookie), que chama a mesma. A
+  notificação leva de quem é (`usuario`, o `user_id` do envio) e a rota recusa
+  com 403 a de outra conta: no aparelho em que outra pessoa entrou depois, o
+  "Comi" gravaria o almoço de quem estiver logado. "Comi"
+  com uma opção grava a refeição da opção e a resposta ligada; com várias, só a
+  resposta, e o plano pergunta "Qual opção?" ("Foi esta"). **A refeição antiga
+  sai antes da resposta nova**: se a segunda escrita falha, tentar de novo chega
+  ao mesmo fim, sem refeição órfã. "Comi" numa refeição já registrada à mão não
+  lança de novo, e a refeição registrada sem resposta não oferece botão. Só de
+  hoje até 6 dias atrás. **Excluir a refeição desfaz a resposta ligada**
+  (`on delete cascade`): com `set null`, o plano perguntaria "Qual opção?" a
+  quem acabou de apagar o que registrou.
+- **O envio**: o agendador `pacefit-reminders` (pg_cron, de 15 em 15) chama
+  `/api/cron/reminders`, que depois do lembrete diário e do da caneta chama
+  `refeicoes_devidas` (`SECURITY DEFINER`, protegida pelo `cron_secret`). A
+  conta é `refeicoes_devidas_em(p_agora)`, que só o dono executa: existe para o
+  teste passar a hora (a ceia das 23:30 e a meia-noite). Até 1 hora depois do
+  horário, uma vez por dia (`meal_reminders_sent`, sem política, 7 dias), e
+  nada para quem já respondeu, já registrou a refeição ou não tem inscrição. Os
+  horários sugeridos estão na migração e em `HORARIOS_SUGERIDOS`: mudou um, mude
+  o outro (um teste confere).
+- **O service worker** (`public/sw.js`, `pacefit-v5`) só escolhe o corpo
+  (`Notification.maxActions`), chama a rota e, com o app aberto, põe a janela na
+  frente e manda o endereço por recado (`postMessage`), que o `AppShell` segue:
+  o `client.navigate` pode não existir no iPhone. O recado sai mesmo se o
+  `focus()` recusar (o WebKit pode recusar, e o app ficaria na tela em que
+  estava). Na mesma página, o `AppShell` troca o endereço (`replaceState`) e
+  recarrega (a Dieta lê o `?data=` só ao montar); **não** `location.assign`, que
+  com o mesmo endereço, ou só outra âncora, só pula para a âncora, e quem tinha
+  mudado o dia pela seta (que não mexe no endereço) ficava no dia da seta. O
+  texto da falha ("Não deu para marcar sua resposta…") viaja pronto na
+  notificação. O `sw.js` roda num `vm` do Node em `lib/serviceWorker.test.ts`
+  (o corpo escolhido, o recado, o pedido do botão e a falha); a notificação de
+  verdade não aparece no navegador de teste: quem confere é o passo 5 de "Para
+  ligar".
+- **O login volta para a refeição**: sem sessão, o middleware leva a
+  `/login?volta=<caminho>` (sem o `_rsc`), e o login vai ao `volta` com a âncora
+  que o navegador trouxe; só caminho do app (`destinoDoLogin`).
+- **Desligar um lembrete não cancela a inscrição de push.** O `PwaSettings`
+  cancelava e apagava a inscrição ao desligar o lembrete diário, o que matava o
+  da caneta e mataria os das refeições. A chave de cada lembrete é a coluna
+  dele no perfil; um teste acusa `.unsubscribe(` nos dois blocos. E o
+  `ensurePushSubscription` refaz a inscrição que o navegador tenha com outra
+  chave.
+- **A nutricionista** vê "Pulou N refeições do plano (7d)" na fila (tipo
+  `refeicao`, nível 4, a partir de 3 "não comi"; "sem resposta" não alerta),
+  com "Ver alimentação", e a semana por refeição na aba Alimentação
+  (`semanaDasRefeicoes`), em que a refeição registrada à mão, sem resposta,
+  conta como "comeu" (a resposta vence): sem isso, quem registra pelo
+  formulário aparecia "sem resposta" na semana toda. A resposta conta como
+  registro do paciente (dias com registro, parado), e o resumo lê as respostas
+  de 30 dias em páginas (`lerRespostasDoResumo`): sete pacientes respondendo
+  cinco refeições por dia passam de 1.000, e o PostgREST cortava sem erro (o
+  paciente que ficava de fora perdia o alerta). A Início do paciente conta a refeição respondida como feita; sem as
+  respostas, o "Para hoje" diz que não carregou tudo, e o "Seu dia" fica (as
+  respostas não entram nos anéis nem no Score).
+
+**Para ligar** (nesta ordem; ligar faz chegar também o lembrete diário e o da
+caneta a quem os tiver ligado):
+
+1. Aplicar a migração `20261027120000_lembretes_das_refeicoes.sql` no SQL
+   Editor do Supabase. **Antes do merge**, que dispara o deploy da Vercel: sem
+   a tabela, os botões do plano dizem que não carregaram as respostas, e o
+   "Para hoje" da Início, que não carregou tudo, para todos. Antes de aplicar,
+   em produção e só lendo: o dono (`pg_class.relowner`) de `meals`,
+   `meal_plans`, `meal_plan_items`, `push_subscriptions`, `patient_links` e
+   `profiles` é o papel que aplica a migração, e `relforcerowsecurity` é falso
+   nelas; senão a RLS barra a conta de `refeicoes_devidas_em`, que roda como o
+   dono, e ninguém recebe nada, sem erro (a réplica local roda como
+   superusuário e não pega). Depois de aplicar, dão falso
+   `has_function_privilege('anon', 'public.refeicoes_devidas_em(timestamp)', 'execute')`,
+   o mesmo com `authenticated`, e
+   `has_table_privilege('authenticated', 'public.meal_reminders_sent', 'select')`.
+2. Fazer o merge (o deploy). Ainda desligado.
+3. Gerar as chaves: `npx web-push generate-vapid-keys`. Na Vercel:
+   `NEXT_PUBLIC_VAPID_PUBLIC_KEY` (a pública), `VAPID_PRIVATE_KEY` (a privada) e
+   `CRON_SECRET` (um texto longo qualquer). O mesmo segredo no banco:
+   `insert into public.app_config (key, value) values ('cron_secret', '<o mesmo CRON_SECRET>') on conflict (key) do update set value = excluded.value;`.
+   Um deploy novo: a chave pública entra no build.
+4. Conferir no SQL Editor que o `pacefit-reminders` chama
+   `https://app-saude-silk.vercel.app/api/cron/reminders` com
+   `Authorization: Bearer <CRON_SECRET>`
+   (`select schedule, active, command from cron.job where jobname = 'pacefit-reminders';`).
+   O comando tem o segredo: quem confere é o dono.
+5. Testar num Android e num iPhone (com o app na Tela de Início): ligar no
+   Perfil, usar o "Testar agora" do lembrete diário, esperar uma refeição. Em
+   cada um, tocar na notificação com o app fechado e com o app aberto em outra
+   tela, e conferir que abre na refeição; no Android, os dois botões; no
+   iPhone, o "Toque para marcar." no texto; e, com a sessão vencida, o login
+   voltando à refeição.
+
 ## Visual do app (paciente)
 
 Spec: `docs/superpowers/specs/2026-10-14-visual-do-app-do-paciente-design.md`.
@@ -523,7 +644,8 @@ ponto. O que ficou de fora está em "Em aberto".
 "Não fui" no aviso (`app-atencao`). Todos com 44 px. Antes eram três regras:
 o mesmo "Fui" sólido queria dizer "sem resposta" na Início e "respondido" em
 Treinos, e o "Não fui" marcado era âmbar num lado e rosa sólido no outro.
-Nenhuma classe de botão do check-in fica fora desse arquivo. Prescrito é
+Nenhuma classe de botão do check-in fica fora desse arquivo: a resposta das
+refeições (`BotoesDaRefeicao`) usa as mesmas pelo `ESTILO_DO_CHECKIN`. Prescrito é
 `prescribed_by` **com vínculo ativo** (`montarParaHoje`; Treinos e a leitura
 do treino leem `patient_links`, e com essa leitura falhando vale o
 `prescribed_by`): só ele tem "Não fui"; o treino próprio tem só "Fiz", em toda
@@ -692,7 +814,7 @@ acordo"); a regra em si é maior que a guarda.
 
 ```bash
 npm run dev      # desenvolvimento
-npm test         # 1195 testes unitários (vitest)
+npm test         # 1296 testes unitários (vitest)
 ferramentas/testar-sql.sh   # migrações e testes SQL num Postgres local
 npm run build    # produção
 ```
@@ -703,7 +825,8 @@ logadas num ambiente sem acesso ao banco. Para a página do paciente do
 nutricionista, o mock com `CENARIO=carteira` e
 `ferramentas/tirar-prints-nutri.cjs`. Para o app do paciente, o mock sem
 cenário e `tirar-prints.cjs`, `conferir-inicio.cjs`, `conferir-dieta.cjs`,
-`conferir-consulta-paciente.cjs` e `conferir-treinos.cjs`. Para a página de
+`conferir-consulta-paciente.cjs`, `conferir-treinos.cjs` e
+`conferir-refeicoes.cjs` (os lembretes das refeições). Para a página de
 entrada e a tela de entrar, `conferir-entrada.cjs`, sem login nem cenário.
 Esses processos se param e se esperam pelo PID, nunca por `pkill -f` nem
 `until ! pgrep -f` (o laço casa consigo mesmo e não termina): veja o LEIAME.
@@ -812,7 +935,32 @@ Modal fora do lugar: procure um `transform` num ancestral.
 - **Nenhum nutricionista real usou o produto.** É a maior incerteza, e
   nenhuma ferramenta resolve. A página do paciente foi aprovada pelo dono do
   produto, não por um nutricionista.
-- Sem Web Push (falta VAPID) e sem cobrança.
+- Sem cobrança. O Web Push está montado e desligado (falta VAPID): veja "Para
+  ligar", em "Lembretes das refeições".
+- **A notificação das refeições nunca foi vista num celular de verdade.** O
+  navegador de teste não mostra notificação: os botões, o corpo escolhido pelo
+  celular e o toque com o app aberto ou fechado só se conferem no passo 5 de
+  "Para ligar". No iPhone, só chega com o app na Tela de Início, e quem não
+  instala aparece como "sem resposta" para a nutricionista.
+- **Sair da conta não esquece o aparelho.** A inscrição de push fica em
+  `push_subscriptions` com a conta de quem a fez, e o "Sair" não a apaga: num
+  aparelho compartilhado (o tablet da família), depois de sair, as
+  notificações dela seguem chegando, com o cardápio no texto (o mesmo vale para
+  o lembrete diário e o da caneta, desde antes). O "Comi" de outra conta já não
+  grava (a rota dá 403), mas o texto aparece. Apagar a inscrição no "Sair"
+  tem custo: quem sai e entra de novo no próprio celular para de receber, com
+  a chave do Perfil ainda ligada, até ligar de novo. **Decidir antes do passo
+  3 de "Para ligar".**
+- **Também antes do passo 3:** o `/api/cron/reminders` manda em série e
+  depois de marcar como enviado (os sugeridos juntam todo mundo às 12:30, e um
+  estouro de tempo da função perde lembretes já marcados), e o erro do
+  `due_reminders` devolve 500 cedo e derruba os das refeições; e a frase de
+  falha do `sw.js` vai inteira no título, que o Android corta numa linha.
+- **"Comi" por reflexo.** Um toque é barato também para responder sem pensar: a
+  "Refeições da semana" mostra o padrão, não a verdade de cada refeição.
+- **Cinco ou seis lembretes por dia podem cansar.** A chave do Perfil desliga
+  as refeições sem desligar o resto; se o piloto mostrar abandono, a próxima
+  versão escolhe as refeições.
 - Conta de teste (`Maria Souza (teste)`) e a rota `/estilo` precisam sair
   antes de usuários reais.
 - **Sem proteção contra senhas vazadas.** É só do plano Pro do Supabase e está
@@ -882,11 +1030,11 @@ Modal fora do lugar: procure um `transform` num ancestral.
   É o `roleRow` do começo de `DashboardPage`, em `app/app/page.tsx`: vem nulo e
   a página segue como se fosse paciente; falta conferir o `error` e mostrar a
   falha.
-- **O "comi" do plano casa por descrição.** `MealPlanView` marca a opção como
-  "comi" quando há uma refeição do mesmo tipo com o mesmo texto; se a descrição
-  é editada, ou o nutricionista troca a opção, a marca some e o "Comi isso"
-  volta (nunca aparece "comi" sem ter comido). Só fica robusto com um
-  `meal_plan_item_id` em `meals`, que pede migração.
+- **Qual opção foi ainda sai da descrição.** O "comi" vem da resposta
+  (`meal_checks`), mas qual opção foi é a de mesma descrição que a refeição
+  ligada (e, nas refeições de antes das respostas, a de qualquer refeição do
+  tipo). Se o nutricionista edita a opção, a refeição continua "comi", só sem
+  dizer qual. Só fica exato com um `meal_plan_item_id`, que pede migração.
 - **Em Treinos, "Iniciar treino" e o "Fui" sólido ficam um sobre o outro** na
   sessão com rotina, em todo dia que já chegou e ainda sem resposta (no
   celular e nas três colunas do computador). A regra do check-in vale igual

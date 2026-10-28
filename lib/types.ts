@@ -318,6 +318,41 @@ export type Database = {
         };
         Relationships: [];
       };
+      // A resposta "comi" / "não comi" de uma refeição do cardápio (migração
+      // 20261027120000_lembretes_das_refeicoes).
+      meal_checks: {
+        Row: {
+          created_at: string;
+          date: string;
+          id: string;
+          meal_id: string | null;
+          meal_type: string;
+          status: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          date: string;
+          id?: string;
+          meal_id?: string | null;
+          meal_type: string;
+          status: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          date?: string;
+          id?: string;
+          meal_id?: string | null;
+          meal_type?: string;
+          status?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       meals: {
         Row: {
           calories: number | null;
@@ -370,6 +405,8 @@ export type Database = {
           updated_at: string;
           weight_goal_kg: number | null;
           reminder_enabled: boolean;
+          meal_reminders_enabled: boolean;
+          meal_reminder_times: Json;
           reminder_time: string | null;
           reminder_tz_offset: number;
           last_reminded_on: string | null;
@@ -391,6 +428,8 @@ export type Database = {
           updated_at?: string;
           weight_goal_kg?: number | null;
           reminder_enabled?: boolean;
+          meal_reminders_enabled?: boolean;
+          meal_reminder_times?: Json;
           reminder_time?: string | null;
           reminder_tz_offset?: number;
           last_reminded_on?: string | null;
@@ -412,6 +451,8 @@ export type Database = {
           updated_at?: string;
           weight_goal_kg?: number | null;
           reminder_enabled?: boolean;
+          meal_reminders_enabled?: boolean;
+          meal_reminder_times?: Json;
           reminder_time?: string | null;
           reminder_tz_offset?: number;
           last_reminded_on?: string | null;
