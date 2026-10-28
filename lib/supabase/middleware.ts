@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { destinoDoLogin, voltaDoPedido } from "@/lib/destinoDoLogin";
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -36,16 +37,19 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname === "/app" ||
     request.nextUrl.pathname.startsWith("/app/");
 
+  // Sem sessão, o /login guarda para onde a pessoa ia (`?volta=`): o toque na
+  // notificação de uma refeição terminava na Início depois de entrar. A âncora
+  // (#refeicao-…) o navegador leva sozinho no redirecionamento.
   if (!user && isProtected) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
+    const url = new URL("/login", request.url);
+    url.searchParams.set("volta", voltaDoPedido(request.nextUrl.pathname, request.nextUrl.search));
     return NextResponse.redirect(url);
   }
 
   if (user && isAuthRoute) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/app";
-    return NextResponse.redirect(url);
+    const destino =
+      request.nextUrl.pathname === "/login" ? destinoDoLogin(request.nextUrl.searchParams.get("volta")) : "/app";
+    return NextResponse.redirect(new URL(destino, request.url));
   }
 
   return supabaseResponse;

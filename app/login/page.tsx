@@ -21,6 +21,7 @@ import {
   problemaDaSenha,
 } from "@/lib/senha";
 import { NOME } from "@/lib/marca";
+import { destinoDoLogin } from "@/lib/destinoDoLogin";
 
 // O painel fala com os dois lados de quem entra: a nutricionista, que paga, e o
 // paciente que ela convidou. Os destaques antigos (Modo Caneta, IA, foto do
@@ -128,7 +129,12 @@ export default function LoginPage() {
         // assim que um login de paciente caiu no painel do nutricionista.
         // Trocar de conta tem que descartar tudo que foi renderizado para a
         // conta antiga, e só um carregamento completo garante isso.
-        window.location.assign("/app");
+        // O destino é o `?volta=` do middleware (a refeição da notificação,
+        // com a âncora que o navegador trouxe no redirecionamento), só se for
+        // um caminho do app; senão, a Início.
+        window.location.assign(
+          destinoDoLogin(new URLSearchParams(window.location.search).get("volta"), window.location.hash)
+        );
       }
     } catch (err: any) {
       setError(traduzErro(err));

@@ -156,6 +156,32 @@ const contexto = (b) =>
     }, { escrita: true });
   });
 
+  await etapa("login", async () => {
+    // Sem sessão, a refeição da notificação passa pelo login e volta, com a âncora.
+    const ontem = somaDias(hoje, -1);
+    const c = await contexto(b);
+    const q = await c.newPage();
+    q.setDefaultTimeout(90000);
+    await q.goto(`${APP}/app/dieta?data=${ontem}#refeicao-almoco`, { waitUntil: "networkidle", timeout: 120000 });
+    const noLogin = new URL(q.url());
+    ok(noLogin.pathname === "/login" && noLogin.searchParams.get("volta") === `/app/dieta?data=${ontem}`,
+      "sem sessão, vai ao /login com o volta da refeição", q.url());
+    await q.waitForTimeout(1200);
+    await q.fill('input[type="email"]', "maria.teste@exemplo.com");
+    await q.fill('input[type="password"]', "senha-de-mentira");
+    await q.click('button[type="submit"]');
+    await q.waitForURL("**/app/dieta**", { timeout: 60000 });
+    const depois = new URL(q.url());
+    ok(depois.pathname === "/app/dieta" && depois.searchParams.get("data") === ontem && depois.hash === "#refeicao-almoco",
+      "depois de entrar, volta à refeição com a data e a âncora", q.url());
+    // Já com sessão, o /login com volta vai direto, e o volta de fora do app não.
+    await q.goto(`${APP}/login?volta=${encodeURIComponent("/app/nutricionista?aba=cardapio")}`, { waitUntil: "networkidle", timeout: 120000 });
+    ok(new URL(q.url()).pathname === "/app/nutricionista", "com sessão, o /login com volta vai ao volta", q.url());
+    await q.goto(`${APP}/login?volta=${encodeURIComponent("https://outro.site/app")}`, { waitUntil: "networkidle", timeout: 120000 });
+    ok(new URL(q.url()).origin === new URL(APP).origin && new URL(q.url()).pathname === "/app", "volta de fora do app vai à Início", q.url());
+    await c.close();
+  });
+
   await b.close();
   await reset();
   const falhas = resultados.filter((r) => !r).length;
