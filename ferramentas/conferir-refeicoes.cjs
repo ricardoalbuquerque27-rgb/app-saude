@@ -196,6 +196,9 @@ const contexto = (b) =>
     let u = new URL(p.url());
     ok(u.pathname === "/app/dieta" && u.searchParams.get("data") === ontem && u.hash === "#refeicao-almoco",
       "da Início, o recado leva à refeição", p.url());
+    await p.locator("#plano").waitFor({ timeout: 60000 });
+    ok((await p.getByRole("button", { name: `${rotuloDoDia(ontem, hoje)}, escolher outra data` }).count()) === 1,
+      "e a Dieta abre no dia da refeição");
 
     // Já na Dieta, outro dia: a página recarrega (o marcador posto em window some).
     await p.waitForTimeout(800);
@@ -206,6 +209,9 @@ const contexto = (b) =>
     u = new URL(p.url());
     ok(u.searchParams.get("data") === anteontem && u.hash === "#refeicao-jantar", "na Dieta, o recado troca o dia", p.url());
     ok((await p.evaluate(() => window.__marcador)) === undefined, "e a página recarregou");
+    await p.locator("#plano").waitFor({ timeout: 60000 });
+    ok((await p.getByRole("button", { name: `${rotuloDoDia(anteontem, hoje)}, escolher outra data` }).count()) === 1,
+      "e a Dieta mostra o outro dia");
 
     // Recado de fora do app, ou de outro tipo, não sai da página.
     const antes = p.url();
@@ -230,6 +236,128 @@ const contexto = (b) =>
     const lateral = await p.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     ok(lateral <= 0, "sem rolagem lateral em 390 px", `${lateral} px a mais`);
     await p.screenshot({ path: `${OUT}/perfil-390.png`, fullPage: true });
+  });
+
+  await etapa("botoes", async () => {
+    await reset();
+    const abrir = async (rota) => {
+      await p.goto(APP + rota, { waitUntil: "networkidle", timeout: 120000 });
+      await p.locator("#plano").waitFor({ timeout: 60000 });
+      await p.waitForTimeout(900);
+    };
+    const bloco = (slug) => p.locator(`#refeicao-${slug}`);
+    const botao = (slug, nome) => bloco(slug).getByRole("button", { name: nome, exact: true });
+    const respostaDe = async (tipo) => (await tabela("meal_checks")).find((c) => c.date === hoje && c.meal_type === tipo);
+    const registradas = p.locator('section[aria-labelledby="refeicoes-registradas"]');
+    const atencao = await (async () => {
+      await abrir("/app/dieta");
+      return p.evaluate(() => {
+        const e = document.createElement("span");
+        e.style.color = "var(--app-atencao)";
+        document.body.appendChild(e);
+        const c = getComputedStyle(e).color;
+        e.remove();
+        return c;
+      });
+    })();
+
+    // Sem resposta: uma opção tem Comi e Não comi; várias, Comi isso e Não comi.
+    ok((await botao("almoco", "Comi").count()) === 1 && (await botao("almoco", "Não comi").count()) === 1,
+      "Almoço (uma opção): Comi e Não comi");
+    ok((await botao("cafe-da-manha", "Comi isso").count()) === 2 && (await botao("cafe-da-manha", "Não comi").count()) === 1,
+      "Café da manhã (duas opções): Comi isso em cada opção e Não comi");
+    const alturas = await bloco("almoco").getByRole("button").evaluateAll((l) => l.map((e) => Math.round(e.getBoundingClientRect().height)));
+    ok(alturas.length === 2 && alturas.every((h) => h >= 44), `Comi e Não comi com 44 px (${alturas.join(", ")})`);
+    const solido = await botao("almoco", "Comi").evaluate((e) => getComputedStyle(e).backgroundColor);
+    const secundario = await botao("almoco", "Não comi").evaluate((e) => getComputedStyle(e).backgroundColor);
+    ok(solido !== secundario, "o Comi é sólido e o Não comi, secundário", `${solido} / ${secundario}`);
+
+    // Comi → a opção diz "comi", com Desfazer, e a refeição entra na lista.
+    await botao("almoco", "Comi").click();
+    await botao("almoco", "Desfazer").waitFor({ timeout: 15000 });
+    ok((await bloco("almoco").getByText("comi", { exact: true }).count()) === 1, 'Comi: a opção diz "comi"');
+    ok((await registradas.getByText(/Almoço/).count()) >= 1, "e o almoço entra em Refeições registradas");
+    let r = await respostaDe("Almoço");
+    ok(r && r.status === "done" && r.meal_id, "e a resposta é done, ligada à refeição", JSON.stringify(r));
+
+    // Desfazer → volta, e a refeição sai.
+    await botao("almoco", "Desfazer").click();
+    await botao("almoco", "Comi").waitFor({ timeout: 15000 });
+    ok(!(await respostaDe("Almoço")), "Desfazer apaga a resposta");
+    ok((await registradas.getByText(/Almoço/).count()) === 0, "e a refeição sai da lista");
+
+    // Não comi → marcado no aviso, e o Comi fica secundário para trocar.
+    await botao("almoco", "Não comi").click();
+    await p.waitForFunction(() => document.querySelector('#refeicao-almoco button[aria-pressed="true"]'), null, { timeout: 15000 });
+    // A cor do botão tem transição: lida no instante da troca, ainda é a de antes.
+    await p.waitForTimeout(600);
+    const marcado = bloco("almoco").locator('button[aria-pressed="true"]');
+    ok((await marcado.innerText()).includes("Não comi"), "Não comi fica marcado");
+    const corMarcado = await marcado.evaluate((e) => getComputedStyle(e).color);
+    ok(corMarcado === atencao, "em app-atencao", `${corMarcado} / ${atencao}`);
+    ok((await botao("almoco", "Comi").count()) === 1, "e o Comi fica para trocar");
+    r = await respostaDe("Almoço");
+    ok(r && r.status === "skipped" && !r.meal_id, "a resposta é skipped, sem refeição", JSON.stringify(r));
+
+    // "Comi" pela notificação no café (duas opções): Qual opção?
+    await marcar({ data: hoje, refeicao: "Café da manhã", resposta: "comi" });
+    await abrir("/app/dieta");
+    ok((await bloco("cafe-da-manha").getByText("Qual opção?", { exact: true }).count()) === 1, "comi sem a opção: Qual opção?");
+    ok((await botao("cafe-da-manha", "Foi esta").count()) === 2 && (await botao("cafe-da-manha", "Desfazer").count()) === 1,
+      "com Foi esta nas duas opções e Desfazer");
+    await botao("cafe-da-manha", "Foi esta").nth(1).click();
+    await bloco("cafe-da-manha").getByText("comi", { exact: true }).waitFor({ timeout: 15000 });
+    const linhas = bloco("cafe-da-manha").locator("ul > li");
+    ok((await linhas.nth(1).getByText("comi", { exact: true }).count()) === 1 && (await linhas.nth(0).getByText("comi", { exact: true }).count()) === 0,
+      "Foi esta na segunda: ela diz comi, e a primeira não");
+    ok((await bloco("cafe-da-manha").getByText("Qual opção?").count()) === 0, "e o Qual opção? sai");
+
+    // Gravação que falha: o aviso embaixo dos botões da refeição.
+    await comFalha("meal_checks", async () => {
+      await abrir("/app/dieta");
+      await botao("jantar", "Não comi").click();
+      const aviso = bloco("jantar").getByText("Não foi possível salvar. Tente de novo.", { exact: true });
+      ok(await aviso.waitFor({ timeout: 15000 }).then(() => true, () => false), "gravação que falha: o aviso no Jantar");
+    }, { escrita: true });
+
+    // Leitura das respostas que falha: nenhum botão, e a frase.
+    await comFalha("meal_checks", async () => {
+      await abrir("/app/dieta");
+      ok((await p.locator("#plano").getByRole("button", { name: /^(Comi|Não comi|Comi isso|Foi esta|Desfazer)$/ }).count()) === 0,
+        "leitura das respostas falhando: nenhum botão no plano");
+      ok((await p.getByText("Não deu para carregar as respostas das refeições.", { exact: true }).count()) === 1, "e a frase");
+    });
+
+    // ?data=: ontem abre em ontem; amanhã, em hoje; 10 dias atrás, sem botão.
+    const ontem = somaDias(hoje, -1);
+    await abrir(`/app/dieta?data=${ontem}`);
+    ok((await p.getByRole("button", { name: `${rotuloDoDia(ontem, hoje)}, escolher outra data` }).count()) === 1, "?data= de ontem abre em ontem");
+    await abrir(`/app/dieta?data=${somaDias(hoje, 1)}`);
+    ok((await p.getByRole("button", { name: `${rotuloDoDia(hoje, hoje)}, escolher outra data` }).count()) === 1, "?data= de amanhã abre em hoje");
+    await abrir(`/app/dieta?data=${somaDias(hoje, -10)}`);
+    ok((await p.locator("#plano").getByRole("button", { name: /^(Comi|Não comi|Comi isso|Foi esta|Desfazer)$/ }).count()) === 0
+      && (await p.getByText("Dá para marcar o plano só nos últimos 7 dias.", { exact: true }).count()) === 1,
+      "10 dias atrás: o plano sem botão, e a frase");
+
+    // A âncora: rola até o Jantar.
+    await abrir(`/app/dieta?data=${hoje}#refeicao-jantar`);
+    await p.waitForTimeout(800);
+    const topo = await bloco("jantar").evaluate((e) => e.getBoundingClientRect().top);
+    const rolou = await p.evaluate(() => window.scrollY);
+    ok(rolou > 0 && topo >= 40 && topo < 600, `#refeicao-jantar rola até o Jantar (rolou ${Math.round(rolou)} px; topo em ${Math.round(topo)} px)`);
+    const lateral = await p.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    ok(lateral <= 0, "sem rolagem lateral em 390 px", `${lateral} px a mais`);
+    await p.screenshot({ path: `${OUT}/dieta-botoes-390.png`, fullPage: true });
+
+    // Meu plano: os mesmos botões.
+    await reset();
+    await abrir("/app/nutricionista?aba=cardapio");
+    ok((await botao("almoco", "Comi").count()) === 1 && (await botao("almoco", "Não comi").count()) === 1, "Meu plano: Comi e Não comi no Almoço");
+    await botao("almoco", "Comi").click();
+    await bloco("almoco").getByText("comi", { exact: true }).waitFor({ timeout: 15000 }).catch(() => {});
+    ok((await bloco("almoco").getByText("comi", { exact: true }).count()) === 1, 'e o Comi vira "comi"');
+    await p.screenshot({ path: `${OUT}/meu-plano-390.png`, fullPage: true });
+    await reset();
   });
 
   await b.close();

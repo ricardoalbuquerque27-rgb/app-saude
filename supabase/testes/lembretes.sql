@@ -148,11 +148,12 @@ do $$ begin
 exception when unique_violation then raise notice 'ok: uma resposta por refeição e por dia';
 end $$;
 
--- Apagar a refeição ligada não apaga a resposta: ela fica sem a refeição.
+-- Excluir a refeição ligada desfaz a resposta; a resposta sem refeição fica.
 delete from public.meals where id = :'m1';
 select teste.esperar(
-  (select status = 'done' and meal_id is null from public.meal_checks where id = :'ck1'),
-  'apagar a refeição deixa a resposta com meal_id nulo');
+  (select count(*) from public.meal_checks where id = :'ck1') = 0
+    and (select count(*) from public.meal_checks where user_id = :'p1') = 1,
+  'excluir a refeição apaga a resposta ligada a ela, e só ela');
 
 do $$ begin
   perform count(*) from public.meal_reminders_sent;
@@ -175,7 +176,7 @@ reset role;
 select set_config('request.jwt.claims', json_build_object('sub', :'n1', 'role', 'authenticated')::text, true) \gset x
 set local role authenticated;
 select teste.esperar(
-  (select count(*) from public.meal_checks where user_id = :'p1') = 2,
+  (select count(*) from public.meal_checks where user_id = :'p1') = 1,
   'a nutri com vínculo ativo lê as respostas do paciente');
 select teste.esperar(
   (select count(*) from public.meal_checks where user_id = :'p3') = 0,

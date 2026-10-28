@@ -9,7 +9,8 @@
 --   meal_checks          a resposta, uma por refeição e por dia. "done" é comi,
 --                        "skipped" é não comi, e nenhuma linha é sem resposta
 --                        (como plan_completions, no treino). meal_id é a
---                        refeição que o "Comi" gravou em meals, quando gravou.
+--                        refeição que o "Comi" gravou em meals, quando gravou;
+--                        excluída a refeição, a resposta sai junto.
 --   profiles             os lembretes ligados e só os horários que o paciente
 --                        mudou ({"Almoço": "13:00"}); o resto vale o sugerido.
 --   meal_reminders_sent  o que já foi enviado, para ninguém receber duas
@@ -34,8 +35,10 @@ create table public.meal_checks (
   -- também tem lembrete quando o paciente escolhe um horário.
   meal_type text not null check (char_length(trim(meal_type)) between 1 and 200),
   status text not null check (status in ('done', 'skipped')),
-  -- A refeição some e a resposta fica ("comi", sem dizer qual opção).
-  meal_id uuid references public.meals(id) on delete set null,
+  -- Excluir a refeição desfaz a resposta ligada a ela: quem apaga da lista
+  -- da Dieta o almoço que o "Comi" gravou não está mais dizendo que comeu
+  -- (com set null, o plano perguntaria "Qual opção?").
+  meal_id uuid references public.meals(id) on delete cascade,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (user_id, date, meal_type),

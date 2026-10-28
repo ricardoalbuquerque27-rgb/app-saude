@@ -1341,7 +1341,7 @@ const sessao = (id) => ({
  *    `on_conflict=user_id,date,meal_type`) e DELETE (o "Desfazer"): a resposta
  *    da refeição, só de quem pede, e com a refeição ligada (`meal_id`) sendo
  *    dela, como a RLS da migração 20261027120000; senão 403. Apagar a refeição
- *    ligada deixa a resposta com `meal_id` nulo (o `on delete set null`).
+ *    ligada apaga a resposta junto (o `on delete cascade`).
  *  Nas escritas de insert, só linha de quem pede (a RLS `user_id = auth.uid()`),
  *  senão 403.
  */
@@ -1457,8 +1457,8 @@ function escrever(tabela, metodo, params, corpo, quem, prefer) {
     // apagar, a refeição da própria pessoa.
     const visiveis = aplicaFiltros(T.meals, params).filter((l) => l.user_id === quem);
     T.meals = T.meals.filter((l) => !visiveis.includes(l));
-    // meal_checks.meal_id tem `on delete set null`.
-    for (const c of T.meal_checks || []) if (visiveis.some((m) => m.id === c.meal_id)) c.meal_id = null;
+    // meal_checks.meal_id tem `on delete cascade`: a resposta ligada sai junto.
+    T.meal_checks = (T.meal_checks || []).filter((c) => !visiveis.some((m) => m.id === c.meal_id));
     if (representacao) return { status: 200, dados: visiveis, cabecalhos: contagem(visiveis.length) };
     return { status: 204, dados: null, cabecalhos: contagem(visiveis.length) };
   }
