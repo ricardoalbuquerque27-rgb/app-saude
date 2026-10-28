@@ -178,3 +178,16 @@ describe("situacaoDosLembretes", () => {
     expect(situacaoDosLembretes(base)).toBe("pronto");
   });
 });
+
+describe("as telas dos lembretes", () => {
+  // A inscrição de push serve a todos os lembretes (o diário, o da caneta e
+  // os das refeições). Desligar um deles e cancelar a inscrição desligava os
+  // outros calado: a chave de cada lembrete é a coluna dele no perfil.
+  it("desligar um lembrete não cancela a inscrição de push", () => {
+    for (const arquivo of ["components/PwaSettings.tsx", "components/LembretesDasRefeicoes.tsx"]) {
+      const fonte = readFileSync(arquivo, "utf8");
+      expect(fonte, arquivo).not.toContain(".unsubscribe(");
+      expect(fonte, arquivo).not.toMatch(/from\("push_subscriptions"\)\s*\.delete/);
+    }
+  });
+});

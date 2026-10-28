@@ -215,6 +215,23 @@ const contexto = (b) =>
     ok(p.url() === antes, "recado de fora do app, ou de outro tipo, não sai da página", p.url());
   });
 
+  await etapa("perfil", async () => {
+    // O dev do mock sobe sem NEXT_PUBLIC_VAPID_PUBLIC_KEY: o push desligado no
+    // app inteiro, e os dois blocos dizem que os lembretes chegam em breve.
+    await p.goto(APP + "/app/perfil", { waitUntil: "networkidle", timeout: 120000 });
+    const bloco = p.locator("section", { has: p.getByRole("heading", { name: "Lembretes das refeições" }) });
+    await bloco.waitFor({ timeout: 60000 });
+    ok(await bloco.getByText("Os lembretes das refeições chegam em breve.", { exact: true }).isVisible(),
+      "o bloco das refeições diz que chegam em breve");
+    ok((await bloco.getByRole("switch").count()) === 0 && (await bloco.locator('input[type="time"]').count()) === 0,
+      "sem chave nem horário no bloco das refeições");
+    ok(await p.getByText("Os lembretes chegam em breve.", { exact: true }).isVisible(), "o lembrete diário também");
+    ok((await p.getByRole("switch", { name: "Lembrete diário" }).count()) === 0, "sem a chave do lembrete diário");
+    const lateral = await p.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    ok(lateral <= 0, "sem rolagem lateral em 390 px", `${lateral} px a mais`);
+    await p.screenshot({ path: `${OUT}/perfil-390.png`, fullPage: true });
+  });
+
   await b.close();
   await reset();
   const falhas = resultados.filter((r) => !r).length;

@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { Profile } from "@/lib/types";
 import { PageHeader, Field } from "@/components/ui";
 import PwaSettings from "@/components/PwaSettings";
+import LembretesDasRefeicoes from "@/components/LembretesDasRefeicoes";
 import { meuPerfil } from "@/lib/perfil";
 import { todayISO } from "@/lib/date";
 
@@ -56,6 +57,10 @@ export default function PerfilPage() {
   const [birthDate, setBirthDate] = useState("");
   const [sex, setSex] = useState("");
   const [role, setRole] = useState("patient");
+  // O papel como está gravado, e não o do seletor do formulário: os lembretes
+  // das refeições são só do paciente, e não podem aparecer e sumir enquanto a
+  // pessoa mexe no seletor antes de salvar.
+  const [papelGravado, setPapelGravado] = useState<string | null>(null);
   const [crn, setCrn] = useState("");
   const [weightGoal, setWeightGoal] = useState("");
   const [waterGoal, setWaterGoal] = useState("");
@@ -87,6 +92,7 @@ export default function PerfilPage() {
       setBirthDate(p.birth_date ?? "");
       setSex(p.sex ?? "");
       setRole(p.role ?? "patient");
+      setPapelGravado(p.role ?? "patient");
       setCrn(p.crn ?? "");
       setWeightGoal(p.weight_goal_kg?.toString() ?? "");
       setWaterGoal(p.daily_water_goal_ml?.toString() ?? "");
@@ -380,6 +386,8 @@ export default function PerfilPage() {
       </form>
 
       <PwaSettings />
+
+      {!loading && papelGravado === "patient" && <LembretesDasRefeicoes />}
 
       <button
         onClick={signOut}
